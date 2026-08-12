@@ -1,0 +1,132 @@
+flowchart TB
+  %% Ferio diagram 1 of 3: customer purchase and tracking
+
+  subgraph LEGEND["Status legend"]
+    direction LR
+    L1["Implemented"]:::done
+    L2["Partial"]:::partial
+    L3["Planned"]:::planned
+    L4["Blocked"]:::blocked
+    L5["External"]:::external
+  end
+
+  CUSTOMER(["Customer"])
+  PAYMENT_PROVIDER(["Prepaid payment provider"]):::external
+
+  subgraph DISCOVERY["1. Acquisition and discovery"]
+    direction TB
+    TRAFFIC["Social, search, referral, direct, QR, or campaign link"]:::partial
+    ATTRIBUTION["Capture source, medium, and campaign"]:::done
+    HOME["Home and merchandising"]:::done
+    SEARCH["Browse categories, search, filter, and sort"]:::done
+    FOUND{"Products found?"}:::decision
+    SEARCH_RECOVERY["Clear filters, browse categories, or search again"]:::done
+    PRODUCT["Product detail: media, price, variants, stock, delivery, returns"]:::done
+    AVAILABLE{"Published variant available?"}:::decision
+    UNAVAILABLE["Unavailable state and recovery products"]:::done
+  end
+
+  CUSTOMER --> TRAFFIC --> ATTRIBUTION --> HOME --> SEARCH --> FOUND
+  FOUND -- "No" --> SEARCH_RECOVERY --> SEARCH
+  FOUND -- "Yes" --> PRODUCT --> AVAILABLE
+  AVAILABLE -- "No" --> UNAVAILABLE --> SEARCH
+
+  subgraph CART_CHECKOUT["2. Cart and guest checkout"]
+    direction TB
+    ADD_CART["Add valid variant and quantity"]:::done
+    CART["Persistent guest cart"]:::done
+    REVALIDATE["Revalidate publication, price, quantity, and stock"]:::done
+    CART_VALID{"Cart valid?"}:::decision
+    FIX_CART["Explain changed lines; update or remove them"]:::done
+    CHECKOUT["Start guest checkout"]:::done
+    IDENTITY["Name, Bangladesh phone, optional email"]:::done
+    ADDRESS["District, area, detailed address, optional landmark"]:::done
+    MAP["Optional map location"]:::planned
+    CONSENT["Required terms and separate optional marketing consent"]:::done
+    DELIVERY["Supported delivery zone, fee, and free-delivery rule"]:::done
+    COUPON["Deterministic coupon and promotion validation"]:::planned
+    PREVIEW["Server recalculates items, discounts, fees, charges, and total"]:::done
+    PREVIEW_VALID{"Checkout still valid?"}:::decision
+    CHECKOUT_RECOVERY["Preserve input and show actionable correction"]:::done
+    PAYMENT_METHOD{"Payment method"}:::decision
+  end
+
+  AVAILABLE -- "Yes" --> ADD_CART --> CART --> REVALIDATE --> CART_VALID
+  CART_VALID -- "No" --> FIX_CART --> REVALIDATE
+  CART_VALID -- "Yes" --> CHECKOUT --> IDENTITY --> ADDRESS --> CONSENT --> DELIVERY --> PREVIEW
+  ADDRESS -. "If approved" .-> MAP
+  DELIVERY -. "When enabled" .-> COUPON --> PREVIEW
+  PREVIEW --> PREVIEW_VALID
+  PREVIEW_VALID -- "No" --> CHECKOUT_RECOVERY --> REVALIDATE
+  PREVIEW_VALID -- "Yes" --> PAYMENT_METHOD
+
+  subgraph COD["3A. Cash on delivery"]
+    direction TB
+    CREATE_COD["Create one immutable order using idempotency key"]:::done
+    SNAPSHOT["Link customer; snapshot address and order items"]:::done
+    COD_POLICY{"COD verification required?"}:::decision
+    COD_PENDING["Order PENDING_CONFIRMATION\nPayment UNPAID\nFulfillment UNFULFILLED"]:::done
+    COD_VERIFY["Call, OTP, or approved verification method"]:::partial
+    VERIFIED{"Customer and address verified?"}:::decision
+    COD_CONFIRM["Confirm order and reserve stock atomically"]:::done
+    COD_CANCEL["Cancel with reason and release reservation"]:::done
+    COD_AUTO["Auto-confirm by policy and reserve stock"]:::done
+  end
+
+  PAYMENT_METHOD -- "COD" --> CREATE_COD --> SNAPSHOT --> COD_POLICY
+  COD_POLICY -- "Yes" --> COD_PENDING --> COD_VERIFY --> VERIFIED
+  VERIFIED -- "Yes" --> COD_CONFIRM
+  VERIFIED -- "No" --> COD_CANCEL
+  COD_POLICY -- "No" --> COD_AUTO
+
+  subgraph PREPAID["3B. Prepaid payment"]
+    direction TB
+    PREPAID_BLOCK["Payment provider and launch requirement need approval"]:::blocked
+    PREPAID_ORDER["Create order with independent pending order and payment states"]:::planned
+    ATTEMPT["Create separate payment attempt and provider reference"]:::planned
+    PROVIDER_UI["Redirect or present provider UI"]:::planned
+    CALLBACK["Authenticate and idempotently process callback"]:::planned
+    VERIFY_PAYMENT{"Amount, currency, order, and state valid?"}:::decision
+    PAID["Payment PAID; confirm order using reservation policy"]:::planned
+    FAILED["Payment FAILED or EXPIRED; do not confirm"]:::planned
+    RETRY["Safe retry with new attempt and same order"]:::planned
+  end
+
+  PAYMENT_METHOD -- "Prepaid" --> PREPAID_BLOCK --> PREPAID_ORDER --> ATTEMPT --> PROVIDER_UI --> PAYMENT_PROVIDER
+  PAYMENT_PROVIDER --> CALLBACK --> VERIFY_PAYMENT
+  VERIFY_PAYMENT -- "Yes" --> PAID
+  VERIFY_PAYMENT -- "No or uncertain" --> FAILED --> RETRY --> ATTEMPT
+
+  subgraph CONFIRMATION_TRACKING["4. Confirmation and secure tracking"]
+    direction TB
+    CONFIRMATION["Order confirmation with human-readable reference"]:::done
+    TRACK_ENTRY["Open Track order from navigation or confirmation"]:::done
+    TRACK_INPUT["Enter order reference and checkout phone"]:::done
+    TRACK_MATCH{"Verification matches?"}:::decision
+    TRACK_DENIED["Generic failure; expose no order data"]:::done
+    TRACK_TIMELINE["Customer-safe order and accepted courier timeline"]:::done
+    STATUS_LANGUAGE["Normalized customer language; no provider codes or raw payloads"]:::done
+    SUPPORT["Policy, support, return, or post-purchase action"]:::planned
+  end
+
+  COD_PENDING --> CONFIRMATION
+  COD_CONFIRM --> CONFIRMATION
+  COD_AUTO --> CONFIRMATION
+  PAID --> CONFIRMATION
+  CONFIRMATION --> TRACK_ENTRY
+  CUSTOMER --> TRACK_ENTRY --> TRACK_INPUT --> TRACK_MATCH
+  TRACK_MATCH -- "No" --> TRACK_DENIED
+  TRACK_MATCH -- "Yes" --> TRACK_TIMELINE --> STATUS_LANGUAGE --> SUPPORT
+
+  HANDOFF_OPERATIONS[["Handoff to diagram 02\nConfirmed order → fulfillment and delivery"]]:::handoff
+  COD_CONFIRM --> HANDOFF_OPERATIONS
+  COD_AUTO --> HANDOFF_OPERATIONS
+  PAID --> HANDOFF_OPERATIONS
+
+  classDef done fill:#111114,color:#fff,stroke:#111114;
+  classDef partial fill:#f2f2f2,color:#111114,stroke:#777;
+  classDef planned fill:#fff,color:#55555c,stroke:#b9b9bd,stroke-dasharray:5 4;
+  classDef blocked fill:#fff4e5,color:#7a4b00,stroke:#c88719,stroke-dasharray:4 3;
+  classDef external fill:#f5f2ff,color:#33205f,stroke:#7c5cff;
+  classDef decision fill:#fff,color:#111114,stroke:#111114,stroke-width:1.5px;
+  classDef handoff fill:#eef6ff,color:#12385f,stroke:#4c88c7,stroke-width:1.5px;

@@ -1,0 +1,124 @@
+export type CatalogCategory = {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  isActive: boolean;
+  sortOrder: number;
+  parentId: string | null;
+  _count: { products: number };
+};
+
+export type InventoryBreakdown = {
+  warehouseId: string;
+  warehouseCode: string;
+  warehouseName: string;
+  onHand: number;
+  reserved: number;
+  damaged: number;
+  incoming: number;
+  available: number;
+  lowStockThreshold: number;
+};
+
+export type CatalogVariant = {
+  id: string;
+  name: string;
+  sku: string;
+  attributes: Record<string, string> | null;
+  price: number;
+  compareAtPrice: number | null;
+  availableStock: number;
+  isActive: boolean;
+  sortOrder: number;
+  weightGrams: number | null;
+  inventory: InventoryBreakdown[];
+};
+
+export type CatalogMedia = {
+  id: string;
+  url: string;
+  altText: string | null;
+  type: "IMAGE" | "VIDEO";
+  sortOrder: number;
+};
+
+export type CatalogProduct = {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  brand: string | null;
+  status: "DRAFT" | "ACTIVE" | "ARCHIVED";
+  isFeatured: boolean;
+  codAvailable: boolean;
+  deliveryNote: string | null;
+  returnNote: string | null;
+  seoTitle: string | null;
+  seoDescription: string | null;
+  category: CatalogCategory;
+  price: number;
+  compareAtPrice: number | null;
+  availableStock: number;
+  variants: CatalogVariant[];
+  media: CatalogMedia[];
+  image: string | null;
+};
+
+export type ProductPage = {
+  items: CatalogProduct[];
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+};
+
+export type InventoryRow = {
+  id: string;
+  variantId: string;
+  sku: string;
+  variantName: string;
+  product: {
+    id: string;
+    name: string;
+    slug: string;
+    status: "DRAFT" | "ACTIVE" | "ARCHIVED";
+  };
+  warehouse: { id: string; code: string; name: string };
+  onHand: number;
+  reserved: number;
+  damaged: number;
+  incoming: number;
+  available: number;
+  lowStockThreshold: number;
+  isLowStock: boolean;
+  hasDiscrepancy: boolean;
+  movementCount: number;
+  updatedAt: string;
+};
+
+export type InventoryPage = {
+  items: InventoryRow[];
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  summary: { lowStock: number; discrepancies: number };
+};
+
+export type InventoryMovement = {
+  id: string;
+  type: string;
+  quantityDelta: number;
+  reason: string;
+  actorId: string | null;
+  createdAt: string;
+};
+
+export function formatTaka(amountInPaisa: number): string {
+  return new Intl.NumberFormat("en-BD", {
+    style: "currency",
+    currency: "BDT",
+    maximumFractionDigits: amountInPaisa % 100 === 0 ? 0 : 2,
+  }).format(amountInPaisa / 100);
+}

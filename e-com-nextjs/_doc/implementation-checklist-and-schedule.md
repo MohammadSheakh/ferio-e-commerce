@@ -1,0 +1,408 @@
+# Ferio Implementation Checklist and Delivery Schedule
+
+**Document status:** Living execution tracker  
+**Created:** August 6, 2026  
+**Primary source:** [Product Requirements Document](product-requirement-document-PRD.md)  
+**Visual input:** [Extra Plan](extraPlan.png)  
+**Progress evidence:** [Project Progress 21](project-progress-21.md)
+
+## 1. How to Use This Document
+
+This document converts the PRD and visual plan into an implementation checklist. It is the working tracker; the PRD remains the product source of truth.
+
+### Status legend
+
+- [x] **Done** — implemented and validated at the current checkpoint.
+- [ ] **Partial** — started, but the stated acceptance condition is not fully met. The item includes a `PARTIAL` label.
+- [ ] **Pending** — not yet implemented.
+- [ ] **Blocked** — waiting for a product-owner or provider decision.
+- [ ] **Deferred** — intentionally outside the current release.
+
+### Update rule
+
+An item may be changed to `[x]` only when its relevant backend behavior, frontend integration, authorization, error states, tests, and documentation satisfy the PRD Definition of Done. A working mock screen is not considered complete.
+
+## 2. Current Position
+
+**Current milestone:** Release 1 — Auditability and operational controls  
+**Current completed slice:** Versioned canonical CSV template and verified Admin session gate  
+**Next scheduled slice:** Disposable full-stack authenticated CSV import smoke test  
+**Release 1 launch status:** Not ready
+
+## 3. Release 0 — Foundation Checklist
+
+### 3.1 Repository and architecture
+
+- [x] Maintain three clear applications: Customer Web, Admin Web, and NestJS backend.
+- [x] Use NestJS as a modular monolith rather than premature microservices.
+- [x] Use PostgreSQL and Prisma as the primary data layer.
+- [x] Retain Redis and BullMQ for caching and background jobs.
+- [x] Remove MongoDB from the active backend configuration.
+- [x] Define separate customer and admin application origins.
+- [x] Add backend environment examples and startup documentation.
+- [x] Add frontend environment examples and backend URL boundaries.
+- [ ] **PARTIAL:** Define shared domain contracts; authentication and catalog contracts exist, but later commerce domains do not.
+- [x] Apply and verify the complete Prisma migration chain against a disposable PostgreSQL database.
+- [x] Define module-level audit conventions for all sensitive mutations.
+- [ ] Define provider-neutral payment, courier, storage, and communication adapter interfaces.
+- [ ] Add consistent correlation IDs across HTTP requests, jobs, and provider calls.
+- [ ] Add production-ready structured logging and stable machine-readable error codes.
+
+### 3.2 Authentication and access
+
+- [x] Implement backend staff authentication (`FR-AUTH-001`).
+- [x] Add dedicated server-validated admin login.
+- [x] Enforce server-owned roles during public registration and OAuth login.
+- [x] Add expiring access and refresh tokens with logout and revocation (`FR-AUTH-004`).
+- [x] Store Admin Web session tokens in HTTP-only cookies.
+- [x] Protect Admin Web dashboard routes and refresh expired sessions.
+- [x] Add repeated-login protection and temporary account lockout.
+- [x] Prevent account discovery through forgot-password responses.
+- [x] Add an environment-driven initial administrator seed.
+- [ ] **PARTIAL:** Implement explicit permissions and role checks across every protected module (`FR-AUTH-002`, `FR-AUTH-003`).
+- [ ] **PARTIAL:** Complete security-event logging for authentication failures (`FR-AUTH-005`).
+- [ ] Add staff invitation, deactivation, and reset workflows (`FR-AUTH-006`).
+- [ ] Add optional two-factor authentication for high-risk roles (`FR-AUTH-007`).
+- [x] Implement guest checkout without account creation (`FR-AUTH-008`).
+- [ ] Implement verified customer access to order history (`FR-AUTH-009`).
+
+### 3.3 Frontend alignment
+
+- [x] Replace Admin Web mock login with backend authentication.
+- [x] Add real Admin Web logout.
+- [x] Add a typed Customer Web backend-client foundation.
+- [x] Fix the Customer Web checkout server-rendering failure.
+- [x] Connect Customer Web catalog, cart, checkout preview, and COD order placement to real APIs.
+- [ ] **PARTIAL:** Admin Web catalog, inventory, delivery, order, reporting, settings, and overview use protected APIs; the customer-management placeholder remains.
+- [ ] Align all retained screens with `_doc/design-language.md`.
+- [ ] Verify loading, empty, success, validation, failure, and retry states on each connected screen.
+
+### 3.4 Release 0 validation
+
+- [x] Generate Prisma Client from the composed schema.
+- [x] Pass the current backend production build.
+- [x] Pass the current backend unit suite.
+- [x] Pass Admin Web TypeScript validation and production build.
+- [x] Pass Customer Web TypeScript validation and production build.
+- [ ] **PARTIAL:** Run the full stack against local PostgreSQL and Redis; isolated PostgreSQL reconciliation and Redis BullMQ runtime harnesses pass, while a combined API-stack environment remains pending.
+- [ ] Apply migrations and seed an administrator in a disposable environment.
+- [ ] Complete a browser-level admin login, refresh, and logout test.
+
+## 4. Release 1 — Sell Reliably
+
+No Release 1 domain is complete yet. Existing prototype UI is treated as a starting point, not production completion.
+
+### Slice 1 — Catalog, products, variants, and inventory
+
+**Purpose:** Create the shared commerce data foundation required by every later slice.  
+**PRD coverage:** `FR-CAT-001`–`FR-CAT-010`, `FR-INV-001`–`FR-INV-010`
+
+- [ ] Confirm the Release 1 category structure and variant model.
+- [x] Model category, product, variant, SKU, attributes, media, price, publication, and SEO data.
+- [x] Store money in minor units and support compare-at price.
+- [x] Model one warehouse and on-hand, reserved, available, damaged, and incoming quantities.
+- [x] Keep immutable stock movements and order-linked reservation records for every confirmation-time stock hold.
+- [x] Draft, publish, unpublish, edit, and archive workflows work with catalog mutation audit records.
+- [x] Add product and media ordering.
+- [ ] **PARTIAL:** Media URLs are validated; S3-compatible upload and delivery are not connected.
+- [x] Add backend catalog and inventory services, DTO validation, authorization, and pagination.
+- [x] Add admin category creation, editing, hierarchy, activation, and ordering controls.
+- [x] Replace Admin Web product mocks with create, edit, archive, publish, and unpublish operations.
+- [x] Add multi-variant, SKU, price, threshold, initial-stock, and stock-adjustment administration.
+- [x] Add low-stock and discrepancy views with movement history.
+- [x] Add stock-adjustment permission, reason, actor, and immutable movement behavior.
+- [ ] **PARTIAL:** Catalog unit tests, confirmation-time reservation contention, and manual stock-adjustment concurrency pass; broader category, product, and media database integration remain.
+- [x] Verify both frontend production builds after integration.
+
+### Slice 2 — Storefront discovery and product detail
+
+**Purpose:** Expose only valid, published, purchasable catalog data to customers.  
+**PRD coverage:** `FR-SRCH-001`–`FR-SRCH-007`, customer-facing parts of `FR-CAT-*`
+
+- [x] Replace Customer Web static category and product data with public APIs.
+- [x] Implement category and product listing routes.
+- [x] Implement product detail with media gallery, price, compare-at price, variants, availability, delivery, and return information.
+- [x] Add backend-driven Customer Web support contacts, policy references, delivery coverage, and footer navigation without placeholder legal copy.
+- [x] Prevent unpublished products from appearing in listing, search, or direct routes.
+- [x] Implement PostgreSQL-backed search for name, category, brand, keywords, and SKU.
+- [x] Add category, price, computed availability, and variant-attribute filters.
+- [x] Add newest, product-name, and price sorting.
+- [ ] **PARTIAL:** Search is Unicode-aware and case-insensitive for Latin text; Banglish/transliteration normalization remains.
+- [x] Add clear no-result and unavailable-product recovery states.
+- [ ] Add product-view, search, filter, and add-to-cart analytics events.
+- [ ] **PARTIAL:** SEO metadata, sitemap, Open Graph, responsive layouts, and labelled controls exist; device, performance, keyboard, and screen-reader validation remain.
+
+### Slice 3 — Customer, address, cart, and checkout foundation
+
+**Purpose:** Build a validated guest purchase path before connecting payment and order operations.  
+**PRD coverage:** `FR-CART-001`–`FR-CART-006`, `FR-CHK-001`–`FR-CHK-010`, `FR-CUST-001`–`FR-CUST-008`
+
+- [x] Implement opaque persistent guest cart identity and server storage.
+- [x] Add, remove, and update valid variant quantities through the backend cart.
+- [x] Revalidate unpublished, repriced, invalid, and unavailable lines.
+- [x] Label cart totals as estimates and recalculate current product prices on the server.
+- [ ] Merge a guest cart safely when verified customer accounts are introduced.
+- [ ] Require identity and valid consent before abandoned-cart eligibility.
+- [x] Normalize Bangladesh phone numbers while preserving appropriate source data.
+- [x] Model customer profiles without treating a phone match as infallible identity proof.
+- [x] Support reusable multiple-address records and immutable order-address snapshots.
+- [x] Collect name, phone, district, area, address, and optional landmark.
+- [ ] Add selectable map location only if approved and useful; do not block checkout on it.
+- [x] Separate optional promotional consent from transactional communication.
+- [x] Present required order terms clearly at checkout and link to the current configured policy references.
+- [x] Add configurable delivery regions, fees, and free-delivery thresholds.
+- [ ] Add deterministic coupon validation and calculation.
+- [ ] **PARTIAL:** Cart, delivery, payment charge, and final checkout total are server-calculated; deterministic coupon rules remain.
+- [x] Display the final total and payment method before confirmation.
+- [x] Capture source and campaign attribution.
+- [x] Preserve entered data across recoverable checkout errors.
+- [ ] **PARTIAL:** Persistent cart and checkout calculation tests pass; database integration tests remain.
+
+### Slice 4 — Orders and COD operations
+
+**Purpose:** Place and operate idempotent COD orders with explicit state transitions.  
+**PRD coverage:** `FR-ORD-001`–`FR-ORD-010`, COD portions of `FR-PAY-*`
+
+- [x] Prove idempotent COD placement and human-readable references against concurrent duplicate database requests.
+- [x] Persist immutable product, variant, SKU, price, discount, tax, quantity, and address snapshots.
+- [x] Keep order, payment, fulfillment, shipment, return, and refund states separate.
+- [x] Implement and unit-test server-side order transition rules.
+- [x] Record complete order status history with actor, source, time, and note.
+- [x] Implement configurable COD verification policy.
+- [x] Admin order queue supports reference, phone, customer, status, payment, fulfillment, courier, tracking, and date controls.
+- [ ] **PARTIAL:** Admin order detail shows customer, address, items, totals, lifecycle states, reservations, and status history; later-domain communication, shipment, and return histories remain.
+- [x] Add call/confirmation actions for order operations agents.
+- [x] Require a cancellation reason and transactionally release reservations with inverse movement, history, audit, and message evidence.
+- [x] Prove serializable confirmation transactions prevent oversell when two orders compete for the same finite stock.
+- [ ] Add customer profile and delivered-order count to appropriate admin context.
+- [x] Cover invalid transition rules, duplicate placement, confirmation lock contention, and reservation release with unit or PostgreSQL integration tests.
+
+### Slice 5 — Prepaid payments
+
+**Purpose:** Add one safe provider-neutral prepaid path without coupling orders to one provider.  
+**PRD coverage:** `FR-PAY-001`–`FR-PAY-010`
+
+- [ ] Approve the first production payment provider and launch requirement.
+- [ ] Implement the provider-neutral payment adapter contract.
+- [ ] Store a separate record for every payment attempt and provider reference.
+- [ ] Add redirect or provider-UI initiation and result handling.
+- [ ] Authenticate and idempotently process callbacks/webhooks.
+- [ ] Verify amount, currency, order, and expected state before marking payment successful.
+- [ ] Support safe payment retry without duplicate order creation.
+- [ ] Show paid, unpaid, failed, expired, partially refunded, and refunded states in Admin Web.
+- [ ] Restrict and audit manual payment-state changes.
+- [ ] Add sandbox tests for success, failure, cancellation, replay, expiry, and retry.
+
+### Slice 6 — Fulfillment, courier, tracking, and notifications
+
+**Purpose:** Move confirmed orders through warehouse and delivery with traceable customer updates.  
+**PRD coverage:** `FR-SHP-001`–`FR-SHP-010`, `FR-NOT-001`–`FR-NOT-008`
+
+- [ ] **PARTIAL:** Pathao and Steadfast are supported; production provider, credentials, contract, and service-area rules still require approval.
+- [x] Implement fulfillment queues for confirmed orders.
+- [x] Implement pick, pack, quality check, ready-for-handover, and handed-over actions.
+- [x] Record shortages and substitutions as explicit exceptions.
+- [x] Implement the provider-neutral courier adapter contract with configuration-gated Pathao and Steadfast adapters.
+- [x] Store courier request, response, external consignment, tracking, label reference, COD amount, charge, and weight.
+- [x] Store raw courier events and normalized shipment states outside the order table.
+- [ ] **PARTIAL:** Authenticate, deduplicate, retain, and expose courier callbacks; queue retry and provider sandbox tests remain.
+- [x] Prevent unknown and out-of-order events from regressing accepted shipment state.
+- [ ] Add polling fallback where the provider requires it.
+- [x] Add secure public order tracking using verification or a signed link.
+- [x] Queue transactional messages only after business transactions commit.
+- [ ] **PARTIAL:** Message-attempt and provider-outcome records exist; an approved provider adapter is still required to populate live outcomes.
+- [x] Keep notification failure isolated from commerce operations.
+- [ ] Add configured transactional channel priority and fallback.
+- [ ] Test delivery, failed attempt, cancellation, RTO, callback replay, and provider outage with provider sandbox access.
+- [ ] Add pickup batches after the MVP shipment/event flow is proven.
+- [ ] Add provider labels and printable AWB/barcodes where the approved provider exposes them.
+- [ ] **PARTIAL:** COD collection, courier settlement, normalized provider report import, versioned evidence-bound canonical CSV workflow, immutable row evidence, and shipment-settlement reconciliation are implemented; provider-native column mappings/API retrieval and sandbox-proven delivery callbacks remain pending.
+
+### Slice 7 — Returns, replacement, refund, and reconciliation
+
+**Purpose:** Complete the post-purchase lifecycle and make inconsistencies visible.  
+**PRD coverage:** `FR-RET-001`–`FR-RET-009`, reconciliation requirements from inventory, payment, and shipping
+
+- [ ] **Blocked:** Approve return windows and category exceptions; the system records review-required eligibility while policy is unapproved.
+- [x] Add return eligibility evaluation without automatic blanket approval.
+- [x] Record return item, quantity, reason, evidence, requested resolution, channel, and append-only status history.
+- [x] Add received-item inspection with received/accepted quantities, condition, decision, final resolution, and explicit inventory disposition.
+- [ ] **PARTIAL:** Support approve, partial approve, reject, replacement, and refund outcomes; review, inspection, refund instruction, and refund result recording are implemented, while replacement fulfillment and direct provider execution remain pending.
+- [x] Link refunds to optional source-payment reference, order, return, reason, amount, method, provider/manual result, and actor.
+- [x] Model RTO separately from customer return.
+- [x] Add traceable RTO cost and stock disposition.
+- [ ] **PARTIAL:** Add reservation, stock, payment, COD settlement, courier, and refund reconciliation jobs; persistent idempotent scans and a scheduled BullMQ worker now cover active terminal reservations, invalid stock, COD/payment mismatch, missing or overdue collection, RTO collection, settlement variance, and aged refunds, while prepaid-provider comparison remains pending.
+- [x] Add an Admin Web cross-domain exception queue with severity, age, owner, context, related-record drill-down, acknowledgement, resolution, reopening, and manual scan actions.
+- [ ] **PARTIAL:** Test return-to-refund, RTO, failed refund, delayed settlement, and seeded inconsistencies; unit coverage includes return/refund/RTO/settlement paths, finding persistence, durable scan failure, scheduled worker routing, retry enqueueing, and audited resolution. PostgreSQL proves a seeded invalid-stock lifecycle and concurrent idempotent replay, while isolated Redis proves scheduler delivery, worker retry, next delayed execution, and operator retry. Provider sandbox and broader database integration cases remain.
+
+### Slice 8 — Reports, settings, audit, and operations
+
+**Purpose:** Make delivered outcomes, controls, and accountability launch-ready.  
+**PRD coverage:** `FR-ANL-001`–`FR-ANL-011`, `FR-SET-001`–`FR-SET-007`
+
+- [x] Configure store identity, contacts, currency, timezone, order prefix, and policies.
+- [ ] **PARTIAL:** Configure COD rules, return window, delivery fees, regions, payments, and notification templates; COD availability, COD verification, return-window default, delivery zones, and fees are configurable, while prepaid-provider activation and notification templates remain blocked or pending.
+- [x] Keep provider credentials outside normal application settings.
+- [x] Add append-only audit records for sensitive actions.
+- [x] Add placed, confirmed, shipped, delivered, cancelled, returned, and RTO reporting.
+- [x] Separate revenue, collection, refund, and settlement views with explicit gross, delivered, collected, refunded, COD settlement, fee, variance, and RTO cost bases.
+- [ ] **Blocked:** Add delivered contribution only after approved cost inputs and formulas exist; the required product-cost source and allocation policy remain unapproved.
+- [x] Label incomplete profitability calculations clearly and never present incomplete contribution as profit.
+- [ ] Add permission-aware exports with sensitive-data masking.
+- [ ] **PARTIAL:** Add owner, operations, and finance dashboard views that link to filtered details; overview, reports, and a dedicated reconciliation workspace exist, while permission-specific workspaces and complete filtered drill-downs remain.
+- [ ] Add feature flags for risky staged rollouts where appropriate.
+
+### Slice 9 — Release 1 hardening and launch
+
+**Purpose:** Satisfy all PRD Release 1 exit criteria before real launch.
+
+- [ ] Complete automated unit tests required by PRD section 27.1.
+- [ ] Complete transactional and concurrency integration tests.
+- [ ] Complete browse-to-COD and browse-to-prepaid end-to-end tests.
+- [ ] Complete admin-confirmation-to-delivery and return-to-refund tests.
+- [ ] Test Bangla, English, and mixed customer names and addresses.
+- [ ] Test mobile devices, constrained networks, keyboard use, and screen readers.
+- [ ] **PARTIAL:** Add request, database, queue, commerce, provider, and backup metrics; reconciliation queue health now exposes delivery counts plus PostgreSQL-derived 24-hour completion, failure, success-rate, duration, and last-run evidence, while platform-wide metrics remain pending.
+- [ ] Add actionable alerts for critical paths and provider failures.
+- [ ] Configure error tracking, structured logs, and secret-safe diagnostics.
+- [ ] Configure automated database backups and object-storage protection.
+- [ ] Complete and document one restore exercise.
+- [ ] Resolve or explicitly accept critical and high security findings.
+- [ ] Complete Ferio design-language review.
+- [ ] Run internal alpha with a real catalog subset.
+- [ ] Run controlled beta with one warehouse, one courier, COD, and the selected prepaid policy.
+- [ ] Pass every Release 1 exit criterion in PRD section 26.1.
+
+## 5. Release 2 — Retain Customers
+
+These items correspond to the CRM and marketing areas in the visual plan. They must not displace Release 1 operational reliability.
+
+### Customer 360 and identity
+
+- [ ] **Deferred to Release 2:** Unified customer timeline and profile (`FR-CRM-001`–`FR-CRM-008`).
+- [ ] **Deferred to Release 2:** Reviewed duplicate-profile merge and identity links.
+- [ ] **Deferred to Release 2:** Delivered, cancelled, returned, spend, source, and risk indicators.
+- [ ] **Deferred to Release 2:** Customer context for support calls and messages.
+- [ ] **Deferred to Release 2:** Customer lifetime contribution and cohort views.
+
+### Consent and communication control
+
+- [ ] **Deferred to Release 2:** Channel-specific consent evidence (`FR-CON-001`–`FR-CON-008`).
+- [ ] **Deferred to Release 2:** Revocation, suppression, frequency caps, and quiet hours.
+- [ ] **Deferred to Release 2:** Global marketing kill switch.
+- [ ] **Deferred to Release 2:** Explainable message eligibility and send history.
+
+### Segments, campaigns, and automations
+
+- [ ] **Deferred to Release 2:** Deterministic segments and previews (`FR-MKT-001`–`FR-MKT-012`).
+- [ ] **Deferred to Release 2:** WhatsApp-first campaign execution with controlled fallback.
+- [ ] **Deferred to Release 2:** Abandoned-cart automation.
+- [ ] **Deferred to Release 2:** Restock and price-drop automation.
+- [ ] **Deferred to Release 2:** Post-purchase, repeat-purchase, and win-back automation.
+- [ ] **Deferred to Release 2:** Meta Lead Ads, Pixel/CAPI, and audience synchronization.
+- [ ] **Deferred to Release 2:** Campaign reporting through delivered, returned, and contribution outcomes.
+- [ ] **Deferred to Release 2:** Customer wishlist and reviewed product feedback workflows if approved.
+- [ ] Pass every Release 2 exit criterion in PRD section 26.2.
+
+## 6. Release 3 — Optimize and Scale
+
+These visual-plan ideas are candidates, not commitments. Each requires separate approval and a measured trigger.
+
+- [ ] **Deferred to Release 3:** Dedicated search infrastructure.
+- [ ] **Deferred to Release 3:** Personalized recommendations.
+- [ ] **Deferred to Release 3:** Advanced COD/fraud risk scoring.
+- [ ] **Deferred to Release 3:** AI-assisted product descriptions.
+- [ ] **Deferred to Release 3:** AI-assisted SEO generation.
+- [ ] **Deferred to Release 3:** Review summarization and image moderation.
+- [ ] **Deferred to Release 3:** Customer support chatbot and translation assistance.
+- [ ] **Deferred to Release 3:** Image background removal.
+- [ ] **Deferred to Release 3:** Automatic category and duplicate-product detection.
+- [ ] **Deferred to Release 3:** Analytics warehouse.
+- [ ] **Deferred to Release 3:** Multiple courier optimization.
+- [ ] **Deferred to Release 3:** Additional warehouses or extracted services.
+
+## 7. Product-Owner Decision Checklist
+
+These decisions must be completed before their dependent slices can be finalized.
+
+- [ ] **Blocked:** Approve exact Release 1 categories and variant structure — needed for Slice 1.
+- [ ] **Blocked:** Select first payment provider and decide whether prepaid is required at initial launch — needed for Slice 5.
+- [ ] **Blocked:** Select first courier and service-area rules — needed for Slice 6.
+- [ ] **Blocked:** Approve COD verification method and thresholds — needed for Slice 4.
+- [ ] **Blocked:** Approve stock reservation timing for COD and prepaid orders — needed for Slices 3–5.
+- [ ] **Blocked:** Approve return windows and category exceptions — needed for Slice 7.
+- [ ] **Blocked:** Approve delivery-fee matrix and free-delivery rules — needed for Slice 3.
+- [ ] **Blocked:** Approve product-cost source and contribution allocation — needed for Slice 8.
+- [ ] **Blocked:** Approve initial staff roles and approval thresholds — needed across Admin Web.
+- [ ] **Blocked:** Approve transactional channel priority and fallback — needed for Slice 6.
+- [ ] **Blocked:** Approve Bangla/English customer-content strategy — needed before launch review.
+- [ ] **Blocked:** Approve retention and deletion periods — needed before launch review.
+- [ ] **Blocked:** Select hosting providers and recovery objectives — needed for Slice 9.
+- [ ] **Blocked:** Decide whether customer accounts ship in Release 1 or secure guest tracking is sufficient.
+
+Approved answers should be recorded in a separate decision log and linked from the affected checklist item.
+
+## 8. Delivery Order and Dependency Schedule
+
+This is a dependency sequence, not a calendar promise. Dates should be assigned only after Slice 1 domain decisions and provider availability are confirmed.
+
+| Order | Delivery slice | Depends on | Completion gate |
+| --- | --- | --- | --- |
+| 0 | Remaining Release 0 foundation | Environment availability | Full-stack auth smoke test and commerce conventions documented |
+| 1 | Catalog, products, variants, inventory | Category/variant decision | Admin CRUD and stock ledger work with real APIs |
+| 2 | Storefront discovery and product detail | Slice 1 | Customer Web contains no production-path catalog mocks |
+| 3 | Customer, address, cart, checkout | Slices 1–2; fee/reservation decisions | Server-calculated guest checkout is valid and persistent |
+| 4 | Orders and COD operations | Slice 3; COD policy | Idempotent COD order moves through confirmation safely |
+| 5 | Prepaid payments | Slice 4; provider decision/access | Sandbox payment lifecycle passes replay and retry tests |
+| 6 | Fulfillment, courier, tracking, notifications | Slice 4; courier/channel decisions | One courier lifecycle and secure tracking work end to end |
+| 7 | Returns, refunds, RTO, reconciliation | Slices 5–6; return policy | Post-purchase records and seeded inconsistencies are traceable |
+| 8 | Reports, settings, audit | Slices 1–7; cost-policy decisions | Delivered-outcome reports and sensitive audit coverage reconcile |
+| 9 | Hardening, alpha, beta, launch | All Release 1 slices | Every PRD Release 1 exit criterion passes |
+| 10 | Release 2 CRM and retention | Stable Release 1 data and consent policy | Every PRD Release 2 exit criterion passes |
+| 11 | Release 3 optimization candidates | Measured trigger and separate approval | Approved experiment proves value and safety |
+
+## 9. Next Work Session
+
+- [ ] Resolve or document assumptions for category and variant structure.
+- [x] Inspect existing Prisma models for reusable catalog and inventory foundations.
+- [ ] **PARTIAL:** Define Slice 1 entities, state rules, API contracts, and acceptance tests; integration cases remain.
+- [x] Implement Slice 1 backend schema and initial services first.
+- [x] Connect initial Admin Web category and product flows to real APIs.
+- [x] Connect Customer Web catalog reads after admin write workflows are stable.
+- [x] Update this checklist and create the next progress checkpoint after validation.
+- [x] Apply the full catalog-through-reconciliation migration chain to a disposable PostgreSQL database.
+- [ ] **PARTIAL:** Add database integration and concurrent inventory tests; reconciliation persistence, scan idempotency, finite-stock reservation contention, insufficient-stock rollback, reservation release, manual adjustment contention, cancellation-versus-adjustment convergence, auto-confirm reservation replay, courier settlement contention, and provider report import replay now run against PostgreSQL, while provider-native retrieval and broader catalog cases remain.
+- [x] Add a dedicated scheduled BullMQ reconciliation worker with deterministic scan idempotency and retry/backoff.
+- [x] Preserve failed reconciliation runs in PostgreSQL outside rolled-back scan transactions.
+- [x] Expose queue availability, job counts, scheduler timing, durable recent runs, and failed-run retry controls.
+- [x] Prove isolated BullMQ scheduler creation, first-job delivery, retry/backoff, completion, next delayed execution, and operator retry against Redis.
+- [x] Add safe reconciliation operations metrics and exclude idempotency hashes from Admin health responses.
+- [x] Prove concurrent COD confirmation reserves finite stock once and insufficient stock rolls back all workflow evidence.
+- [x] Prove cancellation releases active stock once and concurrent manual decrements cannot create stale stock or duplicate ledger entries.
+- [x] Prove concurrent COD placement creates one order, customer/address outcome, snapshot set, placement audit, and deduplicated placed message.
+- [x] Prove cancellation racing manual adjustment converges to a cancelled order, released reservation, valid stock balance, and matching ledger evidence.
+- [x] Prove auto-confirm COD placement immediately reserves stock once, deduplicates placed/confirmed messages, and leaves insufficient-stock carts untouched.
+- [x] Prove concurrent courier settlement replay creates one batch, item set, audit record, and payment transition while overlapping batches cannot claim the same COD collection twice.
+- [x] Persist normalized courier settlement reports and immutable rows, quarantine mixed exceptions without partial posting, and prove replay, row deduplication, and overlapping imports against PostgreSQL.
+- [x] Connect Admin Web to submit normalized settlement rows, review immutable import history, and inspect unmatched, ineligible, duplicate, and already-settled exceptions.
+- [x] Allow one corrected report to supersede a quarantined import without editing source evidence, atomically transfer row claims, audit resolution, and reject concurrent correction contenders.
+- [x] Add a quoted-field-safe canonical settlement CSV preflight with strict size, row, header, encoding, identity, and BDT amount validation plus Admin diagnostics and ready-only row population.
+- [x] Re-run CSV preflight during import, bind file and normalized-row checksums plus parser version to immutable evidence, exclude full file content from stored JSON, and reject post-preview drift before financial effects.
+- [x] Generate a versioned canonical CSV template from the backend parser contract, expose an Admin download action with BDT guidance, and live-smoke the proxy session gate returning a clean unauthenticated 401.
+- [x] Apply the full migration chain to disposable PostgreSQL and test a seeded reconciliation inconsistency plus concurrent scans.
+- [ ] Connect managed object storage for product media.
+- [x] Implement persistent guest cart and server-side cart revalidation.
+- [x] Model customer identity, reusable Bangladesh addresses, and immutable order-address snapshots.
+- [x] Add configurable delivery rules and server-calculated checkout preview.
+- [x] Add and database-prove idempotent COD order conversion, immutable item/address snapshots, and guarded confirmation-time reservation operations.
+
+## 10. Checklist Maintenance
+
+After every completed slice:
+
+1. Change only validated items from `[ ]` to `[x]`.
+2. Add validation evidence to the latest progress document.
+3. Record deferred work rather than silently dropping it.
+4. Add newly discovered dependencies to the schedule.
+5. Recheck the PRD exit criteria before beginning the next release.
+6. Keep AI and scaling candidates deferred until their stated trigger exists.
