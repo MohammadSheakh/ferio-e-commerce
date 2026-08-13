@@ -4,6 +4,7 @@ import "./globals.css";
 import { CartProvider } from "@/components/CartContext";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import PurchaseActivityToast from "@/components/PurchaseActivityToast";
 import { fallbackStoreConfig, getStoreConfig } from "@/lib/store";
 
 const inter = Inter({
@@ -33,6 +34,7 @@ export default async function RootLayout({
           <Header storeName={store.storeName} />
           {children}
           <Footer store={store} />
+          <PurchaseActivityToast />
         </CartProvider>
       </body>
     </html>

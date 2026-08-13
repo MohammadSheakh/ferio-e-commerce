@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { formatTaka, getProduct } from "@/lib/catalog";
 import AddToCart from "./AddToCart";
+import ReviewSection from "./ReviewSection";
+import { getPublicApi } from "@/lib/backend";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +35,7 @@ export default async function ProductDetailPage({
   const product = await getProduct(params.slug).catch(() => null);
   if (!product) notFound();
 
+  const content = await getPublicApi<Parameters<typeof ReviewSection>[0]["content"]>(`/product-content/${params.slug}`, { cache: "no-store" }).catch(() => null);
   return (
     <main className="mx-auto max-w-6xl px-6 py-14">
       <div className="grid gap-16 md:grid-cols-2">
@@ -44,6 +47,17 @@ export default async function ProductDetailPage({
           <p className="text-[13px] text-ink2">{product.category.name}</p>
           <h1 className="mt-1.5 text-[26px] font-semibold tracking-tight text-ink">{product.name}</h1>
           {product.brand && <p className="mt-2 text-[13px] text-ink2">By {product.brand}</p>}
+          {product.condition === "SECOND_HAND" && (
+            <div className="mt-5 rounded-card border border-line p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-[13px] font-medium text-ink">Second-hand product</p>
+                <span className="rounded-full bg-surface px-2.5 py-1 text-[11px] text-ink2">
+                  {product.conditionGrade?.replaceAll("_", " ").toLowerCase()}
+                </span>
+              </div>
+              <p className="mt-2 whitespace-pre-wrap text-[12px] leading-5 text-ink2">{product.conditionNote}</p>
+            </div>
+          )}
           <div className="mt-5 flex items-baseline gap-3">
             <span className="text-[22px] font-semibold text-ink">{formatTaka(product.price)}</span>
             {product.compareAtPrice && <span className="text-[15px] text-ink2 line-through">{formatTaka(product.compareAtPrice)}</span>}
@@ -59,6 +73,7 @@ export default async function ProductDetailPage({
           <AddToCart product={product} />
         </div>
       </div>
+      <ReviewSection productId={product.id} content={content} />
     </main>
   );
 }

@@ -80,6 +80,9 @@ export default function ProductForm({
     })) ?? [{ url: "", altText: "" }],
   );
   const [saving, setSaving] = useState(false);
+  const [condition, setCondition] = useState<CatalogProduct["condition"]>(
+    product?.condition ?? "NEW",
+  );
   const [statusSaving, setStatusSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -145,6 +148,15 @@ export default function ProductForm({
         codAvailable: form.get("codAvailable") === "on",
         deliveryNote: String(form.get("deliveryNote")) || undefined,
         returnNote: String(form.get("returnNote")) || undefined,
+        condition,
+        conditionGrade:
+          condition === "SECOND_HAND"
+            ? String(form.get("conditionGrade"))
+            : undefined,
+        conditionNote:
+          condition === "SECOND_HAND"
+            ? String(form.get("conditionNote"))
+            : undefined,
         seoTitle: String(form.get("seoTitle")) || undefined,
         seoDescription: String(form.get("seoDescription")) || undefined,
         variants: variantPayload,
@@ -230,6 +242,31 @@ export default function ProductForm({
           <label className="text-[12px] text-ink2">Category<select name="categoryId" required defaultValue={product?.category.id ?? ""} className={inputClass}><option value="">Select category</option>{categories.filter((category) => category.isActive || category.id === product?.category.id).map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
           <label className="text-[12px] text-ink2">Brand<input name="brand" defaultValue={product?.brand ?? ""} className={inputClass} /></label>
         </div>
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <label className="text-[12px] text-ink2">
+            Product condition
+            <select value={condition} onChange={(event) => setCondition(event.target.value as CatalogProduct["condition"])} className={inputClass}>
+              <option value="NEW">New</option>
+              <option value="SECOND_HAND">Second-hand</option>
+            </select>
+          </label>
+          {condition === "SECOND_HAND" && (
+            <label className="text-[12px] text-ink2">
+              Condition grade
+              <select name="conditionGrade" required defaultValue={product?.conditionGrade ?? "GOOD"} className={inputClass}>
+                <option value="LIKE_NEW">Like new</option>
+                <option value="GOOD">Good</option>
+                <option value="FAIR">Fair</option>
+              </select>
+            </label>
+          )}
+        </div>
+        {condition === "SECOND_HAND" && (
+          <label className="mt-4 block text-[12px] text-ink2">
+            Condition disclosure
+            <textarea name="conditionNote" required minLength={10} maxLength={1000} rows={4} defaultValue={product?.conditionNote ?? ""} placeholder="Describe visible wear, repairs, included accessories, battery condition, and known limitations." className={inputClass} />
+          </label>
+        )}
         <label className="mt-4 block text-[12px] text-ink2">Description<textarea name="description" required rows={6} defaultValue={product?.description} className={inputClass} /></label>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <label className="text-[12px] text-ink2">Delivery note<input name="deliveryNote" defaultValue={product?.deliveryNote ?? ""} className={inputClass} /></label>

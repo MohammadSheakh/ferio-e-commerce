@@ -1,0 +1,1 @@
+import{NextResponse}from'next/server';import{adminApi,AdminApiError}from'@/lib/admin-api';export async function GET(){try{return NextResponse.json({data:await adminApi('/admin/warranty')})}catch(e){return NextResponse.json({message:e instanceof Error?e.message:'Unable to load warranty claims.'},{status:e instanceof AdminApiError?e.status:503})}}

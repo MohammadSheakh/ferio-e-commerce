@@ -31,9 +31,9 @@ export type OrderListItem = {
   fulfillmentStatus: OrderFulfillmentStatus;
   codVerification: string;
   total: number;
-  paymentMethod: "COD";
+  paymentMethod: "COD" | "PREPAID";
   createdAt: string;
-  customer: { name: string; phoneNormalized: string };
+  customer: { id: string; name: string; phoneNormalized: string };
   address: { district: string; area: string } | null;
   shipment: {
     trackingNumber: string | null;
@@ -59,7 +59,7 @@ export type OrderDetail = {
   returnStatus: string;
   refundStatus: string;
   codVerification: string;
-  paymentMethod: "COD";
+  paymentMethod: "COD" | "PREPAID";
   currency: "BDT";
   subtotal: number;
   discountTotal: number;
@@ -69,6 +69,7 @@ export type OrderDetail = {
   source: string | null;
   medium: string | null;
   campaign: string | null;
+  customerNote: string | null;
   cancellationReason: string | null;
   confirmedAt: string | null;
   cancelledAt: string | null;
@@ -94,6 +95,9 @@ export type OrderDetail = {
     productName: string;
     variantName: string;
     sku: string;
+    productCondition: "NEW" | "SECOND_HAND";
+    conditionGrade: "LIKE_NEW" | "GOOD" | "FAIR" | null;
+    conditionNote: string | null;
     unitPrice: number;
     quantity: number;
     lineTotal: number;

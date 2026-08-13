@@ -24,3 +24,21 @@ export async function PATCH(
     return NextResponse.json({ message }, { status });
   }
 }
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: { id: string } },
+) {
+  try {
+    const result = await adminApi<{ id: string; deleted: true }>(
+      `/admin/catalog/categories/${params.id}`,
+      { method: "DELETE" },
+    );
+    return NextResponse.json({ data: result });
+  } catch (error) {
+    const status = error instanceof AdminApiError ? error.status : 503;
+    const message =
+      error instanceof Error ? error.message : "Unable to delete category.";
+    return NextResponse.json({ message }, { status });
+  }
+}

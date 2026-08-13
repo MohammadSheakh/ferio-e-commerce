@@ -66,7 +66,7 @@ export default async function ProductsPage() {
                       {product.name}
                     </Link>
                     <p className="text-[11px] text-ink2">
-                      {product.variants.length} variant{product.variants.length === 1 ? "" : "s"}
+                      {product.variants.length} variant{product.variants.length === 1 ? "" : "s"}{product.condition === "SECOND_HAND" ? " · second-hand" : ""}
                     </p>
                   </td>
                   <td className="px-5 py-3.5 text-ink2">{product.category.name}</td>

@@ -10,6 +10,14 @@ export type CommerceSettings = {
   defaultReturnWindowDays: number | null;
   codEnabled: boolean;
   prepaidEnabled: boolean;
+  purchaseActivityEnabled: boolean;
+  purchaseHistoryEnabled: boolean;
+  purchaseActivityShowDistrict: boolean;
+  purchaseActivityShowArea: boolean;
+  purchaseActivityDurationMs: number;
+  purchaseActivityIntervalSeconds: number;
+  purchaseActivityMaxAgeDays: number;
+  purchaseActivityExcludedProductIds: string[];
   termsUrl: string | null;
   privacyUrl: string | null;
   returnPolicyUrl: string | null;

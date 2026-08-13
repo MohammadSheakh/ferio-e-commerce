@@ -166,7 +166,7 @@ export default function OrdersPage() {
               {orders.items.map((order) => (
                 <tr key={order.id} className="text-[13px] text-ink/80">
                   <td className="px-5 py-3.5"><Link href={`/dashboard/orders/${order.id}`} className="font-medium text-ink hover:underline">{order.reference}</Link><p className="mt-0.5 text-[11px] text-ink2">{new Date(order.createdAt).toLocaleString("en-BD")}</p></td>
-                  <td className="px-5 py-3.5"><p>{order.customer.name}</p><p className="text-[11px] text-ink2">{order.customer.phoneNormalized}</p></td>
+                  <td className="px-5 py-3.5"><Link href={`/dashboard/customers/${order.customer.id}`} className="hover:underline">{order.customer.name}</Link><p className="text-[11px] text-ink2">{order.customer.phoneNormalized}</p></td>
                   <td className="px-5 py-3.5 text-ink2">{order.address ? `${order.address.area}, ${order.address.district}` : "—"}</td>
                   <td className="px-5 py-3.5 text-ink">{formatTaka(order.total)}</td>
                   <td className="px-5 py-3.5 text-ink2">COD · {order.paymentStatus.toLowerCase()}</td>

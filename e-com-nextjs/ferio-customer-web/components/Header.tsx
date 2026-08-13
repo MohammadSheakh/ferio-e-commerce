@@ -24,6 +24,9 @@ export default function Header({ storeName }: { storeName: string }) {
           <Link href="/support" className="transition hover:text-ink">
             Support
           </Link>
+          <Link href="/services" className="transition hover:text-ink">Services</Link>
+          <Link href="/account/orders" className="transition hover:text-ink">Sign in / Account</Link>
+          <Link href="/account/warranty" className="transition hover:text-ink">Warranty</Link>
         </nav>
         <Link
           href="/cart"

@@ -3,10 +3,11 @@ import Link from "next/link";
 export default function OrderConfirmationPage({
   searchParams,
 }: {
-  searchParams: { reference?: string; status?: string };
+  searchParams: { reference?: string; status?: string; payment?: string };
 }) {
   const reference = searchParams.reference?.trim();
   const confirmed = searchParams.status === "CONFIRMED";
+  const paymentFailed = searchParams.payment && searchParams.payment !== "success";
 
   return (
     <main className="mx-auto max-w-2xl px-6 py-24 text-center">
@@ -33,6 +34,9 @@ export default function OrderConfirmationPage({
         </p>
       )}
       <div className="mt-9 flex justify-center gap-3">
+        {reference && paymentFailed && (
+          <Link href={`/payment-retry?reference=${encodeURIComponent(reference)}`} className="rounded-full bg-ink px-6 py-3 text-[14px] font-medium text-white">Retry payment</Link>
+        )}
         {reference && (
           <Link
             href={`/track?reference=${encodeURIComponent(reference)}`}

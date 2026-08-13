@@ -28,6 +28,9 @@ export type CatalogProduct = {
   codAvailable: boolean;
   deliveryNote: string | null;
   returnNote: string | null;
+  condition: "NEW" | "SECOND_HAND";
+  conditionGrade: "LIKE_NEW" | "GOOD" | "FAIR" | null;
+  conditionNote: string | null;
   seoTitle: string | null;
   seoDescription: string | null;
   category: CatalogCategory;
@@ -68,6 +71,7 @@ export function getProducts(params?: {
   category?: string;
   search?: string;
   featured?: boolean;
+  condition?: "NEW" | "SECOND_HAND";
   limit?: number;
   minPrice?: number;
   maxPrice?: number;
@@ -82,6 +86,7 @@ export function getProducts(params?: {
   if (params?.featured !== undefined) {
     query.set("featured", String(params.featured));
   }
+  if (params?.condition) query.set("condition", params.condition);
   if (params?.limit) query.set("limit", String(params.limit));
   if (params?.minPrice !== undefined) {
     query.set("minPrice", String(Math.round(params.minPrice * 100)));

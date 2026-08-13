@@ -4,7 +4,7 @@
 **Created:** August 6, 2026  
 **Primary source:** [Product Requirements Document](product-requirement-document-PRD.md)  
 **Visual input:** [Extra Plan](extraPlan.png)  
-**Progress evidence:** [Project Progress 21](project-progress-21.md)
+**Progress evidence:** [Project Progress 43](project-progress-43.md)
 
 ## 1. How to Use This Document
 
@@ -25,8 +25,8 @@ An item may be changed to `[x]` only when its relevant backend behavior, fronten
 ## 2. Current Position
 
 **Current milestone:** Release 1 — Auditability and operational controls  
-**Current completed slice:** Versioned canonical CSV template and verified Admin session gate  
-**Next scheduled slice:** Disposable full-stack authenticated CSV import smoke test  
+**Current completed slice:** Abstract payment gateways and prepaid expiry/retry recovery
+**Next scheduled slice:** Prepaid provider reconciliation and refund adapter foundation
 **Release 1 launch status:** Not ready
 
 ## 3. Release 0 — Foundation Checklist
@@ -44,7 +44,7 @@ An item may be changed to `[x]` only when its relevant backend behavior, fronten
 - [ ] **PARTIAL:** Define shared domain contracts; authentication and catalog contracts exist, but later commerce domains do not.
 - [x] Apply and verify the complete Prisma migration chain against a disposable PostgreSQL database.
 - [x] Define module-level audit conventions for all sensitive mutations.
-- [ ] Define provider-neutral payment, courier, storage, and communication adapter interfaces.
+- [ ] **PARTIAL:** Define provider-neutral payment, courier, storage, and communication adapter interfaces; courier and transactional communication boundaries exist, while payment and storage remain pending.
 - [ ] Add consistent correlation IDs across HTTP requests, jobs, and provider calls.
 - [ ] Add production-ready structured logging and stable machine-readable error codes.
 
@@ -64,16 +64,22 @@ An item may be changed to `[x]` only when its relevant backend behavior, fronten
 - [ ] Add staff invitation, deactivation, and reset workflows (`FR-AUTH-006`).
 - [ ] Add optional two-factor authentication for high-risk roles (`FR-AUTH-007`).
 - [x] Implement guest checkout without account creation (`FR-AUTH-008`).
-- [ ] Implement verified customer access to order history (`FR-AUTH-009`).
+- [x] Implement verified customer access to order history (`FR-AUTH-009`).
+- [x] Add Customer Web email registration, Redis-backed email-code verification, resend, verified-session issuance, and unverified-login rejection.
+- [x] Add Google Identity Services sign-in with official audience/signature verification and durable provider-identity linking; activation remains configuration-gated by the Google client ID.
 
 ### 3.3 Frontend alignment
 
 - [x] Replace Admin Web mock login with backend authentication.
 - [x] Add real Admin Web logout.
+- [x] Add Customer Web HTTP-only access/refresh cookies, refresh-token rotation, retry-once behavior for authenticated account/review/warranty APIs, and revoking logout.
+- [x] Add polished Customer Web sign-in, registration, and email-verification screens with visible account creation and Google sign-in entry points.
+- [x] Enforce exact same-origin checks for every state-changing Customer Web BFF route while keeping payment-provider callbacks on the backend boundary.
 - [x] Add a typed Customer Web backend-client foundation.
 - [x] Fix the Customer Web checkout server-rendering failure.
 - [x] Connect Customer Web catalog, cart, checkout preview, and COD order placement to real APIs.
-- [ ] **PARTIAL:** Admin Web catalog, inventory, delivery, order, reporting, settings, and overview use protected APIs; the customer-management placeholder remains.
+- [x] Keep checkout idempotency-key generation compatible with non-secure HTTP test origins while preferring native secure-context UUIDs.
+- [x] Connect Admin Web catalog, inventory, delivery, order, reporting, settings, overview, and customer-management screens to protected APIs.
 - [ ] Align all retained screens with `_doc/design-language.md`.
 - [ ] Verify loading, empty, success, validation, failure, and retry states on each connected screen.
 
@@ -104,13 +110,16 @@ No Release 1 domain is complete yet. Existing prototype UI is treated as a start
 - [x] Keep immutable stock movements and order-linked reservation records for every confirmation-time stock hold.
 - [x] Draft, publish, unpublish, edit, and archive workflows work with catalog mutation audit records.
 - [x] Add product and media ordering.
+- [x] Add new and second-hand product conditions with required grade/disclosure, storefront filtering, and immutable order-item snapshots.
 - [ ] **PARTIAL:** Media URLs are validated; S3-compatible upload and delivery are not connected.
 - [x] Add backend catalog and inventory services, DTO validation, authorization, and pagination.
 - [x] Add admin category creation, editing, hierarchy, activation, and ordering controls.
+- [x] Add guarded category deletion that blocks categories with products or child categories and records an audit event.
 - [x] Replace Admin Web product mocks with create, edit, archive, publish, and unpublish operations.
 - [x] Add multi-variant, SKU, price, threshold, initial-stock, and stock-adjustment administration.
 - [x] Add low-stock and discrepancy views with movement history.
 - [x] Add stock-adjustment permission, reason, actor, and immutable movement behavior.
+- [x] Add typed adjustment reasons, sign rules, source references, optional unit cost, effective time, and evidence URL to manual inventory records.
 - [ ] **PARTIAL:** Catalog unit tests, confirmation-time reservation contention, and manual stock-adjustment concurrency pass; broader category, product, and media database integration remain.
 - [x] Verify both frontend production builds after integration.
 
@@ -139,6 +148,7 @@ No Release 1 domain is complete yet. Existing prototype UI is treated as a start
 
 - [x] Implement opaque persistent guest cart identity and server storage.
 - [x] Add, remove, and update valid variant quantities through the backend cart.
+- [x] Add a cart-page continue-shopping action and checkout-side quantity plus sibling-variant editing with server validation.
 - [x] Revalidate unpublished, repriced, invalid, and unavailable lines.
 - [x] Label cart totals as estimates and recalculate current product prices on the server.
 - [ ] Merge a guest cart safely when verified customer accounts are introduced.
@@ -146,6 +156,7 @@ No Release 1 domain is complete yet. Existing prototype UI is treated as a start
 - [x] Normalize Bangladesh phone numbers while preserving appropriate source data.
 - [x] Model customer profiles without treating a phone match as infallible identity proof.
 - [x] Support reusable multiple-address records and immutable order-address snapshots.
+- [x] Add authenticated customer profile and previous-order history through an explicit one-to-one link verified by order reference plus checkout phone; never infer ownership from similar email or phone alone.
 - [x] Collect name, phone, district, area, address, and optional landmark.
 - [ ] Add selectable map location only if approved and useful; do not block checkout on it.
 - [x] Separate optional promotional consent from transactional communication.
@@ -156,6 +167,8 @@ No Release 1 domain is complete yet. Existing prototype UI is treated as a start
 - [x] Display the final total and payment method before confirmation.
 - [x] Capture source and campaign attribution.
 - [x] Preserve entered data across recoverable checkout errors.
+- [x] Persist an optional customer order note into the checkout draft and immutable order record, and expose it to Admin operations.
+- [x] Show configured support phone or email directly in checkout without hard-coded contact data.
 - [ ] **PARTIAL:** Persistent cart and checkout calculation tests pass; database integration tests remain.
 
 ### Slice 4 — Orders and COD operations
@@ -174,7 +187,7 @@ No Release 1 domain is complete yet. Existing prototype UI is treated as a start
 - [x] Add call/confirmation actions for order operations agents.
 - [x] Require a cancellation reason and transactionally release reservations with inverse movement, history, audit, and message evidence.
 - [x] Prove serializable confirmation transactions prevent oversell when two orders compete for the same finite stock.
-- [ ] Add customer profile and delivered-order count to appropriate admin context.
+- [x] Add paginated Admin customer profiles with masked list contacts, delivered/completed order count and spend, cancellation/return/RTO context, latest attribution, saved addresses, bounded order history, and direct order-queue links.
 - [x] Cover invalid transition rules, duplicate placement, confirmation lock contention, and reservation release with unit or PostgreSQL integration tests.
 
 ### Slice 5 — Prepaid payments
@@ -182,14 +195,14 @@ No Release 1 domain is complete yet. Existing prototype UI is treated as a start
 **Purpose:** Add one safe provider-neutral prepaid path without coupling orders to one provider.  
 **PRD coverage:** `FR-PAY-001`–`FR-PAY-010`
 
-- [ ] Approve the first production payment provider and launch requirement.
-- [ ] Implement the provider-neutral payment adapter contract.
-- [ ] Store a separate record for every payment attempt and provider reference.
-- [ ] Add redirect or provider-UI initiation and result handling.
-- [ ] Authenticate and idempotently process callbacks/webhooks.
-- [ ] Verify amount, currency, order, and expected state before marking payment successful.
-- [ ] Support safe payment retry without duplicate order creation.
-- [ ] Show paid, unpaid, failed, expired, partially refunded, and refunded states in Admin Web.
+- [ ] **PARTIAL:** Approve the first production payment provider and launch requirement; SSLCommerz and aamarPay are selected for implementation, while production account approval and launch ordering remain pending.
+- [x] Implement an abstract payment gateway, registry, and configuration-gated SSLCommerz and aamarPay hosted-payment strategies.
+- [x] Store a separate durable record for every payment attempt, merchant reference, provider reference, callback, raw outcome, and processing status.
+- [x] Add hosted redirect initiation and success, failure, cancellation, and IPN result handling.
+- [ ] **PARTIAL:** Idempotently process callbacks/webhooks and verify outcomes through provider validation/query APIs; local adapter proof passes, while real sandbox callback authenticity and replay remain pending credentials and public callback access.
+- [x] Verify merchant transaction, amount, currency, order, provider, expected state, and SSLCommerz risk before marking payment successful.
+- [ ] **PARTIAL:** Support safe payment retry without duplicate order creation; secure reference-plus-phone retry, expired-attempt claiming, reservation release, same-order re-reservation, and fresh hosted sessions are implemented, while provider sandbox retry proof remains.
+- [ ] **PARTIAL:** Show paid, unpaid, failed, expired, partially refunded, and refunded states in Admin Web; the payment ledger exposes providers, attempts, callbacks, failures, expiry recovery health, and manual sweep, while refund filtering and detailed drill-down remain.
 - [ ] Restrict and audit manual payment-state changes.
 - [ ] Add sandbox tests for success, failure, cancellation, replay, expiry, and retry.
 
@@ -205,14 +218,14 @@ No Release 1 domain is complete yet. Existing prototype UI is treated as a start
 - [x] Implement the provider-neutral courier adapter contract with configuration-gated Pathao and Steadfast adapters.
 - [x] Store courier request, response, external consignment, tracking, label reference, COD amount, charge, and weight.
 - [x] Store raw courier events and normalized shipment states outside the order table.
-- [ ] **PARTIAL:** Authenticate, deduplicate, retain, and expose courier callbacks; queue retry and provider sandbox tests remain.
+- [ ] **PARTIAL:** Authenticate with constant-time credential comparison, isolate rejected attempts from valid event identity, claim concurrent events once, recover failed or abandoned attempts through bounded BullMQ retries, retain attempt evidence, expose queue health, and provide audited Admin retry controls; provider sandbox tests remain.
 - [x] Prevent unknown and out-of-order events from regressing accepted shipment state.
-- [ ] Add polling fallback where the provider requires it.
+- [ ] **PARTIAL:** Add polling fallback where the provider requires it; the provider-neutral contract, durable attempts, shared normalized event path, bounded BullMQ cadence/backoff, terminal stop rules, health, Admin evidence, and fake-provider PostgreSQL/Redis proof are complete, while concrete Pathao/Steadfast status calls await real sandbox contracts.
 - [x] Add secure public order tracking using verification or a signed link.
 - [x] Queue transactional messages only after business transactions commit.
 - [ ] **PARTIAL:** Message-attempt and provider-outcome records exist; an approved provider adapter is still required to populate live outcomes.
 - [x] Keep notification failure isolated from commerce operations.
-- [ ] Add configured transactional channel priority and fallback.
+- [ ] **PARTIAL:** Add configured transactional channel priority and fallback; versioned priority, immutable message snapshots, definitive-failure-only fallback, uncertain-outcome duplicate protection, durable attempt evidence, queue health, and audited retry are implemented, while activation awaits approved priority and real provider adapters.
 - [ ] Test delivery, failed attempt, cancellation, RTO, callback replay, and provider outage with provider sandbox access.
 - [ ] Add pickup batches after the MVP shipment/event flow is proven.
 - [ ] Add provider labels and printable AWB/barcodes where the approved provider exposes them.
@@ -251,16 +264,21 @@ No Release 1 domain is complete yet. Existing prototype UI is treated as a start
 - [ ] Add permission-aware exports with sensitive-data masking.
 - [ ] **PARTIAL:** Add owner, operations, and finance dashboard views that link to filtered details; overview, reports, and a dedicated reconciliation workspace exist, while permission-specific workspaces and complete filtered drill-downs remain.
 - [ ] Add feature flags for risky staged rollouts where appropriate.
+- [x] Add explicit checkout opt-in for anonymized purchase activity and snapshot consent on the order.
+- [x] Derive public social proof only from real delivered/completed orders; mask customer names and never expose contact or full-address data.
+- [x] Add a four-second global customer popup and paginated verified-purchase history aggregated per order as lead product plus `+N items`, with disabled-by-default visibility controls.
+- [x] Add an Admin Global Order History tab for popup/history visibility, optional district, timing, age window, product exclusions, and read-only eligible-record preview.
+- [x] Replace raw purchase-activity exclusion IDs with debounced Admin catalog search, named selections, and explicit remove actions while retaining backend ID enforcement.
 
 ### Slice 9 — Release 1 hardening and launch
 
 **Purpose:** Satisfy all PRD Release 1 exit criteria before real launch.
 
 - [ ] Complete automated unit tests required by PRD section 27.1.
-- [ ] Complete transactional and concurrency integration tests.
+- [ ] **PARTIAL:** Complete transactional and concurrency integration tests; purchase-activity PostgreSQL scenarios now cover eligibility, consent, terminal status, age, exclusions, Bengali masking, order aggregation, locality, and pagination, but require a configured disposable `TEST_DATABASE_URL` for live execution.
 - [ ] Complete browse-to-COD and browse-to-prepaid end-to-end tests.
 - [ ] Complete admin-confirmation-to-delivery and return-to-refund tests.
-- [ ] Test Bangla, English, and mixed customer names and addresses.
+- [ ] **PARTIAL:** Test Bangla, English, and mixed customer names and addresses; purchase-activity coverage now includes English and Bengali names plus Dhaka/Rampura address output rules, while full checkout, fulfillment, and support-flow coverage remains.
 - [ ] Test mobile devices, constrained networks, keyboard use, and screen readers.
 - [ ] **PARTIAL:** Add request, database, queue, commerce, provider, and backup metrics; reconciliation queue health now exposes delivery counts plus PostgreSQL-derived 24-hour completion, failure, success-rate, duration, and last-run evidence, while platform-wide metrics remain pending.
 - [ ] Add actionable alerts for critical paths and provider failures.
@@ -389,10 +407,28 @@ This is a dependency sequence, not a calendar promise. Dates should be assigned 
 - [x] Add a quoted-field-safe canonical settlement CSV preflight with strict size, row, header, encoding, identity, and BDT amount validation plus Admin diagnostics and ready-only row population.
 - [x] Re-run CSV preflight during import, bind file and normalized-row checksums plus parser version to immutable evidence, exclude full file content from stored JSON, and reject post-preview drift before financial effects.
 - [x] Generate a versioned canonical CSV template from the backend parser contract, expose an Admin download action with BDT guidance, and live-smoke the proxy session gate returning a clean unauthenticated 401.
+- [x] Prove the authenticated canonical CSV success path through the built Admin proxy and backend against disposable PostgreSQL and Redis, including login cookies, template, preflight, import, immutable history, idempotent replay, paid-order transition, settled COD evidence, parser checksums, and audit records.
+- [x] Prove Pathao and Steadfast callback authentication, rejected-attempt isolation, concurrent replay deduplication, failed-attempt recovery, delivery effects, and out-of-order retention against disposable PostgreSQL, with retry evidence exposed in Admin Web.
+- [x] Add configurable BullMQ callback sweeps, deterministic bounded retry jobs, stale-lease recovery, queue health, audited operator retry controls, and isolated Redis runtime proof without regressing reconciliation jobs.
+- [x] Add provider-neutral courier polling contracts, durable poll/evidence records, normalized event reuse, bounded outage backoff, terminal stop rules, queue health, audited Admin controls, and fake-provider PostgreSQL/Redis proofs without inventing Pathao or Steadfast payload fields.
+- [x] Add disabled-by-default transactional routing policy, immutable route snapshots, append-only channel attempts, definitive-failure fallback, uncertain-outcome duplicate protection, BullMQ health/recovery controls, and restrained Admin evidence without inventing provider APIs.
+- [x] Add prepaid checkout selection, pre-redirect stock reservation, provider-neutral attempts/callbacks, SSLCommerz and aamarPay hosted adapters, server-side outcome verification, atomic paid-order confirmation, and an Admin payment ledger.
+- [x] Refactor payment providers behind an abstract gateway and registry, add durable expired-attempt recovery with reservation release, secure same-order customer retry, Admin queue health/manual sweep, and isolated Redis scheduler/retry proof.
+- [x] Add guarded category deletion, checkout cart quantity/variant editing, optional persisted customer notes, continue-shopping navigation, and configured checkout support contacts.
+- [x] Add second-hand product disclosure across Admin, storefront, cart, checkout, and order snapshots, plus evidence-rich inventory adjustment controls.
+- [x] Add account-authenticated YouTube review submission, moderation, featured approved embeds, and product review banner management.
+- [x] Add category-scoped service offerings, lead-time validated booking requests, immutable snapshots, and guarded Admin transitions.
+- [x] Add authenticated warranty claims for phone-verified delivered order items, Cloudinary image evidence, duplicate-active-claim protection, immutable snapshots, and guarded repair/brand/rejection history.
+- [x] Add consented real-purchase social proof, a four-second global popup, paginated public history, and audited Admin visibility/exclusion controls without manual or fake activity creation.
+- [x] Add catalog-backed Admin product search for purchase-activity exclusions so operators do not need to copy internal IDs.
+- [x] Add real-Prisma purchase-activity integration scenarios for disabled surfaces, consent/status/age eligibility, exclusions, order-level `+N` aggregation, Bengali masking, locality precedence, and pagination.
 - [x] Apply the full migration chain to disposable PostgreSQL and test a seeded reconciliation inconsistency plus concurrent scans.
 - [ ] Connect managed object storage for product media.
 - [x] Implement persistent guest cart and server-side cart revalidation.
 - [x] Model customer identity, reusable Bangladesh addresses, and immutable order-address snapshots.
+- [x] Replace the Admin Customers placeholder with searchable customer operations profiles, delivered-order metrics, explainable attention indicators, and recent order history.
+- [x] Add Customer Web account order history with explicit order ownership verification, saved addresses, product lines, lifecycle/payment/tracking context, and warranty navigation.
+- [x] Complete Customer Web session lifecycle for account, review, and warranty actions with server-only token handling, transparent access refresh, and visible sign-out.
 - [x] Add configurable delivery rules and server-calculated checkout preview.
 - [x] Add and database-prove idempotent COD order conversion, immutable item/address snapshots, and guarded confirmation-time reservation operations.
 

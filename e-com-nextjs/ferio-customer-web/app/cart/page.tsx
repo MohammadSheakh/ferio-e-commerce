@@ -61,7 +61,7 @@ export default function CartPage() {
             <div key={line.variantId} className="py-6">
               <div className="flex items-center gap-4">
                 <div className="h-20 w-20 overflow-hidden rounded-card bg-surface">{line.image && <img src={line.image} alt={line.productName} className="h-full w-full object-cover" />}</div>
-                <div className="min-w-0 flex-1"><Link href={`/products/${line.slug}`} className="text-[14px] font-medium text-ink hover:underline">{line.productName}</Link><p className="text-[11px] text-ink2">{line.variantName} · {line.sku}</p><p className="mt-0.5 text-[13px] text-ink2">{formatTaka(line.currentUnitPrice)}</p>{line.addedUnitPrice !== line.currentUnitPrice && <p className="mt-1 text-[11px] text-amber-700">Previously {formatTaka(line.addedUnitPrice)}</p>}</div>
+                <div className="min-w-0 flex-1"><Link href={`/products/${line.slug}`} className="text-[14px] font-medium text-ink hover:underline">{line.productName}</Link><p className="text-[11px] text-ink2">{line.variantName} · {line.sku}{line.condition === "SECOND_HAND" ? ` · second-hand (${line.conditionGrade?.replaceAll("_", " ").toLowerCase()})` : ""}</p><p className="mt-0.5 text-[13px] text-ink2">{formatTaka(line.currentUnitPrice)}</p>{line.addedUnitPrice !== line.currentUnitPrice && <p className="mt-1 text-[11px] text-amber-700">Previously {formatTaka(line.addedUnitPrice)}</p>}</div>
                 <div className="flex items-center rounded-full ring-1 ring-line"><button disabled={disabled || line.quantity <= 1} onClick={() => void updateQuantity(line.variantId, line.quantity - 1)} className="px-3 py-1.5 text-ink2 disabled:opacity-30" aria-label="Decrease quantity">−</button><span className="w-6 text-center text-[13px]">{line.quantity}</span><button disabled={disabled || line.quantity >= line.availableStock} onClick={() => void updateQuantity(line.variantId, line.quantity + 1)} className="px-3 py-1.5 text-ink2 disabled:opacity-30" aria-label="Increase quantity">+</button></div>
                 <p className="w-24 text-right text-[14px] font-medium text-ink">{formatTaka(line.lineTotal)}</p>
                 <button disabled={disabled} onClick={() => void removeLine(line.variantId)} className="text-[12px] text-ink2 underline decoration-line underline-offset-4 disabled:opacity-30">Remove</button>
@@ -75,7 +75,10 @@ export default function CartPage() {
       <div className="ml-auto mt-8 max-w-sm space-y-3 text-[13px]">
         <div className="flex justify-between text-ink2"><span>Estimated subtotal</span><span>{formatTaka(subtotal)}</span></div>
         <p className="border-t border-line pt-3 text-[12px] leading-relaxed text-ink2">Delivery, discounts, and final stock are calculated again during checkout.</p>
-        {cart.isValid ? <Link href="/checkout" className="block rounded-full bg-ink px-6 py-3 text-center text-[14px] font-medium text-white hover:opacity-85">Proceed to checkout</Link> : <button disabled className="w-full rounded-full bg-ink/25 px-6 py-3 text-[14px] font-medium text-white">Resolve cart issues to continue</button>}
+        <div className="grid grid-cols-2 gap-2">
+          <Link href="/products" className="rounded-full border border-line px-5 py-3 text-center text-[14px] font-medium text-ink hover:border-ink">Continue shopping</Link>
+          {cart.isValid ? <Link href="/checkout" className="rounded-full bg-ink px-5 py-3 text-center text-[14px] font-medium text-white hover:opacity-85">Proceed to checkout</Link> : <button disabled className="rounded-full bg-ink/25 px-5 py-3 text-[14px] font-medium text-white">Resolve issues</button>}
+        </div>
       </div>
     </main>
   );

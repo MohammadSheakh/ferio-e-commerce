@@ -13,12 +13,23 @@ export type CartLine = {
   variantName: string;
   sku: string;
   codAvailable: boolean;
+  condition: "NEW" | "SECOND_HAND";
+  conditionGrade: "LIKE_NEW" | "GOOD" | "FAIR" | null;
   image: string | null;
   quantity: number;
   addedUnitPrice: number;
   currentUnitPrice: number;
   lineTotal: number;
   availableStock: number;
+  availableVariants: Array<{
+    id: string;
+    name: string;
+    sku: string;
+    attributes: Record<string, string> | null;
+    price: number;
+    availableStock: number;
+    isActive: boolean;
+  }>;
   issues: CartIssue[];
 };
 

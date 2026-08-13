@@ -32,6 +32,11 @@ export default function ProductCard({ product }: { product: CatalogProduct }) {
             Out of stock
           </span>
         )}
+        {product.condition === "SECOND_HAND" && !outOfStock && (
+          <span className="absolute bottom-3 left-3 rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-ink ring-1 ring-line">
+            Second-hand
+          </span>
+        )}
       </div>
       <div className="mt-3">
         <p className="text-[13px] text-ink2">{product.category.name}</p>

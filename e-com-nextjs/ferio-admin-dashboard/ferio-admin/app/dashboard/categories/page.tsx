@@ -28,6 +28,7 @@ export default function CategoriesPage() {
   const [form, setForm] = useState<CategoryForm>(emptyForm);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState("");
   const [error, setError] = useState("");
 
   const loadCategories = useCallback(async () => {
@@ -93,6 +94,31 @@ export default function CategoriesPage() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  async function deleteCategory(category: CatalogCategory) {
+    if (!window.confirm(`Delete “${category.name}”? This cannot be undone.`)) return;
+    setDeletingId(category.id);
+    setError("");
+    try {
+      const response = await fetch(`/api/catalog/categories/${category.id}`, {
+        method: "DELETE",
+      });
+      const payload = (await response.json()) as { message?: string };
+      if (!response.ok) {
+        throw new Error(payload.message || "Unable to delete category.");
+      }
+      if (form.id === category.id) setForm(emptyForm);
+      await loadCategories();
+    } catch (deleteError) {
+      setError(
+        deleteError instanceof Error
+          ? deleteError.message
+          : "Unable to delete category.",
+      );
+    } finally {
+      setDeletingId("");
+    }
+  }
+
   return (
     <>
       <Topbar title="Categories" subtitle="Organize the storefront catalog" />
@@ -116,7 +142,7 @@ export default function CategoriesPage() {
           <table className="w-full text-left">
             <thead><tr className="text-[11px] uppercase tracking-eyebrow text-ink2"><th className="px-5 py-3 font-normal">Category</th><th className="px-5 py-3 font-normal">Products</th><th className="px-5 py-3 font-normal">Order</th><th className="px-5 py-3 font-normal">Status</th><th className="px-5 py-3 font-normal"><span className="sr-only">Actions</span></th></tr></thead>
             <tbody className="divide-y divide-line">
-              {categories.map((category) => <tr key={category.id} className="text-[13px]"><td className="px-5 py-3.5"><p className="text-ink">{category.name}</p><p className="text-[11px] text-ink2">/{category.slug}</p></td><td className="px-5 py-3.5 text-ink2">{category._count.products}</td><td className="px-5 py-3.5 text-ink2">{category.sortOrder}</td><td className="px-5 py-3.5"><span className={`rounded-full px-2.5 py-1 text-[11px] ${category.isActive ? "bg-emerald-50 text-emerald-700" : "bg-surface text-ink2"}`}>{category.isActive ? "Active" : "Inactive"}</span></td><td className="px-5 py-3.5 text-right"><button onClick={() => editCategory(category)} className="text-[12px] text-ink2 underline decoration-line underline-offset-4 hover:text-ink">Edit</button></td></tr>)}
+              {categories.map((category) => <tr key={category.id} className="text-[13px]"><td className="px-5 py-3.5"><p className="text-ink">{category.name}</p><p className="text-[11px] text-ink2">/{category.slug}</p></td><td className="px-5 py-3.5 text-ink2">{category._count.products}</td><td className="px-5 py-3.5 text-ink2">{category.sortOrder}</td><td className="px-5 py-3.5"><span className={`rounded-full px-2.5 py-1 text-[11px] ${category.isActive ? "bg-emerald-50 text-emerald-700" : "bg-surface text-ink2"}`}>{category.isActive ? "Active" : "Inactive"}</span></td><td className="px-5 py-3.5 text-right"><div className="flex justify-end gap-3"><button onClick={() => editCategory(category)} className="text-[12px] text-ink2 underline decoration-line underline-offset-4 hover:text-ink">Edit</button><button disabled={deletingId === category.id} onClick={() => void deleteCategory(category)} className="text-[12px] text-rose-700 underline decoration-line underline-offset-4 disabled:opacity-40">{deletingId === category.id ? "Deleting…" : "Delete"}</button></div></td></tr>)}
               {!loading && categories.length === 0 && <tr><td colSpan={5} className="px-5 py-12 text-center text-[13px] text-ink2">Create the first category to start adding products.</td></tr>}
               {loading && <tr><td colSpan={5} className="px-5 py-12 text-center text-[13px] text-ink2">Loading categories…</td></tr>}
             </tbody>

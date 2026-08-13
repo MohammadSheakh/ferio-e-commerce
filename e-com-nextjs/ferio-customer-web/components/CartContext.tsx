@@ -20,6 +20,11 @@ type CartContextType = {
   add: (variantId: string, quantity?: number) => Promise<void>;
   remove: (variantId: string) => Promise<void>;
   setQty: (variantId: string, quantity: number) => Promise<void>;
+  replaceVariant: (
+    variantId: string,
+    replacementVariantId: string,
+    quantity: number,
+  ) => Promise<void>;
   revalidate: () => Promise<CartState>;
   clearError: () => void;
 };
@@ -91,6 +96,18 @@ export function CartProvider({ children }: { children: ReactNode }) {
     });
   }
 
+  async function replaceVariant(
+    variantId: string,
+    replacementVariantId: string,
+    quantity: number,
+  ) {
+    await requestCart(`/api/cart/items/${variantId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ quantity, replacementVariantId }),
+    });
+  }
+
   async function revalidate() {
     return requestCart("/api/cart/validate", { method: "POST" });
   }
@@ -107,6 +124,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         add,
         remove,
         setQty,
+        replaceVariant,
         revalidate,
         clearError: () => setError(""),
       }}

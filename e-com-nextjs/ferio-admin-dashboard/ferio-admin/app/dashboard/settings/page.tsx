@@ -7,7 +7,18 @@ import type { CommerceSettings } from "@/lib/commerce-settings";
 
 type SettingsForm = Omit<
   CommerceSettings,
-  "id" | "createdAt" | "updatedAt" | "defaultReturnWindowDays"
+  | "id"
+  | "createdAt"
+  | "updatedAt"
+  | "defaultReturnWindowDays"
+  | "purchaseActivityEnabled"
+  | "purchaseHistoryEnabled"
+  | "purchaseActivityShowDistrict"
+  | "purchaseActivityShowArea"
+  | "purchaseActivityDurationMs"
+  | "purchaseActivityIntervalSeconds"
+  | "purchaseActivityMaxAgeDays"
+  | "purchaseActivityExcludedProductIds"
 > & { defaultReturnWindowDays: string };
 
 function toForm(settings: CommerceSettings): SettingsForm {

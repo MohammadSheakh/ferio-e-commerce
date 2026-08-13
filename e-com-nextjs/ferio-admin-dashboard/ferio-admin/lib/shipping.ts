@@ -5,6 +5,7 @@ export type ShipmentProvider = {
   baseUrl: string;
   isActive: boolean;
   configured: boolean;
+  pollingConfigured: boolean;
 };
 
 export type ShipmentEvent = {
@@ -28,6 +29,10 @@ export type Shipment = {
   shippingCharge: number | null;
   lastRawStatus: string | null;
   exceptionReason: string | null;
+  lastPolledAt: string | null;
+  nextPollAt: string | null;
+  pollingFailureCount: number;
+  pollingError: string | null;
   provider: ShipmentProvider;
   events?: ShipmentEvent[];
   createdAt: string;
@@ -39,6 +44,77 @@ export type Shipment = {
     customer: { name: string; phoneNormalized: string };
     address: { district: string; area: string } | null;
   };
+};
+
+export type ShipmentPollAttempt = {
+  id: string;
+  status: "QUEUED" | "PROCESSING" | "SUCCEEDED" | "FAILED" | "SKIPPED";
+  normalizedStatus: string | null;
+  errorMessage: string | null;
+  requestedByActorId: string | null;
+  createdAt: string;
+  finishedAt: string | null;
+  shipment: {
+    id: string;
+    trackingNumber: string | null;
+    status: string;
+    provider: { code: "PATHAO" | "STEADFAST"; name: string };
+    order: { reference: string };
+  };
+};
+
+export type ShipmentPollingQueueHealth = {
+  available: boolean;
+  scheduleEnabled: boolean;
+  scheduleEveryMinutes: number;
+  batchSize: number;
+  eligibleCount: number;
+  counts: CourierWebhookQueueHealth["counts"];
+  scheduler: CourierWebhookQueueHealth["scheduler"];
+  error?: string;
+};
+
+export type CourierWebhookLog = {
+  id: string;
+  providerCode: "PATHAO" | "STEADFAST";
+  authValid: boolean;
+  processed: boolean;
+  attemptCount: number;
+  processingStartedAt: string | null;
+  lastAttemptAt: string | null;
+  processingError: string | null;
+  receivedAt: string;
+  processedAt: string | null;
+};
+
+export type CourierWebhookQueueHealth = {
+  available: boolean;
+  scheduleEnabled: boolean;
+  scheduleEveryMinutes: number;
+  maxAttempts: number;
+  recoverableCount: number;
+  counts: {
+    waiting: number;
+    active: number;
+    completed: number;
+    failed: number;
+    delayed: number;
+  } | null;
+  scheduler: { id: string; name: string; next: number } | null;
+  error?: string;
+};
+
+export const webhookStatus = (log: CourierWebhookLog) => {
+  if (!log.authValid) {
+    return { label: "Rejected", className: "bg-rose-50 text-rose-700" };
+  }
+  if (log.processed) {
+    return { label: "Processed", className: "bg-emerald-50 text-emerald-700" };
+  }
+  if (log.processingStartedAt) {
+    return { label: "Processing", className: "bg-surface text-ink2" };
+  }
+  return { label: "Retry needed", className: "bg-amber-50 text-amber-700" };
 };
 
 export type RtoItem = {

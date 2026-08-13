@@ -26,6 +26,9 @@ export default function InventoryPageView() {
   const [movements, setMovements] = useState<InventoryMovement[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [adjustmentReason, setAdjustmentReason] = useState<
+    "STOCK_COUNT_CORRECTION" | "PURCHASE_RECEIPT" | "CUSTOMER_RETURN" | "DAMAGE_WRITE_OFF" | "OTHER"
+  >("STOCK_COUNT_CORRECTION");
   const [error, setError] = useState("");
 
   const loadInventory = useCallback(async () => {
@@ -104,7 +107,17 @@ export default function InventoryPageView() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             quantityDelta: Number(form.get("quantityDelta")),
+            adjustmentReason,
             reason: String(form.get("reason")),
+            referenceType: String(form.get("referenceType")) || undefined,
+            referenceId: String(form.get("referenceId")) || undefined,
+            unitCost: form.get("unitCost")
+              ? Math.round(Number(form.get("unitCost")) * 100)
+              : undefined,
+            evidenceUrl: String(form.get("evidenceUrl")) || undefined,
+            effectiveAt: form.get("effectiveAt")
+              ? new Date(String(form.get("effectiveAt"))).toISOString()
+              : undefined,
           }),
         },
       );
@@ -204,16 +217,20 @@ export default function InventoryPageView() {
           <section className="mt-8 grid gap-8 border-t border-line pt-8 lg:grid-cols-[360px_1fr]">
             <form onSubmit={adjustInventory} className="h-fit rounded-card border border-line p-5">
               <h2 className="text-[16px] font-medium text-ink">Adjust {selected.sku}</h2>
-              <p className="mt-1 text-[12px] text-ink2">Enter a positive or negative change. Every adjustment records the actor and reason.</p>
+              <p className="mt-1 text-[12px] text-ink2">Record what changed, why it changed, and the source evidence. The ledger remains append-only.</p>
+              <label className="mt-4 block text-[12px] text-ink2">Adjustment reason<select value={adjustmentReason} onChange={(event) => setAdjustmentReason(event.target.value as typeof adjustmentReason)} className="mt-1.5 w-full rounded-card border border-line px-3.5 py-2.5 text-[14px] outline-none focus:border-ink"><option value="STOCK_COUNT_CORRECTION">Stock count correction</option><option value="PURCHASE_RECEIPT">Purchase receipt</option><option value="CUSTOMER_RETURN">Customer return</option><option value="DAMAGE_WRITE_OFF">Damage write-off</option><option value="OTHER">Other</option></select></label>
               <label className="mt-4 block text-[12px] text-ink2">Quantity change<input name="quantityDelta" required type="number" step="1" className="mt-1.5 w-full rounded-card border border-line px-3.5 py-2.5 text-[14px] outline-none focus:border-ink" /></label>
-              <label className="mt-4 block text-[12px] text-ink2">Reason<textarea name="reason" required minLength={3} rows={3} className="mt-1.5 w-full rounded-card border border-line px-3.5 py-2.5 text-[14px] outline-none focus:border-ink" /></label>
+              <div className="mt-4 grid grid-cols-2 gap-3"><label className="text-[12px] text-ink2">Reference type<input name="referenceType" maxLength={80} placeholder="PO, invoice, return" className="mt-1.5 w-full rounded-card border border-line px-3.5 py-2.5 text-[14px] outline-none focus:border-ink" /></label><label className="text-[12px] text-ink2">Reference ID<input name="referenceId" required={adjustmentReason === "PURCHASE_RECEIPT" || adjustmentReason === "CUSTOMER_RETURN"} maxLength={120} placeholder="PO-10024" className="mt-1.5 w-full rounded-card border border-line px-3.5 py-2.5 text-[14px] outline-none focus:border-ink" /></label></div>
+              <div className="mt-4 grid grid-cols-2 gap-3"><label className="text-[12px] text-ink2">Unit cost (৳)<input name="unitCost" type="number" min="0" step="0.01" className="mt-1.5 w-full rounded-card border border-line px-3.5 py-2.5 text-[14px] outline-none focus:border-ink" /></label><label className="text-[12px] text-ink2">Effective time<input name="effectiveAt" type="datetime-local" className="mt-1.5 w-full rounded-card border border-line px-3.5 py-2.5 text-[14px] outline-none focus:border-ink" /></label></div>
+              <label className="mt-4 block text-[12px] text-ink2">Evidence URL<input name="evidenceUrl" type="url" placeholder="https://…" className="mt-1.5 w-full rounded-card border border-line px-3.5 py-2.5 text-[14px] outline-none focus:border-ink" /></label>
+              <label className="mt-4 block text-[12px] text-ink2">Detailed note<textarea name="reason" required minLength={3} maxLength={300} rows={3} className="mt-1.5 w-full rounded-card border border-line px-3.5 py-2.5 text-[14px] outline-none focus:border-ink" /></label>
               <button disabled={saving} className="mt-4 rounded-full bg-ink px-5 py-2.5 text-[13px] text-white disabled:opacity-50">{saving ? "Saving…" : "Record adjustment"}</button>
             </form>
 
             <div>
               <h2 className="text-[16px] font-medium text-ink">Movement history</h2>
               <div className="mt-4 divide-y divide-line border-y border-line">
-                {movements.map((movement) => <div key={movement.id} className="grid gap-2 py-3.5 text-[12px] md:grid-cols-[150px_90px_1fr_150px]"><span className="text-ink2">{movement.type.replaceAll("_", " ").toLowerCase()}</span><span className={movement.quantityDelta > 0 ? "text-emerald-700" : "text-rose-700"}>{movement.quantityDelta > 0 ? "+" : ""}{movement.quantityDelta}</span><span className="text-ink">{movement.reason}</span><time className="text-ink2">{new Date(movement.createdAt).toLocaleString("en-BD")}</time></div>)}
+                {movements.map((movement) => <div key={movement.id} className="py-3.5 text-[12px]"><div className="grid gap-2 md:grid-cols-[180px_90px_1fr_150px]"><span className="text-ink2">{(movement.adjustmentReason ?? movement.type).replaceAll("_", " ").toLowerCase()}</span><span className={movement.quantityDelta > 0 ? "text-emerald-700" : "text-rose-700"}>{movement.quantityDelta > 0 ? "+" : ""}{movement.quantityDelta}</span><span className="text-ink">{movement.reason}</span><time className="text-ink2">{new Date(movement.effectiveAt ?? movement.createdAt).toLocaleString("en-BD")}</time></div>{(movement.referenceId || movement.unitCost !== null || movement.evidenceUrl) && <p className="mt-2 text-[11px] text-ink2">{movement.referenceId && `${movement.referenceType ?? "Reference"}: ${movement.referenceId}`}{movement.unitCost !== null && ` · Unit cost ৳${(movement.unitCost / 100).toFixed(2)}`}{movement.evidenceUrl && <> · <a href={movement.evidenceUrl} target="_blank" rel="noreferrer" className="underline decoration-line underline-offset-4">Evidence</a></>}</p>}</div>)}
                 {movements.length === 0 && <p className="py-10 text-center text-[13px] text-ink2">No movements recorded for this SKU.</p>}
               </div>
             </div>

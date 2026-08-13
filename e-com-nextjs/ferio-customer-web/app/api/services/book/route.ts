@@ -1,0 +1,3 @@
+import { NextResponse } from 'next/server';
+const api = process.env.FERIO_API_URL ?? process.env.NEXT_PUBLIC_FERIO_API_URL ?? 'http://localhost:6733/api/v1';
+export async function POST(request: Request) { const response = await fetch(`${api}/services/bookings/request`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(await request.json()) }); const payload = await response.json(); return NextResponse.json(response.ok ? { data: payload.data } : { message: Array.isArray(payload.message) ? payload.message.join(' ') : payload.message }, { status: response.status }); }

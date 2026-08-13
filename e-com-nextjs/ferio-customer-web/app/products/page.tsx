@@ -16,6 +16,7 @@ type ProductSearchParams = {
   minPrice?: string;
   maxPrice?: string;
   inStock?: string;
+  condition?: "NEW" | "SECOND_HAND";
   sort?: "newest" | "price-asc" | "price-desc" | "name-asc";
   attributeKey?: string;
   attributeValue?: string;
@@ -31,6 +32,7 @@ export default async function ProductsPage({
   const minPrice = searchParams.minPrice ? Number(searchParams.minPrice) : undefined;
   const maxPrice = searchParams.maxPrice ? Number(searchParams.maxPrice) : undefined;
   const inStock = searchParams.inStock === "true";
+  const condition = searchParams.condition;
   const sort = searchParams.sort || "newest";
   const attributeKey = searchParams.attributeKey || "";
   const attributeValue = searchParams.attributeValue || "";
@@ -42,6 +44,7 @@ export default async function ProductsPage({
       minPrice: Number.isFinite(minPrice) ? minPrice : undefined,
       maxPrice: Number.isFinite(maxPrice) ? maxPrice : undefined,
       inStock,
+      condition,
       sort,
       attributeKey,
       attributeValue,
@@ -61,6 +64,7 @@ export default async function ProductsPage({
     if (searchParams.minPrice) query.set("minPrice", searchParams.minPrice);
     if (searchParams.maxPrice) query.set("maxPrice", searchParams.maxPrice);
     if (inStock) query.set("inStock", "true");
+    if (condition) query.set("condition", condition);
     if (sort !== "newest") query.set("sort", sort);
     if (attributeKey) query.set("attributeKey", attributeKey);
     if (attributeValue) query.set("attributeValue", attributeValue);
@@ -80,9 +84,10 @@ export default async function ProductsPage({
           <label className="text-[11px] uppercase tracking-eyebrow text-ink2">Maximum price<input name="maxPrice" defaultValue={searchParams.maxPrice} type="number" min="0" step="1" placeholder="Any" className="mt-1.5 w-full rounded-card border border-line px-3.5 py-2.5 text-[13px] normal-case tracking-normal outline-none focus:border-ink" /></label>
           <label className="text-[11px] uppercase tracking-eyebrow text-ink2">Sort<select name="sort" defaultValue={sort} className="mt-1.5 w-full rounded-card border border-line px-3.5 py-2.5 text-[13px] normal-case tracking-normal outline-none focus:border-ink"><option value="newest">Newest</option><option value="price-asc">Price: low to high</option><option value="price-desc">Price: high to low</option><option value="name-asc">Name</option></select></label>
         </div>
-        <div className="mt-3 grid gap-3 md:grid-cols-[1fr_1fr_auto]">
+        <div className="mt-3 grid gap-3 md:grid-cols-[1fr_1fr_1fr_auto]">
           <label className="text-[11px] uppercase tracking-eyebrow text-ink2">Variant attribute<input name="attributeKey" defaultValue={attributeKey} placeholder="e.g. size" className="mt-1.5 w-full rounded-card border border-line px-3.5 py-2.5 text-[13px] normal-case tracking-normal outline-none focus:border-ink" /></label>
           <label className="text-[11px] uppercase tracking-eyebrow text-ink2">Attribute value<input name="attributeValue" defaultValue={attributeValue} placeholder="e.g. M" className="mt-1.5 w-full rounded-card border border-line px-3.5 py-2.5 text-[13px] normal-case tracking-normal outline-none focus:border-ink" /></label>
+          <label className="text-[11px] uppercase tracking-eyebrow text-ink2">Condition<select name="condition" defaultValue={condition ?? ""} className="mt-1.5 w-full rounded-card border border-line px-3.5 py-2.5 text-[13px] normal-case tracking-normal outline-none focus:border-ink"><option value="">Any condition</option><option value="NEW">New</option><option value="SECOND_HAND">Second-hand</option></select></label>
           <div className="flex items-end gap-3 pb-0.5"><label className="flex items-center gap-2 whitespace-nowrap text-[13px] text-ink2"><input type="checkbox" name="inStock" value="true" defaultChecked={inStock} /> In stock only</label><button className="rounded-full bg-ink px-5 py-2.5 text-[13px] text-white">Apply</button><Link href="/products" className="text-[12px] text-ink2 underline decoration-line underline-offset-4">Clear</Link></div>
         </div>
       </form>

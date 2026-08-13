@@ -26,8 +26,11 @@ export type CheckoutPreview = {
     paymentCharge: number;
     total: number;
   };
-  paymentMethod: "COD";
+  paymentMethod: "COD" | "PREPAID";
+  paymentProvider: "SSLCOMMERZ" | "AAMARPAY" | null;
   marketingConsent: boolean;
+  purchaseActivityConsent: boolean;
+  customerNote: string | null;
   expiresAt: string;
   canPlaceOrder: true;
 };
@@ -37,7 +40,16 @@ export type OrderConfirmation = {
   reference: string;
   status: "PENDING_CONFIRMATION" | "CONFIRMED";
   codVerification: "REQUIRED" | "NOT_REQUIRED";
-  paymentMethod: "COD";
+  paymentMethod: "COD" | "PREPAID";
   total: number;
   createdAt: string;
+};
+
+export type PaymentOptions = {
+  methods: { cod: boolean; prepaid: boolean };
+  providers: Array<{ code: "SSLCOMMERZ" | "AAMARPAY"; name: string; configured: boolean }>;
+};
+
+export type CheckoutOrderResult = OrderConfirmation & {
+  payment?: { provider: "SSLCOMMERZ" | "AAMARPAY"; status: string; redirectUrl: string | null };
 };

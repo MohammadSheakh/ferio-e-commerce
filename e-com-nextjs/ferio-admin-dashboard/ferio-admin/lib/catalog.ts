@@ -54,6 +54,9 @@ export type CatalogProduct = {
   codAvailable: boolean;
   deliveryNote: string | null;
   returnNote: string | null;
+  condition: "NEW" | "SECOND_HAND";
+  conditionGrade: "LIKE_NEW" | "GOOD" | "FAIR" | null;
+  conditionNote: string | null;
   seoTitle: string | null;
   seoDescription: string | null;
   category: CatalogCategory;
@@ -111,6 +114,18 @@ export type InventoryMovement = {
   type: string;
   quantityDelta: number;
   reason: string;
+  adjustmentReason:
+    | "STOCK_COUNT_CORRECTION"
+    | "PURCHASE_RECEIPT"
+    | "CUSTOMER_RETURN"
+    | "DAMAGE_WRITE_OFF"
+    | "OTHER"
+    | null;
+  referenceType: string | null;
+  referenceId: string | null;
+  unitCost: number | null;
+  evidenceUrl: string | null;
+  effectiveAt: string | null;
   actorId: string | null;
   createdAt: string;
 };
