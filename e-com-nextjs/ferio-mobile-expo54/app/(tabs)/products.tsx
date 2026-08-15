@@ -1,0 +1,21 @@
+import { useLocalSearchParams } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FerioHeader } from '@/components/FerioHeader';
+import { ProductCard } from '@/components/ProductCard';
+import { getCategories, getProducts } from '@/lib/catalog';
+import { colors, radii } from '@/lib/theme';
+import type { CatalogCategory, CatalogProduct } from '@/types/catalog';
+
+export default function ProductsScreen() {
+ const params=useLocalSearchParams<{category?:string;sort?:string;sale?:string}>(); const [categories,setCategories]=useState<CatalogCategory[]>([]); const [products,setProducts]=useState<CatalogProduct[]>([]); const [search,setSearch]=useState(''); const [active,setActive]=useState(params.category||''); const [loading,setLoading]=useState(true);
+ const load=async(nextSearch=search,nextCategory=active)=>{setLoading(true); try{const [c,p]=await Promise.all([getCategories(),getProducts({search:nextSearch,category:nextCategory,sort:params.sort||'newest',sale:params.sale})]);setCategories(c);setProducts(p.items);}finally{setLoading(false)}};
+ useEffect(()=>{setActive(params.category||''); void load('',params.category||'');},[params.category,params.sort,params.sale]);
+ return <SafeAreaView style={styles.safe}><FerioHeader/><ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps='handled'>
+   <Text style={styles.title}>Shop all</Text><Text style={styles.count}>{products.length} products</Text>
+   <View style={styles.filters}><Text style={styles.label}>SEARCH</Text><View style={styles.searchRow}><TextInput value={search} onChangeText={setSearch} onSubmitEditing={()=>load()} placeholder='Product, brand, category' placeholderTextColor='#9a9a9e' style={styles.input}/><Pressable onPress={()=>load()} style={styles.apply}><Text style={styles.applyText}>Apply</Text></Pressable></View></View>
+   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}><Pressable onPress={()=>{setActive('');load(search,'')}} style={[styles.chip,!active&&styles.chipActive]}><Text style={[styles.chipText,!active&&styles.chipTextActive]}>All</Text></Pressable>{categories.map(c=><Pressable key={c.id} onPress={()=>{setActive(c.slug);load(search,c.slug)}} style={[styles.chip,active===c.slug&&styles.chipActive]}><Text style={[styles.chipText,active===c.slug&&styles.chipTextActive]}>{c.name}</Text></Pressable>)}</ScrollView>
+   {loading?<ActivityIndicator style={{marginTop:40}}/>:<View style={styles.grid}>{products.map(p=><ProductCard key={p.id} product={p}/>)}</View>}{!loading&&!products.length?<View style={styles.no}><Text style={styles.noTitle}>No matching products</Text><Text style={styles.noCopy}>Clear a filter or try a broader search.</Text></View>:null}
+ </ScrollView></SafeAreaView>
+}
+const styles=StyleSheet.create({safe:{flex:1,backgroundColor:colors.paper},container:{padding:18,paddingBottom:70},title:{fontSize:28,fontWeight:'600',letterSpacing:-.7,color:colors.ink},count:{marginTop:5,fontSize:13,color:colors.ink2},filters:{marginTop:26,borderWidth:1,borderColor:colors.line,borderRadius:radii.card,padding:16},label:{fontSize:10,letterSpacing:1.2,color:colors.ink2,fontWeight:'600'},searchRow:{marginTop:8,flexDirection:'row',gap:8},input:{flex:1,borderWidth:1,borderColor:colors.line,borderRadius:radii.card,paddingHorizontal:13,paddingVertical:10,fontSize:13,color:colors.ink},apply:{backgroundColor:colors.ink,borderRadius:radii.pill,paddingHorizontal:18,justifyContent:'center'},applyText:{color:'#fff',fontSize:12,fontWeight:'600'},chips:{gap:8,paddingVertical:22,borderBottomWidth:1,borderBottomColor:colors.line,paddingRight:18},chip:{borderWidth:1,borderColor:colors.line,borderRadius:radii.pill,paddingHorizontal:15,paddingVertical:7},chipActive:{backgroundColor:colors.ink,borderColor:colors.ink},chipText:{color:colors.ink2,fontSize:12},chipTextActive:{color:'#fff'},grid:{marginTop:28,flexDirection:'row',flexWrap:'wrap',justifyContent:'space-between'},no:{paddingVertical:70,alignItems:'center'},noTitle:{fontSize:15,color:colors.ink},noCopy:{marginTop:6,fontSize:13,color:colors.ink2}});
