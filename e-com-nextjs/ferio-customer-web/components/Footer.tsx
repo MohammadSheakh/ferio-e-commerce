@@ -36,8 +36,24 @@ export default function Footer({ store }: { store: PublicStoreConfig }) {
           </div>
         </div>
       </div>
-      <div className="border-t border-line px-6 py-6 text-center text-[12px] text-ink2">
-        © {new Date().getFullYear()} {store.storeName}. All rights reserved.
+
+      {/* Oversized ferio signature cropped and blurred into the footer baseline */}
+      <div className="relative mt-8 h-[clamp(5.5rem,11.5vw,12rem)] overflow-hidden bg-[#111] text-center">
+        <div
+          className="absolute inset-x-0 -bottom-[0.12em] whitespace-nowrap text-[clamp(4.6rem,10.8vw,12rem)] font-semibold leading-[0.82] tracking-[-0.08em] text-white select-none pointer-events-none"
+          style={{
+            fontFamily: "var(--font-space-grotesk), Arial, sans-serif",
+          }}
+        >
+          f e r i o
+        </div>
+
+        {/* Copyright notice positioned in bottom-right corner in white text color */}
+        <div className="absolute bottom-3 right-5 z-10 text-[11px] font-medium text-white/90 drop-shadow-md">
+          © 2026-{new Date().getFullYear() + 1} {store.storeName}. All rights reserved.
+        </div>
+
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[18%] bg-gradient-to-b from-transparent to-[#111]/25 backdrop-blur-[3px] [mask-image:linear-gradient(to_bottom,transparent,black)]" />
       </div>
     </footer>
   );
