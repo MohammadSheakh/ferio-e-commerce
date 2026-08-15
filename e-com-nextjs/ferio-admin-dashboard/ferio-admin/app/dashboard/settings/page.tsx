@@ -36,6 +36,8 @@ function toForm(settings: CommerceSettings): SettingsForm {
         : String(settings.defaultReturnWindowDays),
     codEnabled: settings.codEnabled,
     prepaidEnabled: settings.prepaidEnabled,
+    categoryTopNavEnabled: settings.categoryTopNavEnabled ?? true,
+    categorySideNavEnabled: settings.categorySideNavEnabled ?? true,
     termsUrl: settings.termsUrl,
     privacyUrl: settings.privacyUrl,
     returnPolicyUrl: settings.returnPolicyUrl,
@@ -219,6 +221,46 @@ export default function SettingsPage() {
                   <Link href="/dashboard/orders" className="text-ink2 underline decoration-line underline-offset-4 hover:text-ink">COD verification</Link>
                   <Link href="/dashboard/delivery" className="text-ink2 underline decoration-line underline-offset-4 hover:text-ink">Delivery regions and fees</Link>
                 </div>
+              </div>
+            </section>
+
+            <section className="border-b border-line pb-10">
+              <div className="mb-5">
+                <h2 className="text-[17px] font-medium text-ink">Category Navigation Layouts</h2>
+                <p className="mt-1 text-[12px] text-ink2">
+                  Select which category navigation design(s) are active on the customer website. You can enable either or both simultaneously.
+                </p>
+              </div>
+              <div className="grid gap-6 md:grid-cols-2">
+                <label className="flex items-start gap-3 text-[13px] font-medium text-ink cursor-pointer select-none rounded-card border border-line p-4 transition hover:border-ink">
+                  <input
+                    type="checkbox"
+                    checked={form.categoryTopNavEnabled}
+                    onChange={(event) => set("categoryTopNavEnabled", event.target.checked)}
+                    className="mt-1 h-4 w-4 accent-ink"
+                  />
+                  <div>
+                    <span className="font-semibold text-ink">Top Header Category Bar</span>
+                    <span className="mt-1 block text-[12px] font-normal text-ink2">
+                      Multi-level horizontal dropdown menu displayed directly below the main header bar.
+                    </span>
+                  </div>
+                </label>
+
+                <label className="flex items-start gap-3 text-[13px] font-medium text-ink cursor-pointer select-none rounded-card border border-line p-4 transition hover:border-ink">
+                  <input
+                    type="checkbox"
+                    checked={form.categorySideNavEnabled}
+                    onChange={(event) => set("categorySideNavEnabled", event.target.checked)}
+                    className="mt-1 h-4 w-4 accent-ink"
+                  />
+                  <div>
+                    <span className="font-semibold text-ink">Side Panel Category Navigation</span>
+                    <span className="mt-1 block text-[12px] font-normal text-ink2">
+                      Vertical collapsible sidebar drawer & panel displaying root categories, expandable accordions, and thumbnail grid cards.
+                    </span>
+                  </div>
+                </label>
               </div>
             </section>
 

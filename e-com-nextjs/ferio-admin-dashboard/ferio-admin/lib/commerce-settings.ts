@@ -18,6 +18,8 @@ export type CommerceSettings = {
   purchaseActivityIntervalSeconds: number;
   purchaseActivityMaxAgeDays: number;
   purchaseActivityExcludedProductIds: string[];
+  categoryTopNavEnabled: boolean;
+  categorySideNavEnabled: boolean;
   termsUrl: string | null;
   privacyUrl: string | null;
   returnPolicyUrl: string | null;

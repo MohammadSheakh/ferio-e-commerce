@@ -22,6 +22,7 @@ const links = [
   { href: "/dashboard/reconciliation", label: "Reconciliation" },
   { href: "/dashboard/reports", label: "Reports" },
   { href: "/dashboard/settings", label: "Settings" },
+  { href: "/dashboard/hero-showcase", label: "Hero Showcase" },
   { href: "/dashboard/customers", label: "Customers" },
 ];
 

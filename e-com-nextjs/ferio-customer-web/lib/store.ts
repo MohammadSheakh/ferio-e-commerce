@@ -15,6 +15,8 @@ export type PublicStoreConfig = {
   termsUrl: string | null;
   privacyUrl: string | null;
   returnPolicyUrl: string | null;
+  categoryTopNavEnabled: boolean;
+  categorySideNavEnabled: boolean;
 };
 
 export const fallbackStoreConfig: PublicStoreConfig = {
@@ -32,6 +34,8 @@ export const fallbackStoreConfig: PublicStoreConfig = {
   termsUrl: null,
   privacyUrl: null,
   returnPolicyUrl: null,
+  categoryTopNavEnabled: true,
+  categorySideNavEnabled: true,
 };
 
 export function getStoreConfig() {

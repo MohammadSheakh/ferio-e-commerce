@@ -3,9 +3,11 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { CartProvider } from "@/components/CartContext";
 import Header from "@/components/Header";
+import CategorySideNav from "@/components/CategorySideNav";
 import Footer from "@/components/Footer";
 import PurchaseActivityToast from "@/components/PurchaseActivityToast";
 import { fallbackStoreConfig, getStoreConfig } from "@/lib/store";
+import { getCategories } from "@/lib/catalog";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -26,13 +28,23 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const store = await getStoreConfig().catch(() => fallbackStoreConfig);
+  const [store, categories] = await Promise.all([
+    getStoreConfig().catch(() => fallbackStoreConfig),
+    getCategories().catch(() => []),
+  ]);
   return (
     <html lang="en">
       <body className={`${inter.variable} font-sans text-ink antialiased`}>
         <CartProvider>
-          <Header storeName={store.storeName} />
+          <Header
+            storeName={store.storeName}
+            categories={categories}
+            categoryTopNavEnabled={store.categoryTopNavEnabled ?? true}
+          />
           {children}
+          {store.categorySideNavEnabled && (
+            <CategorySideNav categories={categories} />
+          )}
           <Footer store={store} />
           <PurchaseActivityToast />
         </CartProvider>

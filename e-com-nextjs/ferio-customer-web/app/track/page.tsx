@@ -12,6 +12,123 @@ function formatTaka(amount: number) {
   }).format(amount);
 }
 
+function getOrderStages(tracking: OrderTracking) {
+  const isCancelled = tracking.status === "CANCELLED";
+
+  const findEvent = (codes: string[]) =>
+    tracking.timeline.find((t) => codes.includes(t.code.toUpperCase()));
+
+  const confirmedEvent = findEvent(["CONFIRMED"]);
+  const processingEvent = findEvent([
+    "READY_FOR_FULFILLMENT",
+    "PICKING",
+    "PACKED",
+    "HANDED_OVER",
+    "READY",
+  ]);
+  const shippedEvent = findEvent(["IN_TRANSIT", "OUT_FOR_DELIVERY"]);
+  const deliveredEvent = findEvent(["DELIVERED"]);
+
+  const isConfirmed =
+    !!confirmedEvent ||
+    tracking.status === "CONFIRMED" ||
+    !!processingEvent ||
+    !!shippedEvent ||
+    !!deliveredEvent;
+  const isProcessing =
+    !!processingEvent ||
+    !!tracking.shipment ||
+    !!shippedEvent ||
+    !!deliveredEvent;
+  const isShipped =
+    !!shippedEvent ||
+    tracking.shipment?.status === "IN_TRANSIT" ||
+    tracking.shipment?.status === "OUT_FOR_DELIVERY" ||
+    !!deliveredEvent;
+  const isDelivered =
+    !!deliveredEvent ||
+    tracking.status === "DELIVERED" ||
+    tracking.shipment?.status === "DELIVERED";
+
+  if (isCancelled) {
+    const cancelEvent = findEvent(["CANCELLED"]);
+    return [
+      {
+        key: "received",
+        label: "Order received",
+        isCompleted: true,
+        isCancelled: false,
+        occurredAt: tracking.createdAt,
+      },
+      {
+        key: "cancelled",
+        label: "Order cancelled",
+        isCompleted: true,
+        isCancelled: true,
+        occurredAt: cancelEvent?.occurredAt || tracking.createdAt,
+      },
+      {
+        key: "confirmed",
+        label: "Order confirmed",
+        isCompleted: false,
+        isCancelled: false,
+      },
+      {
+        key: "shipped",
+        label: "Out for delivery",
+        isCompleted: false,
+        isCancelled: false,
+      },
+      {
+        key: "delivered",
+        label: "Delivered",
+        isCompleted: false,
+        isCancelled: false,
+      },
+    ];
+  }
+
+  return [
+    {
+      key: "received",
+      label: "Order received",
+      isCompleted: true,
+      isCancelled: false,
+      occurredAt: tracking.createdAt,
+    },
+    {
+      key: "confirmed",
+      label: "Order confirmed",
+      isCompleted: isConfirmed,
+      isCancelled: false,
+      occurredAt:
+        confirmedEvent?.occurredAt ||
+        (isConfirmed ? tracking.createdAt : undefined),
+    },
+    {
+      key: "processing",
+      label: "Processing",
+      isCompleted: isProcessing,
+      isCancelled: false,
+      occurredAt: processingEvent?.occurredAt,
+    },
+    {
+      key: "shipped",
+      label: "Out for delivery",
+      isCompleted: isShipped,
+      isCancelled: false,
+      occurredAt: shippedEvent?.occurredAt,
+    },
+    {
+      key: "delivered",
+      label: "Delivered",
+      isCompleted: isDelivered,
+      isCancelled: false,
+      occurredAt: deliveredEvent?.occurredAt,
+    },
+  ];
+}
+
 function TrackOrderContent() {
   const searchParams = useSearchParams();
   const [tracking, setTracking] = useState<OrderTracking | null>(null);
@@ -51,6 +168,8 @@ function TrackOrderContent() {
       setLoading(false);
     }
   }
+
+  const stages = tracking ? getOrderStages(tracking) : [];
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-16 md:py-24">
@@ -96,17 +215,91 @@ function TrackOrderContent() {
                   <div className="text-right"><p className="text-ink2">Tracking number</p><p className="mt-1 text-ink">{tracking.shipment.trackingNumber || "Being assigned"}</p></div>
                 </div>
               )}
-              <ol className="mt-8 space-y-0">
-                {tracking.timeline.map((entry, index) => (
-                  <li key={`${entry.code}-${entry.occurredAt}-${index}`} className="grid grid-cols-[18px_1fr] gap-4">
-                    <div className="flex flex-col items-center">
-                      <span className="mt-1 h-2.5 w-2.5 rounded-full bg-ink" />
-                      {index < tracking.timeline.length - 1 && <span className="min-h-12 w-px flex-1 bg-line" />}
+
+              {/* Horizontal Order Status Timeline (X-Axis) */}
+              <div className="mt-8 overflow-x-auto pb-4 pt-2 scrollbar-thin">
+                <div className="min-w-[650px]">
+                  <div className="relative">
+                    {/* Background Line */}
+                    <div className="absolute left-[10%] right-[10%] top-2 h-[2px] -translate-y-1/2 bg-line" />
+                    
+                    {/* Active Progress Line */}
+                    {(() => {
+                      const completedCount = stages.filter((s) => s.isCompleted).length;
+                      const progressPercent = Math.max(
+                        0,
+                        ((completedCount - 1) / Math.max(1, stages.length - 1)) * 80
+                      );
+                      return (
+                        <div
+                          className="absolute left-[10%] top-2 h-[2px] -translate-y-1/2 bg-ink transition-all duration-500"
+                          style={{ width: `${progressPercent}%` }}
+                        />
+                      );
+                    })()}
+
+                    {/* X-Axis Horizontal Grid of Nodes & Cards */}
+                    <div
+                      className="relative z-10 grid gap-2.5"
+                      style={{ gridTemplateColumns: `repeat(${stages.length}, minmax(0, 1fr))` }}
+                    >
+                      {stages.map((stage) => {
+                        const isSolid = stage.isCompleted;
+                        return (
+                          <div key={stage.key} className="flex flex-col items-center">
+                            {/* Dot Node */}
+                            <div className="mb-4 flex h-4 items-center justify-center">
+                              <div
+                                className={`h-4 w-4 rounded-full transition-all duration-300 ${
+                                  stage.isCancelled
+                                    ? "bg-red-600 ring-4 ring-red-100"
+                                    : isSolid
+                                    ? "bg-ink ring-4 ring-white shadow-sm"
+                                    : "border-2 border-line bg-white"
+                                }`}
+                              />
+                            </div>
+
+                            {/* Stage Card (Horizontally arranged on X-axis) */}
+                            <div
+                              className={`flex h-full w-full flex-col justify-between rounded-card border p-3.5 transition-all duration-200 ${
+                                stage.isCancelled
+                                  ? "border-red-200 bg-red-50/50 text-red-900"
+                                  : isSolid
+                                  ? "border-line bg-white text-ink shadow-sm"
+                                  : "border-line/40 bg-gray-50/40 text-ink2/40 opacity-40 select-none"
+                              }`}
+                            >
+                              <p className={`text-[12.5px] leading-snug ${isSolid ? "text-ink font-semibold" : "text-ink2/60"}`}>
+                                {stage.label}
+                              </p>
+                              <div className="mt-3">
+                                {stage.occurredAt ? (
+                                  <time className="block text-[10.5px] leading-tight text-ink2">
+                                    {new Date(stage.occurredAt).toLocaleString("en-BD", {
+                                      month: "numeric",
+                                      day: "numeric",
+                                      year: "numeric",
+                                      hour: "numeric",
+                                      minute: "2-digit",
+                                      second: "2-digit",
+                                      hour12: true,
+                                    })}
+                                  </time>
+                                ) : (
+                                  <span className="text-[10.5px] italic text-ink2/40">
+                                    Pending
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                    <div className="pb-7"><p className="text-[14px] text-ink">{entry.label}</p><time className="mt-1 block text-[11px] text-ink2">{new Date(entry.occurredAt).toLocaleString("en-BD")}</time></div>
-                  </li>
-                ))}
-              </ol>
+                  </div>
+                </div>
+              </div>
             </div>
           ) : (
             <div className="flex min-h-[360px] items-center justify-center border-y border-line px-8 text-center">

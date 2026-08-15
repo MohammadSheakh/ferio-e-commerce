@@ -5,7 +5,10 @@ export type CatalogCategory = {
   name: string;
   slug: string;
   description: string | null;
-  _count: { products: number };
+  parentId?: string | null;
+  sortOrder?: number;
+  isActive?: boolean;
+  _count?: { products: number };
 };
 
 export type CatalogVariant = {

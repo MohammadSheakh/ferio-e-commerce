@@ -1,7 +1,7 @@
 import Link from "next/link";
 import ProductCard from "@/components/ProductCard";
 import FlashSaleCard from "@/components/FlashSaleCard";
-import InteractiveHeroShowcase from "@/components/InteractiveHeroShowcase";
+import InteractiveHeroShowcaseV2 from "@/components/InteractiveHeroShowcaseV2";
 import ProductRequestBanner from "@/components/ProductRequestBanner";
 import { getCategories, getProducts } from "@/lib/catalog";
 
@@ -22,7 +22,7 @@ export default async function HomePage() {
   return (
     <main>
       {/* Primary Hero Section */}
-      <section className="border-b border-line">
+      {/* <section className="border-b border-line">
         <div className="mx-auto grid max-w-6xl items-center gap-14 px-6 py-20 md:grid-cols-2 md:py-28">
           <div>
             <p className="text-[11px] uppercase tracking-eyebrow text-ink2">New arrivals every week</p>
@@ -35,10 +35,10 @@ export default async function HomePage() {
           </div>
           <div className="flex aspect-[4/5] items-center justify-center overflow-hidden rounded-card bg-surface px-10 text-center text-[14px] text-ink2">Published catalog products appear here automatically.</div>
         </div>
-      </section>
+      </section> */}
 
-      {/* get.ru Landing Page Hero Section */}
-      <InteractiveHeroShowcase />
+      {/* get.ru Style Hero Showcase V2 Section */}
+      <InteractiveHeroShowcaseV2 />
 
       {/* Shop By Category */}
       <section id="categories" className="mx-auto max-w-6xl px-6 py-16">
