@@ -7,6 +7,7 @@ import CategorySideNav from "@/components/CategorySideNav";
 import Footer from "@/components/Footer";
 import PurchaseActivityToast from "@/components/PurchaseActivityToast";
 import LiveChatWidget from "@/components/LiveChatWidget";
+import PageTracker from "@/components/PageTracker";
 import { fallbackStoreConfig, getStoreConfig } from "@/lib/store";
 import { getCategories } from "@/lib/catalog";
 
@@ -49,6 +50,7 @@ export default async function RootLayout({
           <Footer store={store} />
           <PurchaseActivityToast />
           <LiveChatWidget />
+          <PageTracker />
         </CartProvider>
       </body>
     </html>

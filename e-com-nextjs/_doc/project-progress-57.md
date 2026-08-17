@@ -280,3 +280,52 @@
   - Updated `AdminLiveChatPage` (`page.tsx`) to fetch registered customers **and** DB stored conversations on mount.
   - Parses guest IDs (e.g. `gst_...`) and retains Guest Visitors in the sidebar across page reloads with their last message and timestamp intact.
 - **Validation**: Production builds for `ferio-nest-prisma`, `ferio-admin`, and `ferio-customer-web` all compiled cleanly with **Exit code 0**.
+
+---
+
+### Update: Resizable & Collapsible 3-Panel Admin Live Chat Layout
+
+- **Feature Implementation**:
+  - Transformed the Admin Live Chat Desk into a 3-Panel dynamic, resizable, and collapsible interface:
+    1. **Left Panel**: Conversation List Sidebar (Resizable & Collapsible).
+    2. **Center Panel**: Active Chat Thread & Reply Inbox (Expands dynamically).
+    3. **Right Panel**: Customer Profile & Metadata (Resizable & Collapsible).
+- **Interactive Drag Resizing**:
+  - Implemented dual drag splitter handles between Left-Center and Center-Right panels.
+  - Leveraged Pointer Capture (`onPointerDown`, `setPointerCapture`, `onPointerMove`) and Mouse Event listeners for smooth drag-to-resize control.
+  - Double-clicking any resizer handle resets that panel's width to its default layout dimensions.
+- **Collapsible Toggle Controls**:
+  - **Left Panel (Conversation List)**: Toggleable via the `Show Inbox` / `Hide Inbox` header button or Left Header collapse button.
+  - **Right Panel (Customer Profile)**: Toggleable via the `Show Details` / `Hide Details` header button or Right Profile Header collapse button.
+- **Persistence**:
+  - Panel width and collapse preferences (`leftWidth`, `rightWidth`, `leftCollapsed`, `rightCollapsed`) are automatically saved to `localStorage` under `ferio_admin_chat_layout` so layout preferences persist across page reloads.
+- **Validation**: `ferio-admin` compiled cleanly with **Exit code 0**.
+
+---
+
+### Update: Real-Time Active Page Visitors Desk on Admin Overview
+
+- **Socket.IO Backend Real-Time Visitor Tracking (`ferio-nest-prisma`)**:
+  - Added `activePageViews` map in `SocketGateway` (`socket.gateway.ts`) to track real-time socket connections and page locations.
+  - Implemented `@SubscribeMessage('page-view')` to receive instant route location updates (`/track`, `/cart`, `/checkout`, `/products`, `/account`, `/`).
+  - Added `@SubscribeMessage('request-live-page-stats')` for immediate hydration upon admin dashboard mount.
+  - Emits `live-page-visitors-stats` payload to `role::admin` and `admin-room` whenever visitor connections or route locations change.
+- **Frontend Customer Web Route Tracking (`ferio-customer-web`)**:
+  - Created `PageTracker.tsx` component mounted globally in `RootLayout`.
+  - Automatically emits `page-view` event via `getCustomerSocket()` whenever Next.js `pathname` changes or connection initializes.
+- **Admin Dashboard Topbar Oval Pills (`ferio-admin`)**:
+  - Embedded real-time visitor pills directly into `Topbar.tsx`, making live analytics visible on **every page in the Admin Dashboard** next to page headings.
+  - Formatted each route badge in a dark oval pill shape (`rounded-full bg-[#18181b] text-white px-3.5 py-1`):
+    - 🟢 `X Live` status badge
+    - 🚚 `/track X | Y%`
+    - 🛒 `/cart X | Y%`
+    - 💳 `/checkout X | Y%`
+    - 📦 `/products X | Y%`
+    - 🏠 `/ X | Y%`
+- **Admin Dashboard Collapsible Left Sidebar (`ferio-admin`)**:
+  - Added a toggle collapse button (`«` / `»`) at the top right of the Admin Sidebar header (`Sidebar.tsx`).
+  - Implemented smooth CSS transition between expanded mode (`w-56`) and compact icon mode (`w-[68px]`).
+  - Added custom icons for all 19 navigation routes with native browser tooltips (`title`) when collapsed.
+  - Collapsed view includes compact "F" brand logo and icon-only logout button.
+  - Saved collapse state to `localStorage` under `ferio_admin_sidebar_collapsed` to preserve layout preferences across page reloads.
+- **Validation**: All builds (`ferio-nest-prisma`, `ferio-customer-web`, `ferio-admin`) compiled cleanly with **Exit code 0**.

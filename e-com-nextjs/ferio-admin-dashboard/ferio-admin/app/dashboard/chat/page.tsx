@@ -55,6 +55,85 @@ export default function AdminLiveChatPage() {
   const [isLoadingCustomers, setIsLoadingCustomers] = useState<boolean>(true);
   const [openMenuConvId, setOpenMenuConvId] = useState<string | null>(null);
 
+  // Resizable & Collapsible Layout State
+  const [leftWidth, setLeftWidth] = useState<number>(340);
+  const [rightWidth, setRightWidth] = useState<number>(290);
+  const [leftCollapsed, setLeftCollapsed] = useState<boolean>(false);
+  const [rightCollapsed, setRightCollapsed] = useState<boolean>(false);
+  const [isDraggingLeft, setIsDraggingLeft] = useState<boolean>(false);
+  const [isDraggingRight, setIsDraggingRight] = useState<boolean>(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Restore saved layout settings
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("ferio_admin_chat_layout");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (typeof parsed.leftWidth === "number") setLeftWidth(parsed.leftWidth);
+        if (typeof parsed.rightWidth === "number") setRightWidth(parsed.rightWidth);
+        if (typeof parsed.leftCollapsed === "boolean") setLeftCollapsed(parsed.leftCollapsed);
+        if (typeof parsed.rightCollapsed === "boolean") setRightCollapsed(parsed.rightCollapsed);
+      }
+    } catch {
+      // Ignore
+    }
+  }, []);
+
+  const updateLayoutSettings = (newSettings: Partial<{ leftWidth: number; rightWidth: number; leftCollapsed: boolean; rightCollapsed: boolean }>) => {
+    try {
+      const curLeftW = newSettings.leftWidth !== undefined ? newSettings.leftWidth : leftWidth;
+      const curRightW = newSettings.rightWidth !== undefined ? newSettings.rightWidth : rightWidth;
+      const curLeftC = newSettings.leftCollapsed !== undefined ? newSettings.leftCollapsed : leftCollapsed;
+      const curRightC = newSettings.rightCollapsed !== undefined ? newSettings.rightCollapsed : rightCollapsed;
+      
+      localStorage.setItem("ferio_admin_chat_layout", JSON.stringify({
+        leftWidth: curLeftW,
+        rightWidth: curRightW,
+        leftCollapsed: curLeftC,
+        rightCollapsed: curRightC,
+      }));
+    } catch {
+      // Ignore
+    }
+  };
+
+  // Global mouse event listeners for drag resizing
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+
+      if (isDraggingLeft) {
+        let newW = e.clientX - rect.left;
+        if (newW < 220) newW = 220;
+        if (newW > 550) newW = 550;
+        setLeftWidth(newW);
+        updateLayoutSettings({ leftWidth: newW });
+      } else if (isDraggingRight) {
+        let newW = rect.right - e.clientX;
+        if (newW < 200) newW = 200;
+        if (newW > 480) newW = 480;
+        setRightWidth(newW);
+        updateLayoutSettings({ rightWidth: newW });
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsDraggingLeft(false);
+      setIsDraggingRight(false);
+    };
+
+    if (isDraggingLeft || isDraggingRight) {
+      window.addEventListener("mousemove", handleMouseMove);
+      window.addEventListener("mouseup", handleMouseUp);
+    }
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isDraggingLeft, isDraggingRight, leftWidth, rightWidth, leftCollapsed, rightCollapsed]);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const socketRef = useRef<ReturnType<typeof getAdminSocket> | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -865,13 +944,73 @@ export default function AdminLiveChatPage() {
             </div>
           </div>
 
+          {/* Left Drag Resizer Splitter */}
+          {!leftCollapsed && (
+            <div
+              onPointerDown={(e) => {
+                e.currentTarget.setPointerCapture(e.pointerId);
+                setIsDraggingLeft(true);
+              }}
+              onPointerMove={(e) => {
+                if (!isDraggingLeft || !containerRef.current) return;
+                const rect = containerRef.current.getBoundingClientRect();
+                let newW = e.clientX - rect.left;
+                if (newW < 200) newW = 200;
+                if (newW > 550) newW = 550;
+                setLeftWidth(newW);
+                updateLayoutSettings({ leftWidth: newW });
+              }}
+              onPointerUp={(e) => {
+                if (isDraggingLeft) {
+                  try { e.currentTarget.releasePointerCapture(e.pointerId); } catch {}
+                  setIsDraggingLeft(false);
+                }
+              }}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                setIsDraggingLeft(true);
+              }}
+              onDoubleClick={() => {
+                setLeftWidth(340);
+                updateLayoutSettings({ leftWidth: 340 });
+              }}
+              className={`group relative z-20 w-2 cursor-col-resize hover:bg-blue-500/50 transition-colors shrink-0 flex items-center justify-center select-none ${
+                isDraggingLeft ? "bg-blue-600" : "bg-line/40 hover:bg-blue-400"
+              }`}
+              title="Drag to resize conversation list, double-click to reset width"
+            >
+              <div className="h-8 w-1 rounded-full bg-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+            </div>
+          )}
+
           {/* Center Panel: Active Chat Thread */}
           {activeConv ? (
-            <div className="flex flex-1 flex-col bg-white">
+            <div className="flex flex-1 flex-col bg-white min-w-0">
               {/* Thread Header */}
               <div className="flex items-center justify-between border-b border-line px-6 py-4">
-                <div className="flex items-center gap-3">
-                  <div className="relative">
+                <div className="flex items-center gap-3 min-w-0">
+                  {/* Toggle Left Conversation List Button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const nextVal = !leftCollapsed;
+                      setLeftCollapsed(nextVal);
+                      updateLayoutSettings({ leftCollapsed: nextVal });
+                    }}
+                    className={`rounded-lg border px-2.5 py-1 text-[11px] font-medium transition flex items-center gap-1.5 shrink-0 ${
+                      leftCollapsed
+                        ? "border-line bg-surface/60 text-ink hover:bg-slate-200"
+                        : "border-line bg-white text-ink2 hover:bg-surface hover:text-ink"
+                    }`}
+                    title={leftCollapsed ? "Expand Conversation List" : "Collapse Conversation List"}
+                  >
+                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
+                    </svg>
+                    <span>{leftCollapsed ? "Show Inbox" : "Hide Inbox"}</span>
+                  </button>
+
+                  <div className="relative shrink-0">
                     {activeConv.customer.avatar ? (
                       <img
                         src={activeConv.customer.avatar}
@@ -890,9 +1029,9 @@ export default function AdminLiveChatPage() {
                     />
                   </div>
 
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-[14px] font-semibold text-ink">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-[14px] font-semibold text-ink truncate">
                         {activeConv.customer.name}
                       </h3>
                       <span
@@ -922,7 +1061,7 @@ export default function AdminLiveChatPage() {
                       )}
                     </div>
 
-                    <p className="text-[11px] text-ink2">
+                    <p className="text-[11px] text-ink2 truncate">
                       {activeConv.customer.isOnline ? (
                         <span className="text-emerald-600 font-medium">● Connected via Socket.IO Gateway</span>
                       ) : (
@@ -932,12 +1071,33 @@ export default function AdminLiveChatPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0">
                   <span className={`text-[11px] px-3 py-1 rounded-full border font-medium ${
                     isConnected ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-amber-50 text-amber-700 border-amber-200"
                   }`}>
-                    {isConnected ? "● Socket / Redis Gateway Live" : "Connecting Gateway..."}
+                    {isConnected ? "● Gateway Live" : "Connecting..."}
                   </span>
+
+                  {/* Toggle Right Panel (Customer Details) Button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const nextVal = !rightCollapsed;
+                      setRightCollapsed(nextVal);
+                      updateLayoutSettings({ rightCollapsed: nextVal });
+                    }}
+                    className={`rounded-lg border px-2.5 py-1 text-[11px] font-medium transition flex items-center gap-1.5 ${
+                      rightCollapsed
+                        ? "border-line bg-surface/60 text-ink hover:bg-slate-200"
+                        : "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100"
+                    }`}
+                    title={rightCollapsed ? "Expand Customer Details" : "Collapse Customer Details"}
+                  >
+                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                    <span>{rightCollapsed ? "Show Details" : "Hide Details"}</span>
+                  </button>
                 </div>
               </div>
 
@@ -975,8 +1135,8 @@ export default function AdminLiveChatPage() {
               <div className="border-t border-line/60 bg-surface/30 px-6 py-2 flex items-center gap-2 overflow-x-auto">
                 <span className="text-[11px] text-ink2 font-medium shrink-0">Quick Reply:</span>
                 {[
-                  "Hello! How can I assist you with your order today?",
-                  "Delivery takes 24-48 hours in Dhaka Metro.",
+                  "Hello! How can I assist you today?",
+                  "Thank you for reaching out to Ferio Support.",
                   "Cash on Delivery is available across Bangladesh!",
                   "Let me check your order details right now.",
                 ].map((template) => (
@@ -1022,14 +1182,70 @@ export default function AdminLiveChatPage() {
             </div>
           )}
 
+          {/* Right Drag Resizer Splitter */}
+          {activeConv && !rightCollapsed && (
+            <div
+              onPointerDown={(e) => {
+                e.currentTarget.setPointerCapture(e.pointerId);
+                setIsDraggingRight(true);
+              }}
+              onPointerMove={(e) => {
+                if (!isDraggingRight || !containerRef.current) return;
+                const rect = containerRef.current.getBoundingClientRect();
+                let newW = rect.right - e.clientX;
+                if (newW < 180) newW = 180;
+                if (newW > 480) newW = 480;
+                setRightWidth(newW);
+                updateLayoutSettings({ rightWidth: newW });
+              }}
+              onPointerUp={(e) => {
+                if (isDraggingRight) {
+                  try { e.currentTarget.releasePointerCapture(e.pointerId); } catch {}
+                  setIsDraggingRight(false);
+                }
+              }}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                setIsDraggingRight(true);
+              }}
+              onDoubleClick={() => {
+                setRightWidth(290);
+                updateLayoutSettings({ rightWidth: 290 });
+              }}
+              className={`group relative z-20 w-2 cursor-col-resize hover:bg-blue-500/50 transition-colors shrink-0 flex items-center justify-center select-none ${
+                isDraggingRight ? "bg-blue-600" : "bg-line/40 hover:bg-blue-400"
+              }`}
+              title="Drag to resize customer profile, double-click to reset width"
+            >
+              <div className="h-8 w-1 rounded-full bg-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+            </div>
+          )}
+
           {/* Right Panel: Customer Meta Info */}
           {activeConv && (
-            <div className="w-72 border-l border-line p-6 bg-surface/20 space-y-6 hidden lg:block">
-              <div>
+            <div
+              style={{ width: rightCollapsed ? 0 : rightWidth, display: rightCollapsed ? "none" : "block" }}
+              className="border-l border-line p-6 bg-surface/20 space-y-6 shrink-0 overflow-y-auto transition-all duration-150 ease-out"
+            >
+              <div className="flex items-center justify-between">
                 <h4 className="text-[11px] font-semibold uppercase tracking-wider text-ink2">
                   Customer Profile
                 </h4>
-                <div className="mt-3 flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRightCollapsed(true);
+                    updateLayoutSettings({ rightCollapsed: true });
+                  }}
+                  className="rounded p-1 text-ink2 hover:bg-slate-200 hover:text-ink transition"
+                  title="Collapse Details"
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7" />
+                  </svg>
+                </button>
+              </div>
+              <div className="mt-3 flex items-center gap-3">
                   {activeConv.customer.avatar ? (
                     <img
                       src={activeConv.customer.avatar}
@@ -1048,7 +1264,6 @@ export default function AdminLiveChatPage() {
                     </p>
                   </div>
                 </div>
-              </div>
 
               <div className="space-y-3 pt-4 border-t border-line">
                 <h4 className="text-[11px] font-semibold uppercase tracking-wider text-ink2">

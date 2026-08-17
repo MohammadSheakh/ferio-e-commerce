@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import StatCard from "@/components/StatCard";
 import Topbar from "@/components/Topbar";
+import LivePageVisitorsCard from "@/components/LivePageVisitorsCard";
 import { formatTaka } from "@/lib/catalog";
 import type { OrderPage } from "@/lib/orders";
 import { orderStatusClass } from "@/lib/orders";
@@ -58,9 +59,9 @@ export default function DashboardPage() {
             : "Live operational summary"
         }
       />
-      <main className="p-8">
+      <main className="p-8 space-y-8">
         {error && (
-          <p role="alert" className="mb-6 text-[12px] text-rose-700">
+          <p role="alert" className="text-[12px] text-rose-700">
             {error}
           </p>
         )}
@@ -94,53 +95,61 @@ export default function DashboardPage() {
           />
         </div>
 
-        <section className="mt-8 rounded-card border border-line">
-          <div className="flex items-center justify-between border-b border-line px-5 py-4">
-            <div>
-              <h2 className="text-[13px] font-medium text-ink">Recent orders</h2>
-              <p className="mt-0.5 text-[11px] text-ink2">Live backend data</p>
+        {/* 2-Column Main Section: Left = Recent Orders, Right = Real-time Page Visitors */}
+        <div className="grid grid-cols-1 gap-8 xl:grid-cols-3">
+          <section className="xl:col-span-2 rounded-card border border-line bg-white shadow-xs">
+            <div className="flex items-center justify-between border-b border-line px-5 py-4">
+              <div>
+                <h2 className="text-[13px] font-medium text-ink">Recent orders</h2>
+                <p className="mt-0.5 text-[11px] text-ink2">Live backend data</p>
+              </div>
+              <div className="flex gap-4 text-[12px] text-ink2">
+                <Link href="/dashboard/reports" className="hover:text-ink">Reports</Link>
+                <Link href="/dashboard/orders" className="hover:text-ink">View all</Link>
+              </div>
             </div>
-            <div className="flex gap-4 text-[12px] text-ink2">
-              <Link href="/dashboard/reports" className="hover:text-ink">Reports</Link>
-              <Link href="/dashboard/orders" className="hover:text-ink">View all</Link>
-            </div>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-left">
-              <thead>
-                <tr className="text-[11px] uppercase tracking-eyebrow text-ink2">
-                  <th className="px-5 py-3 font-normal">Order</th>
-                  <th className="px-5 py-3 font-normal">Customer</th>
-                  <th className="px-5 py-3 font-normal">Area</th>
-                  <th className="px-5 py-3 font-normal">Total</th>
-                  <th className="px-5 py-3 font-normal">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-line">
-                {orders.map((order) => (
-                  <tr key={order.id} className="text-[13px] text-ink/80">
-                    <td className="px-5 py-3.5">
-                      <Link href={`/dashboard/orders/${order.id}`} className="text-ink hover:underline">
-                        {order.reference}
-                      </Link>
-                    </td>
-                    <td className="px-5 py-3.5">{order.customer.name}</td>
-                    <td className="px-5 py-3.5 text-ink2">{order.address ? `${order.address.area}, ${order.address.district}` : "—"}</td>
-                    <td className="px-5 py-3.5">{formatTaka(order.total)}</td>
-                    <td className="px-5 py-3.5">
-                      <span className={`rounded-full px-2.5 py-1 text-[11px] ${orderStatusClass[order.status]}`}>
-                        {order.status.replaceAll("_", " ")}
-                      </span>
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[600px] text-left">
+                <thead>
+                  <tr className="text-[11px] uppercase tracking-eyebrow text-ink2">
+                    <th className="px-5 py-3 font-normal">Order</th>
+                    <th className="px-5 py-3 font-normal">Customer</th>
+                    <th className="px-5 py-3 font-normal">Area</th>
+                    <th className="px-5 py-3 font-normal">Total</th>
+                    <th className="px-5 py-3 font-normal">Status</th>
                   </tr>
-                ))}
-                {!error && orders.length === 0 && (
-                  <tr><td colSpan={5} className="px-5 py-14 text-center text-[13px] text-ink2">No orders yet.</td></tr>
-                )}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-line">
+                  {orders.map((order) => (
+                    <tr key={order.id} className="text-[13px] text-ink/80">
+                      <td className="px-5 py-3.5">
+                        <Link href={`/dashboard/orders/${order.id}`} className="text-ink hover:underline">
+                          {order.reference}
+                        </Link>
+                      </td>
+                      <td className="px-5 py-3.5">{order.customer.name}</td>
+                      <td className="px-5 py-3.5 text-ink2">{order.address ? `${order.address.area}, ${order.address.district}` : "—"}</td>
+                      <td className="px-5 py-3.5">{formatTaka(order.total)}</td>
+                      <td className="px-5 py-3.5">
+                        <span className={`rounded-full px-2.5 py-1 text-[11px] ${orderStatusClass[order.status]}`}>
+                          {order.status.replaceAll("_", " ")}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                  {!error && orders.length === 0 && (
+                    <tr><td colSpan={5} className="px-5 py-14 text-center text-[13px] text-ink2">No orders yet.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          {/* Right Column: Real-Time Page Visitors Analytics Card */}
+          <div className="xl:col-span-1">
+            <LivePageVisitorsCard />
           </div>
-        </section>
+        </div>
       </main>
     </>
   );
