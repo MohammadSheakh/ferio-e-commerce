@@ -1,6 +1,7 @@
 import { io, Socket } from "socket.io-client";
 
-const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:6733";
+const rawSocketUrl = process.env.NEXT_PUBLIC_SOCKET_URL || process.env.NEXT_PUBLIC_FERIO_API_URL || "http://localhost:6734";
+const SOCKET_URL = rawSocketUrl.replace(/\/api\/v1\/?$/, "").replace(":6733", ":6734");
 
 let socket: Socket | null = null;
 

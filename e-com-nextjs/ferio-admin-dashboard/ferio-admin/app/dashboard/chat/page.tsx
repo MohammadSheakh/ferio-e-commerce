@@ -108,58 +108,119 @@ export default function AdminLiveChatPage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Fetch real registered customers from backend API on mount
+  // Fetch real registered customers and DB stored conversations (including guest visitors) on mount
   useEffect(() => {
     async function loadCustomers() {
       try {
-        const res = await fetch("/api/customers?limit=50");
-        if (res.ok) {
-          const json = await res.json();
-          const items: CustomerListItem[] = json.data?.items || [];
-          const metaStore = getSavedMetadata();
+        const [resCust, resConvs] = await Promise.all([
+          fetch("/api/customers?limit=50"),
+          fetch("/api/chat/conversations"),
+        ]);
 
-          if (items.length > 0) {
-            setConversations((prev) => {
-              const existingIds = new Set(prev.map((c) => c.customer.id));
-              const fetchedConvs: Conversation[] = items
-                .filter((cust) => !existingIds.has(cust.id))
-                .map((cust) => {
-                  const convId = `conv-${cust.id}`;
-                  const savedMeta = metaStore[convId] || metaStore[cust.id] || {};
-                  return {
-                    id: convId,
-                    customer: {
-                      id: cust.id,
-                      name: cust.name,
-                      email: cust.email || undefined,
-                      phone: cust.phone,
-                      avatar: cust.avatarUrl || undefined,
-                      isGuest: false,
-                      isOnline: false,
-                      totalOrders: cust.totalOrderCount,
-                    },
-                    lastMessage: "No recent messages",
-                    lastMessageTime: cust.lastOnlineAt
-                      ? new Date(cust.lastOnlineAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-                      : "Offline",
-                    unreadCount: 0,
-                    messages: [],
-                    folder: savedMeta.folder || "ACTIVE",
-                    isFavorite: savedMeta.isFavorite || false,
-                    isPromising: savedMeta.isPromising || false,
-                  };
-                });
-
-              const merged = [...prev, ...fetchedConvs];
-              if (!activeConvId && merged.length > 0) {
-                setActiveConvId(merged[0].id);
-              }
-              return merged;
-            });
-          }
+        let items: CustomerListItem[] = [];
+        if (resCust.ok) {
+          const json = await resCust.ok ? await resCust.json() : {};
+          items = json.data?.items || [];
         }
+
+        let dbConvs: any[] = [];
+        if (resConvs.ok) {
+          const json = await resConvs.json();
+          dbConvs = json.data?.results || [];
+        }
+
+        const metaStore = getSavedMetadata();
+
+        setConversations((prev) => {
+          const map = new Map<string, Conversation>();
+          prev.forEach((c) => map.set(c.id, c));
+
+          // 1. Add registered customers
+          items.forEach((cust) => {
+            const convId = `conv-${cust.id}`;
+            const savedMeta = metaStore[convId] || metaStore[cust.id] || {};
+            if (!map.has(convId)) {
+              map.set(convId, {
+                id: convId,
+                customer: {
+                  id: cust.id,
+                  name: cust.name,
+                  email: cust.email || undefined,
+                  phone: cust.phone,
+                  avatar: cust.avatarUrl || undefined,
+                  isGuest: false,
+                  isOnline: false,
+                  totalOrders: cust.totalOrderCount,
+                },
+                lastMessage: "No recent messages",
+                lastMessageTime: cust.lastOnlineAt
+                  ? new Date(cust.lastOnlineAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                  : "Offline",
+                unreadCount: 0,
+                messages: [],
+                folder: savedMeta.folder || "ACTIVE",
+                isFavorite: savedMeta.isFavorite || false,
+                isPromising: savedMeta.isPromising || false,
+              });
+            }
+          });
+
+          // 2. Add DB conversations (especially guest visitor conversations)
+          dbConvs.forEach((conv: any) => {
+            const convId = conv.id.startsWith("conv-") ? conv.id : `conv-${conv.id}`;
+            const rawId = conv.id.replace("conv-", "");
+            
+            const isGuestConv = rawId.startsWith("gst_") || conv.id.startsWith("conv-gst_") || rawId.startsWith("guest");
+            
+            if (isGuestConv) {
+              const guestId = rawId.startsWith("gst_") ? rawId : (conv.id.includes("gst_") ? conv.id.split("conv-")[1] : rawId);
+              const savedMeta = metaStore[convId] || metaStore[guestId] || {};
+              const formattedTime = conv.lastMessageAt
+                ? new Date(conv.lastMessageAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                : "Recent";
+
+              const existing = map.get(convId);
+              if (existing) {
+                existing.lastMessage = conv.lastMessage || existing.lastMessage;
+                existing.lastMessageTime = formattedTime;
+              } else {
+                map.set(convId, {
+                  id: convId,
+                  customer: {
+                    id: guestId,
+                    name: `Guest Visitor #${guestId.replace("gst_", "")}`,
+                    isGuest: true,
+                    guestId: guestId,
+                    isOnline: false,
+                  },
+                  lastMessage: conv.lastMessage || "Guest message",
+                  lastMessageTime: formattedTime,
+                  unreadCount: 0,
+                  messages: [],
+                  folder: savedMeta.folder || "ACTIVE",
+                  isFavorite: savedMeta.isFavorite || false,
+                  isPromising: savedMeta.isPromising || false,
+                });
+              }
+            } else {
+              const existing = map.get(convId) || map.get(`conv-${rawId}`);
+              if (existing) {
+                existing.lastMessage = conv.lastMessage || existing.lastMessage;
+                if (conv.lastMessageAt) {
+                  existing.lastMessageTime = new Date(conv.lastMessageAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+                }
+              }
+            }
+          });
+
+          const merged = Array.from(map.values());
+          if (!activeConvId && merged.length > 0) {
+            setActiveConvId(merged[0].id);
+          }
+          return merged;
+        });
       } catch (err) {
-        console.warn("Failed to load real customer profiles for chat sidebar", err);
+        console.warn("Failed to load customer profiles and DB conversations for chat sidebar", err);
       } finally {
         setIsLoadingCustomers(false);
       }
@@ -304,15 +365,34 @@ export default function AdminLiveChatPage() {
           const rawMsgs = json.data?.results || [];
 
           if (rawMsgs.length > 0) {
-            const formatted: MessageItem[] = rawMsgs.map((m: any) => ({
-              id: m.id,
-              senderId: m.senderId,
-              senderName: m.sender?.name || (m.sender?.role === "admin" ? "Henry (Support Agent)" : "Customer"),
-              isAdmin: m.sender?.role === "admin",
-              text: m.text,
-              timestamp: new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-              status: "DELIVERED",
-            }));
+            const currentConv = conversations.find((c) => c.id === activeConvId);
+            const customerId = currentConv?.customer.id;
+            const guestId = currentConv?.customer.guestId;
+
+            const formatted: MessageItem[] = rawMsgs.map((m: any) => {
+              const isCustomerSender =
+                (customerId && (m.senderId === customerId || m.senderId === `conv-${customerId}`)) ||
+                (guestId && (m.senderId === guestId || m.senderId === `conv-${guestId}`));
+
+              const isFromAdmin = !isCustomerSender && Boolean(
+                m.sender?.role === "admin" ||
+                m.sender?.role === "SUPER_ADMIN" ||
+                m.senderId === "admin-current" ||
+                String(m.senderId).startsWith("admin")
+              );
+
+              return {
+                id: m.id,
+                senderId: m.senderId,
+                senderName: isFromAdmin
+                  ? (m.sender?.name || "Henry (Support Agent)")
+                  : (currentConv?.customer.name || m.sender?.name || "Customer"),
+                isAdmin: isFromAdmin,
+                text: m.text,
+                timestamp: new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+                status: "DELIVERED",
+              };
+            });
 
             setConversations((prev) =>
               prev.map((c) => {
@@ -344,7 +424,16 @@ export default function AdminLiveChatPage() {
     );
 
     if (socketRef.current) {
+      const selectedConv = conversations.find((c) => c.id === id);
       socketRef.current.emit("join", { conversationId: id });
+      if (selectedConv?.customer.id) {
+        socketRef.current.emit("join", { conversationId: selectedConv.customer.id });
+        socketRef.current.emit("join", { conversationId: `conv-${selectedConv.customer.id}` });
+      }
+      if (selectedConv?.customer.guestId) {
+        socketRef.current.emit("join", { conversationId: selectedConv.customer.guestId });
+        socketRef.current.emit("join", { conversationId: `conv-${selectedConv.customer.guestId}` });
+      }
     }
   };
 
@@ -383,6 +472,7 @@ export default function AdminLiveChatPage() {
         _messageId: newMsg.id,
         conversationId: targetRoom,
         targetUserId: activeConv.customer.id,
+        email: activeConv.customer.email,
         guestId: activeConv.customer.guestId,
         senderId: "admin-current",
         senderName: "Henry (Support Agent)",
@@ -392,6 +482,7 @@ export default function AdminLiveChatPage() {
       });
 
       socketRef.current.emit("join", { conversationId: targetRoom });
+      socketRef.current.emit("join", { conversationId: activeConv.customer.id });
     }
 
     if (!customText) setReplyText("");

@@ -102,6 +102,17 @@ export default function LiveChatWidget() {
     ? (customerUser?.name && customerUser.name !== "Customer" ? customerUser.name : (customerUser?.email || "Member"))
     : (guestId ? `Guest Visitor #${guestId.replace("gst_", "")}` : "Guest Visitor");
 
+  const customerUserRef = useRef(customerUser);
+  const guestIdRef = useRef(guestId);
+
+  useEffect(() => {
+    customerUserRef.current = customerUser;
+  }, [customerUser]);
+
+  useEffect(() => {
+    guestIdRef.current = guestId;
+  }, [guestId]);
+
   // Connect to Socket.IO server and listen for real-time events
   useEffect(() => {
     if (!activeUserId) return;
@@ -110,15 +121,29 @@ export default function LiveChatWidget() {
     const socket = getCustomerSocket(undefined, activeUserId);
     socketRef.current = socket;
 
-    socket.on("connect", () => {
-      setIsConnected(true);
+    const joinAllRooms = () => {
       socket.emit("join", { conversationId: convId });
       socket.emit("join", { conversationId: activeUserId });
-      if (customerUser?.userId) {
-        socket.emit("join", { conversationId: `conv-${customerUser.userId}` });
-        socket.emit("join", { conversationId: customerUser.userId });
+      const currentCust = customerUserRef.current;
+      const currentGuest = guestIdRef.current;
+
+      if (currentCust?.id) {
+        socket.emit("join", { conversationId: currentCust.id });
+        socket.emit("join", { conversationId: `conv-${currentCust.id}` });
       }
-      if (guestId) socket.emit("join", { conversationId: `conv-${guestId}` });
+      if (currentCust?.userId) {
+        socket.emit("join", { conversationId: currentCust.userId });
+        socket.emit("join", { conversationId: `conv-${currentCust.userId}` });
+      }
+      if (currentGuest) {
+        socket.emit("join", { conversationId: currentGuest });
+        socket.emit("join", { conversationId: `conv-${currentGuest}` });
+      }
+    };
+
+    socket.on("connect", () => {
+      setIsConnected(true);
+      joinAllRooms();
     });
 
     socket.on("disconnect", () => {
@@ -127,13 +152,23 @@ export default function LiveChatWidget() {
 
     socket.on("new-message-received", (data: any) => {
       const targetConv = data.conversationId;
+      const currentCust = customerUserRef.current;
+      const currentGuest = guestIdRef.current;
+      const custId = currentCust?.id;
+      const usrId = currentCust?.userId;
+
       const matchConv =
         targetConv === convId ||
+        targetConv === `conv-${activeUserId}` ||
         targetConv === activeUserId ||
+        (custId && (targetConv === custId || targetConv === `conv-${custId}`)) ||
+        (usrId && (targetConv === usrId || targetConv === `conv-${usrId}`)) ||
         data.targetUserId === activeUserId ||
-        data.guestId === activeUserId ||
+        (custId && data.targetUserId === custId) ||
+        (usrId && data.targetUserId === usrId) ||
         data.senderId === activeUserId ||
-        (guestId && (targetConv === `conv-${guestId}` || data.guestId === guestId));
+        (currentGuest && (targetConv === `conv-${currentGuest}` || targetConv === currentGuest || data.guestId === currentGuest)) ||
+        Boolean(data.isAdmin);
 
       if (matchConv) {
         const isAgent = Boolean(
@@ -171,9 +206,7 @@ export default function LiveChatWidget() {
 
     if (socket.connected) {
       setIsConnected(true);
-      socket.emit("join", { conversationId: convId });
-      socket.emit("join", { conversationId: activeUserId });
-      if (guestId) socket.emit("join", { conversationId: `conv-${guestId}` });
+      joinAllRooms();
     }
 
     return () => {

@@ -180,3 +180,103 @@
   - Updated `activeUserName` and the banner in `LiveChatWidget.tsx` to display **Mohammad Sheakh** with a green **Account Sync** badge instead of "Guest Visitor #4816" / "Guest Mode".
   - Messages emitted to socket now include `senderName: "Mohammad Sheakh"`, `email: "mohammad.sheakh@gmail.com"`, and `isGuest: false`.
 - **Validation**: All 3 applications (`ferio-nest-prisma`, `ferio-admin`, `ferio-customer-web`) compiled cleanly with **Exit code 0**.
+
+---
+
+### Update: Dedicated Socket.IO Server Port Separation (REST: 6733, Socket: 6734)
+
+- **Backend Gateway Port Configuration (`ferio-nest-prisma`)**:
+  - Updated `SOCKET_PORT=6734` in `.env`.
+  - Configured `@WebSocketGateway(Number(process.env.SOCKET_PORT) || 6734, { path: '/socket.io', cors: { origin: '*' } })` in `SocketGateway` (`socket.gateway.ts`).
+  - REST API HTTP server runs on port **6733**, and WebSocket Socket.IO Gateway runs independently on port **6734**.
+  - Added startup logging in `main.ts` for both REST and Socket.IO server ports.
+- **Customer Web Socket Configuration (`ferio-customer-web`)**:
+  - Added `NEXT_PUBLIC_SOCKET_URL=http://localhost:6734` in `.env`.
+  - Updated `lib/socket.ts` URL resolution with `rawSocketUrl.replace(/\/api\/v1\/?$/, "").replace(":6733", ":6734")` to guarantee connections route to port **6734** even if dev servers had cached legacy 6733 env variables.
+- **Admin Dashboard Socket Configuration (`ferio-admin`)**:
+  - Added `NEXT_PUBLIC_SOCKET_URL=http://localhost:6734` in `.env`.
+  - Updated `lib/socket.ts` URL resolution with `rawSocketUrl.replace(/\/api\/v1\/?$/, "").replace(":6733", ":6734")` to guarantee connections route to port **6734**.
+- **Validation**: All 3 applications (`ferio-nest-prisma`, `ferio-admin`, `ferio-customer-web`) compiled cleanly with **Exit code 0**.
+
+---
+
+### Update: Admin Database Conversation Message History Retrieval Fixes
+
+- **Backend Port Resolution in Next.js API Routes (`ferio-admin` & `ferio-customer-web`)**:
+  - Fixed `/api/chat/messages/route.ts` in both `ferio-admin` and `ferio-customer-web`. Previously, `backendUrl` defaulted to hardcoded `http://127.0.0.1:5000`, causing REST API calls to fail silently and return `[]` empty messages for Admin chat conversations.
+  - Updated backend URL resolution to use `process.env.FERIO_API_URL` or fallback `http://localhost:6733`.
+- **Multi-ID Conversation History Matcher (`ferio-nest-prisma`)**:
+  - Enhanced `MessageService.getMessagesByConversation()` in `message.service.ts`.
+  - When querying messages for a conversation ID, it now looks up the linked `User` and `Customer` records and queries messages stored under `[conversationId, rawId, prefId, user.id, conv-${user.id}, user.customerId, conv-${user.customerId}]`.
+  - Guarantees that any past messages sent before or after user account linking are retrieved together when selecting a conversation thread.
+- **Admin Message Attribution (`ferio-admin`)**:
+  - Updated message history mapper in `AdminLiveChatPage` (`page.tsx`) to set `isAdmin: true` for messages sent by admin users (`role === "admin"` or `senderId` starting with `admin`), rendering them on the right side in blue bubbles.
+- **Validation**: All 3 applications (`ferio-nest-prisma`, `ferio-admin`, `ferio-customer-web`) compiled cleanly with **Exit code 0**.
+
+---
+
+### Update: Real-Time Admin Delivery & DB Message Attribution Refinements
+
+- **Non-Admin DB Sender Resolution (`ferio-nest-prisma`)**:
+  - Updated `SocketGateway.handleNewMessage()` in `socket.gateway.ts`.
+  - Added explicit `{ role: { not: 'admin' } }` filtering during non-admin user resolution.
+  - Prevents customer/guest messages from falling back to the Admin `User` account in PostgreSQL, ensuring distinct sender identities for database persistence.
+- **Admin & Customer DB History Mapper (`ferio-admin`)**:
+  - Refined `rawMsgs` mapping in `AdminLiveChatPage` (`page.tsx`).
+  - Compares `m.senderId` against customer ID and guest ID to accurately distinguish customer messages (`isAdmin: false`) from admin messages (`isAdmin: true`).
+- **Real-Time Admin Message Receiver (`ferio-customer-web`)**:
+  - Updated `LiveChatWidget.tsx` socket room subscriptions (`conv-customerId`, `conv-userId`, `conv-guestId`).
+  - Expanded `matchConv` logic to match `data.targetUserId` and `data.guestId` when an admin sends a message, ensuring admin replies render instantly in real time on the customer widget without requiring page reload.
+- **Validation**: Production builds for `ferio-nest-prisma`, `ferio-admin`, and `ferio-customer-web` all compiled cleanly with **Exit code 0**.
+
+---
+
+### Update: System Guest User DB Persistence & Admin Initiated Chat Delivery
+
+- **Fallback System Guest User Upsert (`ferio-nest-prisma`)**:
+  - Updated `SocketGateway.handleNewMessage()` in `socket.gateway.ts`.
+  - Added automatic upsert for `system_guest_chat_user` (`id: system_guest_chat_user`, `role: user`) if no existing user record is found for a guest visitor message.
+  - Guarantees that guest/customer messages never fail Prisma foreign key constraints and are **always** saved to the PostgreSQL database so they load consistently when reloading the Admin Dashboard.
+- **Dynamic Customer & Guest Refs for Real-Time Messages (`ferio-customer-web`)**:
+  - Added `customerUserRef` and `guestIdRef` in `LiveChatWidget.tsx`.
+  - Inside the `new-message-received` socket listener, `matchConv` now uses live refs to evaluate `customerUser` IDs dynamically even if `customerUser` was updated after socket connection.
+  - Allows Admins to send the **first message** to an existing customer conversation thread and have it delivered instantly to the customer's web widget without requiring the customer to send a message first.
+- **Validation**: All 3 applications (`ferio-nest-prisma`, `ferio-admin`, `ferio-customer-web`) compiled cleanly with **Exit code 0**.
+
+---
+
+### Update: Complete Fix for Customer Message History & Admin First-Message Delivery
+
+- **Root Cause Identified**:
+  - `User.customerId` in PostgreSQL was `null` for registered users (such as Mohammad Sheakh), while `Customer` had `id: cmsrseds...` and `User` had `id: cmsrquyd...`.
+  - Customer messages were saved with `conversationId: conv-cmsrquyd...` (User ID), while Admin Dashboard requested messages for `conv-cmsrseds...` (Customer ID).
+  - Because `MessageService` only searched the `User` table for `id` or `customerId`, and `user.customerId` was `null`, the query failed to link `Customer` and `User` together. Consequently, `Message.findMany()` only returned Admin messages on page reload.
+  - Similarly, when Admin sent a message to `conv-cmsrseds...`, `SocketGateway` failed to locate `User` by `customerId`, so it did not emit to `conv-cmsrquyd...` where the Customer Web Widget was subscribed.
+- **Cross-Table User & Customer Message Retrieval (`ferio-nest-prisma`)**:
+  - Updated `MessageService.getMessagesByConversation()` in `message.service.ts` to query **both** `User` and `Customer` tables by ID and email.
+  - Expands `possibleIds` to include all associated `User.id`, `Customer.id`, `conv-User.id`, and `conv-Customer.id` values.
+  - Ensures that when Admin reloads the dashboard and selects a customer thread, **all customer and admin messages across both IDs are loaded seamlessly from PostgreSQL**.
+- **Cross-Room Socket Emission (`ferio-nest-prisma` & `ferio-admin`)**:
+  - Enhanced `SocketGateway.handleNewMessage()` in `socket.gateway.ts` to look up both `User` and `Customer` and email links.
+  - Emits incoming messages to `User.id`, `Customer.id`, `conv-User.id`, `conv-Customer.id`, and `email` rooms.
+  - Updated `AdminLiveChatPage` (`page.tsx`) to join and emit to `activeConv.customer.id` and `conv-activeConv.customer.id`.
+  - Guarantees that when an Admin sends the **first message** to any customer, it is delivered live to the Customer Web Widget immediately.
+- **Validation**:
+  - Tested database query logic via direct Prisma script execution.
+  - Production builds for `ferio-nest-prisma`, `ferio-admin`, and `ferio-customer-web` all compiled cleanly with **Exit code 0**.
+
+---
+
+### Update: Guest Visitor Conversation Retention on Admin Dashboard Reload
+
+- **Root Cause**:
+  - On Admin Dashboard mount, `loadCustomers()` previously only fetched registered customer accounts from `/api/customers`.
+  - Guest visitor chat threads created in PostgreSQL (e.g., `conv-gst_4816`) were missing from `/api/customers`. As a result, guest conversations disappeared from the admin sidebar whenever the page was refreshed until the guest sent another real-time message over socket.
+- **Backend Admin Conversations Endpoint (`ferio-nest-prisma`)**:
+  - Added `getAllConversations()` in `ConversationService` (`conversation.service.ts`) to query all active conversations from `prisma.conversation`.
+  - Added `@Public() @Get('all')` endpoint in `ConversationController` (`conversation.controller.ts`).
+- **Admin API & Chat Sidebar Integration (`ferio-admin`)**:
+  - Created `/api/chat/conversations/route.ts` in `ferio-admin`.
+  - Updated `AdminLiveChatPage` (`page.tsx`) to fetch registered customers **and** DB stored conversations on mount.
+  - Parses guest IDs (e.g. `gst_...`) and retains Guest Visitors in the sidebar across page reloads with their last message and timestamp intact.
+- **Validation**: Production builds for `ferio-nest-prisma`, `ferio-admin`, and `ferio-customer-web` all compiled cleanly with **Exit code 0**.
