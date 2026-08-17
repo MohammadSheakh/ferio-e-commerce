@@ -292,6 +292,51 @@ export default function AdminLiveChatPage() {
     };
   }, [activeConvId]);
 
+  // Load message history from DB when active conversation changes
+  useEffect(() => {
+    if (!activeConvId) return;
+
+    async function fetchMessageHistory() {
+      try {
+        const res = await fetch(`/api/chat/messages?conversationId=${encodeURIComponent(activeConvId)}`);
+        if (res.ok) {
+          const json = await res.json();
+          const rawMsgs = json.data?.results || [];
+
+          if (rawMsgs.length > 0) {
+            const formatted: MessageItem[] = rawMsgs.map((m: any) => ({
+              id: m.id,
+              senderId: m.senderId,
+              senderName: m.sender?.name || (m.sender?.role === "admin" ? "Henry (Support Agent)" : "Customer"),
+              isAdmin: m.sender?.role === "admin",
+              text: m.text,
+              timestamp: new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+              status: "DELIVERED",
+            }));
+
+            setConversations((prev) =>
+              prev.map((c) => {
+                if (c.id === activeConvId) {
+                  return {
+                    ...c,
+                    messages: formatted,
+                    lastMessage: formatted[formatted.length - 1]?.text || c.lastMessage,
+                    lastMessageTime: formatted[formatted.length - 1]?.timestamp || c.lastMessageTime,
+                  };
+                }
+                return c;
+              })
+            );
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to load message history from backend DB", err);
+      }
+    }
+
+    fetchMessageHistory();
+  }, [activeConvId]);
+
   const handleSelectConv = (id: string) => {
     setActiveConvId(id);
     setConversations((prev) =>

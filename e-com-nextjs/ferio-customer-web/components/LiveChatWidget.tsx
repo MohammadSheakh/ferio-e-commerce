@@ -32,7 +32,7 @@ export default function LiveChatWidget() {
   const [isTyping, setIsTyping] = useState(false);
   const [unreadCount, setUnreadCount] = useState(1);
   const [guestId, setGuestId] = useState<string>("");
-  const [customerUser, setCustomerUser] = useState<{ id: string; name: string; email?: string } | null>(null);
+  const [customerUser, setCustomerUser] = useState<{ id: string; userId?: string; name: string; email?: string } | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [isConnected, setIsConnected] = useState<boolean>(false);
 
@@ -54,13 +54,21 @@ export default function LiveChatWidget() {
         const res = await fetch("/api/account/commerce", { cache: "no-store" });
         if (res.ok) {
           const body = await res.json();
-          const acc = body.account || body.customer || body.data?.account || body.data?.customer;
-          if (acc && (acc.id || acc.userId)) {
+          const custObj = body.customer || body.data?.customer || body.account?.customer;
+          const accObj = body.account || body.data?.account || (body.data?.id ? body.data : undefined);
+
+          const resolvedId = custObj?.id || accObj?.customerId || accObj?.id || body.data?.id;
+          const resolvedUserId = accObj?.id || body.data?.id;
+          const resolvedName = custObj?.name || accObj?.name || body.data?.name || "Customer";
+          const resolvedEmail = accObj?.email || custObj?.email || body.data?.email;
+
+          if (resolvedId || accObj || custObj) {
             const userObj = {
-              id: acc.id || acc.userId,
-              name: acc.name || "Customer",
-              email: acc.email,
-              avatar: acc.profileImageUrl || acc.avatar,
+              id: resolvedId || `acc_${Date.now()}`,
+              userId: resolvedUserId,
+              name: resolvedName !== "Customer" ? resolvedName : (resolvedEmail || "Customer"),
+              email: resolvedEmail,
+              avatar: accObj?.profileImageUrl || custObj?.avatar,
             };
             setCustomerUser(userObj);
             setIsLoggedIn(true);
@@ -90,7 +98,9 @@ export default function LiveChatWidget() {
   }, []);
 
   const activeUserId = customerUser?.id || guestId;
-  const activeUserName = customerUser?.name || (guestId ? `Guest Visitor #${guestId.replace("gst_", "")}` : "Guest Visitor");
+  const activeUserName = isLoggedIn
+    ? (customerUser?.name && customerUser.name !== "Customer" ? customerUser.name : (customerUser?.email || "Member"))
+    : (guestId ? `Guest Visitor #${guestId.replace("gst_", "")}` : "Guest Visitor");
 
   // Connect to Socket.IO server and listen for real-time events
   useEffect(() => {
@@ -104,6 +114,10 @@ export default function LiveChatWidget() {
       setIsConnected(true);
       socket.emit("join", { conversationId: convId });
       socket.emit("join", { conversationId: activeUserId });
+      if (customerUser?.userId) {
+        socket.emit("join", { conversationId: `conv-${customerUser.userId}` });
+        socket.emit("join", { conversationId: customerUser.userId });
+      }
       if (guestId) socket.emit("join", { conversationId: `conv-${guestId}` });
     });
 
@@ -122,24 +136,31 @@ export default function LiveChatWidget() {
         (guestId && (targetConv === `conv-${guestId}` || data.guestId === guestId));
 
       if (matchConv) {
-        // If message is sent by Admin/Agent
-        if (data.isAdmin || (data.senderId !== activeUserId && data.senderId !== "user")) {
-          const agentMsg: ChatMessage = {
-            id: data._messageId || Date.now().toString(),
-            sender: "agent",
-            text: data.text,
-            time: new Date(data.createdAt || Date.now()).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            }),
-          };
+        const isAgent = Boolean(
+          data.isAdmin ||
+          data.senderName?.toLowerCase().includes("support") ||
+          data.senderName?.toLowerCase().includes("henry") ||
+          data.senderId === "admin-current"
+        );
 
-          setMessages((prev) => {
-            if (prev.some((m) => m.id === agentMsg.id || (m.text === agentMsg.text && m.sender === "agent"))) {
-              return prev;
-            }
-            return [...prev, agentMsg];
-          });
+        const newMsg: ChatMessage = {
+          id: data._messageId || Date.now().toString(),
+          sender: isAgent ? "agent" : "user",
+          text: data.text,
+          time: new Date(data.createdAt || Date.now()).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+        };
+
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === newMsg.id || (m.text === newMsg.text && m.sender === newMsg.sender))) {
+            return prev;
+          }
+          return [...prev, newMsg];
+        });
+
+        if (isAgent) {
           setIsTyping(false);
           if (!isOpen) {
             setUnreadCount((prev) => prev + 1);
@@ -172,6 +193,42 @@ export default function LiveChatWidget() {
       }
     }
   }, [activeUserId, messages]);
+
+  // Fetch DB chat history on mount/user identity resolution
+  useEffect(() => {
+    if (!activeUserId) return;
+
+    const targetConvId = `conv-${activeUserId}`;
+    async function loadDbHistory() {
+      try {
+        const res = await fetch(`/api/chat/messages?conversationId=${encodeURIComponent(targetConvId)}`);
+        if (res.ok) {
+          const json = await res.json();
+          const rawMsgs = json.data?.results || [];
+
+          if (rawMsgs.length > 0) {
+            const formatted: ChatMessage[] = rawMsgs.map((m: any) => ({
+              id: m.id,
+              sender: m.sender?.role === "admin" ? "agent" : "user",
+              text: m.text,
+              time: new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            }));
+
+            setMessages((prev) => {
+              const existingIds = new Set(prev.map((item) => item.id));
+              const newItems = formatted.filter((item) => !existingIds.has(item.id));
+              if (newItems.length === 0) return prev;
+              return [...prev, ...newItems];
+            });
+          }
+        }
+      } catch (err) {
+        console.warn("Could not fetch DB message history for customer chat widget", err);
+      }
+    }
+
+    loadDbHistory();
+  }, [activeUserId]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -276,11 +333,11 @@ export default function LiveChatWidget() {
           </div>
 
           {/* Session Banner */}
-          <div className="bg-amber-50 px-4 py-2 text-[11px] text-amber-800 border-b border-amber-200/80 flex items-center justify-between">
+          <div className={`${isLoggedIn ? "bg-emerald-50 text-emerald-900 border-emerald-200/80" : "bg-amber-50 text-amber-800 border-amber-200/80"} px-4 py-2 text-[11px] border-b flex items-center justify-between transition-colors`}>
             <span>
-              💬 Chatting as <strong className="font-semibold text-amber-900">{activeUserName}</strong>
+              💬 Chatting as <strong className="font-semibold">{activeUserName}</strong>
             </span>
-            <span className="text-[10px] text-emerald-700 font-medium bg-emerald-100/80 px-2 py-0.5 rounded">
+            <span className={`text-[10px] font-medium px-2 py-0.5 rounded ${isLoggedIn ? "bg-emerald-200/80 text-emerald-800" : "bg-amber-100/80 text-amber-900"}`}>
               {isLoggedIn ? "Account Sync" : "Guest Mode"}
             </span>
           </div>

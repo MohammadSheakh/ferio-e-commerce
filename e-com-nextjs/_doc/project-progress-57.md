@@ -111,3 +111,72 @@
   - `TRASH`: Contains soft-deleted chats with restore option.
 - **Persistence**: Saved status tags in `localStorage` (`ferio_admin_chat_metadata`) to retain chat classifications across browser reloads.
 - **Validation**: `ferio-admin` production build compiled cleanly with **Exit code 0**.
+
+---
+
+### Update: Database Chat Persistence & Reload Message Retrieval
+
+- **PostgreSQL / Prisma Persistence (`ferio-nest-prisma`)**:
+  - Injected `PrismaService` into `SocketGateway` (`socket.gateway.ts`).
+  - When real-time messages are sent by customers or admin support agents over Socket.IO, `handleNewMessage` automatically ensures `Conversation` and `Message` records are created and updated in the database.
+  - Automatically handles fallbacks for guest visitors and missing user records to prevent foreign key errors.
+- **REST Message Retrieval Endpoint (`ferio-nest-prisma`)**:
+  - Added `@Public()` decorator to `MessageController` (`message.controller.ts`), allowing `GET /api/v1/conversations/:conversationId/messages` to return chat history for active threads.
+  - Made `userId` optional in `MessageService.getMessagesByConversation`.
+- **Admin Dashboard Message History Fetcher (`ferio-admin`)**:
+  - Created API proxy route `app/api/chat/messages/route.ts`.
+  - Added `useEffect` in `AdminLiveChatPage` (`app/dashboard/chat/page.tsx`) to fetch stored database messages whenever an active conversation thread is opened or when the admin dashboard is reloaded.
+- **Customer Web Message History Fetcher (`ferio-customer-web`)**:
+  - Created API proxy route `app/api/chat/messages/route.ts`.
+  - Added `useEffect` in `LiveChatWidget` (`components/LiveChatWidget.tsx`) to retrieve past messages from DB upon user identity resolution or page refresh.
+- **Validation**: Production builds for `ferio-nest-prisma`, `ferio-admin`, and `ferio-customer-web` all compiled cleanly with **Exit code 0**.
+
+---
+
+### Update: Cross-Device Customer Identity & Database Thread Matching Fixes
+
+- **Cross-Device Customer ID Alignment (`ferio-customer-web`)**:
+  - Updated `LiveChatWidget.tsx` identity resolution to extract `acc.customer?.id || acc.customerId || acc.id || acc.userId`.
+  - Ensures logged-in users use their permanent `Customer` profile ID (`cma...`) across all devices (Device A, Device B, Mobile) and aligns 1:1 with `AdminLiveChatPage` customer thread IDs (`conv-cma...`).
+- **Flexible Prisma DB User & Thread Matching (`ferio-nest-prisma`)**:
+  - Updated `SocketGateway` (`socket.gateway.ts`) DB persistence to find sender users using `OR: [{ id: senderId }, { customerId: senderId }, { email: email }]`, ensuring customer messages link to their authentic User profile instead of fallback users.
+  - Updated `MessageService.getMessagesByConversation` (`message.service.ts`) to query messages using `conversationId: { in: [conversationId, rawId, prefId] }`, so fetching with or without `conv-` prefix returns the complete history.
+- **Validation**: All 3 applications (`ferio-nest-prisma`, `ferio-admin`, `ferio-customer-web`) compiled cleanly with **Exit code 0**.
+
+---
+
+### Update: Admin vs. Customer Database Role Resolution & Real-Time Sync Fixes
+
+- **Admin vs. Customer Sender Distinction (`ferio-nest-prisma`)**:
+  - Fixed `SocketGateway` (`socket.gateway.ts`) DB user lookup logic. When `payload.isAdmin` is `true`, it now specifically queries for an Admin user record (`role: 'admin'`).
+  - Previously, `rawConvId` in the `OR` query caused admin replies to link to the customer's user account, marking saved messages as customer messages instead of admin messages in DB history.
+- **Cross-Device & Multi-Tab Real-Time Sync (`ferio-customer-web`)**:
+  - Updated `new-message-received` socket event listener in `LiveChatWidget.tsx` to handle both incoming admin replies (`isAgent: true`) AND customer messages sent from another device or browser tab (`isAgent: false`).
+  - Added duplicate checks (`m.id` / content + sender matching) to guarantee smooth rendering without message loss or double-rendering.
+- **Validation**: All 3 applications (`ferio-nest-prisma`, `ferio-admin`, `ferio-customer-web`) compiled cleanly with **Exit code 0**.
+
+---
+
+### Update: Dual-Room Socket Emission & Canonical DB Thread Resolution
+
+- **Dual-Room Real-Time Broadcast (`ferio-nest-prisma`)**:
+  - Resolved the room mismatch where `ferio-admin` sent messages to `conv-Customer.id` while `ferio-customer-web` joined `conv-User.id`.
+  - Updated `SocketGateway` (`socket.gateway.ts`) to query linked User/Customer records for every incoming message and broadcast `new-message-received` to BOTH `conv-Customer.id` AND `conv-User.id` rooms.
+  - Ensures customer receives admin socket messages instantly regardless of which socket room ID the client joined.
+- **Dual Room Joining (`ferio-customer-web`)**:
+  - Updated `LiveChatWidget.tsx` `initSession()` and socket `connect` handler to emit `join` events for both `conv-${resolvedCustId}` (Customer CUID) and `conv-${resolvedUserId}` (User CUID).
+- **Canonical Database Thread ID (`ferio-nest-prisma`)**:
+  - Forces new conversation creation to use the canonical `conv-${linkedUser.customerId}` thread ID so message history from REST API `/api/v1/conversations/:id/messages` is stored under a unified key.
+- **Validation**: Production builds for `ferio-nest-prisma`, `ferio-admin`, and `ferio-customer-web` all compiled cleanly with **Exit code 0**.
+
+---
+
+### Update: Logged-in Customer Identity & Name Resolution in LiveChatWidget
+
+- **Robust Account / Customer Object Parsing (`ferio-customer-web`)**:
+  - Updated `LiveChatWidget.tsx` `initSession()` logic. Previously, when `/api/account/commerce` returned `{ data: { account: { ... }, customer: null } }`, `dataObj` did not have a top-level `.id` or `.customer.id`. This caused `resolvedCustId` to evaluate to `undefined` and wrongly fell back to Guest Mode (`setIsLoggedIn(false)`).
+  - Fixed `initSession()` to inspect nested `accObj` (`body.account || body.data?.account`), extracting `name` ("Mohammad Sheakh") and `email` ("mohammad.sheakh@gmail.com") directly.
+- **Authenticated Name Display**:
+  - Updated `activeUserName` and the banner in `LiveChatWidget.tsx` to display **Mohammad Sheakh** with a green **Account Sync** badge instead of "Guest Visitor #4816" / "Guest Mode".
+  - Messages emitted to socket now include `senderName: "Mohammad Sheakh"`, `email: "mohammad.sheakh@gmail.com"`, and `isGuest: false`.
+- **Validation**: All 3 applications (`ferio-nest-prisma`, `ferio-admin`, `ferio-customer-web`) compiled cleanly with **Exit code 0**.
