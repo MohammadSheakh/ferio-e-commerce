@@ -1,3 +1,10 @@
+1. customers phone number inconsistency issue 
+2. guest jei visitor ase .. she jodi tar mail share kore rakhe .. and
+tar question kore .. amra tar mail e shei question er reply dibo .. so amra reply deowar time e .. choose korte parbo .. mail e reply dibo .. naki chat ei reply dibo
+
+Guest Visitor .. tar name o send korbe 
+
+=================
 1. category delete korar feature thakte hobe
 2. category er under e service booking er feature thakte hobe
     i mean product purchase er pashapashi service booking

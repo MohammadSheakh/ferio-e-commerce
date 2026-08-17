@@ -4,8 +4,9 @@ import type { CatalogCategory } from '@/types/catalog';
 import { colors, radii } from '@/lib/theme';
 
 export function CategoryRail({ categories }: { categories: CatalogCategory[] }) {
+  const safeCategories = Array.isArray(categories) ? categories : [];
   return <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.content}>
-    {categories.map(category => <Link key={category.id} href={{ pathname: '/(tabs)/products', params: { category: category.slug } }} asChild>
+    {safeCategories.map(category => <Link key={category.id} href={{ pathname: '/(tabs)/products', params: { category: category.slug } }} asChild>
       <Pressable style={styles.item}><Text style={styles.text}>{category.name}</Text></Pressable>
     </Link>)}
   </ScrollView>;

@@ -2,7 +2,8 @@
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import Topbar from "@/components/Topbar";
-import type { CatalogCategory } from "@/lib/catalog";
+import type { CatalogCategory, CatalogBrand } from "@/lib/catalog";
+import Link from "next/link";
 
 type CategoryForm = {
   id?: string;
@@ -30,6 +31,11 @@ export default function CategoriesPage() {
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState("");
   const [error, setError] = useState("");
+
+  // Category Brands Modal
+  const [viewingBrandsCategory, setViewingBrandsCategory] = useState<CatalogCategory | null>(null);
+  const [categoryBrands, setCategoryBrands] = useState<CatalogBrand[]>([]);
+  const [loadingCategoryBrands, setLoadingCategoryBrands] = useState(false);
 
   const loadCategories = useCallback(async () => {
     setLoading(true);
@@ -119,6 +125,23 @@ export default function CategoriesPage() {
     }
   }
 
+  async function openCategoryBrandsModal(category: CatalogCategory) {
+    setViewingBrandsCategory(category);
+    setCategoryBrands([]);
+    setLoadingCategoryBrands(true);
+    try {
+      const res = await fetch(`/api/catalog/brands?categoryId=${category.id}`);
+      if (res.ok) {
+        const body = (await res.json()) as { data?: CatalogBrand[] };
+        if (body.data) setCategoryBrands(body.data);
+      }
+    } catch {
+      // Ignore error
+    } finally {
+      setLoadingCategoryBrands(false);
+    }
+  }
+
   return (
     <>
       <Topbar title="Categories" subtitle="Organize the storefront catalog" />
@@ -138,17 +161,147 @@ export default function CategoriesPage() {
           <div className="flex gap-2"><button disabled={saving} className="rounded-full bg-ink px-5 py-2.5 text-[13px] font-medium text-white disabled:opacity-50">{saving ? "Saving…" : form.id ? "Save changes" : "Create category"}</button>{form.id && <button type="button" onClick={() => setForm(emptyForm)} className="rounded-full border border-line px-4 py-2.5 text-[13px] text-ink2">Cancel</button>}</div>
         </form>
 
-        <div className="overflow-hidden rounded-card border border-line">
+        <div className="overflow-hidden rounded-card border border-line bg-white shadow-sm">
           <table className="w-full text-left">
-            <thead><tr className="text-[11px] uppercase tracking-eyebrow text-ink2"><th className="px-5 py-3 font-normal">Category</th><th className="px-5 py-3 font-normal">Products</th><th className="px-5 py-3 font-normal">Order</th><th className="px-5 py-3 font-normal">Status</th><th className="px-5 py-3 font-normal"><span className="sr-only">Actions</span></th></tr></thead>
+            <thead>
+              <tr className="text-[11px] uppercase tracking-eyebrow text-ink2 border-b border-line bg-neutral-50">
+                <th className="px-5 py-3 font-normal">Category</th>
+                <th className="px-5 py-3 font-normal">Products</th>
+                <th className="px-5 py-3 font-normal">Order</th>
+                <th className="px-5 py-3 font-normal">Status</th>
+                <th className="px-5 py-3 font-normal text-right">Actions</th>
+              </tr>
+            </thead>
             <tbody className="divide-y divide-line">
-              {categories.map((category) => <tr key={category.id} className="text-[13px]"><td className="px-5 py-3.5"><p className="text-ink">{category.name}</p><p className="text-[11px] text-ink2">/{category.slug}</p></td><td className="px-5 py-3.5 text-ink2">{category._count.products}</td><td className="px-5 py-3.5 text-ink2">{category.sortOrder}</td><td className="px-5 py-3.5"><span className={`rounded-full px-2.5 py-1 text-[11px] ${category.isActive ? "bg-emerald-50 text-emerald-700" : "bg-surface text-ink2"}`}>{category.isActive ? "Active" : "Inactive"}</span></td><td className="px-5 py-3.5 text-right"><div className="flex justify-end gap-3"><button onClick={() => editCategory(category)} className="text-[12px] text-ink2 underline decoration-line underline-offset-4 hover:text-ink">Edit</button><button disabled={deletingId === category.id} onClick={() => void deleteCategory(category)} className="text-[12px] text-rose-700 underline decoration-line underline-offset-4 disabled:opacity-40">{deletingId === category.id ? "Deleting…" : "Delete"}</button></div></td></tr>)}
-              {!loading && categories.length === 0 && <tr><td colSpan={5} className="px-5 py-12 text-center text-[13px] text-ink2">Create the first category to start adding products.</td></tr>}
-              {loading && <tr><td colSpan={5} className="px-5 py-12 text-center text-[13px] text-ink2">Loading categories…</td></tr>}
+              {categories.map((category) => (
+                <tr key={category.id} className="text-[13px] hover:bg-neutral-50/50">
+                  <td className="px-5 py-3.5">
+                    <p className="text-ink font-medium">{category.name}</p>
+                    <p className="text-[11px] text-ink2">/{category.slug}</p>
+                  </td>
+                  <td className="px-5 py-3.5 text-ink">
+                    <Link
+                      href={`/dashboard/products?category=${category.slug}`}
+                      className="font-semibold underline hover:text-ink2"
+                    >
+                      {category._count.products} products
+                    </Link>
+                  </td>
+                  <td className="px-5 py-3.5 text-ink2">{category.sortOrder}</td>
+                  <td className="px-5 py-3.5">
+                    <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium ${category.isActive ? "bg-emerald-100 text-emerald-800" : "bg-surface text-ink2"}`}>
+                      {category.isActive ? "Active" : "Inactive"}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3.5 text-right">
+                    <div className="flex justify-end items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => openCategoryBrandsModal(category)}
+                        className="text-[12px] font-medium text-emerald-700 underline underline-offset-2 hover:text-emerald-900"
+                      >
+                        View Brands
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => editCategory(category)}
+                        className="text-[12px] text-ink2 underline underline-offset-2 hover:text-ink"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        disabled={deletingId === category.id}
+                        onClick={() => void deleteCategory(category)}
+                        className="text-[12px] text-rose-700 underline underline-offset-2 disabled:opacity-40"
+                      >
+                        {deletingId === category.id ? "Deleting…" : "Delete"}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {!loading && categories.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-5 py-12 text-center text-[13px] text-ink2">
+                    Create the first category to start adding products.
+                  </td>
+                </tr>
+              )}
+              {loading && (
+                <tr>
+                  <td colSpan={5} className="px-5 py-12 text-center text-[13px] text-ink2">
+                    Loading categories…
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
       </div>
+
+      {viewingBrandsCategory && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="w-full max-w-lg rounded-card border border-line bg-white p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-line pb-3">
+              <div>
+                <h3 className="text-[16px] font-semibold text-ink">
+                  Brands in &quot;{viewingBrandsCategory.name}&quot;
+                </h3>
+                <p className="text-[12px] text-ink2">
+                  All manufacturer brands linked to products under this category
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewingBrandsCategory(null)}
+                className="text-[13px] font-bold text-ink2 hover:text-ink"
+              >
+                ✕
+              </button>
+            </div>
+
+            {loadingCategoryBrands ? (
+              <p className="py-8 text-center text-[13px] text-ink2">Loading brands...</p>
+            ) : categoryBrands.length > 0 ? (
+              <div className="max-h-80 overflow-y-auto divide-y divide-line">
+                {categoryBrands.map((brand) => (
+                  <div key={brand.id} className="flex items-center justify-between py-2.5">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-7 w-7 items-center justify-center rounded bg-neutral-100 font-bold text-ink text-[10px]">
+                        {brand.name.substring(0, 2).toUpperCase()}
+                      </div>
+                      <div>
+                        <span className="text-[13px] font-medium text-ink">{brand.name}</span>
+                        <span className="ml-2 text-[11px] text-ink2 font-mono">/{brand.slug}</span>
+                      </div>
+                    </div>
+                    {brand._count?.products !== undefined && (
+                      <span className="text-[12px] font-semibold text-ink2">
+                        {brand._count.products} products
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="py-8 text-center text-[13px] text-ink2">
+                No distinct saved brands found for products in this category yet.
+              </div>
+            )}
+
+            <div className="flex justify-end pt-2 border-t border-line">
+              <button
+                type="button"
+                onClick={() => setViewingBrandsCategory(null)}
+                className="rounded-full border border-line px-5 py-2 text-[12px] text-ink"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

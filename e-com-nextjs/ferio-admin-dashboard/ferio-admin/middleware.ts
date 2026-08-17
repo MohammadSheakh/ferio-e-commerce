@@ -50,7 +50,7 @@ async function refreshSession(
       httpOnly: true,
       secure,
       sameSite: "lax",
-      maxAge: 15 * 60,
+      maxAge: 7 * 24 * 60 * 60,
       path: "/",
     });
     response.cookies.set("ferio_admin_refresh", nextRefreshToken, {

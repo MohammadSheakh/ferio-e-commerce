@@ -1,5 +1,6 @@
 import { Link, useLocalSearchParams } from 'expo-router';
-import { Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { FerioHeader } from '@/components/FerioHeader';
 import { colors, radii } from '@/lib/theme';
 export default function OrderConfirmation(){const p=useLocalSearchParams<{reference?:string;status?:string}>();const confirmed=p.status==='CONFIRMED';return <SafeAreaView style={styles.safe}><FerioHeader/><View style={styles.container}><Text style={styles.eyebrow}>ORDER RECEIVED</Text><Text style={styles.title}>Thank you for your order.</Text>{p.reference?<><Text style={styles.ref}>Your reference is <Text style={styles.bold}>{p.reference}</Text>.</Text><Text style={styles.copy}>{confirmed?'Your cash-on-delivery order is confirmed and stock is reserved for fulfillment.':'We will verify your cash-on-delivery order and delivery details before fulfillment.'}</Text></>:<Text style={styles.copy}>The order reference is unavailable in this app session.</Text>}<View style={styles.buttons}>{p.reference?<Link href={{pathname:'/track',params:{reference:p.reference}}} asChild><Pressable style={styles.primary}><Text style={styles.primaryText}>Track this order</Text></Pressable></Link>:null}<Link href='/(tabs)/products' asChild><Pressable style={styles.secondary}><Text style={styles.secondaryText}>Continue shopping</Text></Pressable></Link></View></View></SafeAreaView>}

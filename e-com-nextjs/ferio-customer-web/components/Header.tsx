@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCart } from "./CartContext";
 import CategoryNav from "./CategoryNav";
+import HeaderAccountNav from "./HeaderAccountNav";
 import type { CatalogCategory } from "@/lib/catalog";
 
 export default function Header({
@@ -22,7 +23,7 @@ export default function Header({
           <Link href="/" className="text-[19px] font-semibold tracking-tight text-ink">
             {storeName}
           </Link>
-          <nav className="hidden gap-9 text-[13px] text-ink2 md:flex">
+          <nav className="hidden gap-9 text-[13px] text-ink2 md:flex items-center">
             <Link href="/products" className="transition hover:text-ink">
               Shop all
             </Link>
@@ -36,7 +37,7 @@ export default function Header({
               Support
             </Link>
             <Link href="/services" className="transition hover:text-ink">Services</Link>
-            <Link href="/account/orders" className="transition hover:text-ink">Sign in / Account</Link>
+            <HeaderAccountNav />
             <Link href="/account/warranty" className="transition hover:text-ink">Warranty</Link>
           </nav>
           <Link

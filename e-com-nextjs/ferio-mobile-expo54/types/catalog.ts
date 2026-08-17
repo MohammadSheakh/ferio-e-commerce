@@ -3,6 +3,9 @@ export type CatalogCategory = {
   name: string;
   slug: string;
   description: string | null;
+  parentId?: string | null;
+  sortOrder?: number | null;
+  isActive?: boolean;
 };
 
 export type CatalogVariant = {
@@ -14,6 +17,15 @@ export type CatalogVariant = {
   compareAtPrice: number | null;
   isActive: boolean;
   availableStock: number;
+};
+
+export type CatalogYoutubeReview = {
+  id: string;
+  youtubeUrl?: string;
+  youtubeVideoId: string;
+  title: string | null;
+  reviewerName: string | null;
+  isFeatured: boolean;
 };
 
 export type CatalogProduct = {
@@ -38,6 +50,7 @@ export type CatalogProduct = {
   image: string | null;
   images: string[];
   selectedVariantName?: string;
+  youtubeReviews?: CatalogYoutubeReview[];
 };
 
 export type CatalogProductPage = {

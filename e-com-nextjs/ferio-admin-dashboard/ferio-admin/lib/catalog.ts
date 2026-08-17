@@ -43,12 +43,34 @@ export type CatalogMedia = {
   sortOrder: number;
 };
 
+export type CatalogBrand = {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  logoUrl: string | null;
+  isActive: boolean;
+  _count?: { products: number };
+};
+
+export type CatalogYoutubeReview = {
+  id?: string;
+  youtubeUrl: string;
+  youtubeVideoId?: string;
+  title?: string | null;
+  reviewerName?: string | null;
+  isFeatured?: boolean;
+  status?: string;
+};
+
 export type CatalogProduct = {
   id: string;
   name: string;
   slug: string;
   description: string;
   brand: string | null;
+  brandId?: string | null;
+  brandRel?: CatalogBrand | null;
   status: "DRAFT" | "ACTIVE" | "ARCHIVED";
   isFeatured: boolean;
   codAvailable: boolean;
@@ -65,6 +87,7 @@ export type CatalogProduct = {
   availableStock: number;
   variants: CatalogVariant[];
   media: CatalogMedia[];
+  youtubeReviews?: CatalogYoutubeReview[];
   image: string | null;
 };
 

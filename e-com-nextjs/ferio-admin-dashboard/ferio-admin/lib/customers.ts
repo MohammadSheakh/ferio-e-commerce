@@ -24,6 +24,8 @@ export type CustomerListItem = CustomerMetrics & {
   name: string;
   phone: string;
   email: string | null;
+  avatarUrl?: string | null;
+  lastOnlineAt?: string | null;
   createdAt: string;
   latestAttribution: {
     source: string | null;

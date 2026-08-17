@@ -1,26 +1,453 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Link } from 'expo-router';
+import { Link, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, SafeAreaView, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { FerioHeader } from '@/components/FerioHeader';
+import { apiGet, apiPost } from '@/lib/api';
 import { formatTaka } from '@/lib/catalog';
 import { colors, radii } from '@/lib/theme';
 import { useCart } from '@/state/cart';
 
-const STORAGE_KEY='ferio_mobile_checkout_details_v1';
-const initial={name:'',phone:'',email:'',district:'',area:'',detailedAddress:'',landmark:'',customerNote:'',marketingConsent:false,purchaseActivityConsent:false,termsAccepted:false,paymentMethod:'COD' as 'COD'|'PREPAID'};
-export default function CheckoutScreen(){
- const {items,subtotal}=useCart(); const [form,setForm]=useState(initial); const deliveryFee=12000; const total=useMemo(()=>subtotal+deliveryFee,[subtotal]);
- useEffect(()=>{AsyncStorage.getItem(STORAGE_KEY).then(raw=>{if(raw)setForm({...initial,...JSON.parse(raw)})}).catch(()=>{})},[]); useEffect(()=>{AsyncStorage.setItem(STORAGE_KEY,JSON.stringify(form)).catch(()=>{})},[form]);
- const field=(key:keyof typeof form,label:string,placeholder:string,opts?:{keyboardType?:'default'|'phone-pad'|'email-address';multiline?:boolean})=><View style={styles.field}><Text style={styles.label}>{label}</Text><TextInput value={String(form[key]??'')} onChangeText={v=>setForm(s=>({...s,[key]:v}))} placeholder={placeholder} placeholderTextColor='#9a9a9e' keyboardType={opts?.keyboardType} multiline={opts?.multiline} style={[styles.input,opts?.multiline&&styles.textarea]}/></View>;
- return <SafeAreaView style={styles.safe}><FerioHeader/><ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps='handled'>
-   <Text style={styles.eyebrow}>CHECKOUT</Text><Text style={styles.title}>Delivery details</Text><Text style={styles.copy}>Your final delivery fee, stock and payment availability must be calculated by the NestJS checkout preview before an order is placed.</Text>
-   <View style={styles.form}>{field('name','Full name','Your name')}{field('phone','Mobile number','01XXXXXXXXX',{keyboardType:'phone-pad'})}{field('email','Email (optional)','you@example.com',{keyboardType:'email-address'})}{field('district','District','Dhaka')}{field('area','Area / upazila','Your delivery area')}{field('detailedAddress','Detailed address','House, road, block, floor',{multiline:true})}{field('landmark','Landmark (optional)','Nearby landmark')}{field('customerNote','Order note (optional)','Delivery instructions',{multiline:true})}</View>
-   <View style={styles.section}><Text style={styles.sectionTitle}>Payment</Text><View style={styles.paymentRow}><Pressable onPress={()=>setForm(s=>({...s,paymentMethod:'COD'}))} style={[styles.payment,form.paymentMethod==='COD'&&styles.paymentActive]}><Text style={[styles.paymentText,form.paymentMethod==='COD'&&styles.paymentTextActive]}>Cash on delivery</Text></Pressable><Pressable onPress={()=>setForm(s=>({...s,paymentMethod:'PREPAID'}))} style={[styles.payment,form.paymentMethod==='PREPAID'&&styles.paymentActive]}><Text style={[styles.paymentText,form.paymentMethod==='PREPAID'&&styles.paymentTextActive]}>Prepaid</Text></Pressable></View></View>
-   <View style={styles.section}><Text style={styles.sectionTitle}>Consent</Text><Toggle label='Send me product and offer updates' value={form.marketingConsent} onValueChange={v=>setForm(s=>({...s,marketingConsent:v}))}/><Toggle label='Allow anonymized purchase activity notices' value={form.purchaseActivityConsent} onValueChange={v=>setForm(s=>({...s,purchaseActivityConsent:v}))}/><Toggle label='I accept terms, privacy and return conditions' value={form.termsAccepted} onValueChange={v=>setForm(s=>({...s,termsAccepted:v}))}/></View>
-   <View style={styles.summary}><Text style={styles.sectionTitle}>Order summary</Text><View style={styles.summaryRow}><Text style={styles.muted}>Items ({items.reduce((n,i)=>n+i.quantity,0)})</Text><Text style={styles.value}>{formatTaka(subtotal)}</Text></View><View style={styles.summaryRow}><Text style={styles.muted}>Example delivery fee</Text><Text style={styles.value}>{formatTaka(deliveryFee)}</Text></View><View style={[styles.summaryRow,styles.totalRow]}><Text style={styles.totalLabel}>Estimated total</Text><Text style={styles.total}>{formatTaka(total)}</Text></View><Text style={styles.notice}>This screen mirrors the website form structure. Production mobile checkout still needs the explicit mobile cart/session contract and server checkout preview.</Text></View>
-   <Pressable disabled={!items.length||!form.termsAccepted} style={[styles.place,(!items.length||!form.termsAccepted)&&styles.disabled]}><Text style={styles.placeText}>Preview & place order</Text></Pressable><Link href='/(tabs)/cart'><Text style={styles.back}>← Back to cart</Text></Link>
- </ScrollView></SafeAreaView>;
+const STORAGE_KEY = 'ferio_mobile_checkout_details_v2';
+
+export interface DeliveryOption {
+  id: string;
+  name: string;
+  districts: Array<{ id: string; name: string }>;
 }
-function Toggle({label,value,onValueChange}:{label:string;value:boolean;onValueChange:(v:boolean)=>void}){return <View style={styles.toggle}><Text style={styles.toggleText}>{label}</Text><Switch value={value} onValueChange={onValueChange} trackColor={{false:'#dedee1',true:'#2b2b2f'}} thumbColor='#fff'/></View>}
-const styles=StyleSheet.create({safe:{flex:1,backgroundColor:colors.paper},container:{padding:18,paddingBottom:70},eyebrow:{fontSize:10,letterSpacing:1.2,color:colors.ink2,fontWeight:'600'},title:{marginTop:7,fontSize:30,fontWeight:'600',letterSpacing:-.8,color:colors.ink},copy:{marginTop:10,maxWidth:520,fontSize:13,lineHeight:20,color:colors.ink2},form:{marginTop:28,gap:15},field:{gap:7},label:{fontSize:12,color:colors.ink2},input:{borderWidth:1,borderColor:colors.line,borderRadius:radii.card,paddingHorizontal:14,paddingVertical:12,fontSize:14,color:colors.ink,backgroundColor:'#fff'},textarea:{minHeight:82,textAlignVertical:'top'},section:{marginTop:30,borderTopWidth:1,borderTopColor:colors.line,paddingTop:22},sectionTitle:{fontSize:16,fontWeight:'500',color:colors.ink},paymentRow:{marginTop:14,flexDirection:'row',gap:8},payment:{flex:1,borderWidth:1,borderColor:colors.line,borderRadius:radii.pill,paddingVertical:11,alignItems:'center'},paymentActive:{backgroundColor:colors.ink,borderColor:colors.ink},paymentText:{fontSize:12,color:colors.ink2},paymentTextActive:{color:'#fff'},toggle:{minHeight:52,flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:16,borderBottomWidth:1,borderBottomColor:colors.line},toggleText:{flex:1,fontSize:12.5,lineHeight:18,color:colors.ink2},summary:{marginTop:30,borderWidth:1,borderColor:colors.line,borderRadius:radii.card,padding:17,gap:11},summaryRow:{flexDirection:'row',justifyContent:'space-between',gap:12},muted:{fontSize:12,color:colors.ink2},value:{fontSize:12,color:colors.ink},totalRow:{borderTopWidth:1,borderTopColor:colors.line,paddingTop:12,marginTop:3},totalLabel:{fontSize:14,fontWeight:'600',color:colors.ink},total:{fontSize:16,fontWeight:'600',color:colors.ink},notice:{fontSize:11,lineHeight:16,color:colors.ink2},place:{marginTop:22,backgroundColor:colors.ink,borderRadius:radii.pill,paddingVertical:14,alignItems:'center'},disabled:{opacity:.25},placeText:{color:'#fff',fontSize:14,fontWeight:'600'},back:{marginTop:18,textAlign:'center',fontSize:12,color:colors.ink2}});
+
+export interface CheckoutPreview {
+  pricing: {
+    subtotal: number;
+    deliveryFee: number;
+    total: number;
+  };
+  paymentMethod: 'COD' | 'PREPAID';
+  paymentProvider?: string;
+}
+
+export interface CheckoutOrderResult {
+  reference: string;
+  status: string;
+  payment?: {
+    redirectUrl?: string;
+  };
+}
+
+const initialForm = {
+  name: '',
+  phone: '',
+  email: '',
+  district: 'Dhaka',
+  area: '',
+  detailedAddress: '',
+  landmark: '',
+  customerNote: '',
+  marketingConsent: false,
+  purchaseActivityConsent: false,
+  termsAccepted: false,
+  paymentMethod: 'COD' as 'COD' | 'PREPAID',
+  paymentProvider: 'SSLCOMMERZ' as 'SSLCOMMERZ' | 'AAMARPAY',
+};
+
+export default function CheckoutScreen() {
+  const router = useRouter();
+  const { items, subtotal, clear } = useCart();
+  const [form, setForm] = useState(initialForm);
+  const [preview, setPreview] = useState<CheckoutPreview | null>(null);
+  const [deliveryOptions, setDeliveryOptions] = useState<DeliveryOption[]>([]);
+  const [loadingOptions, setLoadingOptions] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
+  const [placing, setPlacing] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    AsyncStorage.getItem(STORAGE_KEY)
+      .then((raw) => {
+        if (raw) setForm({ ...initialForm, ...JSON.parse(raw) });
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(form)).catch(() => {});
+  }, [form]);
+
+  useEffect(() => {
+    async function loadDelivery() {
+      setLoadingOptions(true);
+      try {
+        const res = await apiGet<DeliveryOption[]>('/checkout/delivery-options');
+        if (Array.isArray(res)) setDeliveryOptions(res);
+      } catch {
+        // Fallback default zones if API is unreachable
+      } finally {
+        setLoadingOptions(false);
+      }
+    }
+    void loadDelivery();
+  }, []);
+
+  function updateForm<K extends keyof typeof form>(key: K, value: typeof form[K]) {
+    setForm((prev) => ({ ...prev, [key]: value }));
+    setPreview(null);
+    setError('');
+  }
+
+  async function handleCalculatePreview() {
+    if (!form.name.trim() || !form.phone.trim() || !form.area.trim() || !form.detailedAddress.trim()) {
+      setError('Please fill in all required name, phone, area and detailed address fields.');
+      return;
+    }
+    setPreviewing(true);
+    setError('');
+    try {
+      const res = await apiPost<CheckoutPreview>('/checkout/preview', {
+        ...form,
+        email: form.email || undefined,
+        landmark: form.landmark || undefined,
+      });
+      setPreview(res);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to calculate checkout total.');
+    } finally {
+      setPreviewing(false);
+    }
+  }
+
+  async function handlePlaceOrder() {
+    if (!form.termsAccepted) {
+      setError('Please accept terms and conditions.');
+      return;
+    }
+    setPlacing(true);
+    setError('');
+    const idempotencyKey = `mob_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    try {
+      const res = await apiPost<CheckoutOrderResult>('/checkout/order', {
+        idempotencyKey,
+        paymentMethod: form.paymentMethod,
+        paymentProvider: form.paymentMethod === 'PREPAID' ? form.paymentProvider : undefined,
+      });
+
+      await clear();
+      await AsyncStorage.removeItem(STORAGE_KEY);
+
+      router.replace({
+        pathname: '/order-confirmation',
+        params: {
+          reference: res.reference,
+          status: res.status,
+        },
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to place your order.');
+      setPlacing(false);
+    }
+  }
+
+  const finalTotal = preview ? preview.pricing.total : subtotal + (form.district === 'Dhaka' ? 6000 : 12000);
+  const deliveryFeeText = preview
+    ? preview.pricing.deliveryFee === 0
+      ? 'Free'
+      : formatTaka(preview.pricing.deliveryFee)
+    : form.district === 'Dhaka'
+    ? '৳60 (Dhaka City)'
+    : '৳120 (Outside Dhaka)';
+
+  return (
+    <SafeAreaView style={styles.safe}>
+      <FerioHeader />
+      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+        <Text style={styles.eyebrow}>CHECKOUT</Text>
+        <Text style={styles.title}>Delivery details</Text>
+        <Text style={styles.copy}>
+          Confirm your address and payment method to calculate final total and place your order.
+        </Text>
+
+        <View style={styles.form}>
+          <View style={styles.field}>
+            <Text style={styles.label}>Full name *</Text>
+            <TextInput
+              value={form.name}
+              onChangeText={(v) => updateForm('name', v)}
+              placeholder="Your full name"
+              placeholderTextColor="#9a9a9e"
+              style={styles.input}
+            />
+          </View>
+
+          <View style={styles.field}>
+            <Text style={styles.label}>Bangladesh mobile *</Text>
+            <TextInput
+              value={form.phone}
+              onChangeText={(v) => updateForm('phone', v)}
+              keyboardType="phone-pad"
+              placeholder="01XXXXXXXXX"
+              placeholderTextColor="#9a9a9e"
+              style={styles.input}
+            />
+          </View>
+
+          <View style={styles.field}>
+            <Text style={styles.label}>Email (optional)</Text>
+            <TextInput
+              value={form.email}
+              onChangeText={(v) => updateForm('email', v)}
+              keyboardType="email-address"
+              placeholder="you@example.com"
+              placeholderTextColor="#9a9a9e"
+              style={styles.input}
+            />
+          </View>
+
+          <View style={styles.field}>
+            <Text style={styles.label}>District *</Text>
+            <TextInput
+              value={form.district}
+              onChangeText={(v) => updateForm('district', v)}
+              placeholder="Dhaka"
+              placeholderTextColor="#9a9a9e"
+              style={styles.input}
+            />
+          </View>
+
+          <View style={styles.field}>
+            <Text style={styles.label}>Area / Thana *</Text>
+            <TextInput
+              value={form.area}
+              onChangeText={(v) => updateForm('area', v)}
+              placeholder="Your delivery area"
+              placeholderTextColor="#9a9a9e"
+              style={styles.input}
+            />
+          </View>
+
+          <View style={styles.field}>
+            <Text style={styles.label}>Detailed address *</Text>
+            <TextInput
+              value={form.detailedAddress}
+              onChangeText={(v) => updateForm('detailedAddress', v)}
+              multiline
+              placeholder="House, road, block, floor or village details"
+              placeholderTextColor="#9a9a9e"
+              style={[styles.input, styles.textarea]}
+            />
+          </View>
+
+          <View style={styles.field}>
+            <Text style={styles.label}>Landmark (optional)</Text>
+            <TextInput
+              value={form.landmark}
+              onChangeText={(v) => updateForm('landmark', v)}
+              placeholder="Nearby mosque, market or landmark"
+              placeholderTextColor="#9a9a9e"
+              style={styles.input}
+            />
+          </View>
+
+          <View style={styles.field}>
+            <Text style={styles.label}>Order note (optional)</Text>
+            <TextInput
+              value={form.customerNote}
+              onChangeText={(v) => updateForm('customerNote', v)}
+              multiline
+              placeholder="Delivery instructions"
+              placeholderTextColor="#9a9a9e"
+              style={[styles.input, styles.textarea]}
+            />
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Payment method</Text>
+          <View style={styles.paymentRow}>
+            <Pressable
+              onPress={() => updateForm('paymentMethod', 'COD')}
+              style={[styles.payment, form.paymentMethod === 'COD' && styles.paymentActive]}
+            >
+              <Text style={[styles.paymentText, form.paymentMethod === 'COD' && styles.paymentTextActive]}>
+                Cash on delivery
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => updateForm('paymentMethod', 'PREPAID')}
+              style={[styles.payment, form.paymentMethod === 'PREPAID' && styles.paymentActive]}
+            >
+              <Text style={[styles.paymentText, form.paymentMethod === 'PREPAID' && styles.paymentTextActive]}>
+                Pay online
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Consent & Terms</Text>
+          <Toggle
+            label="Send me product and offer updates"
+            value={form.marketingConsent}
+            onValueChange={(v) => updateForm('marketingConsent', v)}
+          />
+          <Toggle
+            label="Allow anonymized purchase activity notice"
+            value={form.purchaseActivityConsent}
+            onValueChange={(v) => updateForm('purchaseActivityConsent', v)}
+          />
+          <Toggle
+            label="I confirm delivery details & accept store policies *"
+            value={form.termsAccepted}
+            onValueChange={(v) => updateForm('termsAccepted', v)}
+          />
+        </View>
+
+        <View style={styles.summary}>
+          <Text style={styles.sectionTitle}>Order summary</Text>
+          {items.map((item) => (
+            <View key={item.variantId} style={styles.summaryRow}>
+              <Text style={styles.muted}>
+                {item.name} x{item.quantity}
+              </Text>
+              <Text style={styles.value}>{formatTaka(item.price * item.quantity)}</Text>
+            </View>
+          ))}
+          <View style={styles.summaryRow}>
+            <Text style={styles.muted}>Subtotal</Text>
+            <Text style={styles.value}>{formatTaka(subtotal)}</Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.muted}>Delivery fee</Text>
+            <Text style={styles.value}>{deliveryFeeText}</Text>
+          </View>
+          <View style={[styles.summaryRow, styles.totalRow]}>
+            <Text style={styles.totalLabel}>Final total</Text>
+            <Text style={styles.total}>{formatTaka(finalTotal)}</Text>
+          </View>
+        </View>
+
+        {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+        {!preview ? (
+          <Pressable
+            disabled={previewing || !items.length}
+            onPress={handleCalculatePreview}
+            style={[styles.calcButton, (!items.length || previewing) && styles.disabled]}
+          >
+            {previewing ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.calcButtonText}>Calculate & Preview Total</Text>
+            )}
+          </Pressable>
+        ) : null}
+
+        <Pressable
+          disabled={!items.length || !form.termsAccepted || placing}
+          onPress={handlePlaceOrder}
+          style={[styles.place, (!items.length || !form.termsAccepted || placing) && styles.disabled]}
+        >
+          {placing ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.placeText}>
+              {form.paymentMethod === 'PREPAID' ? 'Continue to online payment' : 'Place cash-on-delivery order'}
+            </Text>
+          )}
+        </Pressable>
+
+        <Link href="/(tabs)/cart">
+          <Text style={styles.back}>← Back to cart</Text>
+        </Link>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+function Toggle({
+  label,
+  value,
+  onValueChange,
+}: {
+  label: string;
+  value: boolean;
+  onValueChange: (v: boolean) => void;
+}) {
+  return (
+    <View style={styles.toggle}>
+      <Text style={styles.toggleText}>{label}</Text>
+      <Switch
+        value={value}
+        onValueChange={onValueChange}
+        trackColor={{ false: '#dedee1', true: '#2b2b2f' }}
+        thumbColor="#fff"
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: colors.paper },
+  container: { padding: 18, paddingBottom: 70 },
+  eyebrow: { fontSize: 10, letterSpacing: 1.2, color: colors.ink2, fontWeight: '600' },
+  title: { marginTop: 7, fontSize: 30, fontWeight: '600', letterSpacing: -0.8, color: colors.ink },
+  copy: { marginTop: 10, maxWidth: 520, fontSize: 13, lineHeight: 20, color: colors.ink2 },
+  form: { marginTop: 28, gap: 15 },
+  field: { gap: 7 },
+  label: { fontSize: 12, color: colors.ink2, fontWeight: '500' },
+  input: {
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: radii.card,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 14,
+    color: colors.ink,
+    backgroundColor: '#fff',
+  },
+  textarea: { minHeight: 82, textAlignVertical: 'top' },
+  section: { marginTop: 30, borderTopWidth: 1, borderTopColor: colors.line, paddingTop: 22 },
+  sectionTitle: { fontSize: 16, fontWeight: '500', color: colors.ink },
+  paymentRow: { marginTop: 14, flexDirection: 'row', gap: 8 },
+  payment: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.line,
+    borderRadius: radii.pill,
+    paddingVertical: 11,
+    alignItems: 'center',
+  },
+  paymentActive: { backgroundColor: colors.ink, borderColor: colors.ink },
+  paymentText: { fontSize: 12, color: colors.ink2 },
+  paymentTextActive: { color: '#fff' },
+  toggle: {
+    minHeight: 52,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.line,
+  },
+  toggleText: { flex: 1, fontSize: 12.5, lineHeight: 18, color: colors.ink2 },
+  summary: { marginTop: 30, borderWidth: 1, borderColor: colors.line, borderRadius: radii.card, padding: 17, gap: 11 },
+  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
+  muted: { fontSize: 12, color: colors.ink2, flex: 1 },
+  value: { fontSize: 12, color: colors.ink },
+  totalRow: { borderTopWidth: 1, borderTopColor: colors.line, paddingTop: 12, marginTop: 3 },
+  totalLabel: { fontSize: 14, fontWeight: '600', color: colors.ink },
+  total: { fontSize: 16, fontWeight: '600', color: colors.ink },
+  calcButton: {
+    marginTop: 22,
+    borderWidth: 1,
+    borderColor: colors.ink,
+    borderRadius: radii.pill,
+    paddingVertical: 13,
+    alignItems: 'center',
+  },
+  calcButtonText: { color: colors.ink, fontSize: 13, fontWeight: '600' },
+  place: { marginTop: 12, backgroundColor: colors.ink, borderRadius: radii.pill, paddingVertical: 14, alignItems: 'center' },
+  disabled: { opacity: 0.35 },
+  placeText: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  errorText: { marginTop: 14, color: '#b91c1c', fontSize: 13 },
+  back: { marginTop: 18, textAlign: 'center', fontSize: 12, color: colors.ink2 },
+});

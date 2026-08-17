@@ -21,7 +21,7 @@ export function setCustomerSession(accessToken: string, refreshToken: string) {
     httpOnly: true,
     secure,
     sameSite: "lax",
-    maxAge: 15 * 60,
+    maxAge: 7 * 24 * 60 * 60,
     path: "/",
   });
   store.set("ferio_customer_refresh", refreshToken, {

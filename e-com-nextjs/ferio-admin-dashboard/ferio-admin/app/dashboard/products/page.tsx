@@ -40,6 +40,18 @@ export default async function ProductsPage() {
             Categories
           </Link>
           <Link
+            href="/dashboard/brands"
+            className="rounded-full border border-line px-5 py-2.5 text-[13px] text-ink2 hover:text-ink"
+          >
+            Brands
+          </Link>
+          <Link
+            href="/dashboard/reviews"
+            className="rounded-full border border-line px-5 py-2.5 text-[13px] text-ink2 hover:text-ink"
+          >
+            YouTube reviews
+          </Link>
+          <Link
             href="/dashboard/products/new"
             className="rounded-full bg-ink px-5 py-2.5 text-[13px] font-medium text-white hover:opacity-85"
           >
