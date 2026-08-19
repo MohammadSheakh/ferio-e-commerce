@@ -4,7 +4,7 @@ import type { CheckoutOrderResult, OrderConfirmation } from "@/lib/checkout";
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as { idempotencyKey?: string; paymentMethod?: "COD" | "PREPAID"; paymentProvider?: "SSLCOMMERZ" | "AAMARPAY" };
+    const body = (await request.json()) as { idempotencyKey?: string; paymentMethod?: "COD" | "PREPAID" | "PAY_AT_STORE"; paymentProvider?: "SSLCOMMERZ" | "AAMARPAY" };
     const order = await cartApi<OrderConfirmation>("/checkout/orders", {
       method: "POST",
       headers: {

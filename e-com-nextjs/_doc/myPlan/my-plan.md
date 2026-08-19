@@ -2,7 +2,14 @@
 2. guest jei visitor ase .. she jodi tar mail share kore rakhe .. and
 tar question kore .. amra tar mail e shei question er reply dibo .. so amra reply deowar time e .. choose korte parbo .. mail e reply dibo .. naki chat ei reply dibo
 
-Guest Visitor .. tar name o send korbe 
+3. Guest Visitor .. tar name o send korbe 
+
+4. Multiple address jeno customer add korte pare
+
+5. suspence .. skeleton --- issue ase ekhono
+
+6. ekjon jodi dhaka north ar dhk south na bujhe amra kivabe ta ke help
+korte pari
 
 =================
 1. category delete korar feature thakte hobe

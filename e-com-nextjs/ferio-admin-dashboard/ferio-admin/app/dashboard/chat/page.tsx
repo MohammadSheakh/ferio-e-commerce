@@ -86,7 +86,7 @@ export default function AdminLiveChatPage() {
       const curRightW = newSettings.rightWidth !== undefined ? newSettings.rightWidth : rightWidth;
       const curLeftC = newSettings.leftCollapsed !== undefined ? newSettings.leftCollapsed : leftCollapsed;
       const curRightC = newSettings.rightCollapsed !== undefined ? newSettings.rightCollapsed : rightCollapsed;
-      
+
       localStorage.setItem("ferio_admin_chat_layout", JSON.stringify({
         leftWidth: curLeftW,
         rightWidth: curRightW,
@@ -248,9 +248,9 @@ export default function AdminLiveChatPage() {
           dbConvs.forEach((conv: any) => {
             const convId = conv.id.startsWith("conv-") ? conv.id : `conv-${conv.id}`;
             const rawId = conv.id.replace("conv-", "");
-            
+
             const isGuestConv = rawId.startsWith("gst_") || conv.id.startsWith("conv-gst_") || rawId.startsWith("guest");
-            
+
             if (isGuestConv) {
               const guestId = rawId.startsWith("gst_") ? rawId : (conv.id.includes("gst_") ? conv.id.split("conv-")[1] : rawId);
               const savedMeta = metaStore[convId] || metaStore[guestId] || {};
@@ -352,7 +352,7 @@ export default function AdminLiveChatPage() {
         const newMsgItem: MessageItem = {
           id: data._messageId || `msg-${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
           senderId: senderId || (isFromAdmin ? "admin-current" : "customer"),
-          senderName: senderName || (isFromAdmin ? "Henry (Support Agent)" : isGuest ? `Guest Visitor #${guestId || "8921"}` : "Customer"),
+          senderName: senderName || (isFromAdmin ? "Mohammad Sheakh (Support)" : isGuest ? `Guest Visitor #${guestId || "8921"}` : "Customer"),
           isAdmin: isFromAdmin,
           text: text,
           timestamp: formattedTime,
@@ -464,7 +464,7 @@ export default function AdminLiveChatPage() {
                 id: m.id,
                 senderId: m.senderId,
                 senderName: isFromAdmin
-                  ? (m.sender?.name || "Henry (Support Agent)")
+                  ? (m.sender?.name || "Mohammad (Support)")
                   : (currentConv?.customer.name || m.sender?.name || "Customer"),
                 isAdmin: isFromAdmin,
                 text: m.text,
@@ -524,7 +524,7 @@ export default function AdminLiveChatPage() {
     const newMsg: MessageItem = {
       id: `m-${Date.now()}`,
       senderId: "admin-current",
-      senderName: "Henry (Support Agent)",
+      senderName: "Mohammad (Support)",
       isAdmin: true,
       text: text,
       timestamp: formattedTime,
@@ -554,7 +554,7 @@ export default function AdminLiveChatPage() {
         email: activeConv.customer.email,
         guestId: activeConv.customer.guestId,
         senderId: "admin-current",
-        senderName: "Henry (Support Agent)",
+        senderName: "Mohammad (Support)",
         text: text,
         createdAt: new Date().toISOString(),
         isAdmin: true,
@@ -665,19 +665,17 @@ export default function AdminLiveChatPage() {
                     <button
                       key={tab.id}
                       onClick={() => setPrimaryTab(tab.id as PrimaryFolderTab)}
-                      className={`flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition ${
-                        primaryTab === tab.id
-                          ? "bg-ink text-white shadow-xs"
-                          : "bg-surface/60 text-ink2 hover:bg-surface hover:text-ink"
-                      }`}
+                      className={`flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition ${primaryTab === tab.id
+                        ? "bg-ink text-white shadow-xs"
+                        : "bg-surface/60 text-ink2 hover:bg-surface hover:text-ink"
+                        }`}
                     >
                       <span className="text-[12px]">{tab.icon}</span>
                       <span>{tab.label}</span>
                       {count > 0 && (
                         <span
-                          className={`ml-0.5 rounded-full px-1.5 py-0.2 text-[9px] font-semibold ${
-                            primaryTab === tab.id ? "bg-white/20 text-white" : "bg-line/70 text-ink"
-                          }`}
+                          className={`ml-0.5 rounded-full px-1.5 py-0.2 text-[9px] font-semibold ${primaryTab === tab.id ? "bg-white/20 text-white" : "bg-line/70 text-ink"
+                            }`}
                         >
                           {count}
                         </span>
@@ -703,19 +701,18 @@ export default function AdminLiveChatPage() {
                   <button
                     key={tab}
                     onClick={() => setSubFilter(tab)}
-                    className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition ${
-                      subFilter === tab
-                        ? "bg-ink text-white"
-                        : "bg-white text-ink2 border border-line hover:text-ink"
-                    }`}
+                    className={`rounded-full px-2 py-0.5 text-[10px] font-medium transition ${subFilter === tab
+                      ? "bg-ink text-white"
+                      : "bg-white text-ink2 border border-line hover:text-ink"
+                      }`}
                   >
                     {tab === "ALL"
                       ? "All Types"
                       : tab === "LOGGED_IN"
-                      ? "Logged-in"
-                      : tab === "GUEST"
-                      ? "Guests"
-                      : "Unread"}
+                        ? "Logged-in"
+                        : tab === "GUEST"
+                          ? "Guests"
+                          : "Unread"}
                   </button>
                 ))}
               </div>
@@ -730,9 +727,8 @@ export default function AdminLiveChatPage() {
                 return (
                   <div
                     key={conv.id}
-                    className={`group relative flex items-start gap-3 p-3.5 transition cursor-pointer ${
-                      isActive ? "bg-white shadow-xs border-l-4 border-l-ink" : "hover:bg-white/60"
-                    }`}
+                    className={`group relative flex items-start gap-3 p-3.5 transition cursor-pointer ${isActive ? "bg-white shadow-xs border-l-4 border-l-ink" : "hover:bg-white/60"
+                      }`}
                     onClick={() => handleSelectConv(conv.id)}
                   >
                     <div className="relative shrink-0">
@@ -748,9 +744,8 @@ export default function AdminLiveChatPage() {
                         </div>
                       )}
                       <span
-                        className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white ${
-                          conv.customer.isOnline ? "bg-emerald-500" : "bg-slate-300"
-                        }`}
+                        className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-white ${conv.customer.isOnline ? "bg-emerald-500" : "bg-slate-300"
+                          }`}
                       />
                     </div>
 
@@ -768,11 +763,10 @@ export default function AdminLiveChatPage() {
 
                       <div className="mt-1 flex items-center gap-1.5 flex-wrap">
                         <span
-                          className={`rounded px-1.5 py-0.2 text-[9px] font-semibold shrink-0 ${
-                            conv.customer.isGuest
-                              ? "bg-amber-100 text-amber-800"
-                              : "bg-emerald-100 text-emerald-800"
-                          }`}
+                          className={`rounded px-1.5 py-0.2 text-[9px] font-semibold shrink-0 ${conv.customer.isGuest
+                            ? "bg-amber-100 text-amber-800"
+                            : "bg-emerald-100 text-emerald-800"
+                            }`}
                         >
                           {conv.customer.isGuest ? "GUEST" : "CUSTOMER"}
                         </span>
@@ -962,7 +956,7 @@ export default function AdminLiveChatPage() {
               }}
               onPointerUp={(e) => {
                 if (isDraggingLeft) {
-                  try { e.currentTarget.releasePointerCapture(e.pointerId); } catch {}
+                  try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { }
                   setIsDraggingLeft(false);
                 }
               }}
@@ -974,9 +968,8 @@ export default function AdminLiveChatPage() {
                 setLeftWidth(340);
                 updateLayoutSettings({ leftWidth: 340 });
               }}
-              className={`group relative z-20 w-2 cursor-col-resize hover:bg-blue-500/50 transition-colors shrink-0 flex items-center justify-center select-none ${
-                isDraggingLeft ? "bg-blue-600" : "bg-line/40 hover:bg-blue-400"
-              }`}
+              className={`group relative z-20 w-2 cursor-col-resize hover:bg-blue-500/50 transition-colors shrink-0 flex items-center justify-center select-none ${isDraggingLeft ? "bg-blue-600" : "bg-line/40 hover:bg-blue-400"
+                }`}
               title="Drag to resize conversation list, double-click to reset width"
             >
               <div className="h-8 w-1 rounded-full bg-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -997,11 +990,10 @@ export default function AdminLiveChatPage() {
                       setLeftCollapsed(nextVal);
                       updateLayoutSettings({ leftCollapsed: nextVal });
                     }}
-                    className={`rounded-lg border px-2.5 py-1 text-[11px] font-medium transition flex items-center gap-1.5 shrink-0 ${
-                      leftCollapsed
-                        ? "border-line bg-surface/60 text-ink hover:bg-slate-200"
-                        : "border-line bg-white text-ink2 hover:bg-surface hover:text-ink"
-                    }`}
+                    className={`rounded-lg border px-2.5 py-1 text-[11px] font-medium transition flex items-center gap-1.5 shrink-0 ${leftCollapsed
+                      ? "border-line bg-surface/60 text-ink hover:bg-slate-200"
+                      : "border-line bg-white text-ink2 hover:bg-surface hover:text-ink"
+                      }`}
                     title={leftCollapsed ? "Expand Conversation List" : "Collapse Conversation List"}
                   >
                     <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1023,9 +1015,8 @@ export default function AdminLiveChatPage() {
                       </div>
                     )}
                     <span
-                      className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white ${
-                        activeConv.customer.isOnline ? "bg-emerald-500" : "bg-slate-300"
-                      }`}
+                      className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white ${activeConv.customer.isOnline ? "bg-emerald-500" : "bg-slate-300"
+                        }`}
                     />
                   </div>
 
@@ -1035,11 +1026,10 @@ export default function AdminLiveChatPage() {
                         {activeConv.customer.name}
                       </h3>
                       <span
-                        className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                          activeConv.customer.isGuest
-                            ? "bg-amber-50 text-amber-700 border border-amber-200"
-                            : "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                        }`}
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${activeConv.customer.isGuest
+                          ? "bg-amber-50 text-amber-700 border border-amber-200"
+                          : "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                          }`}
                       >
                         {activeConv.customer.isGuest ? "Guest Visitor" : "Registered Customer"}
                       </span>
@@ -1072,9 +1062,8 @@ export default function AdminLiveChatPage() {
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
-                  <span className={`text-[11px] px-3 py-1 rounded-full border font-medium ${
-                    isConnected ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-amber-50 text-amber-700 border-amber-200"
-                  }`}>
+                  <span className={`text-[11px] px-3 py-1 rounded-full border font-medium ${isConnected ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-amber-50 text-amber-700 border-amber-200"
+                    }`}>
                     {isConnected ? "● Gateway Live" : "Connecting..."}
                   </span>
 
@@ -1086,11 +1075,10 @@ export default function AdminLiveChatPage() {
                       setRightCollapsed(nextVal);
                       updateLayoutSettings({ rightCollapsed: nextVal });
                     }}
-                    className={`rounded-lg border px-2.5 py-1 text-[11px] font-medium transition flex items-center gap-1.5 ${
-                      rightCollapsed
-                        ? "border-line bg-surface/60 text-ink hover:bg-slate-200"
-                        : "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100"
-                    }`}
+                    className={`rounded-lg border px-2.5 py-1 text-[11px] font-medium transition flex items-center gap-1.5 ${rightCollapsed
+                      ? "border-line bg-surface/60 text-ink hover:bg-slate-200"
+                      : "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100"
+                      }`}
                     title={rightCollapsed ? "Expand Customer Details" : "Collapse Customer Details"}
                   >
                     <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1113,11 +1101,10 @@ export default function AdminLiveChatPage() {
                         {msg.senderName} · {msg.timestamp}
                       </span>
                       <div
-                        className={`max-w-[70%] rounded-2xl px-4 py-2.5 text-[13px] leading-relaxed shadow-xs ${
-                          msg.isAdmin
-                            ? "bg-ink text-white rounded-br-xs"
-                            : "bg-white text-ink border border-line/80 rounded-bl-xs"
-                        }`}
+                        className={`max-w-[70%] rounded-2xl px-4 py-2.5 text-[13px] leading-relaxed shadow-xs ${msg.isAdmin
+                          ? "bg-ink text-white rounded-br-xs"
+                          : "bg-white text-ink border border-line/80 rounded-bl-xs"
+                          }`}
                       >
                         <p>{msg.text}</p>
                       </div>
@@ -1200,7 +1187,7 @@ export default function AdminLiveChatPage() {
               }}
               onPointerUp={(e) => {
                 if (isDraggingRight) {
-                  try { e.currentTarget.releasePointerCapture(e.pointerId); } catch {}
+                  try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { }
                   setIsDraggingRight(false);
                 }
               }}
@@ -1212,9 +1199,8 @@ export default function AdminLiveChatPage() {
                 setRightWidth(290);
                 updateLayoutSettings({ rightWidth: 290 });
               }}
-              className={`group relative z-20 w-2 cursor-col-resize hover:bg-blue-500/50 transition-colors shrink-0 flex items-center justify-center select-none ${
-                isDraggingRight ? "bg-blue-600" : "bg-line/40 hover:bg-blue-400"
-              }`}
+              className={`group relative z-20 w-2 cursor-col-resize hover:bg-blue-500/50 transition-colors shrink-0 flex items-center justify-center select-none ${isDraggingRight ? "bg-blue-600" : "bg-line/40 hover:bg-blue-400"
+                }`}
               title="Drag to resize customer profile, double-click to reset width"
             >
               <div className="h-8 w-1 rounded-full bg-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -1246,24 +1232,24 @@ export default function AdminLiveChatPage() {
                 </button>
               </div>
               <div className="mt-3 flex items-center gap-3">
-                  {activeConv.customer.avatar ? (
-                    <img
-                      src={activeConv.customer.avatar}
-                      alt={activeConv.customer.name}
-                      className="h-12 w-12 rounded-full object-cover border border-line"
-                    />
-                  ) : (
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 text-blue-700 font-semibold text-sm">
-                      {activeConv.customer.name.slice(0, 2).toUpperCase()}
-                    </div>
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[14px] font-semibold text-ink truncate">{activeConv.customer.name}</p>
-                    <p className="text-[11px] text-ink2 truncate">
-                      {activeConv.customer.email || "No email linked"}
-                    </p>
+                {activeConv.customer.avatar ? (
+                  <img
+                    src={activeConv.customer.avatar}
+                    alt={activeConv.customer.name}
+                    className="h-12 w-12 rounded-full object-cover border border-line"
+                  />
+                ) : (
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 text-blue-700 font-semibold text-sm">
+                    {activeConv.customer.name.slice(0, 2).toUpperCase()}
                   </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="text-[14px] font-semibold text-ink truncate">{activeConv.customer.name}</p>
+                  <p className="text-[11px] text-ink2 truncate">
+                    {activeConv.customer.email || "No email linked"}
+                  </p>
                 </div>
+              </div>
 
               <div className="space-y-3 pt-4 border-t border-line">
                 <h4 className="text-[11px] font-semibold uppercase tracking-wider text-ink2">

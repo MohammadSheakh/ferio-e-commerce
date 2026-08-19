@@ -174,7 +174,7 @@ export default function LiveChatWidget() {
         const isAgent = Boolean(
           data.isAdmin ||
           data.senderName?.toLowerCase().includes("support") ||
-          data.senderName?.toLowerCase().includes("henry") ||
+          data.senderName?.toLowerCase().includes("mohammad sheakh") ||
           data.senderId === "admin-current"
         );
 
@@ -332,23 +332,22 @@ export default function LiveChatWidget() {
               <div className="relative">
                 <div className="flex h-11 w-11 items-center justify-center rounded-full bg-white/20 p-0.5 shadow-md">
                   <img
-                    src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80"
-                    alt="Henry - Support Agent"
+                    src="https://media.licdn.com/dms/image/v2/D5603AQF6xtEy4KLdJg/profile-displayphoto-scale_400_400/B56Z55.UopK8Ag-/0/1780162842990?e=1788393600&v=beta&t=T_Tp2ReUVsGhh4Ol2JiFjELLdUKmpsyV9WdN83wanA0"
+                    alt="Mohammad - Support"
                     className="h-full w-full rounded-full object-cover"
                   />
                 </div>
                 <span
-                  className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white ${
-                    isConnected ? "bg-emerald-500" : "bg-amber-400"
-                  }`}
+                  className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white ${isConnected ? "bg-emerald-500" : "bg-amber-400"
+                    }`}
                 />
               </div>
               <div>
-                <h4 className="text-sm font-semibold tracking-tight">Henry</h4>
+                <h4 className="text-sm font-semibold tracking-tight">Mohammad Sheakh</h4>
                 <p className="text-[11px] text-blue-100/90 font-medium">
-                  Ferio Support Specialist ·{" "}
+                  Ferio Admin ·{" "}
                   <span className={isConnected ? "text-emerald-300 font-semibold" : "text-amber-200"}>
-                    {isConnected ? "Live Socket" : "Connecting..."}
+                    {isConnected ? "Connected" : "Connecting..."}
                   </span>
                 </p>
               </div>
@@ -380,32 +379,29 @@ export default function LiveChatWidget() {
             {messages.map((msg) => (
               <div
                 key={msg.id}
-                className={`flex items-end gap-2 ${
-                  msg.sender === "user" ? "justify-end" : "justify-start"
-                }`}
+                className={`flex items-end gap-2 ${msg.sender === "user" ? "justify-end" : "justify-start"
+                  }`}
               >
                 {msg.sender === "agent" && (
                   <div className="h-7 w-7 flex-shrink-0 rounded-full overflow-hidden border border-blue-200">
                     <img
-                      src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=80&q=80"
-                      alt="Henry"
+                      src="https://media.licdn.com/dms/image/v2/D5603AQF6xtEy4KLdJg/profile-displayphoto-scale_400_400/B56Z55.UopK8Ag-/0/1780162842990?e=1788393600&v=beta&t=T_Tp2ReUVsGhh4Ol2JiFjELLdUKmpsyV9WdN83wanA0"
+                      alt="Mohammad Sheakh"
                       className="h-full w-full object-cover"
                     />
                   </div>
                 )}
 
                 <div
-                  className={`max-w-[78%] rounded-2xl px-4 py-2.5 text-[13px] leading-relaxed shadow-sm ${
-                    msg.sender === "user"
-                      ? "rounded-br-xs bg-ink text-white"
-                      : "rounded-bl-xs bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-medium shadow-blue-500/10"
-                  }`}
+                  className={`max-w-[78%] rounded-2xl px-4 py-2.5 text-[13px] leading-relaxed shadow-sm ${msg.sender === "user"
+                    ? "rounded-br-xs bg-ink text-white"
+                    : "rounded-bl-xs bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-medium shadow-blue-500/10"
+                    }`}
                 >
                   <p>{msg.text}</p>
                   <span
-                    className={`mt-1 block text-[9px] ${
-                      msg.sender === "user" ? "text-slate-300 text-right" : "text-blue-100/80"
-                    }`}
+                    className={`mt-1 block text-[9px] ${msg.sender === "user" ? "text-slate-300 text-right" : "text-blue-100/80"
+                      }`}
                   >
                     {msg.time}
                   </span>
@@ -417,8 +413,8 @@ export default function LiveChatWidget() {
               <div className="flex items-center gap-2">
                 <div className="h-7 w-7 flex-shrink-0 rounded-full overflow-hidden border border-blue-200">
                   <img
-                    src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=80&q=80"
-                    alt="Henry"
+                    src="https://media.licdn.com/dms/image/v2/D5603AQF6xtEy4KLdJg/profile-displayphoto-scale_400_400/B56Z55.UopK8Ag-/0/1780162842990?e=1788393600&v=beta&t=T_Tp2ReUVsGhh4Ol2JiFjELLdUKmpsyV9WdN83wanA0"
+                    alt="Mohammad Sheakh"
                     className="h-full w-full object-cover"
                   />
                 </div>
@@ -487,9 +483,8 @@ export default function LiveChatWidget() {
               <button
                 type="submit"
                 disabled={!inputMessage.trim()}
-                className={`flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-white transition hover:bg-blue-700 shadow-md ${
-                  !inputMessage.trim() ? "opacity-50 cursor-not-allowed" : "hover:scale-105 active:scale-95"
-                }`}
+                className={`flex h-8 w-8 items-center justify-center rounded-full bg-blue-600 text-white transition hover:bg-blue-700 shadow-md ${!inputMessage.trim() ? "opacity-50 cursor-not-allowed" : "hover:scale-105 active:scale-95"
+                  }`}
                 title="Send message"
               >
                 <svg className="h-4 w-4 transform rotate-90 stroke-current" fill="currentColor" viewBox="0 0 20 20">

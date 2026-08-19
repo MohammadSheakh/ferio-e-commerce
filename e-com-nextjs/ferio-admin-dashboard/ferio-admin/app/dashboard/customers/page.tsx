@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Topbar from "@/components/Topbar";
+import CustomerPagination from "@/components/CustomerPagination";
 import { adminApi } from "@/lib/admin-api";
 import type { CustomerPage } from "@/lib/customers";
 import { formatTaka } from "@/lib/catalog";
@@ -219,29 +220,13 @@ export default async function CustomersPage({
                 ) : null}
               </tbody>
             </table>
+            <CustomerPagination
+              currentPage={customers.page}
+              totalPages={customers.totalPages}
+              totalItems={customers.total}
+              pageSize={customers.limit}
+            />
           </div>
-
-          {customers.totalPages > 1 ? (
-            <nav aria-label="Customer pages" className="mt-7 flex items-center justify-between text-[13px]">
-              <span>
-                {customers.page > 1 ? (
-                  <Link href={pageHref(customers.page - 1)} className="underline underline-offset-4">
-                    Previous
-                  </Link>
-                ) : null}
-              </span>
-              <span className="text-ink2">
-                Page {customers.page} of {customers.totalPages}
-              </span>
-              <span>
-                {customers.page < customers.totalPages ? (
-                  <Link href={pageHref(customers.page + 1)} className="underline underline-offset-4">
-                    Next
-                  </Link>
-                ) : null}
-              </span>
-            </nav>
-          ) : null}
         </div>
       </main>
     </>

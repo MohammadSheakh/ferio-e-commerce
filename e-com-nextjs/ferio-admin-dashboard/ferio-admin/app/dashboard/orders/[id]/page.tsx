@@ -6,7 +6,7 @@ import Topbar from "@/components/Topbar";
 import { formatTaka } from "@/lib/catalog";
 import type { OrderDetail, OrderFulfillmentStatus } from "@/lib/orders";
 import { orderStatusClass } from "@/lib/orders";
-import type { Shipment, ShipmentProvider } from "@/lib/shipping";
+import type { CourierCode, Shipment, ShipmentProvider } from "@/lib/shipping";
 import { shipmentStatusClass } from "@/lib/shipping";
 import ReturnCasePanel from "@/components/returns/ReturnCasePanel";
 
@@ -31,7 +31,7 @@ export default function OrderDetailPage() {
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [shipment, setShipment] = useState<Shipment | null>(null);
   const [providers, setProviders] = useState<ShipmentProvider[]>([]);
-  const [selectedProvider, setSelectedProvider] = useState<"STEADFAST" | "PATHAO">("STEADFAST");
+  const [selectedProvider, setSelectedProvider] = useState<CourierCode>("STEADFAST");
   const [exceptionType, setExceptionType] = useState<"SHORTAGE" | "SUBSTITUTION" | "OTHER">("SHORTAGE");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -232,10 +232,124 @@ export default function OrderDetailPage() {
         <aside className="space-y-6">
           <section className="rounded-card border border-line p-6"><h2 className="text-[13px] font-medium text-ink">Customer and address snapshot</h2><p className="mt-4 text-[13px] text-ink">{order.customer.name}</p><p className="text-[13px] text-ink2">{order.customer.phone}</p>{order.customer.email && <p className="text-[13px] text-ink2">{order.customer.email}</p>}{order.address && <address className="mt-4 not-italic text-[13px] leading-6 text-ink/80">{order.address.detailedAddress}<br />{order.address.area}, {order.address.district}{order.address.landmark && <><br />Landmark: {order.address.landmark}</>}</address>}{order.customerNote && <div className="mt-5 border-t border-line pt-4"><p className="text-[11px] uppercase tracking-eyebrow text-ink2">Customer note</p><p className="mt-2 whitespace-pre-wrap text-[13px] leading-6 text-ink">{order.customerNote}</p></div>}</section>
           <section className="rounded-card border border-line p-6"><h2 className="text-[13px] font-medium text-ink">Reservation</h2><p className="mt-3 text-[13px] text-ink2">{activeReservations.length === 0 ? "No active reservation." : `${activeReservations.reduce((total, item) => total + item.quantity, 0)} units actively reserved.`}</p>{activeReservations.map((reservation) => <p key={reservation.id} className="mt-2 text-[12px] text-ink">{reservation.quantity} · {reservation.inventory.warehouse.name}</p>)}</section>
+
+          {(order as any).deliveryMethod === "STORE_PICKUP" && (
+            <section className="rounded-card border border-amber-200 bg-amber-50/40 p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-[14px] font-bold text-ink flex items-center gap-1.5">
+                  🏪 Store Pickup (Click & Collect)
+                </h2>
+                <span className="text-[11px] px-2.5 py-1 rounded-full font-semibold bg-amber-100 text-amber-900 border border-amber-200 uppercase">
+                  {((order as any).storePickupStatus || "PENDING").replaceAll("_", " ")}
+                </span>
+              </div>
+
+              {(order as any).pickupStore && (
+                <div className="text-[12px] text-ink space-y-1 bg-paper p-3 rounded-lg border border-line/60">
+                  <p className="font-semibold text-ink">{(order as any).pickupStore.name}</p>
+                  <p className="text-ink2">📍 {(order as any).pickupStore.address}</p>
+                  <p className="text-ink2">📞 {(order as any).pickupStore.phone || "N/A"}</p>
+                  <p className="text-ink2">⏰ Operating: {(order as any).pickupStore.operatingHours || "10 AM - 8 PM"}</p>
+                </div>
+              )}
+
+              <div className="text-[12px] text-ink space-y-1">
+                {(order as any).preferredPickupDate && (
+                  <p><span className="text-ink2">Preferred Date:</span> {new Date((order as any).preferredPickupDate).toLocaleDateString("en-BD")}</p>
+                )}
+                {(order as any).preferredPickupSlot && (
+                  <p><span className="text-ink2">Preferred Time Slot:</span> {(order as any).preferredPickupSlot}</p>
+                )}
+                {(order as any).storePickupOtp && (
+                  <div className="mt-3 p-3 bg-paper border border-amber-300 rounded-lg text-center">
+                    <p className="text-[11px] text-ink2 uppercase font-medium">Customer Verification OTP</p>
+                    <p className="text-xl font-mono font-bold tracking-widest text-amber-900 mt-1">
+                      {(order as any).storePickupOtp}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {(order as any).storePickupStatus !== "COMPLETED" && (
+                <div className="pt-3 border-t border-amber-200/60 space-y-3">
+                  <form
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      setSaving(true);
+                      try {
+                        const res = await fetch(`/api/orders/${params.id}/store-pickup/status`, {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ status: "READY_FOR_PICKUP" }),
+                        });
+                        if (!res.ok) throw new Error("Failed to update status");
+                        await loadOrder();
+                      } catch (err: any) {
+                        setError(err.message);
+                      } finally {
+                        setSaving(false);
+                      }
+                    }}
+                  >
+                    <button
+                      disabled={saving || (order as any).storePickupStatus === "READY_FOR_PICKUP"}
+                      className="w-full py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-semibold disabled:opacity-50 transition"
+                    >
+                      {(order as any).storePickupStatus === "READY_FOR_PICKUP" ? "✓ Customer Notified (Ready)" : "Mark Ready for Customer Pickup"}
+                    </button>
+                  </form>
+
+                  <form
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      const form = new FormData(e.currentTarget);
+                      const otp = String(form.get("otp"));
+                      setSaving(true);
+                      setError("");
+                      try {
+                        const res = await fetch(`/api/orders/${params.id}/store-pickup/verify-handover`, {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ otp }),
+                        });
+                        if (!res.ok) {
+                          const data = await res.json();
+                          throw new Error(data.message || "OTP verification failed");
+                        }
+                        await loadOrder();
+                      } catch (err: any) {
+                        setError(err.message);
+                      } finally {
+                        setSaving(false);
+                      }
+                    }}
+                    className="space-y-2"
+                  >
+                    <label className="block text-[11px] font-semibold text-ink">Verify Handover OTP Code</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        name="otp"
+                        required
+                        placeholder="Enter 6-digit OTP"
+                        className="flex-1 px-3 py-1.5 border border-line rounded-lg text-xs font-mono"
+                      />
+                      <button
+                        disabled={saving}
+                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold disabled:opacity-50"
+                      >
+                        Verify & Hand Over
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
+            </section>
+          )}
           {order.status === "CONFIRMED" && nextFulfillment && <form onSubmit={advanceFulfillment} className="rounded-card border border-line p-5"><h2 className="text-[13px] font-medium text-ink">Warehouse action</h2><p className="mt-1 text-[12px] leading-5 text-ink2">Next required state: {nextFulfillment.replaceAll("_", " ").toLowerCase()}.</p><textarea name="note" rows={2} maxLength={500} placeholder="Optional operational note" className="mt-4 w-full rounded-card border border-line px-3.5 py-2.5 text-[13px] outline-none focus:border-ink" /><button disabled={saving || !canAdvanceFulfillment} className="mt-3 rounded-full bg-ink px-5 py-2.5 text-[13px] text-white disabled:opacity-40">{saving ? "Saving…" : fulfillmentActionLabel[nextFulfillment]}</button>{nextFulfillment === "HANDED_OVER" && !shipment && <p className="mt-2 text-[11px] text-amber-700">Create the courier shipment before recording handover.</p>}</form>}
           {order.fulfillmentStatus === "PICKING" && <form onSubmit={recordException} className="rounded-card border border-line p-5"><h2 className="text-[13px] font-medium text-ink">Record picking exception</h2><p className="mt-1 text-[12px] leading-5 text-ink2">Shortages and substitutions stay explicit and block packing until resolved.</p><div className="mt-4 grid gap-3 sm:grid-cols-2"><label className="text-[11px] text-ink2">Type<select value={exceptionType} onChange={(event) => setExceptionType(event.target.value as typeof exceptionType)} name="type" className="mt-1 w-full rounded-card border border-line px-3 py-2.5 text-[13px]"><option value="SHORTAGE">Shortage</option><option value="SUBSTITUTION">Substitution</option><option value="OTHER">Other</option></select></label><label className="text-[11px] text-ink2">Order item<select required={exceptionType === "SHORTAGE"} name="orderItemId" className="mt-1 w-full rounded-card border border-line px-3 py-2.5 text-[13px]"><option value="">General exception</option>{order.items.map((item) => <option key={item.id} value={item.id}>{item.productName} · {item.variantName}</option>)}</select></label></div>{exceptionType === "SHORTAGE" && <label className="mt-3 block text-[11px] text-ink2">Affected quantity<input required name="quantity" type="number" min="1" className="mt-1 w-full rounded-card border border-line px-3 py-2.5 text-[13px]" /></label>}<textarea required name="description" minLength={3} maxLength={500} rows={3} placeholder="What was found while picking?" className="mt-3 w-full rounded-card border border-line px-3.5 py-2.5 text-[13px] outline-none focus:border-ink" /><button disabled={saving} className="mt-3 rounded-full border border-line px-5 py-2.5 text-[13px] text-ink disabled:opacity-40">Record exception</button></form>}
           {order.fulfillmentExceptions.length > 0 && <section className="rounded-card border border-line p-5"><h2 className="text-[13px] font-medium text-ink">Fulfillment exceptions</h2><div className="mt-3 divide-y divide-line">{order.fulfillmentExceptions.map((entry) => <div key={entry.id} className="py-4"><div className="flex justify-between gap-3 text-[12px]"><span className="text-ink">{entry.type.toLowerCase()} · {entry.orderItem ? `${entry.orderItem.productName} ${entry.orderItem.variantName}` : "General"}</span><span className={entry.status === "OPEN" ? "text-amber-700" : "text-emerald-700"}>{entry.status.toLowerCase()}</span></div><p className="mt-1 text-[12px] leading-5 text-ink2">{entry.description}{entry.quantity ? ` · Quantity ${entry.quantity}` : ""}</p>{entry.resolution && <p className="mt-2 text-[12px] text-ink">Resolution: {entry.resolution}</p>}{entry.status === "OPEN" && <form onSubmit={resolveException} className="mt-3 flex gap-2"><input type="hidden" name="exceptionId" value={entry.id} /><input required name="resolution" minLength={3} maxLength={500} placeholder="Resolution note" className="min-w-0 flex-1 rounded-card border border-line px-3 py-2 text-[12px]" /><button disabled={saving} className="rounded-full bg-ink px-4 py-2 text-[11px] text-white disabled:opacity-40">Resolve</button></form>}</div>)}</div></section>}
-          {shipment ? <section className="rounded-card border border-line p-6"><div className="flex items-center justify-between gap-3"><h2 className="text-[13px] font-medium text-ink">Courier shipment</h2><span className={`rounded-full px-2.5 py-1 text-[11px] ${shipmentStatusClass(shipment.status)}`}>{shipment.status.replaceAll("_", " ").toLowerCase()}</span></div><p className="mt-4 text-[13px] text-ink">{shipment.provider.name}</p><p className="mt-1 text-[12px] text-ink2">Tracking: {shipment.trackingNumber || "Pending provider response"}</p><p className="text-[12px] text-ink2">Weight: {(shipment.weightGrams / 1000).toFixed(2)} kg · COD {formatTaka(shipment.codAmount)}</p>{shipment.exceptionReason && <p className="mt-3 text-[12px] text-amber-700">{shipment.exceptionReason}</p>}<div className="mt-5 divide-y divide-line border-y border-line">{shipment.events?.map((entry) => <div key={entry.id} className="py-3 text-[12px]"><div className="flex justify-between gap-3"><span className="text-ink">{entry.normalizedStatus.replaceAll("_", " ").toLowerCase()}</span><time className="text-ink2">{new Date(entry.occurredAt).toLocaleString("en-BD")}</time></div><p className="mt-1 text-ink2">Provider: {entry.rawStatus}{entry.ignoredReason ? ` · Ignored: ${entry.ignoredReason}` : ""}</p></div>)}</div></section> : order.fulfillmentStatus === "READY_FOR_HANDOVER" && <form onSubmit={createShipment} className="rounded-card border border-line p-5"><h2 className="text-[13px] font-medium text-ink">Create courier parcel</h2><p className="mt-1 text-[12px] leading-5 text-ink2">Quality check is complete. Provider credentials must be active.</p><label className="mt-4 block text-[12px] text-ink2">Courier<select value={selectedProvider} onChange={(event) => setSelectedProvider(event.target.value as "STEADFAST" | "PATHAO")} className="mt-1.5 w-full rounded-card border border-line px-3.5 py-2.5 text-[13px] outline-none focus:border-ink">{providers.filter((provider) => provider.isActive).map((provider) => <option key={provider.code} value={provider.code}>{provider.name}</option>)}</select></label>{selectedProvider === "PATHAO" && <div className="mt-4 grid grid-cols-3 gap-2">{["recipientCity", "recipientZone", "recipientArea"].map((field) => <label key={field} className="text-[11px] text-ink2">{field.replace("recipient", "")} ID<input required name={field} type="number" min="1" className="mt-1 w-full rounded-card border border-line px-2.5 py-2 text-[13px] outline-none focus:border-ink" /></label>)}</div>}<textarea name="note" rows={3} maxLength={500} placeholder="Optional delivery instruction" className="mt-4 w-full rounded-card border border-line px-3.5 py-2.5 text-[13px] outline-none focus:border-ink" /><button disabled={saving || providers.every((provider) => !provider.isActive)} className="mt-3 rounded-full bg-ink px-5 py-2.5 text-[13px] text-white disabled:opacity-40">{saving ? "Creating parcel…" : "Create courier shipment"}</button></form>}
+          {shipment ? <section className="rounded-card border border-line p-6"><div className="flex items-center justify-between gap-3"><h2 className="text-[13px] font-medium text-ink">Courier shipment</h2><span className={`rounded-full px-2.5 py-1 text-[11px] ${shipmentStatusClass(shipment.status)}`}>{shipment.status.replaceAll("_", " ").toLowerCase()}</span></div><p className="mt-4 text-[13px] text-ink">{shipment.provider.name}</p><p className="mt-1 text-[12px] text-ink2">Tracking: {shipment.trackingNumber || "Pending provider response"}</p><p className="text-[12px] text-ink2">Weight: {(shipment.weightGrams / 1000).toFixed(2)} kg · COD {formatTaka(shipment.codAmount)}</p>{shipment.exceptionReason && <p className="mt-3 text-[12px] text-amber-700">{shipment.exceptionReason}</p>}<div className="mt-5 divide-y divide-line border-y border-line">{shipment.events?.map((entry) => <div key={entry.id} className="py-3 text-[12px]"><div className="flex justify-between gap-3"><span className="text-ink">{entry.normalizedStatus.replaceAll("_", " ").toLowerCase()}</span><time className="text-ink2">{new Date(entry.occurredAt).toLocaleString("en-BD")}</time></div><p className="mt-1 text-ink2">Provider: {entry.rawStatus}{entry.ignoredReason ? ` · Ignored: ${entry.ignoredReason}` : ""}</p></div>)}</div></section> : order.fulfillmentStatus === "READY_FOR_HANDOVER" && <form onSubmit={createShipment} className="rounded-card border border-line p-5"><h2 className="text-[13px] font-medium text-ink">Create courier parcel</h2><p className="mt-1 text-[12px] leading-5 text-ink2">Quality check is complete. Provider credentials must be active.</p><label className="mt-4 block text-[12px] text-ink2">Courier<select value={selectedProvider} onChange={(event) => setSelectedProvider(event.target.value as CourierCode)} className="mt-1.5 w-full rounded-card border border-line px-3.5 py-2.5 text-[13px] outline-none focus:border-ink">{providers.filter((provider) => provider.isActive).map((provider) => <option key={provider.code} value={provider.code}>{provider.name}</option>)}</select></label>{selectedProvider === "PATHAO" && <div className="mt-4 grid grid-cols-3 gap-2">{["recipientCity", "recipientZone", "recipientArea"].map((field) => <label key={field} className="text-[11px] text-ink2">{field.replace("recipient", "")} ID<input required name={field} type="number" min="1" className="mt-1 w-full rounded-card border border-line px-2.5 py-2 text-[13px] outline-none focus:border-ink" /></label>)}</div>}<textarea name="note" rows={3} maxLength={500} placeholder="Optional delivery instruction" className="mt-4 w-full rounded-card border border-line px-3.5 py-2.5 text-[13px] outline-none focus:border-ink" /><button disabled={saving || providers.every((provider) => !provider.isActive)} className="mt-3 rounded-full bg-ink px-5 py-2.5 text-[13px] text-white disabled:opacity-40">{saving ? "Creating parcel…" : "Create courier shipment"}</button></form>}
           {error && <p role="alert" className="text-[13px] text-rose-700">{error}</p>}
           {order.status === "PENDING_CONFIRMATION" && <form onSubmit={confirmOrder} className="rounded-card border border-line p-5"><h2 className="text-[13px] font-medium text-ink">Confirm by phone</h2><p className="mt-1 text-[12px] leading-5 text-ink2">Verify customer and address first. Confirmation reserves available stock atomically.</p><textarea name="note" rows={3} maxLength={500} placeholder="Optional confirmation note" className="mt-4 w-full rounded-card border border-line px-3.5 py-2.5 text-[13px] outline-none focus:border-ink" /><button disabled={saving} className="mt-3 rounded-full bg-ink px-5 py-2.5 text-[13px] text-white disabled:opacity-50">{saving ? "Confirming…" : "Confirm COD order"}</button></form>}
           {(order.status === "PENDING_CONFIRMATION" || order.status === "CONFIRMED") && <form onSubmit={cancelOrder} className="rounded-card border border-line p-5"><h2 className="text-[13px] font-medium text-ink">Cancel order</h2><p className="mt-1 text-[12px] leading-5 text-ink2">A reason is required. Any active reservation is released in the same transaction.</p><textarea required name="reason" minLength={3} maxLength={500} rows={3} className="mt-4 w-full rounded-card border border-line px-3.5 py-2.5 text-[13px] outline-none focus:border-ink" /><button disabled={saving} className="mt-3 rounded-full border border-rose-200 px-5 py-2.5 text-[13px] text-rose-700 disabled:opacity-50">{saving ? "Cancelling…" : "Cancel order"}</button></form>}

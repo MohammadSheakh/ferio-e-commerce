@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { formatTaka } from "@/lib/catalog";
+import type { CourierCode } from "@/lib/shipping";
 import type {
   CourierSettlementImport,
   SettlementReportPreflight,
@@ -60,7 +61,7 @@ export default function SettlementImportPanel({
   const [notice, setNotice] = useState("");
   const [correctionTarget, setCorrectionTarget] =
     useState<CourierSettlementImport | null>(null);
-  const [formProvider, setFormProvider] = useState<"PATHAO" | "STEADFAST">(
+  const [formProvider, setFormProvider] = useState<CourierCode>(
     "STEADFAST",
   );
   const [formSource, setFormSource] = useState<"API" | "CSV" | "MANUAL_JSON">(
@@ -367,7 +368,7 @@ export default function SettlementImportPanel({
               value={formProvider}
               disabled={Boolean(correctionTarget)}
               onChange={(event) => {
-                setFormProvider(event.target.value as typeof formProvider);
+                setFormProvider(event.target.value as CourierCode);
                 setCsvContent(null);
                 setPreflight(null);
               }}
@@ -375,6 +376,10 @@ export default function SettlementImportPanel({
             >
               <option value="STEADFAST">Steadfast</option>
               <option value="PATHAO">Pathao</option>
+              <option value="REDX">REDX</option>
+              <option value="ECOURIER">eCourier</option>
+              <option value="PAPERFLY">Paperfly</option>
+              <option value="CARRYBEE">CarryBee</option>
             </select>
             {correctionTarget && (
               <input type="hidden" name="provider" value={formProvider} />

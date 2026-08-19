@@ -68,5 +68,20 @@ export function cartErrorResponse(error: unknown) {
   const status = error instanceof CartApiError ? error.status : 503;
   const message =
     error instanceof Error ? error.message : "The cart service is unavailable.";
-  return NextResponse.json({ message }, { status });
+  const response = NextResponse.json({ message }, { status });
+  if (
+    status === 404 ||
+    status === 409 ||
+    message.toLowerCase().includes("active cart not found") ||
+    message.toLowerCase().includes("no longer active")
+  ) {
+    response.cookies.set("ferio_cart", "", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 0,
+      path: "/",
+    });
+  }
+  return response;
 }

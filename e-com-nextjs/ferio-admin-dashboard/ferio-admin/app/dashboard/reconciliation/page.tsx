@@ -5,6 +5,7 @@ import Topbar from "@/components/Topbar";
 import FindingsQueue from "@/components/reconciliation/FindingsQueue";
 import SettlementImportPanel from "@/components/reconciliation/SettlementImportPanel";
 import { formatTaka } from "@/lib/catalog";
+import type { CourierCode } from "@/lib/shipping";
 import type {
   CourierSettlement,
   EligibleCodCollection,
@@ -13,7 +14,7 @@ import type {
 export default function ReconciliationPage() {
   const [eligible, setEligible] = useState<EligibleCodCollection[]>([]);
   const [settlements, setSettlements] = useState<CourierSettlement[]>([]);
-  const [provider, setProvider] = useState<"PATHAO" | "STEADFAST">("STEADFAST");
+  const [provider, setProvider] = useState<CourierCode>("STEADFAST");
   const [selected, setSelected] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -150,13 +151,17 @@ export default function ReconciliationPage() {
             <select
               value={provider}
               onChange={(event) => {
-                setProvider(event.target.value as typeof provider);
+                setProvider(event.target.value as CourierCode);
                 setSelected([]);
               }}
               className="rounded-full border border-line px-4 py-2 text-[12px]"
             >
               <option value="STEADFAST">Steadfast</option>
               <option value="PATHAO">Pathao</option>
+              <option value="REDX">REDX</option>
+              <option value="ECOURIER">eCourier</option>
+              <option value="PAPERFLY">Paperfly</option>
+              <option value="CARRYBEE">CarryBee</option>
             </select>
           </div>
           <form onSubmit={record} className="mt-5">

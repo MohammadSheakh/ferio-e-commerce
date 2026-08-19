@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import Topbar from "@/components/Topbar";
+import Pagination from "@/components/Pagination";
 import type {
   InventoryMovement,
   InventoryPage,
@@ -11,7 +12,7 @@ import type {
 const emptyInventory: InventoryPage = {
   items: [],
   page: 1,
-  limit: 30,
+  limit: 20,
   total: 0,
   totalPages: 0,
   summary: { lowStock: 0, discrepancies: 0 },
@@ -19,6 +20,8 @@ const emptyInventory: InventoryPage = {
 
 export default function InventoryPageView() {
   const [inventory, setInventory] = useState<InventoryPage>(emptyInventory);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [lowStockOnly, setLowStockOnly] = useState(false);
@@ -35,7 +38,10 @@ export default function InventoryPageView() {
     setLoading(true);
     setError("");
     try {
-      const query = new URLSearchParams();
+      const query = new URLSearchParams({
+        page: String(page),
+        limit: String(pageSize),
+      });
       if (search) query.set("search", search);
       if (lowStockOnly) query.set("lowStock", "true");
       const response = await fetch(`/api/catalog/inventory?${query.toString()}`, {
@@ -61,7 +67,7 @@ export default function InventoryPageView() {
     } finally {
       setLoading(false);
     }
-  }, [lowStockOnly, search]);
+  }, [page, pageSize, lowStockOnly, search]);
 
   useEffect(() => {
     void loadInventory();
@@ -211,6 +217,18 @@ export default function InventoryPageView() {
               {loading && <tr><td colSpan={8} className="px-5 py-14 text-center text-[13px] text-ink2">Loading inventory…</td></tr>}
             </tbody>
           </table>
+          <Pagination
+            currentPage={page}
+            totalPages={inventory.totalPages}
+            totalItems={inventory.total}
+            pageSize={pageSize}
+            onPageChange={(newPage) => setPage(newPage)}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setPage(1);
+            }}
+            isLoading={loading}
+          />
         </div>
 
         {selected && (

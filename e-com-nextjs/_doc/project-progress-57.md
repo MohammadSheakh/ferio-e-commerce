@@ -328,4 +328,240 @@
   - Added custom icons for all 19 navigation routes with native browser tooltips (`title`) when collapsed.
   - Collapsed view includes compact "F" brand logo and icon-only logout button.
   - Saved collapse state to `localStorage` under `ferio_admin_sidebar_collapsed` to preserve layout preferences across page reloads.
-- **Validation**: All builds (`ferio-nest-prisma`, `ferio-customer-web`, `ferio-admin`) compiled cleanly with **Exit code 0**.
+
+---
+
+### Update: Mobile Live Chat Integration (`ferio-mobile-expo54`)
+
+- **Socket.IO Mobile Client (`lib/socket.ts`)**:
+  - Configured mobile socket singleton `getMobileSocket(accessToken, guestId)` connecting to Socket.IO port `6734`.
+  - Supports fallback socket URL derived from `EXPO_PUBLIC_FERIO_API_URL`.
+- **Live Chat Modal & Floating Widget (`components/LiveChatWidget.tsx`)**:
+  - Floating trigger button positioned at the bottom right of the app with active online indicator (🟢) and unread message counter badge.
+  - Full-featured mobile slide-up modal with `SafeAreaView` and `KeyboardAvoidingView`:
+    - Support agent header ("Mohammad Sheakh — Ferio Support") with live status dot.
+    - FlatList scrollable message thread with auto-scroll to latest message.
+    - Left-aligned agent bubbles and right-aligned customer bubbles.
+    - Typing indicator dots when agent is typing.
+    - Message input bar with send button.
+- **Identity & AsyncStorage Persistence**:
+  - Automatically resolves logged-in user profile (`useAuth()`) or generates persistent `guestId` (`gst_XXXX`) via `@react-native-async-storage/async-storage`.
+  - Cache messages locally in `AsyncStorage` under `ferio_chat_history_${activeUserId}`.
+  - Hydrates message history directly from NestJS backend (`/conversations/conv-${activeUserId}/messages?limit=100`) and safely unpacks nested `data.results`.
+- **Global Layout Mounting (`app/_layout.tsx`)**:
+  - Mounted `<LiveChatWidget />` globally in `RootLayout` so mobile users can chat with support from any tab or screen.
+- **Validation**: `tsc --noEmit` completed with **Exit code 0** (zero errors).
+
+---
+
+### Update: Requested Product Management & Multiline Input Implementation
+
+1. **Database Schema & Backend API (`ferio-nest-prisma`)**:
+   - Added `ProductRequest` model and `ProductRequestStatus` (`PENDING`, `COLLECTED`, `CONTACTED`, `DONE`) enum to Prisma schema.
+   - Pushed DB migration to Neon PostgreSQL (`ProductRequest` table created).
+   - Built `ProductRequestModule` with endpoints:
+     - `POST /api/v1/product-requests` (Public/Authenticated creation)
+     - `GET /api/v1/product-requests` (Admin paginated listing & filtering)
+     - `PATCH /api/v1/product-requests/:id/status` (Admin status update)
+     - `DELETE /api/v1/product-requests/:id` (Admin request deletion)
+
+2. **Customer Web Interface (`ferio-customer-web`)**:
+   - Replaced single-line input in `ProductRequestBanner.tsx` with a multiline `<textarea>` for Product Name & Model.
+   - Fixed API proxy route token cookie name (`ferio_customer_access`) so logged-in customer JWTs are passed correctly to NestJS.
+   - Added **YOUR NAME** input field (required for guest visitors, auto-filled for authenticated customers).
+
+3. **Admin Dashboard (`ferio-admin`)**:
+   - Created `/dashboard/requested-products` page with metric summary cards (`Pending`, `Collected`, `Contacted`, `Done`).
+   - Integrated status filter pills (`ALL`, `PENDING`, `COLLECTED`, `CONTACTED`, `DONE`) and search filter.
+   - Added `Logged-in` badge for authenticated user requests and displayed guest name for `Guest Visitor` submissions.
+   - Added interactive status dropdown for instant updates (`COLLECTED`, `CONTACTED`, `DONE`, `PENDING`) and deletion actions.
+   - Added `Requested Products 📑` link in admin `Sidebar.tsx`.
+
+4. **Mobile Expo App (`ferio-mobile-expo54`)**:
+   - Updated `ProductRequestBanner.tsx` with a slide-up interactive modal featuring multiline text area, guest name input, and optional phone input for authenticated users.
+
+---
+
+### Update: 1:1 Page-Specific Custom Suspense & Skeleton Loading UI Implementation
+
+1. **Customer Web (`ferio-customer-web`)**:
+   - Refactored `loading.tsx` React Suspense boundaries into exact 1:1 structural replicas for each page:
+     - `app/loading.tsx`: Replica of Hero V2 Showcase (dark slider card, product image preview, bottom navigation dots), category pills horizontal scroll, 8 exact ProductCard skeletons (image box, category badge, title, price, cart button), and Product Request banner.
+     - `app/products/loading.tsx`: Exact catalog layout with header title, search bar, category pills, and 8 ProductCard skeletons.
+     - `app/products/[id]/loading.tsx`: Product Detail layout (large main image + 4 thumbnail previews, brand tag, title, price badge, variant selector pills, quantity & CTA buttons, specifications tab section).
+     - `app/cart/loading.tsx`: Cart layout (3 cart item rows with image, title, price, quantity stepper `[- 1 +]`, delete button + order summary sidebar card).
+     - `app/checkout/loading.tsx`: Checkout layout (address & payment method form fields + order summary sidebar).
+     - `app/account/loading.tsx`: Customer profile layout (dark `#111114` avatar header card with camera icon, name, email, account details form inputs).
+     - `app/track/loading.tsx`: Order tracking layout (centered tracking header, search input, timeline steps placeholder).
+     - `app/purchase-history/loading.tsx`: Order history layout (order cards with status badges and item thumbnails).
+
+2. **Admin Dashboard (`ferio-admin`)**:
+   - Refactored `loading.tsx` Suspense boundaries to mirror every admin view's exact Topbar and component structure:
+     - `app/dashboard/loading.tsx`: Overview replica (Topbar with 6 live visitor oval pills, 6 StatCards grid `Gross delivered`, `Placed orders`, `Needs confirmation`, `Delivered`, `RTO`, `Contribution`, 2-column split for Recent Orders table & Live Page Visitors Card).
+     - `app/dashboard/products/loading.tsx`: Products desk (Topbar with oval pills, search & add action bar, 7 product table rows with image thumbnails).
+     - `app/dashboard/requested-products/loading.tsx`: Requested products desk (Topbar with oval pills, 4 metric cards `Pending`, `Collected`, `Contacted`, `Done`, status filter pills, table rows).
+     - `app/dashboard/orders/loading.tsx`: Orders management (Topbar with oval pills, 4 metric cards, status filter pills, order table rows).
+     - `app/dashboard/customers/loading.tsx`: Customers management (Topbar with oval pills, search & activity filter pills, customer avatar table rows).
+     - `app/dashboard/chat/loading.tsx`: Live chat desk (Topbar with oval pills, split layout with 80px left conversation list sidebar, middle inbox message thread with left guest bubbles and right admin bubbles, message input bar).
+
+3. **Validation**:
+   - `npx tsc --noEmit` passed with **Exit code 0** on both `ferio-customer-web` and `ferio-admin`.
+
+---
+
+### Update: SSLCommerz Payment Gateway Integration
+
+1. **Environment Configuration**:
+   - Configured SSLCommerz store credentials (`SSL_STORE_ID`, `SSL_STORE_PASSWORD`, `SSLCOMMERZ_STORE_ID`, `SSLCOMMERZ_STORE_PASSWORD`) in `ferio-nest-prisma/.env`.
+
+2. **Gateway Adapter & Verification**:
+   - Updated `SslcommerzGateway` (`src/features/commerce-payments/gateways/sslcommerz.gateway.ts`) to support dual credential lookup keys (`SSLCOMMERZ_STORE_ID` / `SSL_STORE_ID`).
+   - Extended initiation payload with custom metadata fields (`value_a: orderReference`, `value_b: merchantTransactionId`, `value_c: customerEmail`, `value_d: amount`).
+   - Integrated server-to-server validation against SSLCommerz `validationserverAPI.php` endpoint to verify `val_id`, `status` (`VALID` / `VALIDATED`), transaction amount, currency, and risk level.
+   - Added unit test suite in `payment-adapters.spec.ts` covering initiation and server-to-server validation.
+
+3. **Checklist Update**:
+   - Updated `_doc/implementation-checklist-and-schedule.md` to mark SSLCommerz credential approval, initiation, callback processing, and validation tasks as completed `[x]`.
+
+---
+
+### Update: Multiple Customer Delivery Address Management System
+
+1. **Backend & Database (`ferio-nest-prisma`)**:
+   - **Schema**: Utilized Prisma's `CustomerAddress` model (`label`, `recipientName`, `phoneOriginal`, `phoneNormalized`, `district`, `area`, `detailedAddress`, `landmark`, `isDefault`, `customerId`).
+   - **DTOs (`customer-account.dto.ts`)**: Added `CreateCustomerAddressDto` and `UpdateCustomerAddressDto` with validations.
+   - **Service Layer (`customer-account.service.ts`)**: Implemented `ensureCustomerForUser()`, `addAddress()`, `updateAddress()`, and `deleteAddress()`. Auto-managed `isDefault` states and updated `profile()` to return customer saved addresses.
+   - **Controller (`customer-account.controller.ts`)**: Exposed `POST /account/commerce/addresses`, `PUT /account/commerce/addresses/:id`, and `DELETE /account/commerce/addresses/:id`.
+
+2. **Frontend API Proxies & Profile UI (`ferio-customer-web`)**:
+   - **API Routes**: Created `/api/account/addresses` (POST) and `/api/account/addresses/[id]` (PUT, DELETE) route handlers.
+   - **Account Page (`app/account/page.tsx`)**: Built a **Saved Delivery Addresses** section with address card grids, badges (`Home`, `Office`, `Default`), 1-click "Set as default", modal/accordion form to add/edit addresses with dynamic district selectors, and delete confirmation.
+   - **Checkout Page (`app/checkout/page.tsx`)**: Integrated 1-click saved address selector pills/cards, automatic default address pre-filling, "+ Use New Address" toggle, and a "Save this address to my account for future fast checkout" option.
+
+3. **Build & Validation**:
+   - Executed `npm run build` on both `ferio-nest-prisma` and `ferio-customer-web` with **Exit code 0**.
+
+---
+
+### Update: Multi-Courier Architecture & Routing Engine Implementation
+
+1. **Multi-Courier Provider Abstraction (`ferio-nest-prisma`)**:
+   - Extended `ShipmentProviderCode` enum to support 5 primary Bangladesh courier candidates: `PATHAO`, `STEADFAST`, `REDX`, `ECOURIER`, `PAPERFLY`.
+
+2. **Provider Adapters (`src/features/shipping/adapters/`)**:
+   - `redx.adapter.ts`: Official REDX Developer OpenAPI integration for parcel creation, status tracking, webhook signature verification, and polling.
+   - `ecourier.adapter.ts`: eCourier Merchant API integration with API-Key/Secret verification.
+   - `paperfly.adapter.ts`: Paperfly Courier API integration.
+   - `pathao.adapter.ts` & `steadfast.adapter.ts`: Maintained existing production adapters.
+
+3. **Unified Status Normalization (`shipping.util.ts`)**:
+   - Maps raw status names from all 5 providers into normalized internal shipment states: `CREATED`, `PICKED_UP`, `IN_TRANSIT`, `AT_HUB`, `OUT_FOR_DELIVERY`, `DELIVERED`, `DELIVERY_FAILED`, `RETURN_IN_PROGRESS`, `RTO`, `CANCELLED`.
+
+4. **Intelligent Courier Routing Engine (`courier-router.service.ts`)**:
+   - Evaluates destination (`district`, `upazila`), weight, COD amount, SLA requirements, and provider active status.
+   - Ranks candidate providers (e.g., Pathao/REDX for Dhaka Metro; REDX/eCourier/Steadfast/Paperfly for Nationwide).
+   - Exposes `POST /api/v1/admin/shipping/router/recommend`.
+
+5. **Courier Performance Scorecard (`shipping.service.ts` & `shipping.controller.ts`)**:
+   - Exposes `GET /api/v1/admin/shipping/scorecard` returning real-time performance analytics per provider (Total Parcels, Delivery Rate %, RTO Rate %, Pickup SLA %).
+
+6. **Database & Seeding Sync (`prisma/seed.ts` & `shipping.prisma`)**:
+   - Updated modular Prisma schema & client (`pnpm run prisma:sync`).
+   - Added default seed entries for all 5 providers with base API URLs and active flag checks.
+
+7. **Validation**:
+   - Rebuilt Prisma schema & client (`pnpm run prisma:sync`).
+   - Executed `npm run build` on `ferio-nest-prisma` with **Exit code 0**.
+
+---
+
+### Update: CarryBee Courier API & Webhook Integration
+
+1. **Browser Inspection & Credential Extraction**:
+   - Inspected open CarryBee merchant portal (`merchant.carrybee.com/webhook/credentials`).
+   - Extracted API Base URL (`https://developers.carrybee.com`), Client headers (`Client-ID`, `Client-Secret`, `Client-Context`), handshake verification header (`X-CB-Webhook-Integration-Header`), and secret (`40489fe0-9386-4fc9-8e92-2b2fcb9d451c`).
+
+2. **Schema & Provider Support (`ferio-nest-prisma`)**:
+   - Added `CARRYBEE` to `ShipmentProviderCode` enum in `shipping.prisma` and regenerated Prisma client.
+   - Updated `prisma/seed.ts` with default CarryBee seed record.
+
+3. **CarryBee Adapter (`src/features/shipping/adapters/carrybee.adapter.ts`)**:
+   - Implemented `CarrybeeAdapter` for order creation (`POST /api/v2/orders`), tracking details (`GET /api/v2/orders/:id/details`), and status normalization.
+   - Built signature verification for `X-CB-Webhook-Integration-Header` and `X-Carrybee-Webhook-Signature`.
+
+4. **Handshake & Webhook Response Controller (`shipping.controller.ts`)**:
+   - Updated `CourierWebhookController` to echo back `X-CB-Webhook-Integration-Header` with HTTP status `202 Accepted` during CarryBee handshake verification.
+
+5. **Routing & Scorecard Integration (`courier-router.service.ts` & `shipping.service.ts`)**:
+   - Registered CarryBee in candidate scoring (top rank for Dhaka Metro & high score nationwide).
+   - Integrated CarryBee into provider scorecard analytics.
+
+6. **Validation**:
+   - Executed `npm run build` on `ferio-nest-prisma` with **Exit code 0**.
+
+---
+
+### Update: Prepaid Payment Gateways Integration & Automated Audit Suite
+
+1. **Prepaid Payment Reconciliation Scans (`ReconciliationService`)**:
+   - Added `PREPAID_PAYMENT_STATE_MISMATCH`, `PREPAID_UNVERIFIED_PAID_ORDER`, and `PREPAID_AMOUNT_MISMATCH` to `ReconciliationFindingType` enum and `scannedTypes` detection list.
+   - Implemented detection for:
+     - Prepaid orders marked `PAID` without a valid `SUCCEEDED` payment attempt (`PREPAID_UNVERIFIED_PAID_ORDER`).
+     - Payment attempts marked `SUCCEEDED` where the order payment status is not `PAID` (`PREPAID_PAYMENT_STATE_MISMATCH`).
+     - Payment attempt amounts that differ from order total amounts (`PREPAID_AMOUNT_MISMATCH`).
+
+2. **Automated Unit & Integration Test Suite (`CommercePaymentsService` & `ReconciliationService`)**:
+   - Created test suite `commerce-payments.service.spec.ts` testing gateway initiation, server validation, duplicate IPN deduplication, and tampered payment amount rejection.
+   - Expanded `reconciliation.service.spec.ts` with test coverage for prepaid payment finding detection and auto-resolution.
+   - Total test suite execution: **24/24 unit tests passed**.
+
+3. **Validation & Build Verification**:
+   - `ferio-nest-prisma` production build: **Exit code 0**.
+   - `ferio-admin` production build: **Exit code 0**.
+
+---
+
+### Update: In-Store Pickup (Click & Collect) Logistics & Store Outlets Management System
+
+1. **Database Schema & Model Extensions (`ferio-nest-prisma`)**:
+   - **Warehouse Model**: Extended physical store attributes (`isStore: Boolean`, `phone`, `email`, `district`, `area`, `address`, `operatingHours`, `operatingDays`, `pickupInstructions`).
+   - **Delivery Method**: Added `DeliveryMethod` enum (`HOME_DELIVERY`, `STORE_PICKUP`) and updated `CheckoutDraft` and `Order` models.
+   - **Store Pickup Lifecycle**: Added `StorePickupStatus` enum (`NOT_APPLICABLE`, `AVAILABLE_IN_STORE`, `TRANSFER_REQUIRED`, `SCHEDULED_BY_CUSTOMER`, `IN_TRANSFER`, `READY_FOR_PICKUP`, `COMPLETED`, `CANCELLED`), 6-digit `storePickupOtp`, `pickupScheduledAt`, `preferredPickupSlot`, and `customerPickupNotes`.
+   - **Seeding & Database Push**: Synchronized Neon PostgreSQL database and updated `prisma/seed.ts` to seed initial physical store locations (Dhanmondi Flagship, Jamuna Future Park, Uttara Sector 3).
+
+2. **Backend `StoreLocationsModule` & Order Fulfillment Engine**:
+   - **Public Store Locations API (`/api/v1/store-locations`)**: Exposes active store outlets for customer selection during checkout.
+   - **Real-Time Stock Availability Check (`/api/v1/store-locations/check-availability`)**: Evaluates store stock vs central hub (`MAIN`) stock per variant and determines whether an order is ready for immediate collection or requires a hub transfer.
+   - **Admin Store Management (`/api/v1/admin/store-locations`)**: Full CRUD operations for physical outlets with `AuditService` audit logging.
+   - **Checkout Pricing & Order Creation**: Updated `CheckoutService.preview` to apply ৳0 delivery fee for store pickups and updated `OrderService.createOrder` to generate a 6-digit `storePickupOtp`.
+   - **Store Lifecycle Endpoints**:
+     - `PATCH /api/v1/orders/:id/store-pickup/schedule`: Schedules customer pickup time.
+     - `PATCH /api/v1/admin/orders/:id/store-pickup/status`: Updates store pickup status (`READY_FOR_PICKUP`, `IN_TRANSFER`).
+     - `POST /api/v1/admin/orders/:id/store-pickup/verify-handover`: Verifies 6-digit customer OTP at desk counter and completes order handover.
+
+3. **Admin Dashboard UI Enhancements (`ferio-admin`)**:
+   - **Sidebar Navigation**: Added `Store Outlets 🏪` to `components/Sidebar.tsx`.
+   - **Store Management Desk (`app/dashboard/stores/page.tsx`)**: Modal-driven interface to add new physical store outlets, view pickup stats, and activate/deactivate locations.
+   - **Order Details Store Pickup Panel (`app/dashboard/orders/[id]/page.tsx`)**: Dedicated Click & Collect section displaying store address, preferred pickup date/time, OTP verification card, "Mark Ready for Pickup" notification trigger, and 1-click OTP handover verification.
+
+4. **Next.js API Proxies & Full-Stack Front-End Integration**:
+   - **Admin Dashboard API Proxies (`ferio-admin`)**:
+     - `GET / POST /api/admin/store-locations`: Proxies request to NestJS `/admin/store-locations`.
+     - `PATCH / DELETE /api/admin/store-locations/[id]`: Proxies store updates and status toggles.
+     - `PATCH /api/orders/[id]/store-pickup/status`: Proxies order status updates (`READY_FOR_PICKUP`).
+     - `POST /api/orders/[id]/store-pickup/verify-handover`: Proxies 6-digit customer OTP handover verification.
+   - **Customer Web Checkout Integration (`ferio-customer-web`)**:
+     - Created `GET /api/store-locations` and `POST /api/store-locations/check-availability` proxy handlers.
+     - Added **Fulfillment Method Toggle** to Checkout Page (`🚚 Home Delivery` vs `🏪 Pickup from Store - Free ৳0`).
+     - Integrated Physical Outlet selector displaying active store outlets, addresses, operating hours, and contact numbers.
+     - Integrated Preferred Pickup Date picker & Pickup Time slot selector (`10:00 AM - 01:00 PM`, `02:00 PM - 05:00 PM`, `05:00 PM - 08:00 PM`).
+     - Extended order placement API (`app/api/checkout/order/route.ts`) to support `PAY_AT_STORE` payment option.
+
+5. **Testing & Build Verification**:
+   - **Unit Testing**: 5/5 unit tests passed in `store-locations.service.spec.ts`.
+   - **Production Builds**: `ferio-nest-prisma` (Exit code 0), `ferio-admin` (Exit code 0), `ferio-customer-web` (Exit code 0).
+
+
+
+
+

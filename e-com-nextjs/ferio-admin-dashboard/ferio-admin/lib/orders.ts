@@ -1,3 +1,5 @@
+import type { CourierCode } from "./shipping";
+
 export type OrderStatus =
   | "PENDING_CONFIRMATION"
   | "CONFIRMED"
@@ -37,7 +39,7 @@ export type OrderListItem = {
   address: { district: string; area: string } | null;
   shipment: {
     trackingNumber: string | null;
-    provider: { name: string; code: "PATHAO" | "STEADFAST" };
+    provider: { name: string; code: CourierCode };
   } | null;
 };
 

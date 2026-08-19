@@ -26,7 +26,18 @@ export type CheckoutPreview = {
     paymentCharge: number;
     total: number;
   };
-  paymentMethod: "COD" | "PREPAID";
+  deliveryMethod?: "HOME_DELIVERY" | "STORE_PICKUP";
+  pickupStore?: {
+    id: string;
+    code: string;
+    name: string;
+    address: string;
+    operatingHours?: string;
+  } | null;
+  storePickupStatus?: "NOT_APPLICABLE" | "AVAILABLE_IN_STORE" | "TRANSFER_REQUIRED";
+  preferredPickupDate?: string | null;
+  preferredPickupSlot?: string | null;
+  paymentMethod: "COD" | "PREPAID" | "PAY_AT_STORE";
   paymentProvider: "SSLCOMMERZ" | "AAMARPAY" | null;
   marketingConsent: boolean;
   purchaseActivityConsent: boolean;

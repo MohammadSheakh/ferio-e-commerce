@@ -209,9 +209,9 @@ export default function SettingsPage() {
                   <input type="checkbox" checked={form.codEnabled} onChange={(event) => set("codEnabled", event.target.checked)} className="mt-0.5" />
                   <span>Cash on delivery<span className="mt-0.5 block text-[11px] text-ink2">Allow COD checkout previews and new orders.</span></span>
                 </label>
-                <label className="flex items-start gap-3 text-[13px] text-ink2">
-                  <input type="checkbox" checked={form.prepaidEnabled} disabled className="mt-0.5" />
-                  <span>Prepaid payments<span className="mt-0.5 block text-[11px]">Requires an approved payment provider before activation.</span></span>
+                <label className="flex items-start gap-3 text-[13px] text-ink cursor-pointer select-none">
+                  <input type="checkbox" checked={form.prepaidEnabled} onChange={(event) => set("prepaidEnabled", event.target.checked)} className="mt-0.5" />
+                  <span>Prepaid payments<span className="mt-0.5 block text-[11px] text-ink2">Allow online prepaid checkout (SSLCommerz / aamarPay).</span></span>
                 </label>
                 <label className="text-[12px] text-ink2">
                   Default return window (days)

@@ -7,6 +7,8 @@ import { formatTaka } from "@/lib/catalog";
 import type { CodPolicy, OrderFulfillmentStatus, OrderPage, OrderStatus } from "@/lib/orders";
 import { orderStatusClass } from "@/lib/orders";
 
+import Pagination from "@/components/Pagination";
+
 const statuses: Array<OrderStatus | "ALL"> = [
   "ALL",
   "PENDING_CONFIRMATION",
@@ -29,13 +31,15 @@ const fulfillmentStatuses: Array<OrderFulfillmentStatus | "ALL"> = [
 const emptyPage: OrderPage = {
   items: [],
   page: 1,
-  limit: 30,
+  limit: 20,
   total: 0,
   totalPages: 0,
 };
 
 export default function OrdersPage() {
   const [orders, setOrders] = useState<OrderPage>(emptyPage);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [status, setStatus] = useState<OrderStatus | "ALL">("ALL");
   const [fulfillmentStatus, setFulfillmentStatus] = useState<OrderFulfillmentStatus | "ALL">("ALL");
   const [paymentStatus, setPaymentStatus] = useState("ALL");
@@ -52,7 +56,10 @@ export default function OrdersPage() {
     setLoading(true);
     setError("");
     try {
-      const query = new URLSearchParams();
+      const query = new URLSearchParams({
+        page: String(page),
+        limit: String(pageSize),
+      });
       if (status !== "ALL") query.set("status", status);
       if (fulfillmentStatus !== "ALL") query.set("fulfillmentStatus", fulfillmentStatus);
       if (paymentStatus !== "ALL") query.set("paymentStatus", paymentStatus);
@@ -70,7 +77,7 @@ export default function OrdersPage() {
     } finally {
       setLoading(false);
     }
-  }, [dateFrom, dateTo, fulfillmentStatus, paymentStatus, search, status]);
+  }, [page, pageSize, dateFrom, dateTo, fulfillmentStatus, paymentStatus, search, status]);
 
   useEffect(() => {
     void loadOrders();
@@ -180,6 +187,18 @@ export default function OrdersPage() {
               {loading && <tr><td colSpan={9} className="px-5 py-14 text-center text-[13px] text-ink2">Loading orders…</td></tr>}
             </tbody>
           </table>
+          <Pagination
+            currentPage={page}
+            totalPages={orders.totalPages}
+            totalItems={orders.total}
+            pageSize={pageSize}
+            onPageChange={(newPage) => setPage(newPage)}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setPage(1);
+            }}
+            isLoading={loading}
+          />
         </div>
       </div>
     </>

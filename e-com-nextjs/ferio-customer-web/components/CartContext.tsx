@@ -67,6 +67,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       await requestCart("/api/cart");
     } catch {
       setCart(emptyCart);
+      setError("");
     } finally {
       setLoading(false);
     }

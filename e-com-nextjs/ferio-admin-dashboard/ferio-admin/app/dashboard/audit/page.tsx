@@ -2,12 +2,13 @@
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import Topbar from "@/components/Topbar";
+import Pagination from "@/components/Pagination";
 import type { AuditLogPage, AuditSource } from "@/lib/audit";
 
 const emptyPage: AuditLogPage = {
   items: [],
   page: 1,
-  limit: 30,
+  limit: 20,
   total: 0,
   totalPages: 0,
 };
@@ -19,6 +20,8 @@ function snapshot(value: unknown) {
 
 export default function AuditPage() {
   const [logs, setLogs] = useState(emptyPage);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [actionInput, setActionInput] = useState("");
   const [action, setAction] = useState("");
   const [entityType, setEntityType] = useState("");
@@ -30,7 +33,10 @@ export default function AuditPage() {
     setLoading(true);
     setError("");
     try {
-      const query = new URLSearchParams();
+      const query = new URLSearchParams({
+        page: String(page),
+        limit: String(pageSize),
+      });
       if (action) query.set("action", action);
       if (entityType) query.set("entityType", entityType);
       if (source !== "ALL") query.set("source", source);
@@ -52,7 +58,7 @@ export default function AuditPage() {
     } finally {
       setLoading(false);
     }
-  }, [action, entityType, source]);
+  }, [page, pageSize, action, entityType, source]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -86,6 +92,18 @@ export default function AuditPage() {
               {loading && <tr><td colSpan={6} className="px-5 py-14 text-center text-[13px] text-ink2">Loading audit history…</td></tr>}
             </tbody>
           </table>
+          <Pagination
+            currentPage={page}
+            totalPages={logs.totalPages}
+            totalItems={logs.total}
+            pageSize={pageSize}
+            onPageChange={(newPage) => setPage(newPage)}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setPage(1);
+            }}
+            isLoading={loading}
+          />
         </div>
       </div>
     </>

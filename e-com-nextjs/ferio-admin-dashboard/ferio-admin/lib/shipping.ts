@@ -1,6 +1,14 @@
+export type CourierCode =
+  | "PATHAO"
+  | "STEADFAST"
+  | "REDX"
+  | "ECOURIER"
+  | "PAPERFLY"
+  | "CARRYBEE";
+
 export type ShipmentProvider = {
   id: string;
-  code: "PATHAO" | "STEADFAST";
+  code: CourierCode;
   name: string;
   baseUrl: string;
   isActive: boolean;
@@ -58,7 +66,7 @@ export type ShipmentPollAttempt = {
     id: string;
     trackingNumber: string | null;
     status: string;
-    provider: { code: "PATHAO" | "STEADFAST"; name: string };
+    provider: { code: CourierCode; name: string };
     order: { reference: string };
   };
 };
@@ -76,7 +84,7 @@ export type ShipmentPollingQueueHealth = {
 
 export type CourierWebhookLog = {
   id: string;
-  providerCode: "PATHAO" | "STEADFAST";
+  providerCode: CourierCode;
   authValid: boolean;
   processed: boolean;
   attemptCount: number;

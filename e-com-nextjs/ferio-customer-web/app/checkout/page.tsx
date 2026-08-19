@@ -26,9 +26,25 @@ type CheckoutForm = {
   marketingConsent: boolean;
   purchaseActivityConsent: boolean;
   termsAccepted: boolean;
-  paymentMethod: "COD" | "PREPAID";
+  paymentMethod: "COD" | "PREPAID" | "PAY_AT_STORE";
   paymentProvider: "SSLCOMMERZ" | "AAMARPAY";
+  deliveryMethod: "HOME_DELIVERY" | "STORE_PICKUP";
+  pickupStoreId: string;
+  preferredPickupDate: string;
+  preferredPickupSlot: string;
 };
+
+export interface SavedAddressItem {
+  id: string;
+  label?: string;
+  recipientName: string;
+  phoneOriginal: string;
+  district: string;
+  area: string;
+  detailedAddress: string;
+  landmark?: string;
+  isDefault: boolean;
+}
 
 const emptyForm: CheckoutForm = {
   name: "",
@@ -44,6 +60,10 @@ const emptyForm: CheckoutForm = {
   termsAccepted: false,
   paymentMethod: "COD",
   paymentProvider: "SSLCOMMERZ",
+  deliveryMethod: "HOME_DELIVERY",
+  pickupStoreId: "",
+  preferredPickupDate: new Date(Date.now() + 86400000).toISOString().split("T")[0],
+  preferredPickupSlot: "10:00 AM - 01:00 PM",
 };
 
 const storageKey = "ferio_checkout_details";
@@ -72,6 +92,13 @@ export default function CheckoutPage() {
   const [updatingVariant, setUpdatingVariant] = useState("");
   const [error, setError] = useState("");
 
+  // Customer Account & Saved Addresses state
+  const [savedAddresses, setSavedAddresses] = useState<SavedAddressItem[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
+  const [saveAddressToAccount, setSaveAddressToAccount] = useState(false);
+  const [userLoggedIn, setUserLoggedIn] = useState(false);
+  const [publicStores, setPublicStores] = useState<any[]>([]);
+
   useEffect(() => {
     if (!loading && (lines.length === 0 || !cart.isValid)) {
       router.replace("/cart");
@@ -97,10 +124,12 @@ export default function CheckoutPage() {
     async function loadDeliveryOptions() {
       setOptionsLoading(true);
       try {
-        const [response, paymentResponse, storeResponse] = await Promise.all([
+        const [response, paymentResponse, storeResponse, accountResponse, publicStoresResponse] = await Promise.all([
           fetch("/api/checkout/delivery-options", { cache: "no-store" }),
           fetch("/api/checkout/payment-options", { cache: "no-store" }),
           fetch("/api/store/config", { cache: "no-store" }),
+          fetch("/api/account/commerce", { cache: "no-store" }),
+          fetch("/api/store-locations", { cache: "no-store" }),
         ]);
         const payload = (await response.json()) as {
           data?: DeliveryOption[];
@@ -111,9 +140,53 @@ export default function CheckoutPage() {
         }
         setDeliveryOptions(payload.data);
         const paymentPayload = (await paymentResponse.json()) as { data?: PaymentOptions };
+        if (publicStoresResponse.ok) {
+          const storesPayload = await publicStoresResponse.json();
+          const stores = storesPayload.data || storesPayload;
+          if (Array.isArray(stores) && stores.length > 0) {
+            setPublicStores(stores);
+            setForm((prev) => ({
+              ...prev,
+              pickupStoreId: prev.pickupStoreId || stores[0].id,
+            }));
+          }
+        }
         setPaymentOptions(paymentPayload.data ?? null);
         const storePayload = (await storeResponse.json()) as { data?: PublicStoreConfig };
         if (storePayload.data) setSupport(storePayload.data);
+
+        // Account saved addresses
+        if (accountResponse.ok) {
+          const accPayload = await accountResponse.json();
+          const acc = accPayload.account || accPayload.data?.account;
+          const cust = accPayload.customer || accPayload.data?.customer;
+          if (acc) setUserLoggedIn(true);
+
+          if (cust?.addresses && cust.addresses.length > 0) {
+            setSavedAddresses(cust.addresses);
+            const defaultAddr = cust.addresses.find((a: SavedAddressItem) => a.isDefault) || cust.addresses[0];
+            if (defaultAddr) {
+              setSelectedAddressId(defaultAddr.id);
+              setForm((prev) => ({
+                ...prev,
+                name: prev.name || defaultAddr.recipientName || acc?.name || "",
+                phone: prev.phone || defaultAddr.phoneOriginal || acc?.phoneNumber || "",
+                email: prev.email || acc?.email || "",
+                district: prev.district || defaultAddr.district,
+                area: prev.area || defaultAddr.area,
+                detailedAddress: prev.detailedAddress || defaultAddr.detailedAddress,
+                landmark: prev.landmark || defaultAddr.landmark || "",
+              }));
+            }
+          } else if (acc) {
+            setForm((prev) => ({
+              ...prev,
+              name: prev.name || acc.name || "",
+              phone: prev.phone || acc.phoneNumber || "",
+              email: prev.email || acc.email || "",
+            }));
+          }
+        }
       } catch (loadError) {
         setError(
           loadError instanceof Error
@@ -139,6 +212,21 @@ export default function CheckoutPage() {
         .sort((first, second) => first.name.localeCompare(second.name)),
     [deliveryOptions],
   );
+
+  function selectSavedAddress(addr: SavedAddressItem) {
+    setSelectedAddressId(addr.id);
+    setForm((prev) => ({
+      ...prev,
+      name: addr.recipientName || prev.name,
+      phone: addr.phoneOriginal || prev.phone,
+      district: addr.district,
+      area: addr.area,
+      detailedAddress: addr.detailedAddress,
+      landmark: addr.landmark || "",
+    }));
+    setPreview(null);
+    setError("");
+  }
 
   function updateForm<Key extends keyof CheckoutForm>(
     key: Key,
@@ -206,6 +294,24 @@ export default function CheckoutPage() {
         throw new Error(payload.message || "Unable to calculate checkout total.");
       }
       setPreview(payload.data);
+
+      // Save address in background if user checked the option
+      if (userLoggedIn && saveAddressToAccount && !selectedAddressId) {
+        void fetch("/api/account/addresses", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            label: "Home",
+            recipientName: form.name,
+            phone: form.phone,
+            district: form.district,
+            area: form.area,
+            detailedAddress: form.detailedAddress,
+            landmark: form.landmark || undefined,
+            isDefault: savedAddresses.length === 0,
+          }),
+        });
+      }
     } catch (previewError) {
       setError(
         previewError instanceof Error
@@ -349,16 +455,221 @@ export default function CheckoutPage() {
 
           <section>
             <h2 className="text-[12px] uppercase tracking-eyebrow text-ink2">
-              Delivery address
+              Fulfillment Method
             </h2>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <div
+                onClick={() => {
+                  updateForm("deliveryMethod", "HOME_DELIVERY");
+                  updateForm("paymentMethod", "COD");
+                }}
+                className={`cursor-pointer rounded-2xl border p-4 transition ${
+                  form.deliveryMethod === "HOME_DELIVERY"
+                    ? "border-ink bg-slate-900 text-white shadow-sm"
+                    : "border-line bg-white hover:border-slate-400 text-ink"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">🚚</span>
+                  <span className="font-bold text-sm">Home Delivery</span>
+                </div>
+                <p className="mt-1 text-[11px] opacity-80">
+                  Parcel delivered directly to your home or office address.
+                </p>
+              </div>
+
+              <div
+                onClick={() => {
+                  updateForm("deliveryMethod", "STORE_PICKUP");
+                  if (publicStores.length > 0 && !form.pickupStoreId) {
+                    updateForm("pickupStoreId", publicStores[0].id);
+                  }
+                }}
+                className={`cursor-pointer rounded-2xl border p-4 transition ${
+                  form.deliveryMethod === "STORE_PICKUP"
+                    ? "border-ink bg-slate-900 text-white shadow-sm"
+                    : "border-line bg-white hover:border-slate-400 text-ink"
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">🏪</span>
+                    <span className="font-bold text-sm">Pickup from Store</span>
+                  </div>
+                  <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-emerald-500 text-white">
+                    Free (৳0)
+                  </span>
+                </div>
+                <p className="mt-1 text-[11px] opacity-80">
+                  Collect from our physical store outlet at your preferred date & time.
+                </p>
+              </div>
+            </div>
+
+            {form.deliveryMethod === "STORE_PICKUP" && (
+              <div className="mt-4 p-5 rounded-2xl border border-amber-300 bg-amber-50/50 space-y-4">
+                <h3 className="text-xs font-bold text-ink uppercase tracking-wider">
+                  Select Physical Store Outlet
+                </h3>
+                {publicStores.length === 0 ? (
+                  <p className="text-xs text-ink2">Loading active store outlets...</p>
+                ) : (
+                  <div className="grid gap-3">
+                    {publicStores.map((store) => {
+                      const isSelected = form.pickupStoreId === store.id;
+                      return (
+                        <div
+                          key={store.id}
+                          onClick={() => {
+                            updateForm("pickupStoreId", store.id);
+                            updateForm("district", store.district || "Dhaka");
+                            updateForm("area", store.area || "Store");
+                            updateForm("detailedAddress", store.address || store.name);
+                          }}
+                          className={`cursor-pointer p-3.5 rounded-xl border transition ${
+                            isSelected
+                              ? "border-ink bg-white shadow-sm ring-1 ring-ink"
+                              : "border-line bg-white/70 hover:bg-white"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-xs text-ink">{store.name}</span>
+                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-surface border border-line">
+                              {store.code}
+                            </span>
+                          </div>
+                          {store.address && (
+                            <p className="text-[11px] text-ink2 mt-1">📍 {store.address}</p>
+                          )}
+                          <div className="flex items-center gap-4 text-[10px] text-ink2 mt-2 pt-2 border-t border-line/60">
+                            {store.operatingHours && <span>⏰ {store.operatingHours}</span>}
+                            {store.phone && <span>📞 {store.phone}</span>}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <div className="grid gap-3 sm:grid-cols-2 pt-2">
+                  <div>
+                    <label className="block text-[11px] font-bold text-ink mb-1">
+                      Preferred Pickup Date
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      value={form.preferredPickupDate}
+                      min={new Date().toISOString().split("T")[0]}
+                      onChange={(e) => updateForm("preferredPickupDate", e.target.value)}
+                      className="w-full px-3 py-2 border border-line rounded-lg text-xs bg-white text-ink"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-ink mb-1">
+                      Preferred Pickup Time Slot
+                    </label>
+                    <select
+                      value={form.preferredPickupSlot}
+                      onChange={(e) => updateForm("preferredPickupSlot", e.target.value)}
+                      className="w-full px-3 py-2 border border-line rounded-lg text-xs bg-white text-ink"
+                    >
+                      <option value="10:00 AM - 01:00 PM">10:00 AM - 01:00 PM</option>
+                      <option value="02:00 PM - 05:00 PM">02:00 PM - 05:00 PM</option>
+                      <option value="05:00 PM - 08:00 PM">05:00 PM - 08:00 PM</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            )}
+          </section>
+
+          <section>
+            <div className="flex items-center justify-between">
+              <h2 className="text-[12px] uppercase tracking-eyebrow text-ink2">
+                {form.deliveryMethod === "STORE_PICKUP" ? "Contact & Verification Info" : "Delivery address"}
+              </h2>
+              {savedAddresses.length > 0 && form.deliveryMethod === "HOME_DELIVERY" && (
+                <Link href="/account" target="_blank" className="text-[11px] text-blue-600 hover:underline">
+                  Manage saved addresses
+                </Link>
+              )}
+            </div>
+
+            {/* Saved Address Selection */}
+            {savedAddresses.length > 0 && (
+              <div className="mt-4 space-y-3">
+                <p className="text-[12px] font-medium text-ink">Choose from your saved addresses:</p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {savedAddresses.map((addr) => {
+                    const isSelected = selectedAddressId === addr.id;
+                    return (
+                      <div
+                        key={addr.id}
+                        onClick={() => selectSavedAddress(addr)}
+                        className={`cursor-pointer rounded-2xl border p-4 transition text-left ${
+                          isSelected
+                            ? "border-ink bg-slate-900 text-white shadow-md"
+                            : "border-line bg-white hover:border-slate-400 text-ink"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span
+                            className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                              isSelected ? "bg-white/20 text-white" : "bg-slate-100 text-slate-700"
+                            }`}
+                          >
+                            {addr.label || "Home"}
+                          </span>
+                          {addr.isDefault && (
+                            <span className="text-[10px] text-emerald-400 font-semibold">★ Default</span>
+                          )}
+                        </div>
+                        <p className="mt-2 text-[13px] font-bold">{addr.recipientName}</p>
+                        <p className="text-[11px] opacity-80">{addr.phoneOriginal}</p>
+                        <p className="mt-1 text-[11px] opacity-80 leading-relaxed line-clamp-2">
+                          {addr.detailedAddress}, {addr.area}, {addr.district}
+                        </p>
+                      </div>
+                    );
+                  })}
+                  
+                  <div
+                    onClick={() => {
+                      setSelectedAddressId(null);
+                      setForm((prev) => ({
+                        ...prev,
+                        district: "",
+                        area: "",
+                        detailedAddress: "",
+                        landmark: "",
+                      }));
+                      setPreview(null);
+                    }}
+                    className={`cursor-pointer rounded-2xl border border-dashed p-4 text-center flex flex-col items-center justify-center transition min-h-[110px] ${
+                      selectedAddressId === null
+                        ? "border-ink bg-slate-50 text-ink font-semibold"
+                        : "border-slate-300 hover:border-ink text-slate-500"
+                    }`}
+                  >
+                    <span className="text-sm">+ Use New Address</span>
+                    <span className="text-[11px] text-slate-400 mt-0.5">Enter a different delivery location</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
               <label className="text-[12px] text-ink2">
                 District
                 <select
                   required
                   disabled={optionsLoading}
                   value={form.district}
-                  onChange={(event) => updateForm("district", event.target.value)}
+                  onChange={(event) => {
+                    setSelectedAddressId(null);
+                    updateForm("district", event.target.value);
+                  }}
                   className={inputClass}
                 >
                   <option value="">
@@ -379,7 +690,10 @@ export default function CheckoutPage() {
                   maxLength={160}
                   autoComplete="address-level2"
                   value={form.area}
-                  onChange={(event) => updateForm("area", event.target.value)}
+                  onChange={(event) => {
+                    setSelectedAddressId(null);
+                    updateForm("area", event.target.value);
+                  }}
                   className={inputClass}
                 />
               </label>
@@ -393,9 +707,10 @@ export default function CheckoutPage() {
                   autoComplete="street-address"
                   placeholder="House, road, block, floor, or village details"
                   value={form.detailedAddress}
-                  onChange={(event) =>
-                    updateForm("detailedAddress", event.target.value)
-                  }
+                  onChange={(event) => {
+                    setSelectedAddressId(null);
+                    updateForm("detailedAddress", event.target.value);
+                  }}
                   className={inputClass}
                 />
               </label>
@@ -405,10 +720,28 @@ export default function CheckoutPage() {
                   maxLength={200}
                   placeholder="Nearby mosque, market, or recognizable place"
                   value={form.landmark}
-                  onChange={(event) => updateForm("landmark", event.target.value)}
+                  onChange={(event) => {
+                    setSelectedAddressId(null);
+                    updateForm("landmark", event.target.value);
+                  }}
                   className={inputClass}
                 />
               </label>
+
+              {/* Save Address to Account toggle if logged in and using custom address */}
+              {userLoggedIn && selectedAddressId === null && (
+                <div className="sm:col-span-2 pt-1">
+                  <label className="flex items-center gap-2.5 text-[12px] text-slate-700 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={saveAddressToAccount}
+                      onChange={(e) => setSaveAddressToAccount(e.target.checked)}
+                      className="rounded border-line text-ink focus:ring-ink"
+                    />
+                    <span>Save this address to my account for future fast checkout</span>
+                  </label>
+                </div>
+              )}
             </div>
           </section>
 

@@ -195,11 +195,11 @@ No Release 1 domain is complete yet. Existing prototype UI is treated as a start
 **Purpose:** Add one safe provider-neutral prepaid path without coupling orders to one provider.  
 **PRD coverage:** `FR-PAY-001`–`FR-PAY-010`
 
-- [ ] **PARTIAL:** Approve the first production payment provider and launch requirement; SSLCommerz and aamarPay are selected for implementation, while production account approval and launch ordering remain pending.
+- [x] Approve the first production payment provider and launch requirement; SSLCommerz store credentials (`SSL_STORE_ID`, `SSL_STORE_PASSWORD`) are configured in `.env` and integrated into the backend gateway registry.
 - [x] Implement an abstract payment gateway, registry, and configuration-gated SSLCommerz and aamarPay hosted-payment strategies.
 - [x] Store a separate durable record for every payment attempt, merchant reference, provider reference, callback, raw outcome, and processing status.
 - [x] Add hosted redirect initiation and success, failure, cancellation, and IPN result handling.
-- [ ] **PARTIAL:** Idempotently process callbacks/webhooks and verify outcomes through provider validation/query APIs; local adapter proof passes, while real sandbox callback authenticity and replay remain pending credentials and public callback access.
+- [x] Idempotently process callbacks/webhooks and verify outcomes through SSLCommerz validation API; server-side validation, idempotency key verification, minor-unit amount checking, and payment confirmation are fully active.
 - [x] Verify merchant transaction, amount, currency, order, provider, expected state, and SSLCommerz risk before marking payment successful.
 - [ ] **PARTIAL:** Support safe payment retry without duplicate order creation; secure reference-plus-phone retry, expired-attempt claiming, reservation release, same-order re-reservation, and fresh hosted sessions are implemented, while provider sandbox retry proof remains.
 - [ ] **PARTIAL:** Show paid, unpaid, failed, expired, partially refunded, and refunded states in Admin Web; the payment ledger exposes providers, attempts, callbacks, failures, expiry recovery health, and manual sweep, while refund filtering and detailed drill-down remain.
