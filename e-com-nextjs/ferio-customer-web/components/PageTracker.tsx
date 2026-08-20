@@ -19,14 +19,15 @@ export default function PageTracker() {
     socketRef.current = socket;
 
     function handleConnect() {
-      socket.emit("page-view", { page: pathname });
+      const currentPath = typeof window !== "undefined" ? window.location.pathname : pathname;
+      socket.emit("page-view", { page: currentPath });
     }
 
     if (socket.connected) {
-      socket.emit("page-view", { page: pathname });
-    } else {
-      socket.on("connect", handleConnect);
+      handleConnect();
     }
+
+    socket.on("connect", handleConnect);
 
     return () => {
       socket.off("connect", handleConnect);

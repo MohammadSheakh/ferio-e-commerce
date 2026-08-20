@@ -11,6 +11,7 @@ interface LivePageStatsPayload {
 }
 
 const PAGE_CONFIG: Record<string, { label: string; icon: string; path: string; color: string; bg: string }> = {
+  "/delivery/portal": { label: "Rider Delivery Portal", icon: "🛵", path: "/delivery/portal", color: "text-emerald-700", bg: "bg-emerald-500" },
   "/track": { label: "Track Order Page", icon: "🚚", path: "/track", color: "text-amber-700", bg: "bg-amber-500" },
   "/cart": { label: "Cart Page", icon: "🛒", path: "/cart", color: "text-blue-700", bg: "bg-blue-500" },
   "/checkout": { label: "Checkout Page", icon: "💳", path: "/checkout", color: "text-emerald-700", bg: "bg-emerald-500" },
@@ -28,6 +29,7 @@ export default function LivePageVisitorsCard() {
       "/checkout": 0,
       "/track": 0,
       "/products": 0,
+      "/delivery/portal": 0,
     },
     activeVisitors: [],
   });

@@ -9,6 +9,7 @@ interface LivePageStatsPayload {
 }
 
 const TRACKED_ROUTES = [
+  { route: "/delivery/portal", label: "/delivery/portal", icon: "🛵" },
   { route: "/track", label: "/track", icon: "🚚" },
   { route: "/cart", label: "/cart", icon: "🛒" },
   { route: "/checkout", label: "/checkout", icon: "💳" },
@@ -25,6 +26,7 @@ export default function Topbar({ title, subtitle }: { title: string; subtitle?: 
       "/checkout": 0,
       "/track": 0,
       "/products": 0,
+      "/delivery/portal": 0,
     },
   });
   const [isConnected, setIsConnected] = useState<boolean>(false);

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { type CatalogCategory, getCategories } from "@/lib/catalog";
 
 export type CategoryNode = CatalogCategory & {
@@ -102,6 +103,9 @@ export default function CategoryNav({
 }: {
   categories?: CatalogCategory[];
 }) {
+  const pathname = usePathname();
+  if (pathname?.startsWith("/delivery")) return null;
+
   const [categoriesList, setCategoriesList] = useState<CatalogCategory[]>(initialCategories);
   const [tree, setTree] = useState<CategoryNode[]>([]);
   const [activeRootId, setActiveRootId] = useState<string | null>(null);

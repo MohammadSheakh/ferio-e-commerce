@@ -18,6 +18,7 @@ export function getCustomerSocket(token?: string, guestId?: string): Socket {
       query: {
         guestId: guestId || "",
         role: "customer",
+        page: typeof window !== "undefined" ? window.location.pathname : "/",
       },
     });
   } else {

@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 import { type CatalogCategory, getCategories } from "@/lib/catalog";
 
 export interface CategoryNode extends CatalogCategory {
@@ -85,6 +86,8 @@ export default function CategorySideNav({
 }: {
   categories?: CatalogCategory[];
 }) {
+  const pathname = usePathname();
+  if (pathname?.startsWith("/delivery")) return null;
   const [categoriesList, setCategoriesList] = useState<CatalogCategory[]>(categories);
   const [isOpen, setIsOpen] = useState(false);
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});

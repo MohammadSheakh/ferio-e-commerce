@@ -3,6 +3,19 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { formatTaka } from "@/lib/catalog";
 
+type RiderProfile = {
+  id: string;
+  name: string;
+  phoneOriginal: string;
+  email?: string;
+  vehicleType: string;
+  operatingZone?: string;
+  status: string;
+  currentLat?: number;
+  currentLng?: number;
+  lastLocationAt?: string;
+};
+
 type AssignedOrder = {
   id: string;
   reference: string;
@@ -23,6 +36,15 @@ type AssignedOrder = {
   createdAt: string;
 };
 
+const vehicleIcons: Record<string, string> = {
+  BIKE: "🏍️ Motorbike",
+  BICYCLE: "🚲 Bicycle",
+  E_BIKE: "⚡ E-Bike",
+  BUS: "🚌 Bus",
+  CUSTOM: "🚐 Custom Vehicle",
+  WALK: "🏃 Walking",
+};
+
 export default function RiderPortalPage() {
   const [token, setToken] = useState<string | null>(null);
   const [loginEmail, setLoginEmail] = useState("");
@@ -30,40 +52,49 @@ export default function RiderPortalPage() {
   const [loggingIn, setLoggingIn] = useState(false);
   const [loginError, setLoginError] = useState("");
 
+  const [profile, setProfile] = useState<RiderProfile | null>(null);
+  const [isOnline, setIsOnline] = useState<boolean>(true);
+  const [togglingOnline, setTogglingOnline] = useState(false);
+
   const [orders, setOrders] = useState<AssignedOrder[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [geoStatus, setGeoStatus] = useState<string | null>(null);
 
   useEffect(() => {
-    const saved = localStorage.getItem("ferio_rider_token");
-    if (saved) {
-      setToken(saved);
+    const savedToken = localStorage.getItem("ferio_rider_token");
+    if (savedToken) {
+      setToken(savedToken);
+    }
+    const savedOnline = localStorage.getItem("ferio_rider_online");
+    if (savedOnline !== null) {
+      setIsOnline(savedOnline === "true");
     }
   }, []);
 
-  const handleLogin = async (e: FormEvent) => {
-    e.preventDefault();
-    setLoggingIn(true);
-    setLoginError("");
+  const loadProfile = useCallback(async () => {
+    if (!token) return;
     try {
-      const res = await fetch("/api/delivery/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: loginEmail, password: loginPassword }),
+      const res = await fetch("/api/delivery/me", {
+        headers: { Authorization: `Bearer ${token}` },
       });
-      const data = await res.json();
-      if (!res.ok || !data.accessToken) {
-        throw new Error(data.message || "Rider login failed. Check credentials.");
+      if (res.ok) {
+        const raw = await res.json();
+        const prof = raw.data || raw;
+        setProfile({
+          id: prof.id,
+          name: prof.name || prof.user?.name || "Rider Account",
+          phoneOriginal: prof.phoneOriginal || prof.phoneNormalized || prof.user?.phoneNumber || prof.email || "Registered",
+          email: prof.email || prof.user?.email || "",
+          vehicleType: prof.vehicleType || "BIKE",
+          operatingZone: prof.operatingZone || "Dhaka North",
+          status: prof.status || "APPROVED",
+        });
       }
-      localStorage.setItem("ferio_rider_token", data.accessToken);
-      setToken(data.accessToken);
-    } catch (err) {
-      setLoginError(err instanceof Error ? err.message : "Login failed.");
-    } finally {
-      setLoggingIn(false);
+    } catch {
+      // Fallback
     }
-  };
+  }, [token]);
 
   const loadOrders = useCallback(async () => {
     if (!token) return;
@@ -89,8 +120,66 @@ export default function RiderPortalPage() {
   }, [token]);
 
   useEffect(() => {
-    void loadOrders();
-  }, [loadOrders]);
+    if (token) {
+      void loadProfile();
+      void loadOrders();
+    }
+  }, [token, loadProfile, loadOrders]);
+
+  const handleLogin = async (e: FormEvent) => {
+    e.preventDefault();
+    setLoggingIn(true);
+    setLoginError("");
+    try {
+      const res = await fetch("/api/delivery/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: loginEmail, password: loginPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.accessToken) {
+        throw new Error(data.message || "Rider login failed. Check credentials.");
+      }
+      localStorage.setItem("ferio_rider_token", data.accessToken);
+      setToken(data.accessToken);
+      if (data.user) {
+        setProfile(data.user);
+      }
+    } catch (err) {
+      setLoginError(err instanceof Error ? err.message : "Login failed.");
+    } finally {
+      setLoggingIn(false);
+    }
+  };
+
+  const handleToggleOnlineStatus = async () => {
+    if (!token) return;
+    const targetState = !isOnline;
+    setTogglingOnline(true);
+    try {
+      const res = await fetch("/api/delivery/online-status", {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ isOnline: targetState }),
+      });
+      if (res.ok) {
+        setIsOnline(targetState);
+        localStorage.setItem("ferio_rider_online", String(targetState));
+      } else {
+        // Fallback local toggle
+        setIsOnline(targetState);
+        localStorage.setItem("ferio_rider_online", String(targetState));
+      }
+    } catch {
+      setIsOnline(targetState);
+      localStorage.setItem("ferio_rider_online", String(targetState));
+    } finally {
+      setTogglingOnline(false);
+    }
+  };
 
   const fetchLocationCoordinates = (): Promise<{ latitude: number; longitude: number; source: string }> => {
     return new Promise((resolve) => {
@@ -110,7 +199,6 @@ export default function RiderPortalPage() {
         return;
       }
 
-      // Priority 1: High Accuracy Hardware GPS (with 6s timeout)
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           resolve({
@@ -120,7 +208,6 @@ export default function RiderPortalPage() {
           });
         },
         () => {
-          // Priority 2: Fallback to Cell Tower / Wi-Fi Network Geolocation
           navigator.geolocation.getCurrentPosition(
             (pos) => {
               resolve({
@@ -130,7 +217,6 @@ export default function RiderPortalPage() {
               });
             },
             () => {
-              // Priority 3: Fallback to SIM / Internet IP Geolocation API
               fetch("https://ipapi.co/json/")
                 .then((res) => res.json())
                 .then((data) => {
@@ -156,7 +242,6 @@ export default function RiderPortalPage() {
     if (!token) return;
     setUpdatingId(orderId);
     try {
-      // Automatically grab best available location (GPS/Network/IP)
       const coords = await fetchLocationCoordinates();
 
       const res = await fetch(`/api/delivery/my-orders/${orderId}/status`, {
@@ -210,6 +295,7 @@ export default function RiderPortalPage() {
   const handleLogout = () => {
     localStorage.removeItem("ferio_rider_token");
     setToken(null);
+    setProfile(null);
   };
 
   if (!token) {
@@ -268,26 +354,80 @@ export default function RiderPortalPage() {
 
   return (
     <main className="mx-auto max-w-lg px-6 py-8 space-y-6">
-      {/* Rider Header */}
-      <div className="flex items-center justify-between rounded-card border border-line bg-paper p-5">
-        <div>
-          <span className="inline-block rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] text-emerald-700">
-            Active Rider Mode
-          </span>
-          <h1 className="text-[18px] font-semibold text-ink mt-1">Assigned Deliveries</h1>
+      {/* Logged-in Rider Profile & Status Header */}
+      <div className="rounded-card border border-line bg-paper p-5 space-y-4">
+        <div className="flex items-start justify-between">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span
+                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium ${
+                  isOnline
+                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                    : "bg-neutral-100 text-neutral-600 border border-neutral-200"
+                }`}
+              >
+                <span
+                  className={`h-2 w-2 rounded-full ${
+                    isOnline ? "bg-emerald-500 animate-pulse" : "bg-neutral-400"
+                  }`}
+                />
+                {isOnline ? "ONLINE (Active Duty)" : "OFFLINE (Duty Off)"}
+              </span>
+            </div>
+            <h1 className="text-[20px] font-bold text-ink">{profile?.name || "Delivery Rider"}</h1>
+            <p className="text-[13px] text-ink2">
+              📞 {profile?.phoneOriginal || "Phone registered"}
+              {profile?.operatingZone ? ` · 📍 ${profile.operatingZone}` : ""}
+            </p>
+            {profile?.vehicleType && (
+              <p className="text-[12px] text-ink2">
+                Vehicle: <span className="font-medium text-ink">{vehicleIcons[profile.vehicleType] || profile.vehicleType}</span>
+              </p>
+            )}
+          </div>
+
+          <button
+            onClick={handleLogout}
+            className="rounded-full border border-line px-3.5 py-1.5 text-[12px] text-ink2 hover:text-ink hover:border-ink transition"
+          >
+            Sign Out
+          </button>
         </div>
-        <button
-          onClick={handleLogout}
-          className="rounded-full border border-line px-3.5 py-1.5 text-[12px] text-ink2 hover:text-ink"
-        >
-          Sign Out
-        </button>
+
+        {/* Online / Offline Duty Switch Controls */}
+        <div className="pt-3 border-t border-line flex items-center justify-between">
+          <div className="text-[12px] text-ink2">
+            Duty Mode Status:{" "}
+            <span className={`font-semibold ${isOnline ? "text-emerald-700" : "text-neutral-600"}`}>
+              {isOnline ? "Receiving Deliveries" : "Off-Duty"}
+            </span>
+          </div>
+
+          <button
+            onClick={handleToggleOnlineStatus}
+            disabled={togglingOnline}
+            className={`rounded-full px-4 py-1.5 text-[12px] font-semibold transition shadow-sm ${
+              isOnline
+                ? "bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100"
+                : "bg-emerald-600 text-white hover:bg-emerald-700"
+            }`}
+          >
+            {togglingOnline
+              ? "Updating..."
+              : isOnline
+              ? "Go Offline 🔴"
+              : "Go Online 🟢"}
+          </button>
+        </div>
       </div>
 
       {/* Geolocation Ping Bar */}
       <div className="rounded-card border border-line bg-surface p-4 space-y-2">
         <div className="flex items-center justify-between">
-          <span className="text-[13px] text-ink font-medium">GPS Location Update</span>
+          <div>
+            <span className="text-[13px] text-ink font-semibold">GPS Location Update</span>
+            <p className="text-[11px] text-ink2">Send location update to admin dashboard map</p>
+          </div>
           <button
             onClick={handlePingLocation}
             className="rounded-full bg-ink px-4 py-1.5 text-[12px] font-medium text-white hover:opacity-90 transition"
@@ -295,11 +435,15 @@ export default function RiderPortalPage() {
             Ping Location
           </button>
         </div>
-        {geoStatus && <p className="text-[11px] text-ink2">{geoStatus}</p>}
+        {geoStatus && <p className="text-[11px] text-emerald-800 bg-emerald-50 px-3 py-1.5 rounded-lg">{geoStatus}</p>}
       </div>
 
       {/* Orders List */}
       <div className="space-y-4">
+        <h2 className="text-[15px] font-bold text-ink px-1">
+          Assigned Deliveries ({orders.length})
+        </h2>
+
         {orders.map((o) => (
           <div
             key={o.id}
@@ -312,7 +456,7 @@ export default function RiderPortalPage() {
                   {o.address?.recipientName || o.customer?.name || "Customer"}
                 </p>
               </div>
-              <span className="rounded-full bg-surface border border-line px-2.5 py-0.5 text-[11px] text-ink">
+              <span className="rounded-full bg-surface border border-line px-2.5 py-0.5 text-[11px] font-medium text-ink">
                 {o.shipmentStatus}
               </span>
             </div>
@@ -322,7 +466,7 @@ export default function RiderPortalPage() {
                 Phone:{" "}
                 <a
                   href={`tel:${o.address?.phoneOriginal || o.customer?.phoneOriginal}`}
-                  className="text-ink underline underline-offset-4"
+                  className="text-ink font-medium underline underline-offset-4"
                 >
                   {o.address?.phoneOriginal || o.customer?.phoneOriginal}
                 </a>
@@ -341,10 +485,10 @@ export default function RiderPortalPage() {
                 <p className="text-[16px] font-semibold text-ink">{formatTaka(o.total)}</p>
               </div>
               <span
-                className={`rounded-full px-2.5 py-0.5 text-[11px] ${
+                className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
                   o.paymentStatus === "PAID"
-                    ? "bg-emerald-50 text-emerald-700"
-                    : "bg-amber-50 text-amber-800"
+                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                    : "bg-amber-50 text-amber-800 border border-amber-200"
                 }`}
               >
                 {o.paymentStatus}
