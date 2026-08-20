@@ -8,6 +8,8 @@ import ProductFeaturesSection from "./ProductFeaturesSection";
 import CustomerReviewsSection from "./CustomerReviewsSection";
 import ProductQASection from "./ProductQASection";
 import RelatedProductsSection from "./RelatedProductsSection";
+import ProductImageGallery from "./ProductImageGallery";
+import ProductSubNavTabs from "./ProductSubNavTabs";
 import { getPublicApi } from "@/lib/backend";
 
 export const dynamic = "force-dynamic";
@@ -46,41 +48,13 @@ export default async function ProductDetailPage({
 
   return (
     <main className="mx-auto max-w-6xl px-6 py-14">
-      {/* Product Primary Information Section (Intact, untouched) */}
+      {/* Product Primary Information Section */}
       <div className="grid gap-16 md:grid-cols-2">
-        <div>
-          <div className="aspect-[4/5] overflow-hidden rounded-card bg-surface">
-            {product.image ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={product.image}
-                alt={product.name}
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <div className="flex h-full items-center justify-center text-[13px] text-ink2">
-                Product image coming soon
-              </div>
-            )}
-          </div>
-          {product.images.length > 1 && (
-            <div className="mt-3 grid grid-cols-4 gap-3">
-              {product.images.slice(1, 5).map((image, index) => (
-                <div
-                  key={image}
-                  className="aspect-square overflow-hidden rounded-card bg-surface"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={image}
-                    alt={`${product.name} view ${index + 2}`}
-                    className="h-full w-full object-cover"
-                  />
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <ProductImageGallery
+          mainImage={product.image}
+          images={product.images}
+          productName={product.name}
+        />
 
         <div className="md:pt-2">
           <p className="text-[13px] text-ink2">{product.category.name}</p>
@@ -118,9 +92,10 @@ export default async function ProductDetailPage({
             )}
           </div>
 
-          <p className="mt-6 text-[14px] leading-relaxed text-ink2">
-            {product.description}
-          </p>
+          <div
+            className="mt-6 text-[14px] leading-relaxed text-ink2 prose prose-sm max-w-none [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_blockquote]:border-l-4 [&_blockquote]:border-line [&_blockquote]:pl-3 [&_blockquote]:italic [&_h2]:text-base [&_h2]:font-bold [&_h3]:text-sm [&_h3]:font-semibold [&_p]:mb-2.5"
+            dangerouslySetInnerHTML={{ __html: product.description }}
+          />
 
           <div className="mt-7 space-y-2.5 border-t border-line pt-6 text-[13px] text-ink/80">
             <p>
@@ -150,19 +125,28 @@ export default async function ProductDetailPage({
       </div>
 
       {/* 1. Feature Showcase Section */}
-      <ProductFeaturesSection />
+      <ProductFeaturesSection features={product.features} />
 
-      {/* 2. YouTube Reviews Carousel Section */}
-      <ReviewSection productId={product.id} content={content} />
+      {/* 2. Product Sub Navbar Tabs with wrapped sections for continuous sticky navigation */}
+      <ProductSubNavTabs product={product}>
+        {/* YouTube Video Reviews */}
+        <div id="youtube-reviews-section" className="scroll-mt-32">
+          <ReviewSection productId={product.id} content={content} />
+        </div>
 
-      {/* 3. Customer Reviews Section */}
-      <CustomerReviewsSection productId={product.id} />
+        {/* Customer Reviews Section */}
+        <div id="reviews-section" className="scroll-mt-32">
+          <CustomerReviewsSection productId={product.id} />
+        </div>
 
-      {/* 4. Ask Question / Q&A Section */}
-      <ProductQASection productId={product.id} />
+        {/* Ask Question / Q&A Section */}
+        <div id="questions-section" className="scroll-mt-32">
+          <ProductQASection productId={product.id} />
+        </div>
 
-      {/* 5. Related Products Carousel Section */}
-      <RelatedProductsSection categorySlug={product.category?.slug} />
+        {/* Related Products Carousel Section */}
+        <RelatedProductsSection categorySlug={product.category?.slug} />
+      </ProductSubNavTabs>
     </main>
   );
 }

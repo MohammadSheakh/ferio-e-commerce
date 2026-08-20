@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Topbar from "@/components/Topbar";
 import CustomerPagination from "@/components/CustomerPagination";
+import CopyableId from "@/components/CopyableId";
 import { adminApi } from "@/lib/admin-api";
 import type { CustomerPage } from "@/lib/customers";
 import { formatTaka } from "@/lib/catalog";
@@ -141,6 +142,7 @@ export default async function CustomersPage({
             <table className="w-full min-w-[1020px] text-left">
               <thead>
                 <tr className="text-[11px] uppercase tracking-eyebrow text-ink2">
+                  <th className="px-4 py-3 font-normal w-24">Id</th>
                   <th className="px-5 py-3 font-normal">Customer Profile</th>
                   <th className="px-5 py-3 font-normal">Last Online</th>
                   <th className="px-5 py-3 font-normal">Delivered</th>
@@ -155,6 +157,9 @@ export default async function CustomersPage({
                   const onlineMeta = formatLastOnline(customer.lastOnlineAt);
                   return (
                     <tr key={customer.id} className="text-[13px] text-ink/80">
+                      <td className="px-4 py-4 w-24">
+                        <CopyableId id={customer.id} />
+                      </td>
                       <td className="px-5 py-4">
                         <div className="flex items-center gap-3">
                           {customer.avatarUrl ? (
@@ -213,7 +218,7 @@ export default async function CustomersPage({
 
                 {!customers.items.length ? (
                   <tr>
-                    <td colSpan={7} className="px-5 py-14 text-center text-[13px] text-ink2">
+                    <td colSpan={8} className="px-5 py-14 text-center text-[13px] text-ink2">
                       {error || "No customers match this activity filter."}
                     </td>
                   </tr>

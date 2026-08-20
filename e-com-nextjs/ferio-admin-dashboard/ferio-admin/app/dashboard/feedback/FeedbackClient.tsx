@@ -5,7 +5,7 @@ import Topbar from "@/components/Topbar";
 import Pagination from "@/components/Pagination";
 import CopyableId from "@/components/CopyableId";
 
-export interface ProductRequestItem {
+export interface FeedbackItem {
   id: string;
   productName: string;
   name?: string | null;
@@ -23,7 +23,7 @@ export interface ProductRequestItem {
 }
 
 interface Props {
-  initialItems: ProductRequestItem[];
+  initialItems: FeedbackItem[];
   initialTotal: number;
 }
 
@@ -38,13 +38,13 @@ const STATUS_CONFIG: Record<
     border: "border-amber-200",
   },
   COLLECTED: {
-    label: "Collected",
+    label: "Noted",
     bg: "bg-surface",
     text: "text-ink",
     border: "border-line",
   },
   CONTACTED: {
-    label: "Contacted",
+    label: "Replied",
     bg: "bg-surface",
     text: "text-ink font-medium",
     border: "border-line",
@@ -57,29 +57,63 @@ const STATUS_CONFIG: Record<
   },
 };
 
-function parseProductItems(rawText: string): {
-  products: string[];
-  customerDetails: string | null;
-} {
-  if (!rawText) return { products: [], customerDetails: null };
+export type FeedbackCategory =
+  | "ALL"
+  | "SUGGESTION"
+  | "FEEDBACK"
+  | "WELL_WISH"
+  | "FEATURE_REQUEST";
+
+interface ParsedFeedback {
+  categoryKey: Exclude<FeedbackCategory, "ALL">;
+  categoryLabel: string;
+  messageText: string;
+}
+
+function parseFeedbackContent(rawText: string): ParsedFeedback {
+  if (!rawText) {
+    return {
+      categoryKey: "FEEDBACK",
+      categoryLabel: "Feedback / মতামত",
+      messageText: "",
+    };
+  }
 
   const parts = rawText.split(/\[Additional Details\]:/i);
-  const productsSection = parts[0] || "";
+  const headerSection = (parts[0] || "").trim();
   const customerDetails = parts[1] ? parts[1].trim() : null;
 
-  const lines = productsSection
-    .split("\n")
-    .map((l) => l.replace(/^\d+\.\s*/, "").trim())
-    .filter(Boolean);
+  let categoryKey: Exclude<FeedbackCategory, "ALL"> = "FEEDBACK";
+  let categoryLabel = "Feedback / মতামত";
+
+  const lowerHeader = headerSection.toLowerCase();
+
+  if (lowerHeader.includes("suggestion") || lowerHeader.includes("পরামর্শ")) {
+    categoryKey = "SUGGESTION";
+    categoryLabel = "Suggestion / পরামর্শ";
+  } else if (
+    lowerHeader.includes("well_wish") ||
+    lowerHeader.includes("well wish") ||
+    lowerHeader.includes("শুভকামনা")
+  ) {
+    categoryKey = "WELL_WISH";
+    categoryLabel = "Well Wish / শুভকামনা";
+  } else if (lowerHeader.includes("feature") || lowerHeader.includes("ফিচার")) {
+    categoryKey = "FEATURE_REQUEST";
+    categoryLabel = "Feature Request / ফিচার অনুরোধ";
+  }
+
+  const messageText = customerDetails || headerSection.replace(/^\[FEEDBACK:[^\]]+\]/i, "").trim();
 
   return {
-    products: lines.length > 0 ? lines : [productsSection.trim()],
-    customerDetails,
+    categoryKey,
+    categoryLabel,
+    messageText: messageText || rawText,
   };
 }
 
-export default function RequestedProductsClient({ initialItems, initialTotal }: Props) {
-  const [items, setItems] = useState<ProductRequestItem[]>(initialItems);
+export default function FeedbackClient({ initialItems, initialTotal }: Props) {
+  const [items, setItems] = useState<FeedbackItem[]>(initialItems);
   const [totalItems, setTotalItems] = useState<number>(initialTotal || initialItems.length);
   const [page, setPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(20);
@@ -87,12 +121,13 @@ export default function RequestedProductsClient({ initialItems, initialTotal }: 
     Math.ceil((initialTotal || initialItems.length) / 20) || 1
   );
   const [loading, setLoading] = useState<boolean>(false);
+  const [categoryFilter, setCategoryFilter] = useState<FeedbackCategory>("ALL");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [search, setSearch] = useState<string>("");
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const fetchRequests = useCallback(async () => {
+  const fetchFeedback = useCallback(async () => {
     setLoading(true);
     try {
       const query = new URLSearchParams({
@@ -109,29 +144,29 @@ export default function RequestedProductsClient({ initialItems, initialTotal }: 
       });
       if (res.ok) {
         const data = await res.json();
-        const results: ProductRequestItem[] = data.results || data.items || [];
+        const results: FeedbackItem[] = data.results || data.items || [];
         const pag = data.pagination || {};
         setItems(results);
         setTotalItems(pag.total ?? data.total ?? results.length);
         setTotalPages(pag.totalPages ?? data.totalPages ?? 1);
       }
     } catch (e) {
-      console.error("Failed fetching product requests", e);
+      console.error("Failed fetching feedback", e);
     } finally {
       setLoading(false);
     }
   }, [page, pageSize, statusFilter, search]);
 
   useEffect(() => {
-    void fetchRequests();
-  }, [fetchRequests]);
+    void fetchFeedback();
+  }, [fetchFeedback]);
 
   // Modal State
-  const [selectedItem, setSelectedItem] = useState<ProductRequestItem | null>(null);
+  const [selectedItem, setSelectedItem] = useState<FeedbackItem | null>(null);
   const [adminNoteInput, setAdminNoteInput] = useState<string>("");
   const [savingNote, setSavingNote] = useState<boolean>(false);
 
-  const openDetailModal = (item: ProductRequestItem) => {
+  const openDetailModal = (item: FeedbackItem) => {
     setSelectedItem(item);
     setAdminNoteInput(item.notes || "");
   };
@@ -199,7 +234,7 @@ export default function RequestedProductsClient({ initialItems, initialTotal }: 
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this product request?")) return;
+    if (!confirm("Are you sure you want to delete this feedback entry?")) return;
     setDeletingId(id);
     try {
       const res = await fetch(`/api/admin/product-requests/${id}`, {
@@ -210,106 +245,127 @@ export default function RequestedProductsClient({ initialItems, initialTotal }: 
         setItems((prev) => prev.filter((item) => item.id !== id));
         if (selectedItem?.id === id) closeDetailModal();
       } else {
-        alert("Failed to delete request.");
+        alert("Failed to delete feedback.");
       }
     } catch {
-      alert("Network error deleting request.");
+      alert("Network error deleting feedback.");
     } finally {
       setDeletingId(null);
     }
   };
 
-  // Exclude Feedback items from Product Requests page
-  const productOnlyItems = items.filter((item) => {
+  // Filter feedback items ONLY
+  const feedbackOnlyItems = items.filter((item) => {
     const pName = (item.productName || "").toLowerCase();
-    return !pName.startsWith("[feedback:") && !pName.includes("[user feedback]");
+    return pName.startsWith("[feedback:") || pName.includes("[user feedback]");
   });
 
-  const filteredItems = productOnlyItems.filter((item) => {
-    if (statusFilter !== "ALL" && item.status !== statusFilter) return false;
+  const filteredItems = feedbackOnlyItems.filter((item) => {
+    const parsed = parseFeedbackContent(item.productName);
+
+    if (categoryFilter !== "ALL" && parsed.categoryKey !== categoryFilter) {
+      return false;
+    }
+
+    if (statusFilter !== "ALL" && item.status !== statusFilter) {
+      return false;
+    }
+
     if (search.trim()) {
       const q = search.toLowerCase().trim();
-      const matchProduct = item.productName.toLowerCase().includes(q);
+      const matchMsg = parsed.messageText.toLowerCase().includes(q);
       const matchName = (item.name || "").toLowerCase().includes(q);
       const matchPhone = (item.phone || "").toLowerCase().includes(q);
       const matchUserName = (item.user?.name || "").toLowerCase().includes(q);
       const matchEmail = (item.user?.email || "").toLowerCase().includes(q);
       const matchNotes = (item.notes || "").toLowerCase().includes(q);
-      return matchProduct || matchName || matchPhone || matchUserName || matchEmail || matchNotes;
+      return matchMsg || matchName || matchPhone || matchUserName || matchEmail || matchNotes;
     }
     return true;
   });
 
-  const countPending = productOnlyItems.filter((i) => i.status === "PENDING").length;
-  const countCollected = productOnlyItems.filter((i) => i.status === "COLLECTED").length;
-  const countContacted = productOnlyItems.filter((i) => i.status === "CONTACTED").length;
-  const countDone = productOnlyItems.filter((i) => i.status === "DONE").length;
+  const countSuggestions = feedbackOnlyItems.filter(
+    (i) => parseFeedbackContent(i.productName).categoryKey === "SUGGESTION"
+  ).length;
+  const countFeedbackMsgs = feedbackOnlyItems.filter(
+    (i) => parseFeedbackContent(i.productName).categoryKey === "FEEDBACK"
+  ).length;
+  const countWellWishes = feedbackOnlyItems.filter(
+    (i) => parseFeedbackContent(i.productName).categoryKey === "WELL_WISH"
+  ).length;
+  const countFeatureReqs = feedbackOnlyItems.filter(
+    (i) => parseFeedbackContent(i.productName).categoryKey === "FEATURE_REQUEST"
+  ).length;
 
   return (
     <>
       <Topbar
-        title="Requested Products"
-        subtitle={`${productOnlyItems.length} customer product request${productOnlyItems.length === 1 ? "" : "s"}`}
+        title="Suggestions & Feedback"
+        subtitle={`${feedbackOnlyItems.length} customer feedback submission${feedbackOnlyItems.length === 1 ? "" : "s"}`}
       />
 
       <div className="p-8">
-        {/* Metric Cards (Design Language: Hairline border, muted semantic pills) */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-          <div
-            onClick={() => setStatusFilter("PENDING")}
-            className={`cursor-pointer rounded-card border p-4 transition ${
-              statusFilter === "PENDING"
-                ? "border-amber-400 bg-amber-50/40"
-                : "border-line bg-paper hover:border-ink2"
+        {/* Category Tabs (Ferio Design Language: Hairline border, monochrome pill selection) */}
+        <div className="flex flex-wrap items-center gap-2 mb-6 border-b border-line pb-4">
+          <button
+            type="button"
+            onClick={() => setCategoryFilter("ALL")}
+            className={`rounded-full px-4 py-2 text-[13px] font-medium transition ${
+              categoryFilter === "ALL"
+                ? "bg-ink text-white"
+                : "border border-line bg-paper text-ink2 hover:text-ink hover:bg-surface"
             }`}
           >
-            <p className="text-[11px] font-medium uppercase tracking-eyebrow text-ink2">
-              Pending
-            </p>
-            <p className="mt-2 text-2xl font-semibold text-ink">{countPending}</p>
-          </div>
+            All Submissions ({feedbackOnlyItems.length})
+          </button>
 
-          <div
-            onClick={() => setStatusFilter("COLLECTED")}
-            className={`cursor-pointer rounded-card border p-4 transition ${
-              statusFilter === "COLLECTED"
-                ? "border-ink bg-surface"
-                : "border-line bg-paper hover:border-ink2"
+          <button
+            type="button"
+            onClick={() => setCategoryFilter("SUGGESTION")}
+            className={`rounded-full px-4 py-2 text-[13px] font-medium transition ${
+              categoryFilter === "SUGGESTION"
+                ? "bg-ink text-white"
+                : "border border-line bg-paper text-ink2 hover:text-ink hover:bg-surface"
             }`}
           >
-            <p className="text-[11px] font-medium uppercase tracking-eyebrow text-ink2">
-              Collected
-            </p>
-            <p className="mt-2 text-2xl font-semibold text-ink">{countCollected}</p>
-          </div>
+            Suggestions ({countSuggestions})
+          </button>
 
-          <div
-            onClick={() => setStatusFilter("CONTACTED")}
-            className={`cursor-pointer rounded-card border p-4 transition ${
-              statusFilter === "CONTACTED"
-                ? "border-ink bg-surface"
-                : "border-line bg-paper hover:border-ink2"
+          <button
+            type="button"
+            onClick={() => setCategoryFilter("FEEDBACK")}
+            className={`rounded-full px-4 py-2 text-[13px] font-medium transition ${
+              categoryFilter === "FEEDBACK"
+                ? "bg-ink text-white"
+                : "border border-line bg-paper text-ink2 hover:text-ink hover:bg-surface"
             }`}
           >
-            <p className="text-[11px] font-medium uppercase tracking-eyebrow text-ink2">
-              Contacted
-            </p>
-            <p className="mt-2 text-2xl font-semibold text-ink">{countContacted}</p>
-          </div>
+            Feedback ({countFeedbackMsgs})
+          </button>
 
-          <div
-            onClick={() => setStatusFilter("DONE")}
-            className={`cursor-pointer rounded-card border p-4 transition ${
-              statusFilter === "DONE"
-                ? "border-emerald-400 bg-emerald-50/40"
-                : "border-line bg-paper hover:border-ink2"
+          <button
+            type="button"
+            onClick={() => setCategoryFilter("WELL_WISH")}
+            className={`rounded-full px-4 py-2 text-[13px] font-medium transition ${
+              categoryFilter === "WELL_WISH"
+                ? "bg-ink text-white"
+                : "border border-line bg-paper text-ink2 hover:text-ink hover:bg-surface"
             }`}
           >
-            <p className="text-[11px] font-medium uppercase tracking-eyebrow text-ink2">
-              Completed
-            </p>
-            <p className="mt-2 text-2xl font-semibold text-ink">{countDone}</p>
-          </div>
+            Well Wishes ({countWellWishes})
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setCategoryFilter("FEATURE_REQUEST")}
+            className={`rounded-full px-4 py-2 text-[13px] font-medium transition ${
+              categoryFilter === "FEATURE_REQUEST"
+                ? "bg-ink text-white"
+                : "border border-line bg-paper text-ink2 hover:text-ink hover:bg-surface"
+            }`}
+          >
+            Feature Requests ({countFeatureReqs})
+          </button>
         </div>
 
         {/* Filter Bar */}
@@ -320,16 +376,16 @@ export default function RequestedProductsClient({ initialItems, initialTotal }: 
                 key={st}
                 type="button"
                 onClick={() => setStatusFilter(st)}
-                className={`rounded-full px-4 py-1.5 text-[12px] font-medium transition ${
+                className={`rounded-full px-3.5 py-1 text-[12px] font-medium transition ${
                   statusFilter === st
-                    ? "bg-ink text-white"
-                    : "border border-line bg-paper text-ink2 hover:text-ink hover:bg-surface"
+                    ? "bg-surface text-ink font-semibold border border-line"
+                    : "text-ink2 hover:text-ink"
                 }`}
               >
                 {st === "ALL"
-                  ? `All (${productOnlyItems.length})`
+                  ? `Status: All`
                   : `${STATUS_CONFIG[st]?.label || st} (${
-                      productOnlyItems.filter((i) => i.status === st).length
+                      feedbackOnlyItems.filter((i) => i.status === st).length
                     })`}
               </button>
             ))}
@@ -340,7 +396,7 @@ export default function RequestedProductsClient({ initialItems, initialTotal }: 
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search product, name, phone..."
+              placeholder="Search feedback, submitter, phone..."
               className="w-full rounded-full border border-line bg-paper px-4 py-2 text-[12px] text-ink outline-none focus:border-ink"
             />
           </div>
@@ -353,8 +409,9 @@ export default function RequestedProductsClient({ initialItems, initialTotal }: 
               <tr className="border-b border-line bg-surface text-[11px] uppercase tracking-eyebrow text-ink2">
                 <th className="px-4 py-3 font-medium w-24">Id</th>
                 <th className="px-5 py-3 font-medium">Date & Time</th>
-                <th className="px-5 py-3 font-medium w-2/5">Requested Product(s)</th>
-                <th className="px-5 py-3 font-medium">Requester</th>
+                <th className="px-5 py-3 font-medium">Category</th>
+                <th className="px-5 py-3 font-medium w-2/5">Message Content</th>
+                <th className="px-5 py-3 font-medium">Submitter</th>
                 <th className="px-5 py-3 font-medium">Contact</th>
                 <th className="px-5 py-3 font-medium">Status & Actions</th>
               </tr>
@@ -371,12 +428,13 @@ export default function RequestedProductsClient({ initialItems, initialTotal }: 
                   hour12: true,
                 });
 
-                const { products, customerDetails } = parseProductItems(item.productName);
+                const parsed = parseFeedbackContent(item.productName);
+                const isAnon =
+                  item.name?.includes("Anonymous") ||
+                  item.name?.includes("বেনামী") ||
+                  (!item.name && !item.user && !item.phone);
+
                 const contactPhone = item.phone || item.user?.phoneNumber;
-                const cleanPhoneDigits = contactPhone ? contactPhone.replace(/\D/g, "") : "";
-                const formattedWaPhone = cleanPhoneDigits.startsWith("88")
-                  ? cleanPhoneDigits
-                  : `88${cleanPhoneDigits}`;
 
                 return (
                   <tr key={item.id} className="text-[13px] text-ink hover:bg-surface/50 transition">
@@ -390,40 +448,29 @@ export default function RequestedProductsClient({ initialItems, initialTotal }: 
                       {formattedDate}
                     </td>
 
-                    {/* Product Items */}
+                    {/* Category Pill */}
+                    <td className="px-5 py-4 whitespace-nowrap align-top">
+                      <span className="inline-block rounded-full bg-surface px-2.5 py-0.5 text-[11px] font-medium text-ink2 border border-line">
+                        {parsed.categoryLabel}
+                      </span>
+                    </td>
+
+                    {/* Message Content */}
                     <td className="px-5 py-4 text-ink align-top">
-                      <div className="space-y-2 max-w-md">
-                        <div className="flex items-center gap-2">
-                          <span className="inline-flex items-center rounded-full bg-surface px-2.5 py-0.5 text-[11px] font-medium text-ink2 border border-line">
-                            {products.length} {products.length === 1 ? "Product" : "Products"} Requested
-                          </span>
-                        </div>
-
-                        <div className="space-y-1.5">
-                          {products.map((prod, pIdx) => (
-                            <div
-                              key={pIdx}
-                              className="flex items-start gap-2 rounded-md bg-surface px-3 py-1.5 text-[13px] font-medium text-ink border border-line"
-                            >
-                              <span className="font-semibold text-ink2 text-[11px] shrink-0 pt-0.5">
-                                #{pIdx + 1}
-                              </span>
-                              <span className="leading-snug">{prod}</span>
-                            </div>
-                          ))}
-                        </div>
-
-                        {customerDetails && (
-                          <p className="text-[12px] text-ink2 italic line-clamp-2 bg-surface rounded p-2 border border-line">
-                            &quot;{customerDetails}&quot;
-                          </p>
-                        )}
+                      <div className="rounded-md border border-line bg-surface p-3 space-y-1 max-w-md">
+                        <p className="text-[13px] text-ink font-normal whitespace-pre-wrap leading-relaxed">
+                          {parsed.messageText}
+                        </p>
                       </div>
                     </td>
 
-                    {/* Requester Info */}
+                    {/* Submitter */}
                     <td className="px-5 py-4 whitespace-nowrap align-top">
-                      {item.user ? (
+                      {isAnon ? (
+                        <span className="inline-block rounded-full bg-surface px-2.5 py-0.5 text-[11px] font-medium text-ink2 border border-line">
+                          Anonymous / বেনামী
+                        </span>
+                      ) : item.user ? (
                         <div>
                           <p className="font-semibold text-ink">{item.user.name}</p>
                           <p className="text-[11px] text-ink2">{item.user.email}</p>
@@ -438,27 +485,15 @@ export default function RequestedProductsClient({ initialItems, initialTotal }: 
                       )}
                     </td>
 
-                    {/* Contact Info */}
+                    {/* Contact */}
                     <td className="px-5 py-4 whitespace-nowrap align-top">
                       {contactPhone ? (
-                        <div className="space-y-1">
-                          <a
-                            href={`tel:${contactPhone}`}
-                            className="block font-mono text-[12px] font-medium text-ink hover:underline"
-                          >
-                            {contactPhone}
-                          </a>
-                          {cleanPhoneDigits.length >= 10 && (
-                            <a
-                              href={`https://wa.me/${formattedWaPhone}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex items-center rounded-full bg-surface px-2.5 py-0.5 text-[11px] font-medium text-ink hover:bg-line transition border border-line"
-                            >
-                              WhatsApp
-                            </a>
-                          )}
-                        </div>
+                        <a
+                          href={`tel:${contactPhone}`}
+                          className="block font-mono text-[12px] font-medium text-ink hover:underline"
+                        >
+                          {contactPhone}
+                        </a>
                       ) : (
                         <span className="text-ink2 italic text-[11px]">Not provided</span>
                       )}
@@ -479,8 +514,8 @@ export default function RequestedProductsClient({ initialItems, initialTotal }: 
                           className={`rounded-full border px-3 py-1 text-[11px] font-medium outline-none cursor-pointer ${conf.bg} ${conf.text} ${conf.border}`}
                         >
                           <option value="PENDING">Pending</option>
-                          <option value="COLLECTED">Collected</option>
-                          <option value="CONTACTED">Contacted</option>
+                          <option value="COLLECTED">Noted</option>
+                          <option value="CONTACTED">Replied</option>
                           <option value="DONE">Completed</option>
                         </select>
 
@@ -508,10 +543,10 @@ export default function RequestedProductsClient({ initialItems, initialTotal }: 
 
               {filteredItems.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-5 py-12 text-center text-[13px] text-ink2">
-                    {productOnlyItems.length === 0
-                      ? "No product requests submitted yet."
-                      : "No product requests matching your active status filter."}
+                  <td colSpan={7} className="px-5 py-12 text-center text-[13px] text-ink2">
+                    {feedbackOnlyItems.length === 0
+                      ? "No suggestions or feedback submitted yet."
+                      : "No feedback matching your active filters."}
                   </td>
                 </tr>
               )}
@@ -538,7 +573,7 @@ export default function RequestedProductsClient({ initialItems, initialTotal }: 
           <div className="w-full max-w-xl rounded-card border border-line bg-paper p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-4 border-b border-line">
               <div>
-                <h3 className="text-base font-semibold text-ink">Product Request Details</h3>
+                <h3 className="text-base font-semibold text-ink">Feedback Submission Details</h3>
                 <p className="text-[12px] text-ink2">
                   Submitted on{" "}
                   {new Date(selectedItem.createdAt).toLocaleString("en-US", {
@@ -560,39 +595,54 @@ export default function RequestedProductsClient({ initialItems, initialTotal }: 
             </div>
 
             <div className="mt-4 space-y-5">
-              <div className="flex items-center justify-between rounded-card border border-line bg-surface p-3.5">
-                <span className="text-[11px] font-medium uppercase tracking-eyebrow text-ink2">
-                  Status:
-                </span>
-                <select
-                  disabled={updatingId === selectedItem.id}
-                  value={selectedItem.status}
-                  onChange={(e) =>
-                    handleUpdateStatus(
-                      selectedItem.id,
-                      e.target.value as "PENDING" | "COLLECTED" | "CONTACTED" | "DONE"
-                    )
-                  }
-                  className="rounded-full border border-line bg-paper px-3 py-1 text-[12px] font-medium text-ink outline-none cursor-pointer"
-                >
-                  <option value="PENDING">Pending</option>
-                  <option value="COLLECTED">Collected</option>
-                  <option value="CONTACTED">Contacted</option>
-                  <option value="DONE">Completed</option>
-                </select>
-              </div>
+              {(() => {
+                const parsed = parseFeedbackContent(selectedItem.productName);
+                return (
+                  <div className="flex items-center justify-between rounded-card border border-line bg-surface p-3.5">
+                    <span className="inline-block rounded-full bg-paper border border-line px-3 py-0.5 text-[12px] font-medium text-ink">
+                      {parsed.categoryLabel}
+                    </span>
+                    <select
+                      disabled={updatingId === selectedItem.id}
+                      value={selectedItem.status}
+                      onChange={(e) =>
+                        handleUpdateStatus(
+                          selectedItem.id,
+                          e.target.value as "PENDING" | "COLLECTED" | "CONTACTED" | "DONE"
+                        )
+                      }
+                      className="rounded-full border border-line bg-paper px-3 py-1 text-[12px] font-medium text-ink outline-none cursor-pointer"
+                    >
+                      <option value="PENDING">Pending</option>
+                      <option value="COLLECTED">Noted</option>
+                      <option value="CONTACTED">Replied</option>
+                      <option value="DONE">Completed</option>
+                    </select>
+                  </div>
+                );
+              })()}
 
               <div className="rounded-card border border-line bg-surface p-4 space-y-2">
                 <p className="text-[11px] font-medium uppercase tracking-eyebrow text-ink2">
-                  Requester Information
+                  Submitter Information
                 </p>
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div>
-                    <p className="text-[14px] font-semibold text-ink">
-                      {selectedItem.user?.name || selectedItem.name || "Guest Visitor"}
-                    </p>
-                    {selectedItem.user?.email && (
-                      <p className="text-[12px] text-ink2">{selectedItem.user.email}</p>
+                    {selectedItem.name?.includes("Anonymous") ||
+                    selectedItem.name?.includes("বেনামী") ||
+                    (!selectedItem.name && !selectedItem.user && !selectedItem.phone) ? (
+                      <span className="inline-block rounded-full bg-paper border border-line px-3 py-0.5 text-[12px] font-medium text-ink2">
+                        Anonymous User / বেনামী ব্যবহারকারী
+                      </span>
+                    ) : (
+                      <>
+                        <p className="text-[14px] font-semibold text-ink">
+                          {selectedItem.user?.name || selectedItem.name || "Guest Visitor"}
+                        </p>
+                        {selectedItem.user?.email && (
+                          <p className="text-[12px] text-ink2">{selectedItem.user.email}</p>
+                        )}
+                      </>
                     )}
                   </div>
 
@@ -601,58 +651,37 @@ export default function RequestedProductsClient({ initialItems, initialTotal }: 
                       href={`tel:${selectedItem.phone || selectedItem.user?.phoneNumber}`}
                       className="rounded-full border border-line bg-paper px-3 py-1 text-[12px] font-medium text-ink hover:bg-surface transition"
                     >
-                      Call Requester
+                      Call Submitter
                     </a>
                   )}
                 </div>
               </div>
 
               {(() => {
-                const { products, customerDetails } = parseProductItems(selectedItem.productName);
+                const parsed = parseFeedbackContent(selectedItem.productName);
                 return (
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     <p className="text-[11px] font-medium uppercase tracking-eyebrow text-ink2">
-                      Requested Items ({products.length})
+                      Message Content
                     </p>
-                    <div className="space-y-2">
-                      {products.map((prod, idx) => (
-                        <div
-                          key={idx}
-                          className="flex items-start gap-3 rounded-card border border-line bg-paper p-3"
-                        >
-                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-ink text-white text-[10px] font-medium">
-                            {idx + 1}
-                          </span>
-                          <span className="text-[13px] font-medium text-ink leading-relaxed">
-                            {prod}
-                          </span>
-                        </div>
-                      ))}
+                    <div className="rounded-card border border-line bg-surface p-4">
+                      <p className="text-[13px] text-ink whitespace-pre-wrap leading-relaxed">
+                        {parsed.messageText}
+                      </p>
                     </div>
-
-                    {customerDetails && (
-                      <div className="rounded-card border border-line bg-surface p-4 space-y-1">
-                        <p className="text-[11px] font-medium uppercase tracking-eyebrow text-ink2">
-                          Additional Details
-                        </p>
-                        <p className="text-[13px] text-ink whitespace-pre-wrap leading-relaxed">
-                          {customerDetails}
-                        </p>
-                      </div>
-                    )}
                   </div>
                 );
               })()}
 
               <div className="space-y-2 pt-2 border-t border-line">
                 <label className="block text-[11px] font-medium uppercase tracking-eyebrow text-ink2">
-                  Internal Admin Notes
+                  Internal Admin Remarks / Notes
                 </label>
                 <textarea
                   rows={3}
                   value={adminNoteInput}
                   onChange={(e) => setAdminNoteInput(e.target.value)}
-                  placeholder="Type internal sourcing notes..."
+                  placeholder="Type internal remarks regarding action items or response..."
                   className="w-full rounded-card border border-line bg-surface p-3 text-[13px] text-ink outline-none focus:border-ink resize-y"
                 />
                 <div className="flex justify-end">
@@ -674,7 +703,7 @@ export default function RequestedProductsClient({ initialItems, initialTotal }: 
                 onClick={() => handleDelete(selectedItem.id)}
                 className="text-rose-600 hover:text-rose-800 text-[12px] font-medium"
               >
-                Delete Request
+                Delete Feedback
               </button>
               <button
                 type="button"

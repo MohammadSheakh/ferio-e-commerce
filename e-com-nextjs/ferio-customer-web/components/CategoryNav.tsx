@@ -2,13 +2,14 @@
 
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
-import { type CatalogCategory } from "@/lib/catalog";
+import { type CatalogCategory, getCategories } from "@/lib/catalog";
 
 export type CategoryNode = CatalogCategory & {
   children: CategoryNode[];
 };
 
-// Fallback Tech Categories matching the exact structure from user image
+/*
+// Fallback Tech Categories (Commented out for reference)
 const FALLBACK_CATEGORIES: CatalogCategory[] = [
   // Level 1 Root Categories
   { id: "cat-desktop", name: "Desktop", slug: "desktop", description: null, parentId: null, sortOrder: 1 },
@@ -53,6 +54,7 @@ const FALLBACK_CATEGORIES: CatalogCategory[] = [
   { id: "l3-cd-netum", name: "Netum", slug: "cash-drawer-netum", description: null, parentId: "sub-cash", sortOrder: 1 },
   { id: "l3-cd-honeywell", name: "Honeywell", slug: "cash-drawer-honeywell", description: null, parentId: "sub-cash", sortOrder: 2 },
 ];
+*/
 
 function buildCategoryTree(rawCategories: CatalogCategory[]): CategoryNode[] {
   if (!rawCategories || rawCategories.length === 0) return [];
@@ -100,28 +102,42 @@ export default function CategoryNav({
 }: {
   categories?: CatalogCategory[];
 }) {
+  const [categoriesList, setCategoriesList] = useState<CatalogCategory[]>(initialCategories);
   const [tree, setTree] = useState<CategoryNode[]>([]);
   const [activeRootId, setActiveRootId] = useState<string | null>(null);
   const [activeSubId, setActiveSubId] = useState<string | null>(null);
+  const [isHidden, setIsHidden] = useState(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    let sourceList: CatalogCategory[] = initialCategories;
+    const handleToggleNav = (e: Event) => {
+      const customEvent = e as CustomEvent<{ hide: boolean }>;
+      setIsHidden(!!customEvent.detail?.hide);
+    };
 
-    // If backend returns fewer than 3 top-level items, merge with fallback so user gets rich tree out of the box
-    const hasEnoughRootItems = initialCategories.filter((c) => !c.parentId).length >= 3;
-    if (!hasEnoughRootItems) {
-      // Merge initial categories with fallbacks avoiding ID collisions
-      const existingIds = new Set(initialCategories.map((c) => c.id));
-      const existingSlugs = new Set(initialCategories.map((c) => c.slug));
-      const filteredFallbacks = FALLBACK_CATEGORIES.filter(
-        (f) => !existingIds.has(f.id) && !existingSlugs.has(f.slug)
-      );
-      sourceList = [...initialCategories, ...filteredFallbacks];
+    window.addEventListener("toggle-category-nav", handleToggleNav);
+    return () => {
+      window.removeEventListener("toggle-category-nav", handleToggleNav);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (initialCategories.length > 0) {
+      setCategoriesList(initialCategories);
+    } else {
+      getCategories()
+        .then((cats) => {
+          if (Array.isArray(cats) && cats.length > 0) {
+            setCategoriesList(cats);
+          }
+        })
+        .catch(() => {});
     }
-
-    setTree(buildCategoryTree(sourceList));
   }, [initialCategories]);
+
+  useEffect(() => {
+    setTree(buildCategoryTree(categoriesList));
+  }, [categoriesList]);
 
   const activeRoot = tree.find((node) => node.id === activeRootId);
   const activeSub = activeRoot?.children.find((child) => child.id === activeSubId);
@@ -158,7 +174,11 @@ export default function CategoryNav({
 
   return (
     <div
-      className="relative z-50 border-b border-gray-200/80 bg-white font-sans overflow-visible"
+      className={`relative z-50 bg-white font-sans transition-all duration-300 ${
+        isHidden
+          ? "max-h-0 opacity-0 overflow-hidden border-none pointer-events-none py-0"
+          : "max-h-24 opacity-100 overflow-visible border-b border-gray-200/80"
+      }`}
       onMouseLeave={handleMouseLeave}
       onMouseEnter={handleMouseEnterContainer}
     >

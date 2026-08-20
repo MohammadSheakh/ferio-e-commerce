@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import Topbar from "@/components/Topbar";
+import CopyableId from "@/components/CopyableId";
 import Pagination from "@/components/Pagination";
 import { formatTaka, ProductPage } from "@/lib/catalog";
 
@@ -37,7 +38,7 @@ export default function ProductsPage() {
       });
       if (search) query.set("search", search);
 
-      const res = await fetch(`/api/admin/catalog/products?${query.toString()}`, {
+      const res = await fetch(`/api/catalog/products?${query.toString()}`, {
         cache: "no-store",
         headers: {
           Authorization: `Bearer ${localStorage.getItem("admin_access_token") || ""}`,
@@ -45,7 +46,7 @@ export default function ProductsPage() {
       });
       if (!res.ok) throw new Error("Unable to load products");
       const data = await res.json();
-      setProducts(data);
+      setProducts(data.data || data);
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -87,6 +88,12 @@ export default function ProductsPage() {
 
           <div className="flex justify-end gap-3">
             <Link
+              href="/dashboard/requested-products"
+              className="rounded-full border border-line px-5 py-2 text-[13px] text-ink2 hover:text-ink"
+            >
+              Requested products
+            </Link>
+            <Link
               href="/dashboard/categories"
               className="rounded-full border border-line px-5 py-2 text-[13px] text-ink2 hover:text-ink"
             >
@@ -123,6 +130,7 @@ export default function ProductsPage() {
           <table className="w-full text-left">
             <thead>
               <tr className="text-[11px] uppercase tracking-eyebrow text-ink2">
+                <th className="px-4 py-3 font-normal w-24">Id</th>
                 <th className="px-5 py-3 font-normal">Product</th>
                 <th className="px-5 py-3 font-normal">Category</th>
                 <th className="px-5 py-3 font-normal">Price</th>
@@ -133,6 +141,9 @@ export default function ProductsPage() {
             <tbody className="divide-y divide-line">
               {products.items.map((product) => (
                 <tr key={product.id} className="text-[13px] text-ink/80">
+                  <td className="px-4 py-3.5 w-24">
+                    <CopyableId id={product.id} />
+                  </td>
                   <td className="px-5 py-3.5 text-ink">
                     <Link
                       href={`/dashboard/products/${product.id}`}
@@ -167,7 +178,7 @@ export default function ProductsPage() {
               {!loading && products.items.length === 0 && (
                 <tr>
                   <td
-                    colSpan={5}
+                    colSpan={6}
                     className="px-5 py-12 text-center text-[13px] text-ink2"
                   >
                     {error ||
@@ -178,7 +189,7 @@ export default function ProductsPage() {
               {loading && (
                 <tr>
                   <td
-                    colSpan={5}
+                    colSpan={6}
                     className="px-5 py-12 text-center text-[13px] text-ink2"
                   >
                     Loading products...

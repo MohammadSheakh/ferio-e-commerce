@@ -3,6 +3,7 @@ import ProductCard from "@/components/ProductCard";
 import FlashSaleCard from "@/components/FlashSaleCard";
 import InteractiveHeroShowcaseV2 from "@/components/InteractiveHeroShowcaseV2";
 import ProductRequestBanner from "@/components/ProductRequestBanner";
+import FeedbackBanner from "@/components/FeedbackBanner";
 import { getCategories, getProducts } from "@/lib/catalog";
 
 export const dynamic = "force-dynamic";
@@ -68,6 +69,9 @@ export default async function HomePage() {
 
       {/* Custom Product Request Banner */}
       <ProductRequestBanner />
+
+      {/* User Suggestions, Feedback & Well Wishes Banner */}
+      <FeedbackBanner />
 
       {/* Exclusive Deals Section */}
       <section className="mx-auto max-w-6xl px-6 py-12 border-t border-line">

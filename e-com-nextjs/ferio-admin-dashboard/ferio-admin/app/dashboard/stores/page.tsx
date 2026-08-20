@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Topbar from "@/components/Topbar";
-
 import Pagination from "@/components/Pagination";
+import CopyableId from "@/components/CopyableId";
 
 interface StoreLocation {
   id: string;
@@ -207,90 +207,91 @@ export default function StoresPage() {
             Loading physical store locations...
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {stores.map((store) => (
-              <div
-                key={store.id}
-                className="bg-paper border border-line rounded-xl p-5 shadow-xs hover:border-ink/20 transition flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-start justify-between gap-2 mb-3">
-                    <div>
-                      <span className="text-[11px] font-mono font-semibold text-ink2 uppercase tracking-wider bg-surface px-2 py-0.5 rounded border border-line">
+          <div className="overflow-x-auto rounded-card border border-line bg-paper">
+            <table className="w-full min-w-[900px] text-left">
+              <thead>
+                <tr className="border-b border-line bg-surface/50 text-[11px] uppercase tracking-eyebrow text-ink2">
+                  <th className="px-4 py-3.5 font-normal w-24">Id</th>
+                  <th className="px-5 py-3.5 font-normal">Code</th>
+                  <th className="px-5 py-3.5 font-normal">Store Name</th>
+                  <th className="px-5 py-3.5 font-normal">District & Address</th>
+                  <th className="px-5 py-3.5 font-normal">Contact & Hours</th>
+                  <th className="px-5 py-3.5 font-normal">Orders</th>
+                  <th className="px-5 py-3.5 font-normal text-right">Status & Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line">
+                {stores.map((store) => (
+                  <tr key={store.id} className="text-[13px] text-ink/80 hover:bg-surface/30 transition">
+                    <td className="px-4 py-4 w-24">
+                      <CopyableId id={store.id} />
+                    </td>
+                    <td className="px-5 py-4">
+                      <span className="text-[11px] font-mono font-semibold text-ink uppercase bg-surface px-2 py-0.5 rounded border border-line">
                         {store.code}
                       </span>
-                      <h3 className="text-base font-bold text-ink mt-1.5">{store.name}</h3>
-                    </div>
-                    <span
-                      className={`text-xs px-2.5 py-1 rounded-full font-medium ${
-                        store.isStore
-                          ? store.isActive
-                            ? "bg-emerald-100 text-emerald-800"
-                            : "bg-slate-100 text-slate-600"
-                          : "bg-blue-100 text-blue-800"
-                      }`}
-                    >
-                      {store.isStore
-                        ? store.isActive
-                          ? "Active Store"
-                          : "Inactive Store"
-                        : "Central Hub"}
-                    </span>
-                  </div>
-
-                  {store.address && (
-                    <p className="text-xs text-ink2 mb-3 flex items-start gap-1.5">
-                      <span>📍</span> <span>{store.address}</span>
-                    </p>
-                  )}
-
-                  <div className="space-y-1.5 text-xs text-ink2 bg-surface/50 p-3 rounded-lg border border-line/50 mb-4">
-                    {store.phone && (
-                      <div className="flex items-center justify-between">
-                        <span>Phone:</span>
-                        <span className="font-medium text-ink">{store.phone}</span>
+                    </td>
+                    <td className="px-5 py-4">
+                      <p className="font-semibold text-ink">{store.name}</p>
+                      {store.pickupInstructions && (
+                        <p className="text-[11px] text-amber-700 mt-0.5 line-clamp-1" title={store.pickupInstructions}>
+                          💡 {store.pickupInstructions}
+                        </p>
+                      )}
+                    </td>
+                    <td className="px-5 py-4 text-ink2">
+                      <p className="font-medium text-ink text-[12px]">{store.district || "Dhaka"}</p>
+                      <p className="text-[11px] truncate max-w-xs">{store.address || "—"}</p>
+                    </td>
+                    <td className="px-5 py-4 text-ink2 text-[12px]">
+                      {store.phone && <p>📞 {store.phone}</p>}
+                      {store.operatingHours && <p className="text-[11px]">🕒 {store.operatingHours}</p>}
+                    </td>
+                    <td className="px-5 py-4 text-ink font-medium">
+                      📦 {store._count?.orders ?? 0}
+                    </td>
+                    <td className="px-5 py-4 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <span
+                          className={`text-[11px] px-2.5 py-1 rounded-full font-medium ${
+                            store.isStore
+                              ? store.isActive
+                                ? "bg-emerald-100 text-emerald-800"
+                                : "bg-slate-100 text-slate-600"
+                              : "bg-blue-100 text-blue-800"
+                          }`}
+                        >
+                          {store.isStore
+                            ? store.isActive
+                              ? "Active"
+                              : "Inactive"
+                            : "Central Hub"}
+                        </span>
+                        {store.isStore && (
+                          <button
+                            onClick={() => toggleStatus(store)}
+                            className={`px-3 py-1 rounded text-[11px] font-medium transition ${
+                              store.isActive
+                                ? "bg-rose-50 text-rose-700 hover:bg-rose-100"
+                                : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                            }`}
+                          >
+                            {store.isActive ? "Deactivate" : "Activate"}
+                          </button>
+                        )}
                       </div>
-                    )}
-                    {store.operatingHours && (
-                      <div className="flex items-center justify-between">
-                        <span>Hours:</span>
-                        <span className="font-medium text-ink">{store.operatingHours}</span>
-                      </div>
-                    )}
-                    {store.operatingDays && (
-                      <div className="flex items-center justify-between">
-                        <span>Days:</span>
-                        <span className="font-medium text-ink">{store.operatingDays}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {store.pickupInstructions && (
-                    <p className="text-[11px] text-amber-700 bg-amber-50 p-2.5 rounded-lg border border-amber-200/60 mb-4">
-                      💡 {store.pickupInstructions}
-                    </p>
-                  )}
-                </div>
-
-                <div className="flex items-center justify-between pt-3 border-t border-line/60 text-xs">
-                  <span className="text-ink2 font-medium">
-                    📦 {store._count?.orders ?? 0} Pickup Orders
-                  </span>
-                  {store.isStore && (
-                    <button
-                      onClick={() => toggleStatus(store)}
-                      className={`px-3 py-1.5 rounded text-xs font-medium transition ${
-                        store.isActive
-                          ? "bg-rose-50 text-rose-700 hover:bg-rose-100"
-                          : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                      }`}
-                    >
-                      {store.isActive ? "Deactivate" : "Activate"}
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
+                    </td>
+                  </tr>
+                ))}
+                {stores.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="px-5 py-12 text-center text-[13px] text-ink2">
+                      No store outlets found.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         )}
 

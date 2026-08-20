@@ -22,6 +22,23 @@ export type CatalogVariant = {
   availableStock: number;
 };
 
+export type CatalogFeature = {
+  id?: string;
+  title: string;
+  description: string;
+  image?: string | null;
+  tag?: string | null;
+  sortOrder?: number;
+};
+
+export type CatalogSpecification = {
+  id?: string;
+  group: string;
+  key: string;
+  value: string;
+  sortOrder?: number;
+};
+
 export type CatalogProduct = {
   id: string;
   slug: string;
@@ -45,6 +62,8 @@ export type CatalogProduct = {
   availableStock: number;
   image: string | null;
   images: string[];
+  features?: CatalogFeature[];
+  specifications?: CatalogSpecification[];
   selectedVariantName?: string;
 };
 

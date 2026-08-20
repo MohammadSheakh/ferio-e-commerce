@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import BrandCombobox from "./BrandCombobox";
+import RichTextEditor from "./RichTextEditor";
 import type {
   CatalogCategory,
   CatalogProduct,
@@ -32,6 +33,19 @@ type YoutubeReviewForm = {
   title: string;
   reviewerName: string;
   isFeatured: boolean;
+};
+
+type FeatureForm = {
+  title: string;
+  tag: string;
+  image: string;
+  description: string;
+};
+
+type SpecificationForm = {
+  group: string;
+  key: string;
+  value: string;
 };
 
 const inputClass =
@@ -95,6 +109,22 @@ export default function ProductForm({
       isFeatured: item.isFeatured ?? false,
     })) ?? []
   );
+  const [features, setFeatures] = useState<FeatureForm[]>(
+    product?.features?.map((item) => ({
+      title: item.title,
+      tag: item.tag ?? "",
+      image: item.image ?? "",
+      description: item.description,
+    })) ?? []
+  );
+  const [specifications, setSpecifications] = useState<SpecificationForm[]>(
+    product?.specifications?.map((item) => ({
+      group: item.group ?? "General",
+      key: item.key,
+      value: item.value,
+    })) ?? []
+  );
+  const [description, setDescription] = useState(product?.description ?? "");
 
   const [saving, setSaving] = useState(false);
   const [condition, setCondition] = useState<CatalogProduct["condition"]>(
@@ -140,6 +170,44 @@ export default function ProductForm({
 
   function removeYoutubeReview(index: number) {
     setYoutubeReviews((current) => current.filter((_, i) => i !== index));
+  }
+
+  function addFeature() {
+    setFeatures((current) => [
+      ...current,
+      { title: "", tag: "", image: "", description: "" },
+    ]);
+  }
+
+  function updateFeature(index: number, patch: Partial<FeatureForm>) {
+    setFeatures((current) =>
+      current.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, ...patch } : item,
+      ),
+    );
+  }
+
+  function removeFeature(index: number) {
+    setFeatures((current) => current.filter((_, i) => i !== index));
+  }
+
+  function addSpecification() {
+    setSpecifications((current) => [
+      ...current,
+      { group: "General", key: "", value: "" },
+    ]);
+  }
+
+  function updateSpecification(index: number, patch: Partial<SpecificationForm>) {
+    setSpecifications((current) =>
+      current.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, ...patch } : item,
+      ),
+    );
+  }
+
+  function removeSpecification(index: number) {
+    setSpecifications((current) => current.filter((_, i) => i !== index));
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -216,6 +284,23 @@ export default function ProductForm({
             title: item.title.trim() || undefined,
             reviewerName: item.reviewerName.trim() || undefined,
             isFeatured: item.isFeatured,
+          })),
+        features: features
+          .filter((item) => item.title.trim() && item.description.trim())
+          .map((item, index) => ({
+            title: item.title.trim(),
+            tag: item.tag.trim() || undefined,
+            image: item.image.trim() || undefined,
+            description: item.description.trim(),
+            sortOrder: index,
+          })),
+        specifications: specifications
+          .filter((item) => item.key.trim() && item.value.trim())
+          .map((item, index) => ({
+            group: item.group.trim() || "General",
+            key: item.key.trim(),
+            value: item.value.trim(),
+            sortOrder: index,
           })),
         ...(product ? {} : { status: String(form.get("status")) }),
       };
@@ -362,13 +447,12 @@ export default function ProductForm({
         </div>
 
         <div>
-          <label className="block text-[12px] text-ink2">Description</label>
-          <textarea
-            required
+          <label className="block text-[12px] text-ink2 mb-1.5 font-medium">Description</label>
+          <RichTextEditor
             name="description"
-            rows={5}
-            defaultValue={product?.description}
-            className={inputClass}
+            value={description}
+            onChange={setDescription}
+            placeholder="Write detailed product description..."
           />
         </div>
       </div>
@@ -715,26 +799,183 @@ export default function ProductForm({
         )}
       </div>
 
-      {error && (
-        <p role="alert" className="text-[13px] text-rose-700 font-medium">
-          {error}
-        </p>
-      )}
+      {/* Product Features (Optional) */}
+      <div className="space-y-4 rounded-card border border-line p-5">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-[16px] font-medium text-ink">Product Features (Optional)</h2>
+            <p className="mt-1 text-[12px] text-ink2">
+              Add custom features to highlight on the product details page.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={addFeature}
+            className="rounded-full border border-line px-3 py-1.5 text-[12px] text-ink hover:bg-neutral-50"
+          >
+            + Add Feature
+          </button>
+        </div>
 
-      <div className="flex gap-3">
-        <button
-          disabled={saving}
-          className="rounded-full bg-ink px-6 py-2.5 text-[14px] font-medium text-white disabled:opacity-50 shadow-sm"
-        >
-          {saving ? "Saving…" : product ? "Update product" : "Create product"}
-        </button>
-        <button
-          type="button"
-          onClick={() => router.back()}
-          className="rounded-full border border-line px-5 py-2.5 text-[14px] text-ink2 hover:bg-neutral-50"
-        >
-          Cancel
-        </button>
+        {features.map((item, index) => (
+          <div key={index} className="space-y-3 rounded-card border border-line/60 bg-neutral-50/50 p-4">
+            <div className="flex items-center justify-between border-b border-line/40 pb-2">
+              <p className="text-[13px] font-medium text-ink">Feature #{index + 1}</p>
+              <button
+                type="button"
+                onClick={() => removeFeature(index)}
+                className="text-[12px] text-rose-600 hover:underline"
+              >
+                Remove feature
+              </button>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="block text-[11px] text-ink2">Feature Title *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Easy to clean velour"
+                  value={item.title}
+                  onChange={(e) => updateFeature(index, { title: e.target.value })}
+                  className="mt-1 w-full rounded-card border border-line px-3.5 py-2 text-[13px] outline-none focus:border-ink bg-white"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] text-ink2">Tag / Badge (Optional)</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Velour Fabric"
+                  value={item.tag}
+                  onChange={(e) => updateFeature(index, { tag: e.target.value })}
+                  className="mt-1 w-full rounded-card border border-line px-3.5 py-2 text-[13px] outline-none focus:border-ink bg-white"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] text-ink2">Feature Image URL (Optional)</label>
+              <input
+                type="url"
+                placeholder="https://images.unsplash.com/..."
+                value={item.image}
+                onChange={(e) => updateFeature(index, { image: e.target.value })}
+                className="mt-1 w-full rounded-card border border-line px-3.5 py-2 text-[13px] outline-none focus:border-ink bg-white"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] text-ink2">Description *</label>
+              <textarea
+                required
+                rows={3}
+                placeholder="Detailed feature description..."
+                value={item.description}
+                onChange={(e) => updateFeature(index, { description: e.target.value })}
+                className="mt-1 w-full rounded-card border border-line px-3.5 py-2 text-[13px] outline-none focus:border-ink bg-white"
+              />
+            </div>
+          </div>
+        ))}
+
+        {features.length === 0 && (
+          <p className="text-[12px] text-ink2 italic">No custom features added yet for this product.</p>
+        )}
+      </div>
+
+      {/* Product Specifications */}
+      <div className="space-y-4 rounded-card border border-line p-5">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-[16px] font-medium text-ink">Product Specifications</h2>
+            <p className="mt-1 text-[12px] text-ink2">
+              Add technical specs grouped by categories (e.g. Display Features, Connectivity).
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={addSpecification}
+            className="rounded-full border border-line px-3 py-1.5 text-[12px] text-ink hover:bg-neutral-50"
+          >
+            + Add Specification
+          </button>
+        </div>
+
+        {specifications.map((item, index) => (
+          <div key={index} className="grid gap-3 sm:grid-cols-[1fr_1.5fr_2fr_auto] items-center rounded-card border border-line/60 bg-neutral-50/50 p-4">
+            <div>
+              <label className="block text-[11px] text-ink2">Group / Category</label>
+              <input
+                type="text"
+                placeholder="e.g. Display Features"
+                value={item.group}
+                onChange={(e) => updateSpecification(index, { group: e.target.value })}
+                className="mt-1 w-full rounded-card border border-line px-3 py-2 text-[13px] outline-none focus:border-ink bg-white"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] text-ink2">Key / Attribute *</label>
+              <input
+                type="text"
+                required
+                placeholder="e.g. Display Size"
+                value={item.key}
+                onChange={(e) => updateSpecification(index, { key: e.target.value })}
+                className="mt-1 w-full rounded-card border border-line px-3 py-2 text-[13px] outline-none focus:border-ink bg-white"
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] text-ink2">Value *</label>
+              <input
+                type="text"
+                required
+                placeholder="e.g. 44.5&quot;"
+                value={item.value}
+                onChange={(e) => updateSpecification(index, { value: e.target.value })}
+                className="mt-1 w-full rounded-card border border-line px-3 py-2 text-[13px] outline-none focus:border-ink bg-white"
+              />
+            </div>
+            <div className="pt-5">
+              <button
+                type="button"
+                onClick={() => removeSpecification(index)}
+                className="text-[12px] text-rose-600 hover:underline"
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        ))}
+
+        {specifications.length === 0 && (
+          <p className="text-[12px] text-ink2 italic">No specifications added yet. Click &quot;+ Add Specification&quot; above.</p>
+        )}
+      </div>
+
+      <div className="sticky bottom-4 z-20 flex items-center justify-between rounded-card border border-line bg-white/95 p-4 backdrop-blur shadow-lg">
+        <div>
+          {error && (
+            <p role="alert" className="text-[13px] text-rose-700 font-medium">
+              {error}
+            </p>
+          )}
+        </div>
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="rounded-full border border-line px-5 py-2.5 text-[14px] text-ink2 hover:bg-neutral-50"
+          >
+            Cancel
+          </button>
+          <button
+            disabled={saving}
+            className="rounded-full bg-ink px-6 py-2.5 text-[14px] font-medium text-white disabled:opacity-50 shadow-sm"
+          >
+            {saving ? "Saving…" : product ? "Update product" : "Create product"}
+          </button>
+        </div>
       </div>
     </form>
   );

@@ -13,10 +13,13 @@ const links = [
   { href: "/dashboard/warranty", label: "Warranty", icon: "🛡️" },
   { href: "/dashboard/products", label: "Products", icon: "🏷️" },
   { href: "/dashboard/requested-products", label: "Requested Products", icon: "📑" },
+  { href: "/dashboard/feedback", label: "Suggestions & Feedback", icon: "💡" },
   { href: "/dashboard/services", label: "Services", icon: "🛠️" },
   { href: "/dashboard/inventory", label: "Inventory", icon: "📋" },
   { href: "/dashboard/stores", label: "Store Outlets", icon: "🏪" },
-  { href: "/dashboard/delivery", label: "Delivery", icon: "🚚" },
+  { href: "/dashboard/delivery", label: "Delivery Zones", icon: "🚚" },
+  { href: "/dashboard/delivery-men", label: "Delivery Personnel", icon: "🚴" },
+  { href: "/dashboard/delivery-map", label: "Live Delivery Map", icon: "🗺️" },
   { href: "/dashboard/shipping", label: "Shipping", icon: "⛵" },
   { href: "/dashboard/messages", label: "Messages", icon: "💬" },
   { href: "/dashboard/chat", label: "Live Chat", icon: "⚡" },
@@ -52,7 +55,7 @@ export default function Sidebar() {
 
   return (
     <aside
-      className={`relative flex h-screen flex-col border-r border-line bg-paper transition-all duration-300 ease-in-out shrink-0 select-none ${
+      className={`sticky top-0 z-30 flex h-screen flex-col border-r border-line bg-paper transition-all duration-300 ease-in-out shrink-0 select-none ${
         isCollapsed ? "w-[68px]" : "w-56"
       }`}
     >

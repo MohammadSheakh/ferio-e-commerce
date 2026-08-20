@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import Topbar from "@/components/Topbar";
+import CopyableId from "@/components/CopyableId";
 import { formatTaka } from "@/lib/catalog";
 import type { CodPolicy, OrderFulfillmentStatus, OrderPage, OrderStatus } from "@/lib/orders";
 import { orderStatusClass } from "@/lib/orders";
@@ -168,11 +169,11 @@ export default function OrdersPage() {
         {error && <p role="alert" className="text-[13px] text-rose-700">{error}</p>}
         <div className="overflow-x-auto rounded-card border border-line">
           <table className="w-full min-w-[900px] text-left">
-            <thead><tr className="text-[11px] uppercase tracking-eyebrow text-ink2"><th className="px-5 py-3 font-normal">Order</th><th className="px-5 py-3 font-normal">Customer</th><th className="px-5 py-3 font-normal">Destination</th><th className="px-5 py-3 font-normal">Total</th><th className="px-5 py-3 font-normal">Payment</th><th className="px-5 py-3 font-normal">COD</th><th className="px-5 py-3 font-normal">Fulfillment</th><th className="px-5 py-3 font-normal">Courier</th><th className="px-5 py-3 font-normal">Status</th></tr></thead>
+            <thead><tr className="text-[11px] uppercase tracking-eyebrow text-ink2"><th className="px-4 py-3 font-normal w-24">Id</th><th className="px-5 py-3 font-normal">Customer</th><th className="px-5 py-3 font-normal">Destination</th><th className="px-5 py-3 font-normal">Total</th><th className="px-5 py-3 font-normal">Payment</th><th className="px-5 py-3 font-normal">COD</th><th className="px-5 py-3 font-normal">Fulfillment</th><th className="px-5 py-3 font-normal">Courier</th><th className="px-5 py-3 font-normal">Status</th></tr></thead>
             <tbody className="divide-y divide-line">
               {orders.items.map((order) => (
                 <tr key={order.id} className="text-[13px] text-ink/80">
-                  <td className="px-5 py-3.5"><Link href={`/dashboard/orders/${order.id}`} className="font-medium text-ink hover:underline">{order.reference}</Link><p className="mt-0.5 text-[11px] text-ink2">{new Date(order.createdAt).toLocaleString("en-BD")}</p></td>
+                  <td className="px-4 py-3.5 w-24"><CopyableId id={order.id} displayValue={order.reference} href={`/dashboard/orders/${order.id}`} /><p className="mt-0.5 text-[11px] text-ink2">{new Date(order.createdAt).toLocaleString("en-BD")}</p></td>
                   <td className="px-5 py-3.5"><Link href={`/dashboard/customers/${order.customer.id}`} className="hover:underline">{order.customer.name}</Link><p className="text-[11px] text-ink2">{order.customer.phoneNormalized}</p></td>
                   <td className="px-5 py-3.5 text-ink2">{order.address ? `${order.address.area}, ${order.address.district}` : "—"}</td>
                   <td className="px-5 py-3.5 text-ink">{formatTaka(order.total)}</td>

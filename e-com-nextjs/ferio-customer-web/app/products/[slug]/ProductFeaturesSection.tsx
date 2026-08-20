@@ -2,16 +2,13 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import type { CatalogFeature } from "@/lib/catalog";
 
-interface FeatureItem {
-  id: string;
-  title: string;
-  description: string;
-  image: string;
-  tag: string;
+interface ProductFeaturesSectionProps {
+  features?: CatalogFeature[];
 }
 
-const DEFAULT_FEATURES: FeatureItem[] = [
+const DEFAULT_FEATURES: CatalogFeature[] = [
   {
     id: "feat-1",
     title: "Easy to clean the velour",
@@ -50,17 +47,32 @@ const DEFAULT_FEATURES: FeatureItem[] = [
   },
 ];
 
-export default function ProductFeaturesSection() {
+export default function ProductFeaturesSection({
+  features,
+}: ProductFeaturesSectionProps) {
   const [activeIndex, setActiveIndex] = useState(0);
-  const currentFeature = DEFAULT_FEATURES[activeIndex];
+
+  // If features prop is explicitly passed as an array:
+  // If empty array, hide section. If undefined, fallback to DEFAULT_FEATURES.
+  const featureList =
+    features !== undefined
+      ? features
+      : DEFAULT_FEATURES;
+
+  if (!featureList || featureList.length === 0) {
+    return null;
+  }
+
+  const safeIndex = activeIndex % featureList.length;
+  const currentFeature = featureList[safeIndex];
 
   const handleNext = () => {
-    setActiveIndex((prev) => (prev + 1) % DEFAULT_FEATURES.length);
+    setActiveIndex((prev) => (prev + 1) % featureList.length);
   };
 
   const handlePrev = () => {
     setActiveIndex(
-      (prev) => (prev - 1 + DEFAULT_FEATURES.length) % DEFAULT_FEATURES.length
+      (prev) => (prev - 1 + featureList.length) % featureList.length
     );
   };
 
@@ -74,14 +86,20 @@ export default function ProductFeaturesSection() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
           
           {/* Main Feature Image */}
-          <div className="lg:col-span-5 relative aspect-[4/3] w-full overflow-hidden rounded-2xl border border-line bg-surface">
-            <Image
-              src={currentFeature.image}
-              alt={currentFeature.title}
-              fill
-              className="object-cover transition-transform duration-700 hover:scale-105"
-              sizes="(max-width: 1024px) 100vw, 40vw"
-            />
+          <div className="lg:col-span-5 relative aspect-[4/3] w-full overflow-hidden rounded-2xl border border-line bg-surface flex items-center justify-center">
+            {currentFeature.image ? (
+              <Image
+                src={currentFeature.image}
+                alt={currentFeature.title}
+                fill
+                className="object-cover transition-transform duration-700 hover:scale-105"
+                sizes="(max-width: 1024px) 100vw, 40vw"
+              />
+            ) : (
+              <div className="p-6 text-center text-ink2 text-sm font-medium">
+                {currentFeature.tag || currentFeature.title}
+              </div>
+            )}
           </div>
 
           {/* Feature Details & Controls */}
@@ -90,10 +108,10 @@ export default function ProductFeaturesSection() {
               {/* Index Indicator */}
               <div className="flex items-baseline gap-1 text-ink">
                 <span className="text-3xl font-black">
-                  {String(activeIndex + 1).padStart(2, "0")}
+                  {String(safeIndex + 1).padStart(2, "0")}
                 </span>
                 <span className="text-sm font-semibold text-ink2">
-                  /{String(DEFAULT_FEATURES.length).padStart(2, "0")}
+                  /{String(featureList.length).padStart(2, "0")}
                 </span>
               </div>
 
@@ -107,55 +125,69 @@ export default function ProductFeaturesSection() {
             </div>
 
             {/* Navigation Controls */}
-            <div className="flex items-center gap-4 pt-2">
-              <button
-                onClick={handlePrev}
-                aria-label="Previous feature"
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-line bg-white text-ink transition hover:bg-ink hover:text-white shadow-sm"
-              >
-                ←
-              </button>
-              <button
-                onClick={handleNext}
-                aria-label="Next feature"
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-line bg-white text-ink transition hover:bg-ink hover:text-white shadow-sm"
-              >
-                →
-              </button>
-              <div className="h-[2px] w-28 bg-line relative overflow-hidden rounded-full ml-2">
-                <div
-                  className="absolute inset-y-0 left-0 bg-ink transition-all duration-300"
-                  style={{
-                    width: `${((activeIndex + 1) / DEFAULT_FEATURES.length) * 100}%`,
-                  }}
-                />
+            {featureList.length > 1 && (
+              <div className="flex items-center gap-4 pt-2">
+                <button
+                  onClick={handlePrev}
+                  aria-label="Previous feature"
+                  className="flex h-10 w-10 items-center justify-center rounded-full border border-line bg-white text-ink transition hover:bg-ink hover:text-white shadow-sm"
+                >
+                  ←
+                </button>
+                <button
+                  onClick={handleNext}
+                  aria-label="Next feature"
+                  className="flex h-10 w-10 items-center justify-center rounded-full border border-line bg-white text-ink transition hover:bg-ink hover:text-white shadow-sm"
+                >
+                  →
+                </button>
+                <div className="h-[2px] w-28 bg-line relative overflow-hidden rounded-full ml-2">
+                  <div
+                    className="absolute inset-y-0 left-0 bg-ink transition-all duration-300"
+                    style={{
+                      width: `${((safeIndex + 1) / featureList.length) * 100}%`,
+                    }}
+                  />
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
-          {/* Right Secondary Feature Previews */}
-          <div className="lg:col-span-3 grid grid-cols-2 lg:grid-cols-1 gap-4">
-            {DEFAULT_FEATURES.map((feat, idx) => (
+          {/* Right Secondary Feature Previews - Scrollable container if > 4 items */}
+          <div
+            className={`lg:col-span-3 flex flex-col gap-3.5 ${
+              featureList.length > 4
+                ? "max-h-[380px] overflow-y-auto pr-1.5 scrollbar-thin scrollbar-thumb-line"
+                : ""
+            }`}
+          >
+            {featureList.map((feat, idx) => (
               <button
-                key={feat.id}
+                key={feat.id || idx}
                 onClick={() => setActiveIndex(idx)}
-                className={`group flex items-center gap-3 rounded-2xl border p-3 text-left transition ${
-                  idx === activeIndex
+                className={`group flex items-center gap-3 rounded-2xl border p-3 text-left transition shrink-0 ${
+                  idx === safeIndex
                     ? "border-ink bg-surface shadow-sm ring-1 ring-ink/10"
                     : "border-line bg-paper hover:border-ink/30"
                 }`}
               >
-                <div className="relative h-14 w-14 flex-shrink-0 overflow-hidden rounded-xl bg-surface">
-                  <Image
-                    src={feat.image}
-                    alt={feat.tag}
-                    fill
-                    className="object-cover"
-                  />
-                </div>
-                <div>
-                  <p className="text-[12px] font-semibold text-ink line-clamp-1">
-                    {feat.tag}
+                {feat.image ? (
+                  <div className="relative h-14 w-14 flex-shrink-0 overflow-hidden rounded-xl bg-surface">
+                    <Image
+                      src={feat.image}
+                      alt={feat.tag || feat.title}
+                      fill
+                      className="object-cover"
+                    />
+                  </div>
+                ) : (
+                  <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-xl bg-surface text-ink text-xs font-bold border border-line">
+                    #{idx + 1}
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="text-[12px] font-semibold text-ink truncate">
+                    {feat.tag || feat.title}
                   </p>
                   <p className="text-[10px] text-ink2 mt-0.5">Click to view</p>
                 </div>

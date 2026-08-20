@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import StatCard from "@/components/StatCard";
 import Topbar from "@/components/Topbar";
 import LivePageVisitorsCard from "@/components/LivePageVisitorsCard";
+import CopyableId from "@/components/CopyableId";
 import { formatTaka } from "@/lib/catalog";
 import type { OrderPage } from "@/lib/orders";
 import { orderStatusClass } from "@/lib/orders";
@@ -112,7 +113,7 @@ export default function DashboardPage() {
               <table className="w-full min-w-[600px] text-left">
                 <thead>
                   <tr className="text-[11px] uppercase tracking-eyebrow text-ink2">
-                    <th className="px-5 py-3 font-normal">Order</th>
+                    <th className="px-4 py-3 font-normal w-24">Id</th>
                     <th className="px-5 py-3 font-normal">Customer</th>
                     <th className="px-5 py-3 font-normal">Area</th>
                     <th className="px-5 py-3 font-normal">Total</th>
@@ -122,10 +123,12 @@ export default function DashboardPage() {
                 <tbody className="divide-y divide-line">
                   {orders.map((order) => (
                     <tr key={order.id} className="text-[13px] text-ink/80">
-                      <td className="px-5 py-3.5">
-                        <Link href={`/dashboard/orders/${order.id}`} className="text-ink hover:underline">
-                          {order.reference}
-                        </Link>
+                      <td className="px-4 py-3.5 w-24">
+                        <CopyableId
+                          id={order.id}
+                          displayValue={order.reference}
+                          href={`/dashboard/orders/${order.id}`}
+                        />
                       </td>
                       <td className="px-5 py-3.5">{order.customer.name}</td>
                       <td className="px-5 py-3.5 text-ink2">{order.address ? `${order.address.area}, ${order.address.district}` : "—"}</td>

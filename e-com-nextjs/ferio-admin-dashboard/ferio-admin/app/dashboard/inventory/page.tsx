@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import Topbar from "@/components/Topbar";
 import Pagination from "@/components/Pagination";
+import CopyableId from "@/components/CopyableId";
 import type {
   InventoryMovement,
   InventoryPage,
@@ -190,6 +191,7 @@ export default function InventoryPageView() {
           <table className="w-full min-w-[900px] text-left">
             <thead>
               <tr className="text-[11px] uppercase tracking-eyebrow text-ink2">
+                <th className="px-4 py-3 font-normal w-24">Id</th>
                 <th className="px-5 py-3 font-normal">Product / SKU</th>
                 <th className="px-5 py-3 font-normal">On hand</th>
                 <th className="px-5 py-3 font-normal">Reserved</th>
@@ -203,6 +205,7 @@ export default function InventoryPageView() {
             <tbody className="divide-y divide-line">
               {inventory.items.map((row) => (
                 <tr key={row.id} className="text-[13px] text-ink/80">
+                  <td className="px-4 py-3.5 w-24"><CopyableId id={row.id} /></td>
                   <td className="px-5 py-3.5"><p className="text-ink">{row.product.name}</p><p className="text-[11px] text-ink2">{row.sku} · {row.variantName}</p></td>
                   <td className="px-5 py-3.5">{row.onHand}</td>
                   <td className="px-5 py-3.5">{row.reserved}</td>
@@ -213,8 +216,8 @@ export default function InventoryPageView() {
                   <td className="px-5 py-3.5 text-right"><button onClick={() => void loadMovements(row)} className="text-[12px] text-ink2 underline decoration-line underline-offset-4 hover:text-ink">Review</button></td>
                 </tr>
               ))}
-              {!loading && inventory.items.length === 0 && <tr><td colSpan={8} className="px-5 py-14 text-center text-[13px] text-ink2">No inventory records match this view.</td></tr>}
-              {loading && <tr><td colSpan={8} className="px-5 py-14 text-center text-[13px] text-ink2">Loading inventory…</td></tr>}
+              {!loading && inventory.items.length === 0 && <tr><td colSpan={9} className="px-5 py-14 text-center text-[13px] text-ink2">No inventory records match this view.</td></tr>}
+              {loading && <tr><td colSpan={9} className="px-5 py-14 text-center text-[13px] text-ink2">Loading inventory…</td></tr>}
             </tbody>
           </table>
           <Pagination

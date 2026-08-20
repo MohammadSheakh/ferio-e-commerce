@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import type { CatalogCategory } from "@/lib/catalog";
+import { type CatalogCategory, getCategories } from "@/lib/catalog";
 
 export interface CategoryNode extends CatalogCategory {
   children: CategoryNode[];
@@ -35,35 +35,36 @@ function buildCategoryTree(categories: CatalogCategory[]): CategoryNode[] {
   return roots;
 }
 
-const FALLBACK_CATEGORIES: CatalogCategory[] = [
-  { id: "1", name: "Fashion & Lifestyle", slug: "fashion-lifestyle", description: null, parentId: null, sortOrder: 1, isActive: true },
-  { id: "2", name: "Baby Care", slug: "baby-care", description: null, parentId: null, sortOrder: 2, isActive: true },
-  { id: "3", name: "Personal Care", slug: "personal-care", description: null, parentId: null, sortOrder: 3, isActive: true },
-  { id: "31", name: "Women's Care", slug: "womens-care", description: null, parentId: "3", sortOrder: 1, isActive: true },
-  { id: "311", name: "Women's Soaps", slug: "womens-soaps", description: null, parentId: "31", sortOrder: 1, isActive: true },
-  { id: "312", name: "Hair Care", slug: "hair-care", description: null, parentId: "31", sortOrder: 2, isActive: true },
-  { id: "313", name: "Women's Shampoos & Conditioners", slug: "shampoos-conditioners", description: null, parentId: "31", sortOrder: 3, isActive: true },
-  { id: "314", name: "Feminine Care", slug: "feminine-care", description: null, parentId: "31", sortOrder: 4, isActive: true },
-  { id: "315", name: "Female Moisturizer", slug: "female-moisturizer", description: null, parentId: "31", sortOrder: 5, isActive: true },
-  { id: "316", name: "Face Wash & Scrub", slug: "facewash-scrub", description: null, parentId: "31", sortOrder: 6, isActive: true },
-  { id: "317", name: "Female Deo", slug: "female-deo", description: null, parentId: "31", sortOrder: 7, isActive: true },
-  { id: "318", name: "Women's Perfume", slug: "womens-perfume", description: null, parentId: "31", sortOrder: 8, isActive: true },
-  { id: "319", name: "Women's Shower Gel", slug: "womens-shower-gel", description: null, parentId: "31", sortOrder: 9, isActive: true },
-  { id: "32", name: "Men's Care", slug: "mens-care", description: null, parentId: "3", sortOrder: 2, isActive: true },
-  { id: "321", name: "Men's Shaving & Beard Care", slug: "shaving-beard", description: null, parentId: "32", sortOrder: 1, isActive: true },
-  { id: "322", name: "Men's Hair Styling", slug: "mens-hair-styling", description: null, parentId: "32", sortOrder: 2, isActive: true },
-  { id: "33", name: "Handwash", slug: "handwash", description: null, parentId: "3", sortOrder: 3, isActive: true },
-  { id: "34", name: "Tissue & Wipes", slug: "tissue-wipes", description: null, parentId: "3", sortOrder: 4, isActive: true },
-  { id: "35", name: "Oral Care", slug: "oral-care", description: null, parentId: "3", sortOrder: 5, isActive: true },
-  { id: "36", name: "Skin Care", slug: "skin-care", description: null, parentId: "3", sortOrder: 6, isActive: true },
-  { id: "4", name: "Office Equipments", slug: "office-equipments", description: null, parentId: null, sortOrder: 4, isActive: true },
-  { id: "41", name: "Barcode Scanner", slug: "barcode-scanner", description: null, parentId: "4", sortOrder: 1, isActive: true },
-  { id: "411", name: "Honeywell", slug: "honeywell", description: null, parentId: "41", sortOrder: 1, isActive: true },
-  { id: "412", name: "Netum", slug: "netum", description: null, parentId: "41", sortOrder: 2, isActive: true },
-  { id: "413", name: "Zebra", slug: "zebra", description: null, parentId: "41", sortOrder: 3, isActive: true },
-  { id: "42", name: "Cash Drawer", slug: "cash-drawer", description: null, parentId: "4", sortOrder: 2, isActive: true },
-  { id: "43", name: "Label Printer", slug: "label-printer", description: null, parentId: "4", sortOrder: 3, isActive: true },
-];
+// Fallback Categories (Commented out for reference)
+// const FALLBACK_CATEGORIES: CatalogCategory[] = [
+//   { id: "1", name: "Fashion & Lifestyle", slug: "fashion-lifestyle", description: null, parentId: null, sortOrder: 1, isActive: true },
+//   { id: "2", name: "Baby Care", slug: "baby-care", description: null, parentId: null, sortOrder: 2, isActive: true },
+//   { id: "3", name: "Personal Care", slug: "personal-care", description: null, parentId: null, sortOrder: 3, isActive: true },
+//   { id: "31", name: "Women's Care", slug: "womens-care", description: null, parentId: "3", sortOrder: 1, isActive: true },
+//   { id: "311", name: "Women's Soaps", slug: "womens-soaps", description: null, parentId: "31", sortOrder: 1, isActive: true },
+//   { id: "312", name: "Hair Care", slug: "hair-care", description: null, parentId: "31", sortOrder: 2, isActive: true },
+//   { id: "313", name: "Women's Shampoos & Conditioners", slug: "shampoos-conditioners", description: null, parentId: "31", sortOrder: 3, isActive: true },
+//   { id: "314", name: "Feminine Care", slug: "feminine-care", description: null, parentId: "31", sortOrder: 4, isActive: true },
+//   { id: "315", name: "Female Moisturizer", slug: "female-moisturizer", description: null, parentId: "31", sortOrder: 5, isActive: true },
+//   { id: "316", name: "Face Wash & Scrub", slug: "facewash-scrub", description: null, parentId: "31", sortOrder: 6, isActive: true },
+//   { id: "317", name: "Female Deo", slug: "female-deo", description: null, parentId: "31", sortOrder: 7, isActive: true },
+//   { id: "318", name: "Women's Perfume", slug: "womens-perfume", description: null, parentId: "31", sortOrder: 8, isActive: true },
+//   { id: "319", name: "Women's Shower Gel", slug: "womens-shower-gel", description: null, parentId: "31", sortOrder: 9, isActive: true },
+//   { id: "32", name: "Men's Care", slug: "mens-care", description: null, parentId: "3", sortOrder: 2, isActive: true },
+//   { id: "321", name: "Men's Shaving & Beard Care", slug: "shaving-beard", description: null, parentId: "32", sortOrder: 1, isActive: true },
+//   { id: "322", name: "Men's Hair Styling", slug: "mens-hair-styling", description: null, parentId: "32", sortOrder: 2, isActive: true },
+//   { id: "33", name: "Handwash", slug: "handwash", description: null, parentId: "3", sortOrder: 3, isActive: true },
+//   { id: "34", name: "Tissue & Wipes", slug: "tissue-wipes", description: null, parentId: "3", sortOrder: 4, isActive: true },
+//   { id: "35", name: "Oral Care", slug: "oral-care", description: null, parentId: "3", sortOrder: 5, isActive: true },
+//   { id: "36", name: "Skin Care", slug: "skin-care", description: null, parentId: "3", sortOrder: 6, isActive: true },
+//   { id: "4", name: "Office Equipments", slug: "office-equipments", description: null, parentId: null, sortOrder: 4, isActive: true },
+//   { id: "41", name: "Barcode Scanner", slug: "barcode-scanner", description: null, parentId: "4", sortOrder: 1, isActive: true },
+//   { id: "411", name: "Honeywell", slug: "honeywell", description: null, parentId: "41", sortOrder: 1, isActive: true },
+//   { id: "412", name: "Netum", slug: "netum", description: null, parentId: "41", sortOrder: 2, isActive: true },
+//   { id: "413", name: "Zebra", slug: "zebra", description: null, parentId: "41", sortOrder: 3, isActive: true },
+//   { id: "42", name: "Cash Drawer", slug: "cash-drawer", description: null, parentId: "4", sortOrder: 2, isActive: true },
+//   { id: "43", name: "Label Printer", slug: "label-printer", description: null, parentId: "4", sortOrder: 3, isActive: true },
+// ];
 
 const CATEGORY_IMAGES: Record<string, string> = {
   "womens-soaps": "https://images.unsplash.com/photo-1607006482172-132279177114?auto=format&fit=crop&w=400&q=80",
@@ -84,17 +85,28 @@ export default function CategorySideNav({
 }: {
   categories?: CatalogCategory[];
 }) {
+  const [categoriesList, setCategoriesList] = useState<CatalogCategory[]>(categories);
   const [isOpen, setIsOpen] = useState(false);
-  const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({
-    "3": true, // Personal Care open by default
-    "31": true, // Women's Care open by default
-  });
-  const [selectedNodeId, setSelectedNodeId] = useState<string>("31"); // Default: Women's Care
+  const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});
+  const [selectedNodeId, setSelectedNodeId] = useState<string>("");
+
+  useEffect(() => {
+    if (categories.length > 0) {
+      setCategoriesList(categories);
+    } else {
+      getCategories()
+        .then((cats) => {
+          if (Array.isArray(cats) && cats.length > 0) {
+            setCategoriesList(cats);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [categories]);
 
   const tree = useMemo(() => {
-    const list = categories.length > 0 ? categories : FALLBACK_CATEGORIES;
-    return buildCategoryTree(list);
-  }, [categories]);
+    return buildCategoryTree(categoriesList);
+  }, [categoriesList]);
 
   const toggleExpand = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();

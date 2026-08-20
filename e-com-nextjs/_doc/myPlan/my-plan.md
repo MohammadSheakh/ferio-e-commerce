@@ -11,6 +11,19 @@ tar question kore .. amra tar mail e shei question er reply dibo .. so amra repl
 6. ekjon jodi dhaka north ar dhk south na bujhe amra kivabe ta ke help
 korte pari
 
+7. Rider er vehicle type e .. bus and custom .. add korte hobe 
+
+8. youtube video review jodi admin upload kore .. tahole
+tar email show kora jabe na
+
+9. update product button sticky hoite hobe .. admin dashb e
+
+10. jokhon keo kono phone number dibe ... she select kore dite parbe
+tar whatsapp, telegram, viber account ase kina .. and customer 
+tar profile details edit option e giye .. facebook id er url add 
+korte parbe .. and next feature hishebe facebook id er screen shot dite
+parbe .. 
+
 =================
 1. category delete korar feature thakte hobe
 2. category er under e service booking er feature thakte hobe
