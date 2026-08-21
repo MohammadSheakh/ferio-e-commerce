@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { AdminApiError, adminApi } from "@/lib/admin-api";
+import { adminApi } from "@/lib/admin-api";
+import { adminApiErrorResponse } from "@/lib/bff-response";
 import type { CodPolicy } from "@/lib/orders";
 
 export async function GET() {
@@ -7,9 +8,7 @@ export async function GET() {
     const policy = await adminApi<CodPolicy>("/admin/orders/cod-policy");
     return NextResponse.json({ data: policy });
   } catch (error) {
-    const status = error instanceof AdminApiError ? error.status : 503;
-    const message = error instanceof Error ? error.message : "Unable to load COD policy.";
-    return NextResponse.json({ message }, { status });
+    return adminApiErrorResponse(error, "Unable to load COD policy.");
   }
 }
 
@@ -23,8 +22,6 @@ export async function PATCH(request: Request) {
     });
     return NextResponse.json({ data: policy });
   } catch (error) {
-    const status = error instanceof AdminApiError ? error.status : 503;
-    const message = error instanceof Error ? error.message : "Unable to update COD policy.";
-    return NextResponse.json({ message }, { status });
+    return adminApiErrorResponse(error, "Unable to update COD policy.");
   }
 }

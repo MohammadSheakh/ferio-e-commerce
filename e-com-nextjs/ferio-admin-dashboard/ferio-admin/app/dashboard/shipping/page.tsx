@@ -15,6 +15,11 @@ import type {
 } from "@/lib/shipping";
 import { shipmentStatusClass, webhookStatus } from "@/lib/shipping";
 
+function formatEnum(value: string) {
+  const label = value.replaceAll("_", " ").toLowerCase();
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
 export default function ShippingPage() {
   const [providers, setProviders] = useState<ShipmentProvider[]>([]);
   const [shipments, setShipments] = useState<Shipment[]>([]);
@@ -25,7 +30,9 @@ export default function ShippingPage() {
   const [pollingQueue, setPollingQueue] =
     useState<ShipmentPollingQueueHealth | null>(null);
   const [loading, setLoading] = useState(true);
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -38,15 +45,14 @@ export default function ShippingPage() {
         webhookQueueResponse,
         pollAttemptsResponse,
         pollingQueueResponse,
-      ] =
-        await Promise.all([
-          fetch("/api/shipping/providers", { cache: "no-store" }),
-          fetch("/api/shipping/shipments", { cache: "no-store" }),
-          fetch("/api/shipping/webhooks", { cache: "no-store" }),
-          fetch("/api/shipping/webhooks/queue-health", { cache: "no-store" }),
-          fetch("/api/shipping/polls", { cache: "no-store" }),
-          fetch("/api/shipping/polls/queue-health", { cache: "no-store" }),
-        ]);
+      ] = await Promise.all([
+        fetch("/api/shipping/providers", { cache: "no-store" }),
+        fetch("/api/shipping/shipments", { cache: "no-store" }),
+        fetch("/api/shipping/webhooks", { cache: "no-store" }),
+        fetch("/api/shipping/webhooks/queue-health", { cache: "no-store" }),
+        fetch("/api/shipping/polls", { cache: "no-store" }),
+        fetch("/api/shipping/polls/queue-health", { cache: "no-store" }),
+      ]);
       const providerPayload = (await providerResponse.json()) as {
         data?: ShipmentProvider[];
         message?: string;
@@ -71,38 +77,48 @@ export default function ShippingPage() {
         data?: ShipmentPollingQueueHealth;
         message?: string;
       };
-      if (!providerResponse.ok || !providerPayload.data) {
-        throw new Error(providerPayload.message || "Unable to load providers.");
+      const failures: string[] = [];
+      if (providerResponse.ok && providerPayload.data) {
+        setProviders(providerPayload.data);
+      } else {
+        failures.push(
+          providerPayload.message || "Unable to load courier providers.",
+        );
       }
-      if (!shipmentResponse.ok || !shipmentPayload.data) {
-        throw new Error(shipmentPayload.message || "Unable to load shipments.");
+      if (shipmentResponse.ok && shipmentPayload.data) {
+        setShipments(shipmentPayload.data);
+      } else {
+        failures.push(shipmentPayload.message || "Unable to load shipments.");
       }
-      if (!webhookResponse.ok || !webhookPayload.data) {
-        throw new Error(
+      if (webhookResponse.ok && webhookPayload.data) {
+        setWebhookLogs(webhookPayload.data);
+      } else {
+        failures.push(
           webhookPayload.message || "Unable to load courier callbacks.",
         );
       }
-      if (!webhookQueueResponse.ok || !webhookQueuePayload.data) {
-        throw new Error(
+      if (webhookQueueResponse.ok && webhookQueuePayload.data) {
+        setWebhookQueue(webhookQueuePayload.data);
+      } else {
+        failures.push(
           webhookQueuePayload.message || "Unable to load callback retries.",
         );
       }
-      if (!pollAttemptsResponse.ok || !pollAttemptsPayload.data) {
-        throw new Error(
+      if (pollAttemptsResponse.ok && pollAttemptsPayload.data) {
+        setPollAttempts(pollAttemptsPayload.data);
+      } else {
+        failures.push(
           pollAttemptsPayload.message || "Unable to load courier polls.",
         );
       }
-      if (!pollingQueueResponse.ok || !pollingQueuePayload.data) {
-        throw new Error(
+      if (pollingQueueResponse.ok && pollingQueuePayload.data) {
+        setPollingQueue(pollingQueuePayload.data);
+      } else {
+        failures.push(
           pollingQueuePayload.message || "Unable to load polling health.",
         );
       }
-      setProviders(providerPayload.data);
-      setShipments(shipmentPayload.data);
-      setWebhookLogs(webhookPayload.data);
-      setWebhookQueue(webhookQueuePayload.data);
-      setPollAttempts(pollAttemptsPayload.data);
-      setPollingQueue(pollingQueuePayload.data);
+      setError(failures.join(" "));
     } catch (loadError) {
       setError(
         loadError instanceof Error
@@ -119,7 +135,10 @@ export default function ShippingPage() {
   }, [load]);
 
   async function toggleProvider(provider: ShipmentProvider) {
+    const actionId = `provider-${provider.code}`;
+    setPendingAction(actionId);
     setError("");
+    setNotice("");
     try {
       const response = await fetch(`/api/shipping/providers/${provider.code}`, {
         method: "PATCH",
@@ -129,6 +148,9 @@ export default function ShippingPage() {
       const payload = (await response.json()) as { message?: string };
       if (!response.ok)
         throw new Error(payload.message || "Unable to update provider.");
+      setNotice(
+        `${provider.name} ${provider.isActive ? "disabled" : "enabled"}.`,
+      );
       await load();
     } catch (updateError) {
       setError(
@@ -136,11 +158,16 @@ export default function ShippingPage() {
           ? updateError.message
           : "Unable to update provider.",
       );
+    } finally {
+      setPendingAction(null);
     }
   }
 
   async function retryWebhook(log: CourierWebhookLog) {
+    const actionId = `webhook-${log.id}`;
+    setPendingAction(actionId);
     setError("");
+    setNotice("");
     try {
       const response = await fetch(`/api/shipping/webhooks/${log.id}/retry`, {
         method: "POST",
@@ -149,6 +176,7 @@ export default function ShippingPage() {
       if (!response.ok) {
         throw new Error(payload.message || "Unable to queue callback retry.");
       }
+      setNotice("Courier callback retry queued.");
       await load();
     } catch (retryError) {
       setError(
@@ -156,11 +184,16 @@ export default function ShippingPage() {
           ? retryError.message
           : "Unable to queue callback retry.",
       );
+    } finally {
+      setPendingAction(null);
     }
   }
 
   async function pollShipment(shipment: Shipment) {
+    const actionId = `poll-${shipment.id}`;
+    setPendingAction(actionId);
     setError("");
+    setNotice("");
     try {
       const response = await fetch(
         `/api/shipping/shipments/${shipment.id}/poll`,
@@ -170,6 +203,7 @@ export default function ShippingPage() {
       if (!response.ok) {
         throw new Error(payload.message || "Unable to queue shipment poll.");
       }
+      setNotice(`Courier poll queued for ${shipment.order?.reference}.`);
       await load();
     } catch (pollError) {
       setError(
@@ -177,6 +211,8 @@ export default function ShippingPage() {
           ? pollError.message
           : "Unable to queue shipment poll.",
       );
+    } finally {
+      setPendingAction(null);
     }
   }
 
@@ -184,9 +220,9 @@ export default function ShippingPage() {
     <>
       <Topbar
         title="Shipping"
-        subtitle={`${shipments.length} shipment records`}
+        subtitle={`${shipments.length} shipment${shipments.length === 1 ? "" : "s"}`}
       />
-      <div className="space-y-9 p-8">
+      <main className="space-y-9 p-4 sm:p-8">
         <section>
           <div className="flex items-end justify-between gap-4">
             <div>
@@ -228,21 +264,49 @@ export default function ShippingPage() {
                   </span>
                 </div>
                 <button
-                  disabled={!provider.configured}
+                  type="button"
+                  disabled={!provider.configured || pendingAction !== null}
                   onClick={() => void toggleProvider(provider)}
                   className="mt-5 rounded-full border border-line px-4 py-2 text-[12px] text-ink disabled:opacity-40"
                 >
-                  {provider.isActive ? "Disable" : "Enable"}
+                  {pendingAction === `provider-${provider.code}`
+                    ? "Saving…"
+                    : provider.isActive
+                      ? "Disable"
+                      : "Enable"}
                 </button>
               </div>
             ))}
+            {!loading && providers.length === 0 && (
+              <p className="py-8 text-[12px] text-ink2">
+                No courier providers are available.
+              </p>
+            )}
           </div>
         </section>
 
         {error && (
-          <p role="alert" className="text-[13px] text-rose-700">
-            {error}
-          </p>
+          <div
+            role="alert"
+            className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-rose-200 bg-rose-50 p-4 text-[13px] text-rose-700"
+          >
+            <span>{error}</span>
+            <button
+              type="button"
+              onClick={() => void load()}
+              className="rounded-full border border-rose-200 px-3 py-1.5 text-[12px] font-medium"
+            >
+              Retry shipping data
+            </button>
+          </div>
+        )}
+        {notice && (
+          <div
+            role="status"
+            className="rounded-card border border-emerald-200 bg-emerald-50 p-4 text-[13px] text-emerald-700"
+          >
+            {notice}
+          </div>
         )}
         <section>
           <div className="flex items-end justify-between gap-4">
@@ -257,29 +321,66 @@ export default function ShippingPage() {
             </div>
             {webhookQueue && (
               <div className="text-right text-[11px] text-ink2">
-                <p>
-                  {webhookQueue.available ? "Retry queue available" : "Retry queue unavailable"}
-                  {` · ${webhookQueue.recoverableCount} recoverable`}
+                <p className="flex items-center justify-end gap-2">
+                  <span
+                    className={`rounded-full px-2.5 py-1 ${
+                      webhookQueue.available
+                        ? "bg-emerald-50 text-emerald-700"
+                        : "bg-rose-50 text-rose-700"
+                    }`}
+                  >
+                    {webhookQueue.available
+                      ? "Retry queue available"
+                      : "Retry queue unavailable"}
+                  </span>
+                  <span>{webhookQueue.recoverableCount} recoverable</span>
                 </p>
                 <p className="mt-1">
                   {webhookQueue.scheduleEnabled
                     ? `Sweep every ${webhookQueue.scheduleEveryMinutes} minutes`
                     : "Automatic sweep disabled"}
                 </p>
+                {webhookQueue.counts && (
+                  <p className="mt-1">
+                    Waiting {webhookQueue.counts.waiting} · Active{" "}
+                    {webhookQueue.counts.active} · Failed{" "}
+                    {webhookQueue.counts.failed}
+                  </p>
+                )}
+                {webhookQueue.error && (
+                  <p className="mt-1 text-rose-700">{webhookQueue.error}</p>
+                )}
               </div>
             )}
           </div>
-          <div className="mt-5 overflow-x-auto rounded-card border border-line">
-            <table className="w-full min-w-[900px] text-left">
+          <div
+            className="mt-5 overflow-x-auto border-y border-line"
+            aria-busy={loading}
+          >
+            <table className="w-full min-w-[900px] border-collapse text-left">
               <thead>
-                <tr className="text-[11px] uppercase tracking-eyebrow text-ink2">
-                  <th className="px-5 py-3 font-normal">Received</th>
-                  <th className="px-5 py-3 font-normal">Courier</th>
-                  <th className="px-5 py-3 font-normal">Status</th>
-                  <th className="px-5 py-3 font-normal">Attempts</th>
-                  <th className="px-5 py-3 font-normal">Last attempt</th>
-                  <th className="px-5 py-3 font-normal">Evidence</th>
-                  <th className="px-5 py-3 font-normal">Action</th>
+                <tr className="border-b border-line text-[11px] uppercase tracking-eyebrow text-ink2">
+                  <th scope="col" className="px-5 py-3 font-normal">
+                    Received
+                  </th>
+                  <th scope="col" className="px-5 py-3 font-normal">
+                    Courier
+                  </th>
+                  <th scope="col" className="px-5 py-3 font-normal">
+                    Status
+                  </th>
+                  <th scope="col" className="px-5 py-3 font-normal">
+                    Attempts
+                  </th>
+                  <th scope="col" className="px-5 py-3 font-normal">
+                    Last attempt
+                  </th>
+                  <th scope="col" className="px-5 py-3 font-normal">
+                    Evidence
+                  </th>
+                  <th scope="col" className="px-5 py-3 font-normal">
+                    Action
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
@@ -288,7 +389,7 @@ export default function ShippingPage() {
                   return (
                     <tr key={log.id} className="text-[13px]">
                       <td className="px-5 py-3.5 text-ink2">
-                        {new Date(log.receivedAt).toLocaleString()}
+                        {new Date(log.receivedAt).toLocaleString("en-BD")}
                       </td>
                       <td className="px-5 py-3.5 text-ink">
                         {log.providerCode}
@@ -305,13 +406,13 @@ export default function ShippingPage() {
                       </td>
                       <td className="px-5 py-3.5 text-ink2">
                         {log.lastAttemptAt
-                          ? new Date(log.lastAttemptAt).toLocaleString()
+                          ? new Date(log.lastAttemptAt).toLocaleString("en-BD")
                           : "Not started"}
                       </td>
                       <td className="max-w-[360px] px-5 py-3.5 text-ink2">
                         {log.processingError ||
                           (log.processedAt
-                            ? `Completed ${new Date(log.processedAt).toLocaleString()}`
+                            ? `Completed ${new Date(log.processedAt).toLocaleString("en-BD")}`
                             : "Awaiting processing")}
                       </td>
                       <td className="px-5 py-3.5">
@@ -321,10 +422,14 @@ export default function ShippingPage() {
                         !log.processingStartedAt &&
                         log.attemptCount < webhookQueue.maxAttempts ? (
                           <button
+                            type="button"
                             onClick={() => void retryWebhook(log)}
+                            disabled={pendingAction !== null}
                             className="rounded-full border border-line px-3 py-1.5 text-[11px] text-ink"
                           >
-                            Queue retry
+                            {pendingAction === `webhook-${log.id}`
+                              ? "Queueing…"
+                              : "Queue retry"}
                           </button>
                         ) : (
                           <span className="text-[11px] text-ink2">—</span>
@@ -343,7 +448,7 @@ export default function ShippingPage() {
                     </td>
                   </tr>
                 )}
-                {loading && (
+                {loading && webhookLogs.length === 0 && (
                   <tr>
                     <td
                       colSpan={7}
@@ -370,31 +475,66 @@ export default function ShippingPage() {
             </div>
             {pollingQueue && (
               <div className="text-right text-[11px] text-ink2">
-                <p>
-                  {pollingQueue.available
-                    ? "Polling queue available"
-                    : "Polling queue unavailable"}
-                  {` · ${pollingQueue.eligibleCount} eligible`}
+                <p className="flex items-center justify-end gap-2">
+                  <span
+                    className={`rounded-full px-2.5 py-1 ${
+                      pollingQueue.available
+                        ? "bg-emerald-50 text-emerald-700"
+                        : "bg-rose-50 text-rose-700"
+                    }`}
+                  >
+                    {pollingQueue.available
+                      ? "Polling queue available"
+                      : "Polling queue unavailable"}
+                  </span>
+                  <span>{pollingQueue.eligibleCount} eligible</span>
                 </p>
                 <p className="mt-1">
                   {pollingQueue.scheduleEnabled
                     ? `Poll every ${pollingQueue.scheduleEveryMinutes} minutes`
                     : "Automatic polling disabled"}
                 </p>
+                {pollingQueue.counts && (
+                  <p className="mt-1">
+                    Waiting {pollingQueue.counts.waiting} · Active{" "}
+                    {pollingQueue.counts.active} · Failed{" "}
+                    {pollingQueue.counts.failed}
+                  </p>
+                )}
+                {pollingQueue.error && (
+                  <p className="mt-1 text-rose-700">{pollingQueue.error}</p>
+                )}
               </div>
             )}
           </div>
-          <div className="mt-5 overflow-x-auto rounded-card border border-line">
-            <table className="w-full min-w-[900px] text-left">
+          <div
+            className="mt-5 overflow-x-auto border-y border-line"
+            aria-busy={loading}
+          >
+            <table className="w-full min-w-[900px] border-collapse text-left">
               <thead>
-                <tr className="text-[11px] uppercase tracking-eyebrow text-ink2">
-                  <th className="px-5 py-3 font-normal">Order</th>
-                  <th className="px-5 py-3 font-normal">Customer</th>
-                  <th className="px-5 py-3 font-normal">Courier</th>
-                  <th className="px-5 py-3 font-normal">Tracking</th>
-                  <th className="px-5 py-3 font-normal">COD</th>
-                  <th className="px-5 py-3 font-normal">Status</th>
-                  <th className="px-5 py-3 font-normal">Polling</th>
+                <tr className="border-b border-line text-[11px] uppercase tracking-eyebrow text-ink2">
+                  <th scope="col" className="px-5 py-3 font-normal">
+                    Order
+                  </th>
+                  <th scope="col" className="px-5 py-3 font-normal">
+                    Customer
+                  </th>
+                  <th scope="col" className="px-5 py-3 font-normal">
+                    Courier
+                  </th>
+                  <th scope="col" className="px-5 py-3 font-normal">
+                    Tracking
+                  </th>
+                  <th scope="col" className="px-5 py-3 font-normal">
+                    COD
+                  </th>
+                  <th scope="col" className="px-5 py-3 font-normal">
+                    Status
+                  </th>
+                  <th scope="col" className="px-5 py-3 font-normal">
+                    Polling
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
@@ -412,23 +552,6 @@ export default function ShippingPage() {
                           ? `${shipment.order.address.area}, ${shipment.order.address.district}`
                           : "—"}
                       </p>
-                    </td>
-                    <td className="px-5 py-3.5">
-                      {shipment.provider.pollingConfigured &&
-                      !["DELIVERED", "RETURNED", "CANCELLED", "RTO"].includes(
-                        shipment.status,
-                      ) ? (
-                        <button
-                          onClick={() => void pollShipment(shipment)}
-                          className="rounded-full border border-line px-3 py-1.5 text-[11px] text-ink"
-                        >
-                          Poll now
-                        </button>
-                      ) : (
-                        <span className="text-[11px] text-ink2">
-                          {shipment.pollingError || "Not configured"}
-                        </span>
-                      )}
                     </td>
                     <td className="px-5 py-3.5">
                       <p className="text-ink">
@@ -451,8 +574,29 @@ export default function ShippingPage() {
                       <span
                         className={`rounded-full px-2.5 py-1 text-[11px] ${shipmentStatusClass(shipment.status)}`}
                       >
-                        {shipment.status.replaceAll("_", " ").toLowerCase()}
+                        {formatEnum(shipment.status)}
                       </span>
+                    </td>
+                    <td className="px-5 py-3.5">
+                      {shipment.provider.pollingConfigured &&
+                      !["DELIVERED", "RETURNED", "CANCELLED", "RTO"].includes(
+                        shipment.status,
+                      ) ? (
+                        <button
+                          type="button"
+                          onClick={() => void pollShipment(shipment)}
+                          disabled={pendingAction !== null}
+                          className="rounded-full border border-line px-3 py-1.5 text-[11px] text-ink disabled:opacity-40"
+                        >
+                          {pendingAction === `poll-${shipment.id}`
+                            ? "Queueing…"
+                            : "Poll now"}
+                        </button>
+                      ) : (
+                        <span className="text-[11px] text-ink2">
+                          {shipment.pollingError || "Not configured"}
+                        </span>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -466,7 +610,7 @@ export default function ShippingPage() {
                     </td>
                   </tr>
                 )}
-                {loading && (
+                {loading && shipments.length === 0 && (
                   <tr>
                     <td
                       colSpan={7}
@@ -482,25 +626,43 @@ export default function ShippingPage() {
         </section>
         <section>
           <h2 className="text-[16px] font-medium text-ink">Poll evidence</h2>
-          <div className="mt-5 overflow-x-auto rounded-card border border-line">
-            <table className="w-full min-w-[780px] text-left">
+          <div
+            className="mt-5 overflow-x-auto border-y border-line"
+            aria-busy={loading}
+          >
+            <table className="w-full min-w-[780px] border-collapse text-left">
               <thead>
-                <tr className="text-[11px] uppercase tracking-eyebrow text-ink2">
-                  <th className="px-5 py-3 font-normal">Created</th>
-                  <th className="px-5 py-3 font-normal">Order</th>
-                  <th className="px-5 py-3 font-normal">Courier</th>
-                  <th className="px-5 py-3 font-normal">Result</th>
-                  <th className="px-5 py-3 font-normal">Evidence</th>
+                <tr className="border-b border-line text-[11px] uppercase tracking-eyebrow text-ink2">
+                  <th scope="col" className="px-5 py-3 font-normal">
+                    Created
+                  </th>
+                  <th scope="col" className="px-5 py-3 font-normal">
+                    Order
+                  </th>
+                  <th scope="col" className="px-5 py-3 font-normal">
+                    Courier
+                  </th>
+                  <th scope="col" className="px-5 py-3 font-normal">
+                    Result
+                  </th>
+                  <th scope="col" className="px-5 py-3 font-normal">
+                    Evidence
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line">
                 {pollAttempts.map((attempt) => (
                   <tr key={attempt.id} className="text-[13px]">
                     <td className="px-5 py-3.5 text-ink2">
-                      {new Date(attempt.createdAt).toLocaleString()}
+                      {new Date(attempt.createdAt).toLocaleString("en-BD")}
                     </td>
                     <td className="px-5 py-3.5 text-ink">
-                      {attempt.shipment.order.reference}
+                      <Link
+                        href={`/dashboard/orders/${attempt.shipment.order.id}`}
+                        className="underline decoration-line underline-offset-4 hover:decoration-ink"
+                      >
+                        {attempt.shipment.order.reference}
+                      </Link>
                     </td>
                     <td className="px-5 py-3.5 text-ink2">
                       {attempt.shipment.provider.name}
@@ -509,12 +671,14 @@ export default function ShippingPage() {
                       <span
                         className={`rounded-full px-2.5 py-1 text-[11px] ${attempt.status === "SUCCEEDED" ? "bg-emerald-50 text-emerald-700" : attempt.status === "FAILED" ? "bg-rose-50 text-rose-700" : "bg-surface text-ink2"}`}
                       >
-                        {attempt.status.toLowerCase()}
+                        {formatEnum(attempt.status)}
                       </span>
                     </td>
                     <td className="px-5 py-3.5 text-ink2">
                       {attempt.errorMessage ||
-                        attempt.normalizedStatus?.replaceAll("_", " ").toLowerCase() ||
+                        (attempt.normalizedStatus
+                          ? formatEnum(attempt.normalizedStatus)
+                          : "") ||
                         "Awaiting provider result"}
                     </td>
                   </tr>
@@ -529,12 +693,22 @@ export default function ShippingPage() {
                     </td>
                   </tr>
                 )}
+                {loading && pollAttempts.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={5}
+                      className="px-5 py-14 text-center text-[13px] text-ink2"
+                    >
+                      Loading courier poll evidence…
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
         </section>
         <RtoQueue />
-      </div>
+      </main>
     </>
   );
 }

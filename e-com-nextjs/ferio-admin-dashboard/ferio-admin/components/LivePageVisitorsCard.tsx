@@ -6,18 +6,26 @@ import { getAdminSocket } from "@/lib/socket";
 interface LivePageStatsPayload {
   totalActive: number;
   pageCounts: Record<string, number>;
-  activeVisitors?: Array<{ page: string; role: string; name: string; userId: string }>;
+  activeVisitors?: Array<{
+    page: string;
+    role: string;
+    name: string;
+    userId: string;
+  }>;
   timestamp?: string;
 }
 
-const PAGE_CONFIG: Record<string, { label: string; icon: string; path: string; color: string; bg: string }> = {
-  "/delivery/portal": { label: "Rider Delivery Portal", icon: "🛵", path: "/delivery/portal", color: "text-emerald-700", bg: "bg-emerald-500" },
-  "/track": { label: "Track Order Page", icon: "🚚", path: "/track", color: "text-amber-700", bg: "bg-amber-500" },
-  "/cart": { label: "Cart Page", icon: "🛒", path: "/cart", color: "text-blue-700", bg: "bg-blue-500" },
-  "/checkout": { label: "Checkout Page", icon: "💳", path: "/checkout", color: "text-emerald-700", bg: "bg-emerald-500" },
-  "/products": { label: "Products & Catalog", icon: "📦", path: "/products", color: "text-purple-700", bg: "bg-purple-500" },
-  "/account": { label: "Customer Account", icon: "👤", path: "/account", color: "text-indigo-700", bg: "bg-indigo-500" },
-  "/": { label: "Homepage & Others", icon: "🏠", path: "/", color: "text-slate-700", bg: "bg-slate-500" },
+const PAGE_CONFIG: Record<string, { label: string; path: string }> = {
+  "/delivery/portal": {
+    label: "Rider delivery portal",
+    path: "/delivery/portal",
+  },
+  "/track": { label: "Order tracking", path: "/track" },
+  "/cart": { label: "Cart", path: "/cart" },
+  "/checkout": { label: "Checkout", path: "/checkout" },
+  "/products": { label: "Products", path: "/products" },
+  "/account": { label: "Customer account", path: "/account" },
+  "/": { label: "Home and other pages", path: "/" },
 };
 
 export default function LivePageVisitorsCard() {
@@ -41,7 +49,13 @@ export default function LivePageVisitorsCard() {
 
     function handleStatsUpdate(payload: LivePageStatsPayload) {
       setStats(payload);
-      setLastUpdated(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+      setLastUpdated(
+        new Date().toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        }),
+      );
     }
 
     function handleConnect() {
@@ -81,18 +95,20 @@ export default function LivePageVisitorsCard() {
   const pageCounts = stats.pageCounts || {};
 
   return (
-    <div className="rounded-card border border-line bg-white p-5 shadow-xs flex flex-col justify-between">
-      {/* Card Header */}
+    <div className="flex flex-col justify-between rounded-card border border-line bg-white p-5">
       <div>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <span className="relative flex h-3 w-3">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
-            </span>
+            <span
+              className={`h-2 w-2 rounded-full ${isConnected ? "bg-emerald-600" : "bg-amber-600"}`}
+            />
             <div>
-              <h3 className="text-[14px] font-semibold text-ink">Real-Time Page Visitors</h3>
-              <p className="text-[11px] text-ink2">Socket.IO Live Gateway · Port 6734</p>
+              <h3 className="text-[14px] font-semibold text-ink">
+                Live page visitors
+              </h3>
+              <p className="text-[11px] text-ink2">
+                Current browser sessions by page
+              </p>
             </div>
           </div>
 
@@ -104,39 +120,43 @@ export default function LivePageVisitorsCard() {
                   : "bg-amber-50 text-amber-700 border-amber-200"
               }`}
             >
-              {totalActive} Active Now
+              {totalActive} active now
             </span>
           </div>
         </div>
 
-        {/* Live Visitor Route Breakdown List */}
         <div className="mt-4 space-y-3">
           {Object.entries(PAGE_CONFIG).map(([route, cfg]) => {
             const count = pageCounts[route] || 0;
-            const percentage = totalActive > 0 ? Math.round((count / totalActive) * 100) : 0;
+            const percentage =
+              totalActive > 0 ? Math.round((count / totalActive) * 100) : 0;
 
             return (
               <div key={route} className="space-y-1">
                 <div className="flex items-center justify-between text-[12px]">
-                  <div className="flex items-center gap-2 font-medium text-ink truncate">
-                    <span className="text-[13px]">{cfg.icon}</span>
+                  <div className="flex items-center gap-2 truncate font-medium text-ink">
                     <span className="truncate">{cfg.label}</span>
-                    <span className="text-[10px] text-ink2 font-mono">({cfg.path})</span>
+                    <span className="font-mono text-[10px] text-ink2">
+                      ({cfg.path})
+                    </span>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className={`font-semibold ${count > 0 ? cfg.color : "text-ink2"}`}>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span
+                      className={
+                        count > 0 ? "font-medium text-ink" : "text-ink2"
+                      }
+                    >
                       {count} {count === 1 ? "visitor" : "visitors"}
                     </span>
-                    <span className="text-[10px] text-ink2 font-mono w-7 text-right">
+                    <span className="w-7 text-right font-mono text-[10px] text-ink2">
                       {percentage}%
                     </span>
                   </div>
                 </div>
 
-                {/* Progress bar */}
-                <div className="h-1.5 w-full rounded-full bg-surface/80 overflow-hidden">
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface">
                   <div
-                    className={`h-full ${cfg.bg} transition-all duration-500 rounded-full`}
+                    className="h-full rounded-full bg-ink transition-[width] duration-300 motion-reduce:transition-none"
                     style={{ width: `${percentage}%` }}
                   />
                 </div>
@@ -146,9 +166,8 @@ export default function LivePageVisitorsCard() {
         </div>
       </div>
 
-      {/* Footer Info */}
-      <div className="mt-5 border-t border-line/60 pt-3 flex items-center justify-between text-[10px] text-ink2">
-        <span>● Auto-synced real time</span>
+      <div className="mt-5 flex items-center justify-between border-t border-line pt-3 text-[10px] text-ink2">
+        <span>Updates automatically</span>
         <span>Last update: {lastUpdated}</span>
       </div>
     </div>

@@ -56,7 +56,7 @@ export default function Pagination({
   };
 
   return (
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4 px-2 text-[13px] border-t border-line text-ink2 select-none">
+    <div className="flex select-none flex-col items-center justify-between gap-4 border-t border-line px-2 py-4 text-[13px] text-ink2 sm:flex-row">
       {/* Entries Info & Page Size Selector */}
       <div className="flex items-center gap-3">
         <span>
@@ -66,13 +66,13 @@ export default function Pagination({
         </span>
 
         {onPageSizeChange && (
-          <div className="flex items-center gap-1.5 ml-2">
+          <div className="ml-2 flex items-center gap-1.5">
             <span className="text-[12px]">Per page:</span>
             <select
               value={pageSize}
               onChange={(e) => onPageSizeChange(Number(e.target.value))}
               disabled={isLoading}
-              className="rounded-lg border border-line bg-paper px-2 py-1 text-[12px] font-medium text-ink outline-none cursor-pointer hover:border-ink focus:border-ink"
+              className="cursor-pointer rounded-card border border-line bg-paper px-2 py-1 text-[12px] font-medium text-ink hover:border-ink focus-visible:border-ink focus-visible:outline-none"
             >
               {pageSizeOptions.map((opt) => (
                 <option key={opt} value={opt}>
@@ -91,9 +91,9 @@ export default function Pagination({
           type="button"
           disabled={currentPage <= 1 || isLoading}
           onClick={() => onPageChange(currentPage - 1)}
-          className="inline-flex items-center justify-center rounded-lg border border-line bg-paper px-3 py-1.5 font-medium text-ink transition hover:bg-surface hover:text-ink disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-paper"
+          className="inline-flex items-center justify-center rounded-full border border-line bg-paper px-3 py-1.5 font-medium text-ink transition hover:bg-surface disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-paper"
         >
-          ← Prev
+          Previous
         </button>
 
         {/* Numbered Page Buttons */}
@@ -112,11 +112,12 @@ export default function Pagination({
               <button
                 key={p}
                 type="button"
+                aria-current={isActive ? "page" : undefined}
                 disabled={isLoading}
                 onClick={() => onPageChange(p)}
-                className={`flex h-8 w-8 items-center justify-center rounded-lg font-semibold text-[12px] transition ${
+                className={`flex h-8 w-8 items-center justify-center rounded-full text-[12px] font-semibold transition ${
                   isActive
-                    ? "bg-ink text-white shadow-xs"
+                    ? "bg-ink text-white"
                     : "border border-line bg-paper text-ink2 hover:bg-surface hover:text-ink"
                 }`}
               >
@@ -131,9 +132,9 @@ export default function Pagination({
           type="button"
           disabled={currentPage >= totalPages || isLoading}
           onClick={() => onPageChange(currentPage + 1)}
-          className="inline-flex items-center justify-center rounded-lg border border-line bg-paper px-3 py-1.5 font-medium text-ink transition hover:bg-surface hover:text-ink disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-paper"
+          className="inline-flex items-center justify-center rounded-full border border-line bg-paper px-3 py-1.5 font-medium text-ink transition hover:bg-surface disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-paper"
         >
-          Next →
+          Next
         </button>
       </div>
     </div>

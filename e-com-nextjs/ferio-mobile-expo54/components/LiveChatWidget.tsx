@@ -13,9 +13,10 @@ import {
   View,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Crypto from 'expo-crypto';
 import { useAuth } from '@/state/auth';
 import { getMobileSocket } from '@/lib/socket';
-import { apiGet } from '@/lib/api';
+import { apiGet, apiGetWithToken, apiPost } from '@/lib/api';
 
 interface ChatMessage {
   id: string;
@@ -58,8 +59,8 @@ export default function LiveChatWidget() {
     async function initIdentity() {
       try {
         let savedGuestId = await AsyncStorage.getItem('ferio_chat_guest_id');
-        if (!savedGuestId) {
-          savedGuestId = `gst_${Math.floor(1000 + Math.random() * 9000)}`;
+        if (!savedGuestId || !/^gst_[0-9a-f-]{36}$/i.test(savedGuestId)) {
+          savedGuestId = `gst_${Crypto.randomUUID()}`;
           await AsyncStorage.setItem('ferio_chat_guest_id', savedGuestId);
         }
         if (isSubscribed) setGuestId(savedGuestId);
@@ -224,9 +225,11 @@ export default function LiveChatWidget() {
     const targetConvId = `conv-${activeUserId}`;
     async function loadDbHistory() {
       try {
-        const res = await apiGet<{ results?: any[] } | any[]>(
-          `/conversations/${encodeURIComponent(targetConvId)}/messages?limit=100`
-        );
+        const path = `/conversations/${encodeURIComponent(targetConvId)}/messages?limit=100`;
+        const res = accessToken
+          ? await apiGet<{ results?: any[] } | any[]>(path)
+          : await apiPost<{ token: string }>('/socket-auth/guest-ticket', { guestId })
+              .then((ticket) => apiGetWithToken<{ results?: any[] } | any[]>(path, ticket.token));
 
         const rawResults = Array.isArray(res)
           ? res
@@ -272,7 +275,7 @@ export default function LiveChatWidget() {
       }
     }
     void loadDbHistory();
-  }, [activeUserId]);
+  }, [accessToken, activeUserId, guestId]);
 
   // 5. Send Message to Admin via Socket.IO
   const handleSend = () => {

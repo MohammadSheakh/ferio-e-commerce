@@ -29,7 +29,6 @@ export default function OrderHistoryScreen() {
         const res = await apiGet<CustomerOrderSummary[]>('/customer-account/orders');
         if (Array.isArray(res)) setOrders(res);
       } catch {
-        // Fallback demo order list if endpoint not yet populated
         setOrders([]);
       } finally {
         setLoading(false);

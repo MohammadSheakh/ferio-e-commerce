@@ -230,7 +230,7 @@ export function ProductRequestBanner() {
                 </View>
               </ScrollView>
             )}
-          </div>
+          </View>
         </SafeAreaView>
       </Modal>
     </>

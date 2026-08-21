@@ -42,6 +42,8 @@ export default async function RootLayout({
             storeName={store.storeName}
             categories={categories}
             categoryTopNavEnabled={store.categoryTopNavEnabled ?? true}
+            serviceBookingEnabled={store.serviceBookingEnabled ?? true}
+            warrantyClaimsEnabled={store.warrantyClaimsEnabled ?? true}
           />
           {children}
           {store.categorySideNavEnabled && (

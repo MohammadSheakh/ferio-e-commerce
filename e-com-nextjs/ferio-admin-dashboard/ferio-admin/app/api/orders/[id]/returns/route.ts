@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { AdminApiError, adminApi } from "@/lib/admin-api";
+import { adminApi } from "@/lib/admin-api";
+import { adminApiErrorResponse } from "@/lib/bff-response";
 import type { ReturnCase } from "@/lib/returns";
 
 function failure(error: unknown, fallback: string) {
-  const status = error instanceof AdminApiError ? error.status : 503;
-  return NextResponse.json({ message: error instanceof Error ? error.message : fallback }, { status });
+  return adminApiErrorResponse(error, fallback);
 }
 
 export async function GET(_request: Request, { params }: { params: { id: string } }) {

@@ -32,6 +32,7 @@ type CheckoutForm = {
   pickupStoreId: string;
   preferredPickupDate: string;
   preferredPickupSlot: string;
+  couponCode: string;
 };
 
 export interface SavedAddressItem {
@@ -62,8 +63,11 @@ const emptyForm: CheckoutForm = {
   paymentProvider: "SSLCOMMERZ",
   deliveryMethod: "HOME_DELIVERY",
   pickupStoreId: "",
-  preferredPickupDate: new Date(Date.now() + 86400000).toISOString().split("T")[0],
+  preferredPickupDate: new Date(Date.now() + 86400000)
+    .toISOString()
+    .split("T")[0],
   preferredPickupSlot: "10:00 AM - 01:00 PM",
+  couponCode: "",
 };
 
 const storageKey = "ferio_checkout_details";
@@ -82,8 +86,13 @@ export default function CheckoutPage() {
   const router = useRouter();
   const [form, setForm] = useState<CheckoutForm>(emptyForm);
   const [deliveryOptions, setDeliveryOptions] = useState<DeliveryOption[]>([]);
-  const [paymentOptions, setPaymentOptions] = useState<PaymentOptions | null>(null);
-  const [support, setSupport] = useState<Pick<PublicStoreConfig, "supportPhone" | "supportEmail"> | null>(null);
+  const [paymentOptions, setPaymentOptions] = useState<PaymentOptions | null>(
+    null,
+  );
+  const [support, setSupport] = useState<Pick<
+    PublicStoreConfig,
+    "supportPhone" | "supportEmail"
+  > | null>(null);
   const [preview, setPreview] = useState<CheckoutPreview | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [optionsLoading, setOptionsLoading] = useState(true);
@@ -94,7 +103,9 @@ export default function CheckoutPage() {
 
   // Customer Account & Saved Addresses state
   const [savedAddresses, setSavedAddresses] = useState<SavedAddressItem[]>([]);
-  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(
+    null,
+  );
   const [saveAddressToAccount, setSaveAddressToAccount] = useState(false);
   const [userLoggedIn, setUserLoggedIn] = useState(false);
   const [publicStores, setPublicStores] = useState<any[]>([]);
@@ -108,7 +119,8 @@ export default function CheckoutPage() {
   useEffect(() => {
     try {
       const saved = window.sessionStorage.getItem(storageKey);
-      if (saved) setForm({ ...emptyForm, ...(JSON.parse(saved) as CheckoutForm) });
+      if (saved)
+        setForm({ ...emptyForm, ...(JSON.parse(saved) as CheckoutForm) });
     } catch {
       window.sessionStorage.removeItem(storageKey);
     } finally {
@@ -117,14 +129,21 @@ export default function CheckoutPage() {
   }, []);
 
   useEffect(() => {
-    if (hydrated) window.sessionStorage.setItem(storageKey, JSON.stringify(form));
+    if (hydrated)
+      window.sessionStorage.setItem(storageKey, JSON.stringify(form));
   }, [form, hydrated]);
 
   useEffect(() => {
     async function loadDeliveryOptions() {
       setOptionsLoading(true);
       try {
-        const [response, paymentResponse, storeResponse, accountResponse, publicStoresResponse] = await Promise.all([
+        const [
+          response,
+          paymentResponse,
+          storeResponse,
+          accountResponse,
+          publicStoresResponse,
+        ] = await Promise.all([
           fetch("/api/checkout/delivery-options", { cache: "no-store" }),
           fetch("/api/checkout/payment-options", { cache: "no-store" }),
           fetch("/api/store/config", { cache: "no-store" }),
@@ -139,7 +158,9 @@ export default function CheckoutPage() {
           throw new Error(payload.message || "Unable to load delivery areas.");
         }
         setDeliveryOptions(payload.data);
-        const paymentPayload = (await paymentResponse.json()) as { data?: PaymentOptions };
+        const paymentPayload = (await paymentResponse.json()) as {
+          data?: PaymentOptions;
+        };
         if (publicStoresResponse.ok) {
           const storesPayload = await publicStoresResponse.json();
           const stores = storesPayload.data || storesPayload;
@@ -152,7 +173,9 @@ export default function CheckoutPage() {
           }
         }
         setPaymentOptions(paymentPayload.data ?? null);
-        const storePayload = (await storeResponse.json()) as { data?: PublicStoreConfig };
+        const storePayload = (await storeResponse.json()) as {
+          data?: PublicStoreConfig;
+        };
         if (storePayload.data) setSupport(storePayload.data);
 
         // Account saved addresses
@@ -164,17 +187,24 @@ export default function CheckoutPage() {
 
           if (cust?.addresses && cust.addresses.length > 0) {
             setSavedAddresses(cust.addresses);
-            const defaultAddr = cust.addresses.find((a: SavedAddressItem) => a.isDefault) || cust.addresses[0];
+            const defaultAddr =
+              cust.addresses.find((a: SavedAddressItem) => a.isDefault) ||
+              cust.addresses[0];
             if (defaultAddr) {
               setSelectedAddressId(defaultAddr.id);
               setForm((prev) => ({
                 ...prev,
                 name: prev.name || defaultAddr.recipientName || acc?.name || "",
-                phone: prev.phone || defaultAddr.phoneOriginal || acc?.phoneNumber || "",
+                phone:
+                  prev.phone ||
+                  defaultAddr.phoneOriginal ||
+                  acc?.phoneNumber ||
+                  "",
                 email: prev.email || acc?.email || "",
                 district: prev.district || defaultAddr.district,
                 area: prev.area || defaultAddr.area,
-                detailedAddress: prev.detailedAddress || defaultAddr.detailedAddress,
+                detailedAddress:
+                  prev.detailedAddress || defaultAddr.detailedAddress,
                 landmark: prev.landmark || defaultAddr.landmark || "",
               }));
             }
@@ -291,7 +321,9 @@ export default function CheckoutPage() {
         message?: string;
       };
       if (!response.ok || !payload.data) {
-        throw new Error(payload.message || "Unable to calculate checkout total.");
+        throw new Error(
+          payload.message || "Unable to calculate checkout total.",
+        );
       }
       setPreview(payload.data);
 
@@ -337,7 +369,12 @@ export default function CheckoutPage() {
       const response = await fetch("/api/checkout/order", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ idempotencyKey, paymentMethod: form.paymentMethod, paymentProvider: form.paymentMethod === "PREPAID" ? form.paymentProvider : undefined }),
+        body: JSON.stringify({
+          idempotencyKey,
+          paymentMethod: form.paymentMethod,
+          paymentProvider:
+            form.paymentMethod === "PREPAID" ? form.paymentProvider : undefined,
+        }),
       });
       const payload = (await response.json()) as {
         data?: CheckoutOrderResult;
@@ -370,7 +407,7 @@ export default function CheckoutPage() {
   if (loading || lines.length === 0 || !cart.isValid) return null;
 
   const inputClass =
-    "mt-1.5 w-full rounded-card border border-line bg-white px-4 py-3 text-[14px] text-ink outline-none placeholder:text-ink2/70 focus:border-ink";
+    "mt-1.5 w-full rounded-card border border-line bg-white px-4 py-3 text-[14px] text-ink placeholder:text-ink2/70 focus:border-ink";
 
   return (
     <main className="mx-auto max-w-6xl px-6 py-14">
@@ -438,13 +475,16 @@ export default function CheckoutPage() {
               Order note
             </h2>
             <label className="mt-4 block text-[12px] text-ink2">
-              Instructions for this order <span className="text-ink2/70">(optional)</span>
+              Instructions for this order{" "}
+              <span className="text-ink2/70">(optional)</span>
               <textarea
                 rows={4}
                 maxLength={1000}
                 placeholder="Delivery timing, packaging, or other useful details"
                 value={form.customerNote}
-                onChange={(event) => updateForm("customerNote", event.target.value)}
+                onChange={(event) =>
+                  updateForm("customerNote", event.target.value)
+                }
                 className={inputClass}
               />
               <span className="mt-1 block text-right text-[11px] text-ink2/70">
@@ -453,99 +493,132 @@ export default function CheckoutPage() {
             </label>
           </section>
 
-          <section>
-            <h2 className="text-[12px] uppercase tracking-eyebrow text-ink2">
-              Fulfillment Method
-            </h2>
+          <fieldset>
+            <legend className="text-[12px] uppercase tracking-eyebrow text-ink2">
+              Fulfillment method
+            </legend>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <div
-                onClick={() => {
-                  updateForm("deliveryMethod", "HOME_DELIVERY");
-                  updateForm("paymentMethod", "COD");
-                }}
-                className={`cursor-pointer rounded-2xl border p-4 transition ${
+              <label
+                className={`cursor-pointer rounded-card border p-4 transition-colors ${
                   form.deliveryMethod === "HOME_DELIVERY"
-                    ? "border-ink bg-slate-900 text-white shadow-sm"
-                    : "border-line bg-white hover:border-slate-400 text-ink"
+                    ? "border-ink bg-surface"
+                    : "border-line bg-white hover:border-ink/40"
                 }`}
               >
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">🚚</span>
-                  <span className="font-bold text-sm">Home Delivery</span>
+                <input
+                  type="radio"
+                  name="deliveryMethod"
+                  value="HOME_DELIVERY"
+                  checked={form.deliveryMethod === "HOME_DELIVERY"}
+                  onChange={() => {
+                    updateForm("deliveryMethod", "HOME_DELIVERY");
+                    updateForm("paymentMethod", "COD");
+                  }}
+                  className="mr-3"
+                />
+                <span className="text-[13px] font-medium text-ink">
+                  Home delivery
+                </span>
+                <div className="ml-6">
+                  <p className="mt-1 text-[11px] leading-5 text-ink2">
+                    Parcel delivered directly to your home or office address.
+                  </p>
                 </div>
-                <p className="mt-1 text-[11px] opacity-80">
-                  Parcel delivered directly to your home or office address.
-                </p>
-              </div>
+              </label>
 
-              <div
-                onClick={() => {
-                  updateForm("deliveryMethod", "STORE_PICKUP");
-                  if (publicStores.length > 0 && !form.pickupStoreId) {
-                    updateForm("pickupStoreId", publicStores[0].id);
-                  }
-                }}
-                className={`cursor-pointer rounded-2xl border p-4 transition ${
+              <label
+                className={`cursor-pointer rounded-card border p-4 transition-colors ${
                   form.deliveryMethod === "STORE_PICKUP"
-                    ? "border-ink bg-slate-900 text-white shadow-sm"
-                    : "border-line bg-white hover:border-slate-400 text-ink"
+                    ? "border-ink bg-surface"
+                    : "border-line bg-white hover:border-ink/40"
                 }`}
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">🏪</span>
-                    <span className="font-bold text-sm">Pickup from Store</span>
-                  </div>
-                  <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-emerald-500 text-white">
-                    Free (৳0)
-                  </span>
+                <input
+                  type="radio"
+                  name="deliveryMethod"
+                  value="STORE_PICKUP"
+                  checked={form.deliveryMethod === "STORE_PICKUP"}
+                  onChange={() => {
+                    updateForm("deliveryMethod", "STORE_PICKUP");
+                    if (publicStores.length > 0 && !form.pickupStoreId) {
+                      updateForm("pickupStoreId", publicStores[0].id);
+                    }
+                  }}
+                  className="mr-3"
+                />
+                <span className="text-[13px] font-medium text-ink">
+                  Pickup from store
+                </span>
+                <span className="ml-2 rounded-full border border-line bg-white px-2 py-0.5 text-[10px] text-ink2">
+                  Free · ৳0
+                </span>
+                <div className="ml-6">
+                  <p className="mt-1 text-[11px] leading-5 text-ink2">
+                    Collect from a store outlet at your preferred date and time.
+                  </p>
                 </div>
-                <p className="mt-1 text-[11px] opacity-80">
-                  Collect from our physical store outlet at your preferred date & time.
-                </p>
-              </div>
+              </label>
             </div>
 
             {form.deliveryMethod === "STORE_PICKUP" && (
-              <div className="mt-4 p-5 rounded-2xl border border-amber-300 bg-amber-50/50 space-y-4">
-                <h3 className="text-xs font-bold text-ink uppercase tracking-wider">
-                  Select Physical Store Outlet
+              <div className="mt-4 space-y-4 rounded-card border border-line bg-surface p-5">
+                <h3 className="text-[12px] font-medium text-ink">
+                  Select store outlet
                 </h3>
                 {publicStores.length === 0 ? (
-                  <p className="text-xs text-ink2">Loading active store outlets...</p>
+                  <p className="text-[12px] text-ink2">
+                    Loading active store outlets…
+                  </p>
                 ) : (
                   <div className="grid gap-3">
                     {publicStores.map((store) => {
                       const isSelected = form.pickupStoreId === store.id;
                       return (
-                        <div
+                        <label
                           key={store.id}
-                          onClick={() => {
-                            updateForm("pickupStoreId", store.id);
-                            updateForm("district", store.district || "Dhaka");
-                            updateForm("area", store.area || "Store");
-                            updateForm("detailedAddress", store.address || store.name);
-                          }}
-                          className={`cursor-pointer p-3.5 rounded-xl border transition ${
+                          className={`cursor-pointer rounded-card border bg-white p-3.5 transition-colors ${
                             isSelected
-                              ? "border-ink bg-white shadow-sm ring-1 ring-ink"
-                              : "border-line bg-white/70 hover:bg-white"
+                              ? "border-ink"
+                              : "border-line hover:border-ink/40"
                           }`}
                         >
+                          <input
+                            type="radio"
+                            name="pickupStoreId"
+                            value={store.id}
+                            required
+                            checked={isSelected}
+                            onChange={() => {
+                              updateForm("pickupStoreId", store.id);
+                              updateForm("district", store.district || "Dhaka");
+                              updateForm("area", store.area || "Store");
+                              updateForm(
+                                "detailedAddress",
+                                store.address || store.name,
+                              );
+                            }}
+                            className="mr-2"
+                          />
                           <div className="flex items-center justify-between">
-                            <span className="font-bold text-xs text-ink">{store.name}</span>
-                            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-surface border border-line">
+                            <span className="text-[12px] font-medium text-ink">
+                              {store.name}
+                            </span>
+                            <span className="rounded border border-line bg-surface px-2 py-0.5 font-mono text-[10px] text-ink2">
                               {store.code}
                             </span>
                           </div>
                           {store.address && (
-                            <p className="text-[11px] text-ink2 mt-1">📍 {store.address}</p>
+                            <p className="mt-1 text-[11px] text-ink2">
+                              {store.address}
+                            </p>
                           )}
-                          <div className="flex items-center gap-4 text-[10px] text-ink2 mt-2 pt-2 border-t border-line/60">
-                            {store.operatingHours && <span>⏰ {store.operatingHours}</span>}
-                            {store.phone && <span>📞 {store.phone}</span>}
+                          <div className="mt-2 flex flex-wrap items-center gap-4 border-t border-line pt-2 text-[10px] text-ink2">
+                            {store.operatingHours && (
+                              <span>Hours: {store.operatingHours}</span>
+                            )}
+                            {store.phone && <span>Phone: {store.phone}</span>}
                           </div>
-                        </div>
+                        </label>
                       );
                     })}
                   </div>
@@ -553,109 +626,149 @@ export default function CheckoutPage() {
 
                 <div className="grid gap-3 sm:grid-cols-2 pt-2">
                   <div>
-                    <label className="block text-[11px] font-bold text-ink mb-1">
-                      Preferred Pickup Date
+                    <label className="mb-1 block text-[11px] text-ink2">
+                      Preferred pickup date
                     </label>
                     <input
                       type="date"
                       required
                       value={form.preferredPickupDate}
                       min={new Date().toISOString().split("T")[0]}
-                      onChange={(e) => updateForm("preferredPickupDate", e.target.value)}
-                      className="w-full px-3 py-2 border border-line rounded-lg text-xs bg-white text-ink"
+                      onChange={(e) =>
+                        updateForm("preferredPickupDate", e.target.value)
+                      }
+                      className="w-full rounded-card border border-line bg-white px-3 py-2 text-xs text-ink"
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-bold text-ink mb-1">
-                      Preferred Pickup Time Slot
+                    <label className="mb-1 block text-[11px] text-ink2">
+                      Preferred pickup time slot
                     </label>
                     <select
                       value={form.preferredPickupSlot}
-                      onChange={(e) => updateForm("preferredPickupSlot", e.target.value)}
-                      className="w-full px-3 py-2 border border-line rounded-lg text-xs bg-white text-ink"
+                      onChange={(e) =>
+                        updateForm("preferredPickupSlot", e.target.value)
+                      }
+                      className="w-full rounded-card border border-line bg-white px-3 py-2 text-xs text-ink"
                     >
-                      <option value="10:00 AM - 01:00 PM">10:00 AM - 01:00 PM</option>
-                      <option value="02:00 PM - 05:00 PM">02:00 PM - 05:00 PM</option>
-                      <option value="05:00 PM - 08:00 PM">05:00 PM - 08:00 PM</option>
+                      <option value="10:00 AM - 01:00 PM">
+                        10:00 AM - 01:00 PM
+                      </option>
+                      <option value="02:00 PM - 05:00 PM">
+                        02:00 PM - 05:00 PM
+                      </option>
+                      <option value="05:00 PM - 08:00 PM">
+                        05:00 PM - 08:00 PM
+                      </option>
                     </select>
                   </div>
                 </div>
               </div>
             )}
-          </section>
+          </fieldset>
 
           <section>
             <div className="flex items-center justify-between">
               <h2 className="text-[12px] uppercase tracking-eyebrow text-ink2">
-                {form.deliveryMethod === "STORE_PICKUP" ? "Contact & Verification Info" : "Delivery address"}
+                {form.deliveryMethod === "STORE_PICKUP"
+                  ? "Contact & Verification Info"
+                  : "Delivery address"}
               </h2>
-              {savedAddresses.length > 0 && form.deliveryMethod === "HOME_DELIVERY" && (
-                <Link href="/account" target="_blank" className="text-[11px] text-blue-600 hover:underline">
-                  Manage saved addresses
-                </Link>
-              )}
+              {savedAddresses.length > 0 &&
+                form.deliveryMethod === "HOME_DELIVERY" && (
+                  <Link
+                    href="/account"
+                    target="_blank"
+                    className="text-[11px] text-ink underline decoration-line underline-offset-4"
+                  >
+                    Manage saved addresses
+                  </Link>
+                )}
             </div>
 
-            {/* Saved Address Selection */}
             {savedAddresses.length > 0 && (
               <div className="mt-4 space-y-3">
-                <p className="text-[12px] font-medium text-ink">Choose from your saved addresses:</p>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {savedAddresses.map((addr) => {
-                    const isSelected = selectedAddressId === addr.id;
-                    return (
-                      <div
-                        key={addr.id}
-                        onClick={() => selectSavedAddress(addr)}
-                        className={`cursor-pointer rounded-2xl border p-4 transition text-left ${
-                          isSelected
-                            ? "border-ink bg-slate-900 text-white shadow-md"
-                            : "border-line bg-white hover:border-slate-400 text-ink"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span
-                            className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-                              isSelected ? "bg-white/20 text-white" : "bg-slate-100 text-slate-700"
-                            }`}
-                          >
-                            {addr.label || "Home"}
-                          </span>
-                          {addr.isDefault && (
-                            <span className="text-[10px] text-emerald-400 font-semibold">★ Default</span>
-                          )}
-                        </div>
-                        <p className="mt-2 text-[13px] font-bold">{addr.recipientName}</p>
-                        <p className="text-[11px] opacity-80">{addr.phoneOriginal}</p>
-                        <p className="mt-1 text-[11px] opacity-80 leading-relaxed line-clamp-2">
-                          {addr.detailedAddress}, {addr.area}, {addr.district}
-                        </p>
-                      </div>
-                    );
-                  })}
-                  
-                  <div
-                    onClick={() => {
-                      setSelectedAddressId(null);
-                      setForm((prev) => ({
-                        ...prev,
-                        district: "",
-                        area: "",
-                        detailedAddress: "",
-                        landmark: "",
-                      }));
-                      setPreview(null);
-                    }}
-                    className={`cursor-pointer rounded-2xl border border-dashed p-4 text-center flex flex-col items-center justify-center transition min-h-[110px] ${
-                      selectedAddressId === null
-                        ? "border-ink bg-slate-50 text-ink font-semibold"
-                        : "border-slate-300 hover:border-ink text-slate-500"
-                    }`}
-                  >
-                    <span className="text-sm">+ Use New Address</span>
-                    <span className="text-[11px] text-slate-400 mt-0.5">Enter a different delivery location</span>
+                <fieldset>
+                  <legend className="text-[12px] font-medium text-ink">
+                    Choose a saved address
+                  </legend>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    {savedAddresses.map((addr) => {
+                      const isSelected = selectedAddressId === addr.id;
+                      return (
+                        <label
+                          key={addr.id}
+                          className={`cursor-pointer rounded-card border p-4 text-left transition-colors ${
+                            isSelected
+                              ? "border-ink bg-surface"
+                              : "border-line bg-white hover:border-ink/40"
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="savedAddress"
+                            value={addr.id}
+                            checked={isSelected}
+                            onChange={() => selectSavedAddress(addr)}
+                            className="mr-2"
+                          />
+                          <div className="flex items-center justify-between">
+                            <span className="rounded-full border border-line bg-white px-2.5 py-0.5 text-[10px] uppercase tracking-eyebrow text-ink2">
+                              {addr.label || "Home"}
+                            </span>
+                            {addr.isDefault && (
+                              <span className="text-[10px] text-ink2">
+                                Default
+                              </span>
+                            )}
+                          </div>
+                          <p className="mt-2 text-[13px] font-medium text-ink">
+                            {addr.recipientName}
+                          </p>
+                          <p className="text-[11px] text-ink2">
+                            {addr.phoneOriginal}
+                          </p>
+                          <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-ink2">
+                            {addr.detailedAddress}, {addr.area}, {addr.district}
+                          </p>
+                        </label>
+                      );
+                    })}
+
+                    <label
+                      className={`flex min-h-[110px] cursor-pointer flex-col items-center justify-center rounded-card border border-dashed p-4 text-center transition-colors ${
+                        selectedAddressId === null
+                          ? "border-ink bg-surface text-ink"
+                          : "border-line text-ink2 hover:border-ink/40"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="savedAddress"
+                        value="new"
+                        checked={selectedAddressId === null}
+                        onChange={() => {
+                          setSelectedAddressId(null);
+                          setForm((prev) => ({
+                            ...prev,
+                            district: "",
+                            area: "",
+                            detailedAddress: "",
+                            landmark: "",
+                          }));
+                          setPreview(null);
+                        }}
+                        className="mb-2"
+                      />
+                      <span className="text-[13px] font-medium">
+                        Use a new address
+                      </span>
+                      <span className="mt-0.5 text-[11px] text-ink2">
+                        Enter a different delivery location
+                      </span>
+                    </label>
                   </div>
-                </div>
+                </fieldset>
               </div>
             )}
 
@@ -728,48 +841,87 @@ export default function CheckoutPage() {
                 />
               </label>
 
-              {/* Save Address to Account toggle if logged in and using custom address */}
               {userLoggedIn && selectedAddressId === null && (
                 <div className="sm:col-span-2 pt-1">
                   <label className="flex items-center gap-2.5 text-[12px] text-slate-700 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={saveAddressToAccount}
-                      onChange={(e) => setSaveAddressToAccount(e.target.checked)}
-                      className="rounded border-line text-ink focus:ring-ink"
+                      onChange={(e) =>
+                        setSaveAddressToAccount(e.target.checked)
+                      }
+                      className="rounded border-line text-ink"
                     />
-                    <span>Save this address to my account for future fast checkout</span>
+                    <span>
+                      Save this address to my account for future fast checkout
+                    </span>
                   </label>
                 </div>
               )}
             </div>
           </section>
 
-          <section>
-            <h2 className="text-[12px] uppercase tracking-eyebrow text-ink2">Payment method</h2>
+          <fieldset>
+            <legend className="text-[12px] uppercase tracking-eyebrow text-ink2">
+              Payment method
+            </legend>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <label className={`rounded-card border p-4 ${form.paymentMethod === "COD" ? "border-ink" : "border-line"}`}>
-                <input type="radio" name="paymentMethod" checked={form.paymentMethod === "COD"} onChange={() => updateForm("paymentMethod", "COD")} />
-                <span className="ml-3 text-[13px] font-medium text-ink">Cash on delivery</span>
-                <p className="ml-6 mt-1 text-[11px] text-ink2">Pay when your parcel arrives.</p>
+              <label
+                className={`rounded-card border p-4 ${form.paymentMethod === "COD" ? "border-ink" : "border-line"}`}
+              >
+                <input
+                  type="radio"
+                  name="paymentMethod"
+                  checked={form.paymentMethod === "COD"}
+                  onChange={() => updateForm("paymentMethod", "COD")}
+                />
+                <span className="ml-3 text-[13px] font-medium text-ink">
+                  Cash on delivery
+                </span>
+                <p className="ml-6 mt-1 text-[11px] text-ink2">
+                  Pay when your parcel arrives.
+                </p>
               </label>
-              <label className={`rounded-card border p-4 ${form.paymentMethod === "PREPAID" ? "border-ink" : "border-line"} ${!paymentOptions?.methods.prepaid ? "opacity-50" : ""}`}>
-                <input type="radio" name="paymentMethod" disabled={!paymentOptions?.methods.prepaid} checked={form.paymentMethod === "PREPAID"} onChange={() => updateForm("paymentMethod", "PREPAID")} />
-                <span className="ml-3 text-[13px] font-medium text-ink">Pay online</span>
-                <p className="ml-6 mt-1 text-[11px] text-ink2">Cards, mobile banking, or internet banking.</p>
+              <label
+                className={`rounded-card border p-4 ${form.paymentMethod === "PREPAID" ? "border-ink" : "border-line"} ${!paymentOptions?.methods.prepaid ? "opacity-50" : ""}`}
+              >
+                <input
+                  type="radio"
+                  name="paymentMethod"
+                  disabled={!paymentOptions?.methods.prepaid}
+                  checked={form.paymentMethod === "PREPAID"}
+                  onChange={() => updateForm("paymentMethod", "PREPAID")}
+                />
+                <span className="ml-3 text-[13px] font-medium text-ink">
+                  Pay online
+                </span>
+                <p className="ml-6 mt-1 text-[11px] text-ink2">
+                  Cards, mobile banking, or internet banking.
+                </p>
               </label>
             </div>
             {form.paymentMethod === "PREPAID" && (
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 {paymentOptions?.providers.map((provider) => (
-                  <label key={provider.code} className={`rounded-card border px-4 py-3 text-[13px] ${form.paymentProvider === provider.code ? "border-ink" : "border-line"} ${!provider.configured ? "opacity-50" : ""}`}>
-                    <input type="radio" name="paymentProvider" disabled={!provider.configured} checked={form.paymentProvider === provider.code} onChange={() => updateForm("paymentProvider", provider.code)} />
+                  <label
+                    key={provider.code}
+                    className={`rounded-card border px-4 py-3 text-[13px] ${form.paymentProvider === provider.code ? "border-ink" : "border-line"} ${!provider.configured ? "opacity-50" : ""}`}
+                  >
+                    <input
+                      type="radio"
+                      name="paymentProvider"
+                      disabled={!provider.configured}
+                      checked={form.paymentProvider === provider.code}
+                      onChange={() =>
+                        updateForm("paymentProvider", provider.code)
+                      }
+                    />
                     <span className="ml-3">{provider.name}</span>
                   </label>
                 ))}
               </div>
             )}
-          </section>
+          </fieldset>
 
           <section className="space-y-3 border-t border-line pt-6">
             <label className="flex items-start gap-3 text-[13px] leading-5 text-ink2">
@@ -788,10 +940,15 @@ export default function CheckoutPage() {
               <input
                 type="checkbox"
                 checked={form.purchaseActivityConsent}
-                onChange={(event) => updateForm("purchaseActivityConsent", event.target.checked)}
+                onChange={(event) =>
+                  updateForm("purchaseActivityConsent", event.target.checked)
+                }
                 className="mt-1"
               />
-              Allow this purchase to appear as anonymized recent activity after delivery. A masked name, ordered products, and optionally district or local area may be shown; contact and detailed address stay private.
+              Allow this purchase to appear as anonymized recent activity after
+              delivery. A masked name, ordered products, and optionally district
+              or local area may be shown; contact and detailed address stay
+              private.
             </label>
             <label className="flex items-start gap-3 text-[13px] leading-5 text-ink">
               <input
@@ -823,6 +980,18 @@ export default function CheckoutPage() {
               {error || cartError}
             </p>
           )}
+          <label className="block max-w-sm text-[12px] text-ink2">
+            Coupon code
+            <input
+              value={form.couponCode}
+              onChange={(event) =>
+                updateForm("couponCode", event.target.value.toUpperCase())
+              }
+              maxLength={40}
+              placeholder="Optional"
+              className="mt-1.5 w-full rounded-card border border-line px-3.5 py-2.5 text-[14px] uppercase focus:border-ink"
+            />
+          </label>
           <button
             disabled={previewing || optionsLoading || districts.length === 0}
             className="rounded-full bg-ink px-7 py-3 text-[14px] font-medium text-white disabled:opacity-40"
@@ -839,30 +1008,82 @@ export default function CheckoutPage() {
             {lines.map((line) => {
               const disabled = updatingVariant === line.variantId;
               return (
-                <div key={line.variantId} className="border-b border-line pb-3 last:border-0 last:pb-0">
+                <div
+                  key={line.variantId}
+                  className="border-b border-line pb-3 last:border-0 last:pb-0"
+                >
                   <div className="flex justify-between gap-5">
-                    <Link href={`/products/${line.slug}`} className="font-medium text-ink hover:underline">{line.productName}</Link>
-                    <span className="whitespace-nowrap">{formatTaka(line.lineTotal)}</span>
+                    <Link
+                      href={`/products/${line.slug}`}
+                      className="font-medium text-ink hover:underline"
+                    >
+                      {line.productName}
+                    </Link>
+                    <span className="whitespace-nowrap">
+                      {formatTaka(line.lineTotal)}
+                    </span>
                   </div>
-                  {line.condition === "SECOND_HAND" && <p className="mt-1 text-[11px] text-ink2">Second-hand · {line.conditionGrade?.replaceAll("_", " ").toLowerCase()}</p>}
+                  {line.condition === "SECOND_HAND" && (
+                    <p className="mt-1 text-[11px] text-ink2">
+                      Second-hand ·{" "}
+                      {line.conditionGrade?.replaceAll("_", " ").toLowerCase()}
+                    </p>
+                  )}
                   <div className="mt-2 flex flex-wrap items-center gap-2">
                     <select
                       aria-label={`Variant for ${line.productName}`}
                       disabled={disabled}
                       value={line.variantId}
-                      onChange={(event) => void updateVariant(line.variantId, event.target.value, line.quantity)}
-                      className="min-w-0 flex-1 rounded-full border border-line bg-white px-3 py-1.5 text-[11px] text-ink outline-none focus:border-ink disabled:opacity-40"
+                      onChange={(event) =>
+                        void updateVariant(
+                          line.variantId,
+                          event.target.value,
+                          line.quantity,
+                        )
+                      }
+                      className="min-w-0 flex-1 rounded-full border border-line bg-white px-3 py-1.5 text-[11px] text-ink focus:border-ink disabled:opacity-40"
                     >
                       {line.availableVariants.map((variant) => (
-                        <option key={variant.id} value={variant.id} disabled={!variant.isActive || variant.availableStock === 0}>
-                          {variant.name} · {formatTaka(variant.price)}{variant.availableStock === 0 ? " · sold out" : ""}
+                        <option
+                          key={variant.id}
+                          value={variant.id}
+                          disabled={
+                            !variant.isActive || variant.availableStock === 0
+                          }
+                        >
+                          {variant.name} · {formatTaka(variant.price)}
+                          {variant.availableStock === 0 ? " · sold out" : ""}
                         </option>
                       ))}
                     </select>
                     <div className="flex items-center rounded-full border border-line">
-                      <button type="button" disabled={disabled || line.quantity <= 1} onClick={() => void updateQuantity(line.variantId, line.quantity - 1)} className="px-2.5 py-1 text-ink2 disabled:opacity-30" aria-label="Decrease quantity">−</button>
-                      <span className="w-5 text-center text-[11px]">{line.quantity}</span>
-                      <button type="button" disabled={disabled || line.quantity >= line.availableStock} onClick={() => void updateQuantity(line.variantId, line.quantity + 1)} className="px-2.5 py-1 text-ink2 disabled:opacity-30" aria-label="Increase quantity">+</button>
+                      <button
+                        type="button"
+                        disabled={disabled || line.quantity <= 1}
+                        onClick={() =>
+                          void updateQuantity(line.variantId, line.quantity - 1)
+                        }
+                        className="px-2.5 py-1 text-ink2 disabled:opacity-30"
+                        aria-label="Decrease quantity"
+                      >
+                        −
+                      </button>
+                      <span className="w-5 text-center text-[11px]">
+                        {line.quantity}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={
+                          disabled || line.quantity >= line.availableStock
+                        }
+                        onClick={() =>
+                          void updateQuantity(line.variantId, line.quantity + 1)
+                        }
+                        className="px-2.5 py-1 text-ink2 disabled:opacity-30"
+                        aria-label="Increase quantity"
+                      >
+                        +
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -884,11 +1105,28 @@ export default function CheckoutPage() {
                   : "Calculated by district"}
               </span>
             </div>
+            {preview && preview.pricing.discountTotal > 0 && (
+              <div className="flex justify-between text-emerald-700">
+                <span>
+                  Coupon
+                  {preview.pricing.couponCode
+                    ? ` · ${preview.pricing.couponCode}`
+                    : ""}
+                </span>
+                <span>−{formatTaka(preview.pricing.discountTotal)}</span>
+              </div>
+            )}
             {preview && (
               <>
                 <div className="flex justify-between text-ink2">
                   <span>Payment</span>
-                  <span>{preview.paymentMethod === "COD" ? "Cash on delivery" : preview.paymentProvider === "AAMARPAY" ? "aamarPay" : "SSLCommerz"}</span>
+                  <span>
+                    {preview.paymentMethod === "COD"
+                      ? "Cash on delivery"
+                      : preview.paymentProvider === "AAMARPAY"
+                        ? "aamarPay"
+                        : "SSLCommerz"}
+                  </span>
                 </div>
                 <div className="flex justify-between border-t border-line pt-4 text-[17px] font-semibold text-ink">
                   <span>Final total</span>
@@ -899,7 +1137,9 @@ export default function CheckoutPage() {
           </div>
           {preview ? (
             <div className="mt-6 rounded-card bg-surface p-4">
-              <p className="text-[13px] font-medium text-ink">Total confirmed</p>
+              <p className="text-[13px] font-medium text-ink">
+                Total confirmed
+              </p>
               <p className="mt-1 text-[12px] leading-5 text-ink2">
                 This checkout draft is saved for recovery. Placing the order is
                 idempotent, so a safe retry cannot create a duplicate order.
@@ -917,13 +1157,31 @@ export default function CheckoutPage() {
             onClick={() => void placeOrder()}
             className="mt-6 w-full rounded-full bg-ink px-6 py-3 text-[14px] font-medium text-white disabled:bg-ink/20"
           >
-            {placing ? "Preparing payment safely…" : form.paymentMethod === "PREPAID" ? "Continue to secure payment" : "Place cash-on-delivery order"}
+            {placing
+              ? "Preparing payment safely…"
+              : form.paymentMethod === "PREPAID"
+                ? "Continue to secure payment"
+                : "Place cash-on-delivery order"}
           </button>
           {(support?.supportPhone || support?.supportEmail) && (
             <div className="mt-5 border-t border-line pt-5 text-[12px] leading-5 text-ink2">
               <p className="font-medium text-ink">Need help before ordering?</p>
-              {support.supportPhone && <a href={`tel:${support.supportPhone}`} className="mr-3 underline decoration-line underline-offset-4">{support.supportPhone}</a>}
-              {support.supportEmail && <a href={`mailto:${support.supportEmail}`} className="underline decoration-line underline-offset-4">{support.supportEmail}</a>}
+              {support.supportPhone && (
+                <a
+                  href={`tel:${support.supportPhone}`}
+                  className="mr-3 underline decoration-line underline-offset-4"
+                >
+                  {support.supportPhone}
+                </a>
+              )}
+              {support.supportEmail && (
+                <a
+                  href={`mailto:${support.supportEmail}`}
+                  className="underline decoration-line underline-offset-4"
+                >
+                  {support.supportEmail}
+                </a>
+              )}
             </div>
           )}
         </aside>

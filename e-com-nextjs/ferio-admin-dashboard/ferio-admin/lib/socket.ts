@@ -12,16 +12,11 @@ export function getAdminSocket(token?: string): Socket {
       autoConnect: false,
       auth: {
         token: token || "",
-        role: "admin",
-      },
-      query: {
-        role: "admin",
       },
     });
   } else {
     socket.auth = {
       ...(typeof socket.auth === "object" ? socket.auth : {}),
-      role: "admin",
       ...(token ? { token } : {}),
     };
   }

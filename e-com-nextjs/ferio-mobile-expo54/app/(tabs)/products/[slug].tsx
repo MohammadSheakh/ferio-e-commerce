@@ -49,13 +49,8 @@ export default function ProductDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const [reviews, setReviews] = useState<ProductReview[]>([
-    { id: 'r1', author: 'Tanvir A.', rating: 5, date: '2 days ago', comment: 'Exceptional build quality and smooth delivery in Dhaka!', verified: true },
-    { id: 'r2', author: 'Nusrat J.', rating: 4, date: '1 week ago', comment: 'Matches our interior theme perfectly. Minimalist and elegant.', verified: true },
-  ]);
-  const [questions, setQuestions] = useState<ProductQA[]>([
-    { id: 'q1', question: 'Is assembly service available in Chittagong?', askedBy: 'Sajid M.', date: '3 days ago', answer: 'Yes, our delivery team offers free on-site assembly upon arrival.' },
-  ]);
+  const [reviews, setReviews] = useState<ProductReview[]>([]);
+  const [questions, setQuestions] = useState<ProductQA[]>([]);
 
   // Review Modal state
   const [reviewModal, setReviewModal] = useState(false);
@@ -147,13 +142,13 @@ export default function ProductDetailScreen() {
         rating: reviewRating,
         comment: reviewComment.trim(),
       });
-    } catch {
-      // Local fallback
-    } finally {
       setReviews((prev) => [newRev, ...prev]);
       setReviewAuthor('');
       setReviewComment('');
       setReviewModal(false);
+    } catch {
+      // Keep the form open; never present an unpersisted review as submitted.
+    } finally {
       setSubmittingReview(false);
     }
   }
@@ -197,13 +192,13 @@ export default function ProductDetailScreen() {
         askedBy: qaName.trim(),
         question: qaQuestion.trim(),
       });
-    } catch {
-      // Local fallback
-    } finally {
       setQuestions((prev) => [newQ, ...prev]);
       setQaName('');
       setQaQuestion('');
       setQaModal(false);
+    } catch {
+      // Keep the form open; never present an unpersisted question as submitted.
+    } finally {
       setSubmittingQa(false);
     }
   }

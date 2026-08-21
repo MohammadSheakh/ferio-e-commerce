@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { AdminApiError, adminApi } from "@/lib/admin-api";
+import { adminApi } from "@/lib/admin-api";
+import { adminApiErrorResponse } from "@/lib/bff-response";
 import type { CommerceRefund } from "@/lib/returns";
 
 export async function POST(
@@ -21,15 +22,6 @@ export async function POST(
     );
     return NextResponse.json({ data: result });
   } catch (error) {
-    const status = error instanceof AdminApiError ? error.status : 503;
-    return NextResponse.json(
-      {
-        message:
-          error instanceof Error
-            ? error.message
-            : "Unable to record refund result.",
-      },
-      { status },
-    );
+    return adminApiErrorResponse(error, "Unable to record refund result.");
   }
 }

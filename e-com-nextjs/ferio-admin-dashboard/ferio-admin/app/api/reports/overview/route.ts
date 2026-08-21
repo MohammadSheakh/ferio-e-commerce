@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { AdminApiError, adminApi } from "@/lib/admin-api";
+import { adminApi } from "@/lib/admin-api";
+import { adminApiErrorResponse } from "@/lib/bff-response";
 import type { ReportsOverview } from "@/lib/reports";
 
 export async function GET(request: Request) {
@@ -10,9 +11,6 @@ export async function GET(request: Request) {
     );
     return NextResponse.json({ data: report });
   } catch (error) {
-    const status = error instanceof AdminApiError ? error.status : 503;
-    const message =
-      error instanceof Error ? error.message : "Unable to load reports.";
-    return NextResponse.json({ message }, { status });
+    return adminApiErrorResponse(error, "Unable to load reports.");
   }
 }

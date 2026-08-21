@@ -28,7 +28,9 @@ export interface CustomerAddress {
 export default function AccountPage() {
   const [account, setAccount] = useState<UserAccount | null>(null);
   const [addresses, setAddresses] = useState<CustomerAddress[]>([]);
-  const [districts, setDistricts] = useState<{ id: string; name: string; zoneName?: string }[]>([]);
+  const [districts, setDistricts] = useState<
+    { id: string; name: string; zoneName?: string }[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [unauthorized, setUnauthorized] = useState(false);
 
@@ -36,7 +38,10 @@ export default function AccountPage() {
   const [phoneInput, setPhoneInput] = useState("");
   const [avatarInput, setAvatarInput] = useState("");
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
+  const [message, setMessage] = useState<{
+    text: string;
+    type: "success" | "error";
+  } | null>(null);
 
   // Address Modal / Form state
   const [showAddressForm, setShowAddressForm] = useState(false);
@@ -52,7 +57,10 @@ export default function AccountPage() {
     isDefault: false,
   });
   const [savingAddress, setSavingAddress] = useState(false);
-  const [addressMessage, setAddressMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
+  const [addressMessage, setAddressMessage] = useState<{
+    text: string;
+    type: "success" | "error";
+  } | null>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -67,7 +75,10 @@ export default function AccountPage() {
           if (Array.isArray(distData.data)) {
             const list = distData.data
               .flatMap((zone: any) =>
-                (zone.districts || []).map((d: any) => ({ ...d, zoneName: zone.name })),
+                (zone.districts || []).map((d: any) => ({
+                  ...d,
+                  zoneName: zone.name,
+                })),
               )
               .sort((a: any, b: any) => a.name.localeCompare(b.name));
             setDistricts(list);
@@ -124,11 +135,23 @@ export default function AccountPage() {
           setPhoneInput(updatedAcc.phoneNumber || "");
           setAvatarInput(updatedAcc.profileImageUrl || "");
         } else {
-          setAccount((prev) => prev ? { ...prev, name: nameInput, phoneNumber: phoneInput, profileImageUrl: avatarInput } : null);
+          setAccount((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  name: nameInput,
+                  phoneNumber: phoneInput,
+                  profileImageUrl: avatarInput,
+                }
+              : null,
+          );
         }
         setMessage({ text: "Profile updated successfully!", type: "success" });
       } else {
-        setMessage({ text: data.message || "Failed to update profile", type: "error" });
+        setMessage({
+          text: data.message || "Failed to update profile",
+          type: "error",
+        });
       }
     } catch {
       setMessage({ text: "Network error saving profile.", type: "error" });
@@ -176,7 +199,9 @@ export default function AccountPage() {
 
     try {
       const isEdit = Boolean(editingAddressId);
-      const url = isEdit ? `/api/account/addresses/${editingAddressId}` : "/api/account/addresses";
+      const url = isEdit
+        ? `/api/account/addresses/${editingAddressId}`
+        : "/api/account/addresses";
       const method = isEdit ? "PUT" : "POST";
 
       const res = await fetch(url, {
@@ -193,10 +218,16 @@ export default function AccountPage() {
         }
         setShowAddressForm(false);
       } else {
-        setAddressMessage({ text: payload.message || "Failed to save address", type: "error" });
+        setAddressMessage({
+          text: payload.message || "Failed to save address",
+          type: "error",
+        });
       }
     } catch {
-      setAddressMessage({ text: "Network error saving address.", type: "error" });
+      setAddressMessage({
+        text: "Network error saving address.",
+        type: "error",
+      });
     } finally {
       setSavingAddress(false);
     }
@@ -205,7 +236,9 @@ export default function AccountPage() {
   const handleDeleteAddress = async (addressId: string) => {
     if (!confirm("Are you sure you want to delete this address?")) return;
     try {
-      const res = await fetch(`/api/account/addresses/${addressId}`, { method: "DELETE" });
+      const res = await fetch(`/api/account/addresses/${addressId}`, {
+        method: "DELETE",
+      });
       const payload = await res.json();
       if (res.ok) {
         const cust = payload.data?.customer || payload.customer;
@@ -237,13 +270,6 @@ export default function AccountPage() {
     }
   };
 
-  const sampleAvatars = [
-    "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=240&q=80",
-    "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=240&q=80",
-    "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=240&q=80",
-    "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=240&q=80",
-  ];
-
   if (loading) {
     return (
       <main className="mx-auto max-w-4xl px-6 py-20 text-[13px] text-ink2">
@@ -255,10 +281,15 @@ export default function AccountPage() {
   if (unauthorized || !account) {
     return (
       <main className="mx-auto max-w-xl px-6 py-20">
-        <p className="text-[11px] uppercase tracking-eyebrow text-ink2">Customer Account</p>
-        <h1 className="mt-2 text-[28px] font-semibold tracking-tight text-ink">My Account</h1>
+        <p className="text-[11px] uppercase tracking-eyebrow text-ink2">
+          Customer Account
+        </p>
+        <h1 className="mt-2 text-[28px] font-semibold tracking-tight text-ink">
+          My Account
+        </h1>
         <p className="mt-3 text-[13px] leading-6 text-ink2">
-          Please sign in to view and update your personal account details, shipping preferences, and order history.
+          Please sign in to view and update your personal account details,
+          shipping preferences, and order history.
         </p>
         <Link
           href="/account/login?next=/account"
@@ -271,200 +302,191 @@ export default function AccountPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50/50 py-12 font-sans">
+    <main className="min-h-screen bg-paper py-12">
       <div className="mx-auto max-w-4xl px-4 sm:px-6">
-        {/* Breadcrumb */}
-        <nav className="mb-6 flex text-xs text-slate-500">
-          <Link href="/" className="hover:text-ink">Home</Link>
+        <nav aria-label="Breadcrumb" className="mb-6 flex text-xs text-ink2">
+          <Link href="/" className="hover:text-ink">
+            Home
+          </Link>
           <span className="mx-2">/</span>
-          <span className="font-medium text-ink">My Account</span>
+          <span className="font-medium text-ink">My account</span>
         </nav>
 
-        {/* Profile Card Header */}
-        <div className="overflow-hidden rounded-3xl border border-line bg-white shadow-sm mb-8">
-          <div className="bg-gradient-to-r from-slate-900 via-zinc-900 to-stone-900 p-8 text-white">
-            <div className="flex flex-col sm:flex-row items-center gap-6">
-              <div className="relative group">
-                {account.profileImageUrl ? (
-                  <img
-                    src={account.profileImageUrl}
-                    alt={account.name}
-                    className="h-24 w-24 rounded-full object-cover border-4 border-white/20 shadow-xl"
-                  />
-                ) : (
-                  <div className="flex h-24 w-24 items-center justify-center rounded-full bg-blue-600 text-white font-bold text-2xl border-4 border-white/20 shadow-xl">
-                    {account.name.slice(0, 2).toUpperCase()}
-                  </div>
+        <section className="mb-10 border-y border-line py-7">
+          <div className="flex flex-col items-start gap-6 sm:flex-row sm:items-center">
+            <div>
+              {account.profileImageUrl ? (
+                <img
+                  src={account.profileImageUrl}
+                  alt={account.name}
+                  className="h-20 w-20 rounded-full border border-line object-cover"
+                />
+              ) : (
+                <div className="flex h-20 w-20 items-center justify-center rounded-full border border-line bg-surface text-xl font-semibold text-ink">
+                  {account.name.slice(0, 2).toUpperCase()}
+                </div>
+              )}
+            </div>
+
+            <div className="flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-[26px] font-semibold tracking-tight text-ink">
+                  {account.name}
+                </h1>
+                {account.isEmailVerified && (
+                  <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700">
+                    Email verified
+                  </span>
                 )}
-                <span className="absolute bottom-1 right-1 h-5 w-5 rounded-full border-2 border-slate-900 bg-emerald-500" title="Active" />
               </div>
+              <p className="mt-1 text-[13px] text-ink2">{account.email}</p>
+              <p className="mt-1 text-[12px] text-ink2">
+                Manage your profile, orders, warranty claims, and delivery
+                addresses.
+              </p>
+            </div>
 
-              <div className="text-center sm:text-left flex-1">
-                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-                  <h1 className="text-2xl font-bold tracking-tight">{account.name}</h1>
-                  {account.isEmailVerified && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-2.5 py-0.5 text-xs font-medium text-emerald-300 border border-emerald-500/30">
-                      ✓ Verified Account
-                    </span>
-                  )}
-                </div>
-                <p className="mt-1 text-sm text-slate-300">{account.email}</p>
-                <p className="mt-0.5 text-xs text-slate-400">
-                  Google Auth linked profile · Member of Ferio Platform
-                </p>
-              </div>
-
-              <div className="flex sm:flex-col gap-2 items-center">
-                <Link
-                  href="/account/orders"
-                  className="w-full rounded-full bg-white/10 px-4 py-2 text-xs font-medium text-white backdrop-blur hover:bg-white/20 transition text-center"
-                >
-                  My Orders
-                </Link>
-                <Link
-                  href="/account/warranty"
-                  className="w-full rounded-full bg-white/10 px-4 py-2 text-xs font-medium text-white backdrop-blur hover:bg-white/20 transition text-center"
-                >
-                  Warranty Claims
-                </Link>
-                <div className="pt-1 text-xs text-white/80">
-                  <CustomerLogoutButton />
-                </div>
+            <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+              <Link
+                href="/account/orders"
+                className="rounded-full border border-line px-4 py-2 text-center text-xs font-medium text-ink hover:border-ink"
+              >
+                My orders
+              </Link>
+              <Link
+                href="/account/warranty"
+                className="rounded-full border border-line px-4 py-2 text-center text-xs font-medium text-ink hover:border-ink"
+              >
+                Warranty claims
+              </Link>
+              <div className="text-xs text-ink2">
+                <CustomerLogoutButton />
               </div>
             </div>
           </div>
+        </section>
 
-          {/* Form Content */}
-          <div className="p-8">
-            <h2 className="text-lg font-semibold text-ink mb-6">Edit Profile & Account Picture</h2>
+        <section className="border-b border-line pb-10">
+          <h2 className="mb-6 text-[18px] font-medium text-ink">
+            Profile details
+          </h2>
 
-            {message && (
-              <div
-                className={`mb-6 rounded-2xl p-4 text-xs font-medium ${
-                  message.type === "success"
-                    ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
-                    : "bg-rose-50 text-rose-800 border border-rose-200"
-                }`}
-              >
-                {message.text}
-              </div>
-            )}
+          {message && (
+            <div
+              role={message.type === "error" ? "alert" : "status"}
+              className={`mb-6 rounded-card border p-4 text-xs ${
+                message.type === "success"
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                  : "border-rose-200 bg-rose-50 text-rose-800"
+              }`}
+            >
+              {message.text}
+            </div>
+          )}
 
-            <form onSubmit={handleSaveProfile} className="space-y-6">
-              {/* Picture Selection / Preview */}
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
-                  Profile Picture Avatar
-                </label>
-                
-                <div className="flex flex-wrap items-center gap-4 mb-3">
-                  {sampleAvatars.map((url, idx) => (
-                    <button
-                      type="button"
-                      key={idx}
-                      onClick={() => setAvatarInput(url)}
-                      className={`relative rounded-full p-0.5 transition ${
-                        avatarInput === url ? "ring-2 ring-blue-600 scale-105" : "opacity-70 hover:opacity-100"
-                      }`}
-                    >
-                      <img src={url} alt={`Avatar option ${idx + 1}`} className="h-12 w-12 rounded-full object-cover" />
-                    </button>
-                  ))}
-                </div>
-
-                <input
-                  type="url"
-                  value={avatarInput}
-                  onChange={(e) => setAvatarInput(e.target.value)}
-                  placeholder="Or paste image URL (e.g. Google photo URL or custom image link)"
-                  className="w-full rounded-2xl border border-line bg-slate-50/50 px-4 py-3 text-xs outline-none focus:border-ink focus:bg-white transition"
-                />
-              </div>
-
-              {/* Full Name */}
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
-                  Full Name
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={nameInput}
-                  onChange={(e) => setNameInput(e.target.value)}
-                  className="w-full rounded-2xl border border-line bg-slate-50/50 px-4 py-3 text-xs outline-none focus:border-ink focus:bg-white transition"
-                />
-              </div>
-
-              {/* Email Address (Read Only) */}
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
-                  Email Address (Primary Account)
-                </label>
-                <input
-                  type="email"
-                  disabled
-                  value={account.email}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 text-xs text-slate-500 cursor-not-allowed"
-                />
-                <p className="mt-1 text-[11px] text-slate-400">
-                  Email address is linked to your account login and cannot be changed here.
-                </p>
-              </div>
-
-              {/* Phone Number */}
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">
-                  Phone Number
-                </label>
-                <input
-                  type="tel"
-                  value={phoneInput}
-                  onChange={(e) => setPhoneInput(e.target.value)}
-                  placeholder="+880 1XXXXXXXXX"
-                  className="w-full rounded-2xl border border-line bg-slate-50/50 px-4 py-3 text-xs outline-none focus:border-ink focus:bg-white transition"
-                />
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-line">
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="rounded-full bg-ink px-7 py-3 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50 transition shadow-sm"
-                >
-                  {saving ? "Saving Changes..." : "Save Profile"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-
-        {/* Saved Delivery Addresses Section */}
-        <div className="overflow-hidden rounded-3xl border border-line bg-white shadow-sm p-8">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-line pb-4">
+          <form onSubmit={handleSaveProfile} className="space-y-6">
             <div>
-              <h2 className="text-lg font-semibold text-ink">Saved Delivery Addresses</h2>
-              <p className="text-xs text-slate-500 mt-1">
-                Save multiple addresses for fast 1-click selection during checkout.
+              <label className="mb-2 block text-[11px] uppercase tracking-eyebrow text-ink2">
+                Profile image URL
+              </label>
+              <input
+                type="url"
+                value={avatarInput}
+                onChange={(e) => setAvatarInput(e.target.value)}
+                placeholder="Paste a secure image URL"
+                className="w-full rounded-card border border-line bg-white px-4 py-3 text-xs focus:border-ink"
+              />
+              <p className="mt-1 text-[11px] text-ink2">
+                Leave blank to use your initials.
+              </p>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-[11px] uppercase tracking-eyebrow text-ink2">
+                Full name
+              </label>
+              <input
+                type="text"
+                required
+                value={nameInput}
+                onChange={(e) => setNameInput(e.target.value)}
+                className="w-full rounded-card border border-line bg-white px-4 py-3 text-xs focus:border-ink"
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-[11px] uppercase tracking-eyebrow text-ink2">
+                Account email
+              </label>
+              <input
+                type="email"
+                disabled
+                value={account.email}
+                className="w-full cursor-not-allowed rounded-card border border-line bg-surface px-4 py-3 text-xs text-ink2"
+              />
+              <p className="mt-1 text-[11px] text-ink2">
+                Email address is linked to your account login and cannot be
+                changed here.
+              </p>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-[11px] uppercase tracking-eyebrow text-ink2">
+                Phone number
+              </label>
+              <input
+                type="tel"
+                value={phoneInput}
+                onChange={(e) => setPhoneInput(e.target.value)}
+                placeholder="+880 1XXXXXXXXX"
+                className="w-full rounded-card border border-line bg-white px-4 py-3 text-xs focus:border-ink"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-3 border-t border-line pt-4">
+              <button
+                type="submit"
+                disabled={saving}
+                className="rounded-full bg-ink px-7 py-3 text-xs font-medium text-white hover:opacity-90 disabled:opacity-50"
+              >
+                {saving ? "Saving changes…" : "Save profile"}
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <section className="pt-10">
+          <div className="mb-6 flex flex-col justify-between gap-4 border-b border-line pb-4 sm:flex-row sm:items-center">
+            <div>
+              <h2 className="text-[18px] font-medium text-ink">
+                Saved delivery addresses
+              </h2>
+              <p className="mt-1 text-xs text-ink2">
+                Select these addresses during checkout without entering them
+                again.
               </p>
             </div>
             <button
               onClick={openNewAddressForm}
-              className="inline-flex items-center gap-2 rounded-full bg-ink px-5 py-2.5 text-xs font-semibold text-white hover:opacity-90 transition shadow-sm self-start sm:self-auto"
+              className="self-start rounded-full bg-ink px-5 py-2.5 text-xs font-medium text-white hover:opacity-90 sm:self-auto"
             >
-              + Add New Address
+              Add address
             </button>
           </div>
 
           {addresses.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 p-8 text-center">
-              <p className="text-sm font-medium text-slate-600">No saved addresses yet</p>
-              <p className="text-xs text-slate-400 mt-1">Add your delivery addresses here so you don’t have to type them every time you checkout.</p>
+            <div className="rounded-card border border-dashed border-line bg-surface p-8 text-center">
+              <p className="text-sm font-medium text-ink">
+                No saved addresses yet
+              </p>
+              <p className="mt-1 text-xs text-ink2">
+                Add an address to make checkout faster.
+              </p>
               <button
                 onClick={openNewAddressForm}
                 className="mt-4 rounded-full border border-line bg-white px-5 py-2 text-xs font-medium text-ink hover:border-ink transition"
               >
-                + Add Address Now
+                Add address
               </button>
             </div>
           ) : (
@@ -472,37 +494,44 @@ export default function AccountPage() {
               {addresses.map((addr) => (
                 <div
                   key={addr.id}
-                  className={`relative rounded-2xl border p-5 transition ${
+                  className={`relative rounded-card border p-5 transition-colors ${
                     addr.isDefault
-                      ? "border-emerald-500 bg-emerald-50/20 ring-1 ring-emerald-500/30"
-                      : "border-line bg-slate-50/40 hover:border-slate-300"
+                      ? "border-ink bg-surface"
+                      : "border-line bg-white hover:border-ink/40"
                   }`}
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <span className="rounded-full bg-slate-200/70 px-3 py-0.5 text-[11px] font-semibold text-slate-700 uppercase tracking-wider">
+                    <span className="rounded-full border border-line bg-white px-3 py-0.5 text-[10px] uppercase tracking-eyebrow text-ink2">
                       {addr.label || "Home"}
                     </span>
                     {addr.isDefault ? (
-                      <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-800">
+                      <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-medium text-emerald-700">
                         Default
                       </span>
                     ) : (
                       <button
                         onClick={() => void handleSetDefaultAddress(addr.id)}
-                        className="text-[11px] text-slate-500 hover:text-ink underline"
+                        className="text-[11px] text-ink2 underline decoration-line underline-offset-4 hover:text-ink"
                       >
                         Set as default
                       </button>
                     )}
                   </div>
 
-                  <p className="text-sm font-bold text-ink">{addr.recipientName}</p>
-                  <p className="text-xs font-medium text-slate-600 mt-0.5">{addr.phoneOriginal}</p>
-                  <p className="text-xs text-slate-500 mt-2 leading-relaxed">
-                    {addr.detailedAddress}, {addr.area}, <span className="font-medium text-slate-700">{addr.district}</span>
+                  <p className="text-sm font-medium text-ink">
+                    {addr.recipientName}
+                  </p>
+                  <p className="mt-0.5 text-xs text-ink2">
+                    {addr.phoneOriginal}
+                  </p>
+                  <p className="mt-2 text-xs leading-relaxed text-ink2">
+                    {addr.detailedAddress}, {addr.area},{" "}
+                    <span className="font-medium text-ink">
+                      {addr.district}
+                    </span>
                   </p>
                   {addr.landmark && (
-                    <p className="text-[11px] text-slate-400 mt-1">
+                    <p className="mt-1 text-[11px] text-ink2">
                       Landmark: {addr.landmark}
                     </p>
                   )}
@@ -510,7 +539,7 @@ export default function AccountPage() {
                   <div className="mt-4 flex items-center justify-end gap-3 border-t border-line/60 pt-3 text-xs">
                     <button
                       onClick={() => openEditAddressForm(addr)}
-                      className="font-medium text-blue-600 hover:underline"
+                      className="font-medium text-ink underline decoration-line underline-offset-4"
                     >
                       Edit
                     </button>
@@ -526,28 +555,30 @@ export default function AccountPage() {
             </div>
           )}
 
-          {/* Address Add / Edit Modal / Form */}
           {showAddressForm && (
-            <div className="mt-8 rounded-3xl border border-line bg-slate-50 p-6 sm:p-8">
-              <div className="flex items-center justify-between mb-4 border-b border-line pb-3">
-                <h3 className="text-base font-bold text-ink">
-                  {editingAddressId ? "Edit Delivery Address" : "Add New Delivery Address"}
+            <div className="mt-8 rounded-card border border-line bg-surface p-6 sm:p-8">
+              <div className="mb-4 flex items-center justify-between border-b border-line pb-3">
+                <h3 className="text-base font-medium text-ink">
+                  {editingAddressId
+                    ? "Edit Delivery Address"
+                    : "Add New Delivery Address"}
                 </h3>
                 <button
                   type="button"
                   onClick={() => setShowAddressForm(false)}
-                  className="text-xs text-slate-400 hover:text-ink font-semibold"
+                  className="text-xs text-ink2 underline decoration-line underline-offset-4 hover:text-ink"
                 >
-                  ✕ Close
+                  Close
                 </button>
               </div>
 
               {addressMessage && (
                 <div
-                  className={`mb-4 rounded-xl p-3 text-xs font-medium ${
+                  role={addressMessage.type === "error" ? "alert" : "status"}
+                  className={`mb-4 rounded-card border p-3 text-xs ${
                     addressMessage.type === "success"
-                      ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
-                      : "bg-rose-50 text-rose-800 border border-rose-200"
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                      : "border-rose-200 bg-rose-50 text-rose-800"
                   }`}
                 >
                   {addressMessage.text}
@@ -557,13 +588,18 @@ export default function AccountPage() {
               <form onSubmit={handleSaveAddress} className="space-y-4">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1">
-                      Address Label
+                    <label className="mb-1 block text-[11px] uppercase tracking-eyebrow text-ink2">
+                      Address label
                     </label>
                     <select
                       value={addressForm.label}
-                      onChange={(e) => setAddressForm({ ...addressForm, label: e.target.value })}
-                      className="w-full rounded-2xl border border-line bg-white px-4 py-2.5 text-xs outline-none focus:border-ink"
+                      onChange={(e) =>
+                        setAddressForm({
+                          ...addressForm,
+                          label: e.target.value,
+                        })
+                      }
+                      className="w-full rounded-card border border-line bg-white px-4 py-2.5 text-xs focus:border-ink"
                     >
                       <option value="Home">Home</option>
                       <option value="Office">Office</option>
@@ -573,41 +609,56 @@ export default function AccountPage() {
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1">
-                      Recipient Full Name
+                    <label className="mb-1 block text-[11px] uppercase tracking-eyebrow text-ink2">
+                      Recipient full name
                     </label>
                     <input
                       type="text"
                       required
                       value={addressForm.recipientName}
-                      onChange={(e) => setAddressForm({ ...addressForm, recipientName: e.target.value })}
-                      className="w-full rounded-2xl border border-line bg-white px-4 py-2.5 text-xs outline-none focus:border-ink"
+                      onChange={(e) =>
+                        setAddressForm({
+                          ...addressForm,
+                          recipientName: e.target.value,
+                        })
+                      }
+                      className="w-full rounded-card border border-line bg-white px-4 py-2.5 text-xs focus:border-ink"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1">
-                      Bangladesh Mobile Number
+                    <label className="mb-1 block text-[11px] uppercase tracking-eyebrow text-ink2">
+                      Bangladesh mobile number
                     </label>
                     <input
                       type="tel"
                       required
                       value={addressForm.phone}
-                      onChange={(e) => setAddressForm({ ...addressForm, phone: e.target.value })}
+                      onChange={(e) =>
+                        setAddressForm({
+                          ...addressForm,
+                          phone: e.target.value,
+                        })
+                      }
                       placeholder="01712345678"
-                      className="w-full rounded-2xl border border-line bg-white px-4 py-2.5 text-xs outline-none focus:border-ink"
+                      className="w-full rounded-card border border-line bg-white px-4 py-2.5 text-xs focus:border-ink"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1">
+                    <label className="mb-1 block text-[11px] uppercase tracking-eyebrow text-ink2">
                       District
                     </label>
                     <select
                       required
                       value={addressForm.district}
-                      onChange={(e) => setAddressForm({ ...addressForm, district: e.target.value })}
-                      className="w-full rounded-2xl border border-line bg-white px-4 py-2.5 text-xs outline-none focus:border-ink"
+                      onChange={(e) =>
+                        setAddressForm({
+                          ...addressForm,
+                          district: e.target.value,
+                        })
+                      }
+                      className="w-full rounded-card border border-line bg-white px-4 py-2.5 text-xs focus:border-ink"
                     >
                       <option value="">Select District</option>
                       {districts.map((d) => (
@@ -619,63 +670,80 @@ export default function AccountPage() {
                   </div>
 
                   <div className="sm:col-span-2">
-                    <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1">
+                    <label className="mb-1 block text-[11px] uppercase tracking-eyebrow text-ink2">
                       Area / Thana
                     </label>
                     <input
                       type="text"
                       required
                       value={addressForm.area}
-                      onChange={(e) => setAddressForm({ ...addressForm, area: e.target.value })}
+                      onChange={(e) =>
+                        setAddressForm({ ...addressForm, area: e.target.value })
+                      }
                       placeholder="e.g. Dhanmondi, Mirpur, Uttara, Agrabad"
-                      className="w-full rounded-2xl border border-line bg-white px-4 py-2.5 text-xs outline-none focus:border-ink"
+                      className="w-full rounded-card border border-line bg-white px-4 py-2.5 text-xs focus:border-ink"
                     />
                   </div>
 
                   <div className="sm:col-span-2">
-                    <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1">
-                      Detailed Address
+                    <label className="mb-1 block text-[11px] uppercase tracking-eyebrow text-ink2">
+                      Detailed address
                     </label>
                     <textarea
                       required
                       rows={3}
                       value={addressForm.detailedAddress}
-                      onChange={(e) => setAddressForm({ ...addressForm, detailedAddress: e.target.value })}
+                      onChange={(e) =>
+                        setAddressForm({
+                          ...addressForm,
+                          detailedAddress: e.target.value,
+                        })
+                      }
                       placeholder="House, Road, Block, Floor, or Village details"
-                      className="w-full rounded-2xl border border-line bg-white px-4 py-2.5 text-xs outline-none focus:border-ink"
+                      className="w-full rounded-card border border-line bg-white px-4 py-2.5 text-xs focus:border-ink"
                     />
                   </div>
 
                   <div className="sm:col-span-2">
-                    <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-1">
-                      Landmark (Optional)
+                    <label className="mb-1 block text-[11px] uppercase tracking-eyebrow text-ink2">
+                      Landmark (optional)
                     </label>
                     <input
                       type="text"
                       value={addressForm.landmark}
-                      onChange={(e) => setAddressForm({ ...addressForm, landmark: e.target.value })}
+                      onChange={(e) =>
+                        setAddressForm({
+                          ...addressForm,
+                          landmark: e.target.value,
+                        })
+                      }
                       placeholder="Nearby mosque, market, or recognizable place"
-                      className="w-full rounded-2xl border border-line bg-white px-4 py-2.5 text-xs outline-none focus:border-ink"
+                      className="w-full rounded-card border border-line bg-white px-4 py-2.5 text-xs focus:border-ink"
                     />
                   </div>
 
                   <div className="sm:col-span-2">
-                    <label className="flex items-center gap-2 text-xs text-slate-700">
+                    <label className="flex items-center gap-2 text-xs text-ink">
                       <input
                         type="checkbox"
                         checked={addressForm.isDefault}
-                        onChange={(e) => setAddressForm({ ...addressForm, isDefault: e.target.checked })}
+                        onChange={(e) =>
+                          setAddressForm({
+                            ...addressForm,
+                            isDefault: e.target.checked,
+                          })
+                        }
                       />
                       Set as default delivery address
                     </label>
                   </div>
                 </div>
 
-                <div className="flex items-center justify-end gap-3 pt-4 border-t border-line">
+                <div className="flex items-center justify-end gap-3 border-t border-line pt-4">
                   <button
                     type="button"
                     onClick={() => setShowAddressForm(false)}
-                    className="rounded-full border border-line px-5 py-2 text-xs font-medium text-slate-600 hover:border-ink"
+                    className="rounded-full border border-line px-5 py-2 text-xs font-medium text-ink2 hover:border-ink hover:text-ink"
                   >
                     Cancel
                   </button>
@@ -684,14 +752,18 @@ export default function AccountPage() {
                     disabled={savingAddress}
                     className="rounded-full bg-ink px-6 py-2 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50"
                   >
-                    {savingAddress ? "Saving Address..." : editingAddressId ? "Update Address" : "Save New Address"}
+                    {savingAddress
+                      ? "Saving address…"
+                      : editingAddressId
+                        ? "Update address"
+                        : "Save address"}
                   </button>
                 </div>
               </form>
             </div>
           )}
-        </div>
+        </section>
       </div>
-    </div>
+    </main>
   );
 }

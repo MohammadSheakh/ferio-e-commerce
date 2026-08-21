@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { AdminApiError, adminApi } from "@/lib/admin-api";
+import { adminApi } from "@/lib/admin-api";
+import { adminApiErrorResponse } from "@/lib/bff-response";
 
 export async function PATCH(request: Request) {
   try {
@@ -11,9 +12,6 @@ export async function PATCH(request: Request) {
     });
     return NextResponse.json({ data });
   } catch (error) {
-    return NextResponse.json(
-      { message: error instanceof Error ? error.message : "Unable to assign order." },
-      { status: error instanceof AdminApiError ? error.status : 503 },
-    );
+    return adminApiErrorResponse(error, "Unable to assign order.");
   }
 }

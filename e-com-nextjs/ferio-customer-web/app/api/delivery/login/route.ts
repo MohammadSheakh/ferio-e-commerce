@@ -1,12 +1,19 @@
 import { NextResponse } from "next/server";
+import {
+  backendErrorResponse,
+  bffErrorResponse,
+  forwardedHeaders,
+  type BackendErrorPayload,
+} from "@/lib/bff-response";
 
 export async function POST(request: Request) {
   try {
     const { email, password } = await request.json();
     if (!email || !password) {
-      return NextResponse.json(
-        { message: "Email or phone and password are required." },
-        { status: 400 },
+      return bffErrorResponse(
+        "Email or phone and password are required.",
+        400,
+        "VALIDATION_ERROR",
       );
     }
 
@@ -14,16 +21,21 @@ export async function POST(request: Request) {
       process.env.NEXT_PUBLIC_FERIO_API_URL ?? "http://localhost:6733/api/v1";
     const res = await fetch(`${backendUrl}/auth/login`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: forwardedHeaders(request, {
+        "Content-Type": "application/json",
+      }),
       body: JSON.stringify({ email, password }),
       cache: "no-store",
     });
 
-    const data = await res.json();
+    const data = (await res.json()) as BackendErrorPayload & {
+      data?: { accessToken?: string; user?: unknown };
+    };
     if (!res.ok || !data.data?.accessToken) {
-      return NextResponse.json(
-        { message: data.message || "Rider login failed. Invalid credentials." },
-        { status: res.status || 401 },
+      return backendErrorResponse(
+        data,
+        res.status || 401,
+        "Rider login failed. Invalid credentials.",
       );
     }
 
@@ -32,9 +44,10 @@ export async function POST(request: Request) {
       user: data.data.user,
     });
   } catch {
-    return NextResponse.json(
-      { message: "The Ferio backend server is unavailable." },
-      { status: 503 },
+    return bffErrorResponse(
+      "The Ferio backend server is unavailable.",
+      503,
+      "SERVICE_UNAVAILABLE",
     );
   }
 }

@@ -10,17 +10,24 @@ export default function Header({
   storeName,
   categories = [],
   categoryTopNavEnabled = true,
+  serviceBookingEnabled = true,
+  warrantyClaimsEnabled = true,
 }: {
   storeName: string;
   categories?: CatalogCategory[];
   categoryTopNavEnabled?: boolean;
+  serviceBookingEnabled?: boolean;
+  warrantyClaimsEnabled?: boolean;
 }) {
   const { count } = useCart();
   return (
-    <header className="sticky top-0 z-40 bg-paper/90 backdrop-blur">
+    <header className="sticky top-0 z-40 bg-paper">
       <div className="border-b border-line">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
-          <Link href="/" className="text-[19px] font-semibold tracking-tight text-ink">
+          <Link
+            href="/"
+            className="text-[19px] font-semibold tracking-tight text-ink"
+          >
             {storeName}
           </Link>
           <nav className="hidden gap-9 text-[13px] text-ink2 md:flex items-center">
@@ -36,15 +43,33 @@ export default function Header({
             <Link href="/support" className="transition hover:text-ink">
               Support
             </Link>
-            <Link href="/services" className="transition hover:text-ink">Services</Link>
+            {serviceBookingEnabled && (
+              <Link href="/services" className="transition hover:text-ink">
+                Services
+              </Link>
+            )}
             <HeaderAccountNav />
-            <Link href="/account/warranty" className="transition hover:text-ink">Warranty</Link>
+            {warrantyClaimsEnabled && (
+              <Link
+                href="/account/warranty"
+                className="transition hover:text-ink"
+              >
+                Warranty
+              </Link>
+            )}
           </nav>
           <Link
             href="/cart"
             className="flex items-center gap-2 text-[13px] text-ink transition hover:text-ink2"
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+            >
               <path d="M6 6h15l-1.5 9h-12z" />
               <path d="M6 6l-1-3H2" />
               <circle cx="9" cy="20" r="1" />

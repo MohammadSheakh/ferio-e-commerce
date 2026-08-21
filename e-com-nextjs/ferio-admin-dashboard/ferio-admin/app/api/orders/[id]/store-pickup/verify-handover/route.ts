@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { AdminApiError, adminApi } from "@/lib/admin-api";
+import { adminApi } from "@/lib/admin-api";
+import { adminApiErrorResponse } from "@/lib/bff-response";
 
 export async function POST(
   request: Request,
@@ -14,8 +15,6 @@ export async function POST(
     });
     return NextResponse.json({ data: result });
   } catch (error) {
-    const status = error instanceof AdminApiError ? error.status : 500;
-    const message = error instanceof Error ? error.message : "Unable to verify store handover OTP.";
-    return NextResponse.json({ message }, { status });
+    return adminApiErrorResponse(error, "Unable to verify store handover OTP.");
   }
 }

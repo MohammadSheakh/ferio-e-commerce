@@ -6,6 +6,8 @@ export type ApiEnvelope<T> = {
   data?: T;
   message?: string | string[];
   error?: string;
+  code?: string;
+  correlationId?: string;
 };
 
 export function getBackendUrl(path: string): string {
@@ -18,8 +20,12 @@ export function getApiMessage(payload: unknown): string {
   }
 
   const message = (payload as ApiEnvelope<unknown>).message;
-  if (Array.isArray(message)) return message.join(" ");
-  if (typeof message === "string") return message;
+  const text = Array.isArray(message)
+    ? message.join(" ")
+    : typeof message === "string"
+      ? message
+      : "Unable to complete the request.";
+  const correlationId = (payload as ApiEnvelope<unknown>).correlationId;
 
-  return "Unable to complete the request.";
+  return correlationId ? `${text} Support reference: ${correlationId}.` : text;
 }

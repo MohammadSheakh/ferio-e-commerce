@@ -11,6 +11,9 @@ export type CommerceMessage = {
   id: string;
   eventType: string;
   templateKey: string;
+  templateVersion: number;
+  renderedSubject: string | null;
+  renderedBody: string;
   recipient: string;
   selectedChannel: "SMS" | "WHATSAPP" | "EMAIL" | null;
   channelPlan: Array<"SMS" | "WHATSAPP" | "EMAIL">;
@@ -34,6 +37,17 @@ export type CommerceMessage = {
     errorCode: string | null;
     createdAt: string;
   }>;
+};
+
+export type CommerceMessageTemplate = {
+  key: string;
+  eventType: string;
+  enabled: boolean;
+  subjectTemplate: string | null;
+  bodyTemplate: string;
+  version: number;
+  allowedVariables: string[];
+  updatedAt: string;
 };
 
 export type CommerceMessagingPolicy = {
@@ -74,8 +88,10 @@ export type CommerceMessagePage = {
 };
 
 export function commerceMessageStatusClass(status: CommerceMessageStatus) {
-  if (status === "DELIVERED" || status === "SENT") return "bg-emerald-50 text-emerald-700";
-  if (status === "FAILED" || status === "CANCELLED") return "bg-rose-50 text-rose-700";
+  if (status === "DELIVERED" || status === "SENT")
+    return "bg-emerald-50 text-emerald-700";
+  if (status === "FAILED" || status === "CANCELLED")
+    return "bg-rose-50 text-rose-700";
   if (status === "BLOCKED") return "bg-amber-50 text-amber-700";
   return "bg-surface text-ink2";
 }

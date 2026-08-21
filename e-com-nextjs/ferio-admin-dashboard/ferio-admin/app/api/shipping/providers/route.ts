@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { AdminApiError, adminApi } from "@/lib/admin-api";
+import { adminApi } from "@/lib/admin-api";
+import { adminApiErrorResponse } from "@/lib/bff-response";
 import type { ShipmentProvider } from "@/lib/shipping";
 
 export async function GET() {
@@ -8,10 +9,6 @@ export async function GET() {
       data: await adminApi<ShipmentProvider[]>("/admin/shipping/providers"),
     });
   } catch (error) {
-    const status = error instanceof AdminApiError ? error.status : 503;
-    return NextResponse.json(
-      { message: error instanceof Error ? error.message : "Unable to load courier providers." },
-      { status },
-    );
+    return adminApiErrorResponse(error, "Unable to load courier providers.");
   }
 }

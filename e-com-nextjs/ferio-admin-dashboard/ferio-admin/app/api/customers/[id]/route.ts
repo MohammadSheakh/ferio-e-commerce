@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { AdminApiError, adminApi } from "@/lib/admin-api";
+import { adminApi } from "@/lib/admin-api";
+import { adminApiErrorResponse } from "@/lib/bff-response";
 import type { CustomerDetail } from "@/lib/customers";
 
 export async function GET(
@@ -11,9 +12,6 @@ export async function GET(
       data: await adminApi<CustomerDetail>(`/admin/customers/${params.id}`),
     });
   } catch (error) {
-    return NextResponse.json(
-      { message: error instanceof Error ? error.message : "Unable to load customer." },
-      { status: error instanceof AdminApiError ? error.status : 503 },
-    );
+    return adminApiErrorResponse(error, "Unable to load customer.");
   }
 }

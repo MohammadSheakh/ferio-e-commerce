@@ -14,37 +14,10 @@ export interface HeroSlide {
   ctaText?: string;
 }
 
-const defaultCards: HeroSlide[] = [
-  {
-    image: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?auto=format&fit=crop&w=1000&q=85',
-    kicker: 'CURATED FOR FERIO',
-    title: 'Furniture and objects for a modern interior',
-    body: 'Explore clean forms, practical pieces, and clear delivery options.',
-    href: '/(tabs)/products',
-    ctaText: 'Explore collection',
-  },
-  {
-    image: 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=1000&q=85',
-    kicker: 'SELECTED DEALS',
-    title: 'Up to 30% off selected pieces',
-    body: 'Current pricing and availability are verified before checkout.',
-    href: { pathname: '/(tabs)/products', params: { sale: 'true' } },
-    ctaText: 'View deals',
-  },
-  {
-    image: 'https://images.unsplash.com/photo-1538688525198-9b88f6f53126?auto=format&fit=crop&w=1000&q=85',
-    kicker: 'NEW ARRIVALS',
-    title: 'New pieces, added regularly',
-    body: 'Product-first discovery without decorative clutter.',
-    href: { pathname: '/(tabs)/products', params: { sort: 'newest' } },
-    ctaText: 'Shop new in',
-  },
-];
-
 export function HeroShowcase() {
   const { width } = useWindowDimensions();
   const cardWidth = Math.min(width - 36, 410);
-  const [slides, setSlides] = useState<HeroSlide[]>(defaultCards);
+  const [slides, setSlides] = useState<HeroSlide[]>([]);
 
   useEffect(() => {
     async function loadSlides() {
@@ -54,13 +27,13 @@ export function HeroShowcase() {
           setSlides(res);
         }
       } catch {
-        // Fallback to default cards if API endpoint is not populated
+        setSlides([]);
       }
     }
     void loadSlides();
   }, []);
 
-  const safeSlides = Array.isArray(slides) && slides.length > 0 ? slides : defaultCards;
+  if (slides.length === 0) return null;
 
   return (
     <View style={styles.section}>
@@ -72,7 +45,7 @@ export function HeroShowcase() {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.row}
       >
-        {safeSlides.map((card, index) => {
+        {slides.map((card, index) => {
           const hrefTarget = card.href || '/(tabs)/products';
           return (
             <Link href={hrefTarget as any} key={card.id || index} asChild>

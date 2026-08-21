@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { AdminApiError, adminApi } from "@/lib/admin-api";
+import { adminApi } from "@/lib/admin-api";
+import { adminApiErrorResponse } from "@/lib/bff-response";
 
 type RetryResult = { runId: string; jobId: string; status: "QUEUED" };
 
@@ -14,15 +15,6 @@ export async function POST(
     );
     return NextResponse.json({ data: result }, { status: 202 });
   } catch (error) {
-    const status = error instanceof AdminApiError ? error.status : 503;
-    return NextResponse.json(
-      {
-        message:
-          error instanceof Error
-            ? error.message
-            : "Unable to retry reconciliation run.",
-      },
-      { status },
-    );
+    return adminApiErrorResponse(error, "Unable to retry reconciliation run.");
   }
 }

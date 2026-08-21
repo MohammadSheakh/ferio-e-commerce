@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { CatalogBrand } from "@/lib/catalog";
 
 const inputClass =
-  "w-full rounded-card border border-line px-3.5 py-2 text-[13px] outline-none focus:border-ink";
+  "w-full rounded-card border border-line px-3.5 py-2 text-[13px] focus:border-ink";
 
 export default function BrandsManager({
   initialBrands,
@@ -72,7 +72,10 @@ export default function BrandsManager({
         body: JSON.stringify(body),
       });
 
-      const payload = (await res.json()) as { data?: CatalogBrand; message?: string };
+      const payload = (await res.json()) as {
+        data?: CatalogBrand;
+        message?: string;
+      };
       if (!res.ok || !payload.data) {
         throw new Error(payload.message || "Failed to save brand.");
       }
@@ -83,7 +86,9 @@ export default function BrandsManager({
           prev.map((b) => (b.id === savedBrand.id ? savedBrand : b)),
         );
       } else {
-        setBrands((prev) => [...prev, savedBrand].sort((a, b) => a.name.localeCompare(b.name)));
+        setBrands((prev) =>
+          [...prev, savedBrand].sort((a, b) => a.name.localeCompare(b.name)),
+        );
       }
 
       setIsModalOpen(false);
@@ -130,8 +135,8 @@ export default function BrandsManager({
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search brands by name or slug..."
-          className="w-80 rounded-card border border-line px-3.5 py-2 text-[13px] outline-none focus:border-ink"
+          placeholder="Search brands by name or slug"
+          className="w-80 rounded-card border border-line px-3.5 py-2 text-[13px] focus:border-ink"
         />
 
         <button
@@ -143,9 +148,9 @@ export default function BrandsManager({
         </button>
       </div>
 
-      <div className="rounded-card border border-line bg-white overflow-hidden shadow-sm">
+      <div className="overflow-x-auto border-y border-line bg-white">
         <table className="w-full text-left text-[13px]">
-          <thead className="border-b border-line bg-neutral-50 font-medium text-ink2">
+          <thead className="border-b border-line text-[11px] uppercase tracking-eyebrow text-ink2">
             <tr>
               <th className="p-4">Brand Name</th>
               <th className="p-4">Slug</th>
@@ -156,7 +161,7 @@ export default function BrandsManager({
           </thead>
           <tbody className="divide-y divide-line">
             {filteredBrands.map((brand) => (
-              <tr key={brand.id} className="hover:bg-neutral-50/50">
+              <tr key={brand.id}>
                 <td className="p-4 font-medium text-ink">
                   <div className="flex items-center gap-3">
                     {brand.logoUrl ? (
@@ -181,7 +186,9 @@ export default function BrandsManager({
                     </div>
                   </div>
                 </td>
-                <td className="p-4 text-ink2 font-mono text-[12px]">{brand.slug}</td>
+                <td className="p-4 text-ink2 font-mono text-[12px]">
+                  {brand.slug}
+                </td>
                 <td className="p-4 text-ink font-semibold">
                   {brand._count?.products ?? 0}
                 </td>
@@ -227,10 +234,18 @@ export default function BrandsManager({
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-card border border-line bg-white p-6 shadow-2xl space-y-4">
-            <h3 className="text-[16px] font-semibold text-ink">
-              {editingBrand ? "Edit Brand" : "Create New Brand"}
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="brand-dialog-title"
+            className="w-full max-w-md space-y-4 rounded-card border border-line bg-white p-6"
+          >
+            <h3
+              id="brand-dialog-title"
+              className="text-[16px] font-semibold text-ink"
+            >
+              {editingBrand ? "Edit brand" : "Create brand"}
             </h3>
 
             <form onSubmit={handleSave} className="space-y-4">
@@ -286,7 +301,11 @@ export default function BrandsManager({
                 Active brand (visible in storefront filters)
               </label>
 
-              {error && <p className="text-[12px] text-rose-600">{error}</p>}
+              {error && (
+                <p role="alert" className="text-[12px] text-rose-600">
+                  {error}
+                </p>
+              )}
 
               <div className="flex justify-end gap-3 border-t border-line pt-4">
                 <button
@@ -301,7 +320,7 @@ export default function BrandsManager({
                   disabled={saving}
                   className="rounded-full bg-ink px-5 py-2 text-[12px] font-medium text-white disabled:opacity-50"
                 >
-                  {saving ? "Saving..." : "Save brand"}
+                  {saving ? "Saving…" : "Save brand"}
                 </button>
               </div>
             </form>

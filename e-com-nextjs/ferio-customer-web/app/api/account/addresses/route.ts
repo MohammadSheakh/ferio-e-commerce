@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 import { customerSessionFetch } from "@/lib/customer-session";
+import {
+  backendErrorResponse,
+  bffErrorResponse,
+  type BackendErrorPayload,
+} from "@/lib/bff-response";
 
 export async function POST(request: Request) {
   const body = await request.json();
@@ -9,12 +14,21 @@ export async function POST(request: Request) {
     body: JSON.stringify(body),
   });
 
-  if (!result) return NextResponse.json({ message: "Sign in to add an address." }, { status: 401 });
-  const payload = await result.response.json();
+  if (!result) {
+    return bffErrorResponse(
+      "Sign in to add an address.",
+      401,
+      "AUTHENTICATION_REQUIRED",
+    );
+  }
+  const payload = (await result.response.json()) as BackendErrorPayload & {
+    data?: unknown;
+  };
   if (!result.response.ok) {
-    return NextResponse.json(
-      { message: Array.isArray(payload.message) ? payload.message.join(" ") : payload.message },
-      { status: result.response.status },
+    return backendErrorResponse(
+      payload,
+      result.response.status,
+      "Unable to add the address.",
     );
   }
   const payloadData = payload.data ?? payload;

@@ -1,5 +1,14 @@
 export type ReportCount = { value: string; count: number };
 
+export type ReportOrdersExport = {
+  exportId: string;
+  fileName: string;
+  contentType: string;
+  content: string;
+  rowCount: number;
+  customerFields: "permitted" | "masked";
+};
+
 export type ReportsOverview = {
   basis: {
     dateFrom: string;

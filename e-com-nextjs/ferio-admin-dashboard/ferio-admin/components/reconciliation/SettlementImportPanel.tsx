@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
+import { createBrowserUuid } from "@/lib/browser-uuid";
 import { formatTaka } from "@/lib/catalog";
 import type { CourierCode } from "@/lib/shipping";
 import type {
@@ -8,6 +9,14 @@ import type {
   SettlementReportPreflight,
   SettlementReportTemplate,
 } from "@/lib/settlements";
+
+const fieldClass =
+  "rounded-card border border-line bg-paper px-3 py-2.5 text-[12px] text-ink focus-visible:border-ink focus-visible:outline-none";
+
+function formatEnum(value: string) {
+  const label = value.replaceAll("_", " ").toLowerCase();
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
 
 type ImportRowDraft = {
   id: string;
@@ -21,7 +30,7 @@ type ImportRowDraft = {
 
 function emptyRow(): ImportRowDraft {
   return {
-    id: crypto.randomUUID(),
+    id: createBrowserUuid(),
     providerRowReference: "",
     trackingNumber: "",
     collectedAmount: "",
@@ -43,9 +52,9 @@ function statusClass(status: string) {
 }
 
 function importStatusLabel(status: CourierSettlementImport["status"]) {
-  if (status === "APPLIED") return "applied";
-  if (status === "SUPERSEDED") return "superseded";
-  return "needs review";
+  if (status === "APPLIED") return "Applied";
+  if (status === "SUPERSEDED") return "Superseded";
+  return "Needs review";
 }
 
 export default function SettlementImportPanel({
@@ -57,13 +66,12 @@ export default function SettlementImportPanel({
   const [rows, setRows] = useState<ImportRowDraft[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [correctionTarget, setCorrectionTarget] =
     useState<CourierSettlementImport | null>(null);
-  const [formProvider, setFormProvider] = useState<CourierCode>(
-    "STEADFAST",
-  );
+  const [formProvider, setFormProvider] = useState<CourierCode>("STEADFAST");
   const [formSource, setFormSource] = useState<"API" | "CSV" | "MANUAL_JSON">(
     "CSV",
   );
@@ -81,6 +89,7 @@ export default function SettlementImportPanel({
 
   const loadImports = useCallback(async () => {
     setLoading(true);
+    setLoadError("");
     try {
       const response = await fetch("/api/settlements/imports", {
         cache: "no-store",
@@ -96,7 +105,7 @@ export default function SettlementImportPanel({
       }
       setImports(payload.data);
     } catch (loadError) {
-      setError(
+      setLoadError(
         loadError instanceof Error
           ? loadError.message
           : "Unable to load settlement imports.",
@@ -134,7 +143,7 @@ export default function SettlementImportPanel({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Idempotency-Key": crypto.randomUUID(),
+          "Idempotency-Key": createBrowserUuid(),
         },
         body: JSON.stringify({
           provider: form.get("provider"),
@@ -227,7 +236,7 @@ export default function SettlementImportPanel({
       if (payload.data.ready) {
         setRows(
           payload.data.rows.map((row) => ({
-            id: crypto.randomUUID(),
+            id: createBrowserUuid(),
             providerRowReference: row.providerRowReference,
             trackingNumber: row.trackingNumber,
             collectedAmount: (row.collectedAmount / 100).toFixed(2),
@@ -295,7 +304,7 @@ export default function SettlementImportPanel({
     setPreflight(null);
     setRows(
       entry.rows.map((row) => ({
-        id: crypto.randomUUID(),
+        id: createBrowserUuid(),
         providerRowReference: row.providerRowReference,
         trackingNumber: row.trackingNumber,
         collectedAmount: (row.collectedAmount / 100).toFixed(2),
@@ -349,11 +358,10 @@ export default function SettlementImportPanel({
                 setCsvFile(null);
                 setCsvContent(null);
                 setPreflight(null);
-                setCsvContent(null);
                 setRows([emptyRow()]);
                 setNotice("");
               }}
-              className="text-[11px] text-ink2"
+              className="rounded-full px-3 py-1.5 text-[11px] text-ink2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
             >
               Cancel correction
             </button>
@@ -372,7 +380,7 @@ export default function SettlementImportPanel({
                 setCsvContent(null);
                 setPreflight(null);
               }}
-              className="mt-1 w-full rounded-card border border-line px-3 py-2.5 text-[12px] text-ink"
+              className={`mt-1 w-full ${fieldClass}`}
             >
               <option value="STEADFAST">Steadfast</option>
               <option value="PATHAO">Pathao</option>
@@ -397,7 +405,7 @@ export default function SettlementImportPanel({
                 setCsvContent(null);
                 setPreflight(null);
               }}
-              className="mt-1 w-full rounded-card border border-line px-3 py-2.5 text-[12px] text-ink"
+              className={`mt-1 w-full ${fieldClass}`}
             >
               <option value="CSV">CSV report</option>
               <option value="API">Provider API</option>
@@ -411,7 +419,7 @@ export default function SettlementImportPanel({
               name="providerReportReference"
               minLength={2}
               maxLength={200}
-              className="mt-1 w-full rounded-card border border-line px-3 py-2.5 text-[12px] text-ink"
+              className={`mt-1 w-full ${fieldClass}`}
             />
           </label>
           <label className="text-[10px] text-ink2">
@@ -421,7 +429,7 @@ export default function SettlementImportPanel({
               name="bankReference"
               minLength={2}
               maxLength={200}
-              className="mt-1 w-full rounded-card border border-line px-3 py-2.5 text-[12px] text-ink"
+              className={`mt-1 w-full ${fieldClass}`}
             />
           </label>
           <label className="text-[10px] text-ink2">
@@ -432,7 +440,7 @@ export default function SettlementImportPanel({
               type="number"
               min="0"
               step="0.01"
-              className="mt-1 w-full rounded-card border border-line px-3 py-2.5 text-[12px] text-ink"
+              className={`mt-1 w-full ${fieldClass}`}
             />
           </label>
           <label className="text-[10px] text-ink2">
@@ -441,7 +449,7 @@ export default function SettlementImportPanel({
               required
               name="settledAt"
               type="datetime-local"
-              className="mt-1 w-full rounded-card border border-line px-3 py-2.5 text-[12px] text-ink"
+              className={`mt-1 w-full ${fieldClass}`}
             />
           </label>
           <label className="text-[10px] text-ink2 md:col-span-2">
@@ -450,7 +458,7 @@ export default function SettlementImportPanel({
               name="note"
               maxLength={1000}
               placeholder="Optional context retained with the import"
-              className="mt-1 w-full rounded-card border border-line px-3 py-2.5 text-[12px] text-ink"
+              className={`mt-1 w-full ${fieldClass}`}
             />
           </label>
         </div>
@@ -468,14 +476,14 @@ export default function SettlementImportPanel({
                     setCsvContent(null);
                     setPreflight(null);
                   }}
-                  className="mt-1 block w-full rounded-card border border-line bg-paper px-3 py-2 text-[11px] text-ink"
+                  className={`mt-1 block w-full ${fieldClass}`}
                 />
               </label>
               <button
                 type="button"
                 disabled={downloadingTemplate}
                 onClick={() => void downloadTemplate()}
-                className="rounded-full border border-line bg-paper px-4 py-2.5 text-[12px] text-ink disabled:opacity-40"
+                className="rounded-full border border-line bg-paper px-4 py-2.5 text-[12px] text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:opacity-40"
               >
                 {downloadingTemplate ? "Preparing…" : "Download template"}
               </button>
@@ -483,7 +491,7 @@ export default function SettlementImportPanel({
                 type="button"
                 disabled={!csvFile || preflighting}
                 onClick={() => void previewCsv()}
-                className="rounded-full border border-line bg-paper px-4 py-2.5 text-[12px] text-ink disabled:opacity-40"
+                className="rounded-full border border-line bg-paper px-4 py-2.5 text-[12px] text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:opacity-40"
               >
                 {preflighting ? "Checking…" : "Preview CSV"}
               </button>
@@ -566,7 +574,8 @@ export default function SettlementImportPanel({
                         onChange={(event) =>
                           updateRow(row.id, field, event.target.value)
                         }
-                        className="w-full min-w-32 rounded-card border border-line px-2.5 py-2 text-[11px] text-ink"
+                        aria-label={`${placeholder} for row ${row.providerRowReference || "draft"}`}
+                        className={`w-full min-w-32 ${fieldClass}`}
                       />
                     </td>
                   ))}
@@ -582,7 +591,7 @@ export default function SettlementImportPanel({
                           current.filter((entry) => entry.id !== row.id),
                         )
                       }
-                      className="text-[11px] text-ink2 disabled:opacity-30"
+                      className="rounded-full px-2 py-1 text-[11px] text-ink2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:opacity-30"
                     >
                       Remove
                     </button>
@@ -597,7 +606,7 @@ export default function SettlementImportPanel({
             type="button"
             disabled={formSource === "CSV" && preflight?.ready}
             onClick={() => setRows((current) => [...current, emptyRow()])}
-            className="rounded-full border border-line px-4 py-2.5 text-[12px] text-ink"
+            className="rounded-full border border-line px-4 py-2.5 text-[12px] text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
           >
             Add row
           </button>
@@ -607,7 +616,7 @@ export default function SettlementImportPanel({
               rows.length === 0 ||
               (formSource === "CSV" && !preflight?.ready)
             }
-            className="rounded-full bg-ink px-5 py-2.5 text-[12px] text-white disabled:opacity-40"
+            className="rounded-full bg-ink px-5 py-2.5 text-[12px] text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:opacity-40"
           >
             {saving ? "Importing…" : `Import report (${rows.length})`}
           </button>
@@ -633,6 +642,21 @@ export default function SettlementImportPanel({
           Review exceptions here. Correct source data by importing a new report;
           recorded evidence cannot be edited.
         </p>
+        {loadError && (
+          <div
+            role="alert"
+            className="mt-3 flex flex-wrap items-center justify-between gap-3 border-y border-rose-200 bg-rose-50 px-4 py-3 text-[12px] text-rose-700"
+          >
+            <p>{loadError}</p>
+            <button
+              type="button"
+              onClick={() => void loadImports()}
+              className="rounded-full border border-rose-200 px-3 py-1.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-700"
+            >
+              Retry import history
+            </button>
+          </div>
+        )}
         <div className="mt-4 divide-y divide-line border-y border-line">
           {imports.map((entry) => (
             <article key={entry.id} className="py-5">
@@ -642,8 +666,9 @@ export default function SettlementImportPanel({
                     {entry.reference} · {entry.provider.name}
                   </p>
                   <p className="mt-1 text-[11px] text-ink2">
-                    Provider {entry.providerReportReference} · {entry.source} ·{" "}
-                    {entry.rowCount} rows · {entry.appliedCount} matched
+                    Provider {entry.providerReportReference} ·{" "}
+                    {formatEnum(entry.source)} · {entry.rowCount} rows ·{" "}
+                    {entry.appliedCount} matched
                   </p>
                   {entry.sourceFileChecksum && (
                     <p className="mt-1 text-[10px] text-ink2">
@@ -659,7 +684,7 @@ export default function SettlementImportPanel({
                     {importStatusLabel(entry.status)}
                   </span>
                   <p className="mt-2 text-[10px] text-ink2">
-                    {new Date(entry.createdAt).toLocaleString()}
+                    {new Date(entry.createdAt).toLocaleString("en-BD")}
                   </p>
                 </div>
               </div>
@@ -685,7 +710,7 @@ export default function SettlementImportPanel({
                 <button
                   type="button"
                   onClick={() => beginCorrection(entry)}
-                  className="mt-3 rounded-full border border-line px-4 py-2 text-[11px] text-ink"
+                  className="mt-3 rounded-full border border-line px-4 py-2 text-[11px] text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
                 >
                   Correct report
                 </button>
@@ -716,7 +741,7 @@ export default function SettlementImportPanel({
                               <span
                                 className={`rounded-full px-2 py-1 text-[10px] ${statusClass(row.status)}`}
                               >
-                                {row.status.toLowerCase().replaceAll("_", " ")}
+                                {formatEnum(row.status)}
                               </span>
                             </td>
                             <td className="py-2.5 text-ink2">
@@ -730,7 +755,7 @@ export default function SettlementImportPanel({
               )}
             </article>
           ))}
-          {loading && (
+          {loading && imports.length === 0 && (
             <p className="py-10 text-center text-[12px] text-ink2">
               Loading imports…
             </p>

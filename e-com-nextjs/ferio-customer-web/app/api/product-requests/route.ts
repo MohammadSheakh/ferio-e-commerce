@@ -1,5 +1,9 @@
-import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import {
+  bffErrorResponse,
+  forwardedHeaders,
+  proxyBackendResponse,
+} from "@/lib/bff-response";
 
 export async function POST(request: Request) {
   try {
@@ -16,11 +20,11 @@ export async function POST(request: Request) {
       "http://localhost:6733";
     const backendUrl = rawBackend.replace(/\/api\/v1\/?$/, "");
 
-    const headers: Record<string, string> = {
+    const headers = forwardedHeaders(request, {
       "Content-Type": "application/json",
-    };
+    });
     if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
+      headers.set("Authorization", `Bearer ${token}`);
     }
 
     const res = await fetch(`${backendUrl}/api/v1/product-requests`, {
@@ -30,12 +34,12 @@ export async function POST(request: Request) {
       cache: "no-store",
     });
 
-    const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
+    return proxyBackendResponse(res, "Failed to submit product request.");
   } catch {
-    return NextResponse.json(
-      { success: false, message: "Failed to submit product request" },
-      { status: 500 }
+    return bffErrorResponse(
+      "Failed to submit product request.",
+      503,
+      "SERVICE_UNAVAILABLE",
     );
   }
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { AdminApiError, adminApi } from "@/lib/admin-api";
+import { adminApi } from "@/lib/admin-api";
+import { adminApiErrorResponse } from "@/lib/bff-response";
 import type { CatalogBrand } from "@/lib/catalog";
 
 export async function GET(request: Request) {
@@ -9,10 +10,7 @@ export async function GET(request: Request) {
     );
     return NextResponse.json({ data: brands });
   } catch (error) {
-    const status = error instanceof AdminApiError ? error.status : 503;
-    const message =
-      error instanceof Error ? error.message : "Unable to load brands.";
-    return NextResponse.json({ message }, { status });
+    return adminApiErrorResponse(error, "Unable to load brands.");
   }
 }
 
@@ -26,9 +24,6 @@ export async function POST(request: Request) {
     });
     return NextResponse.json({ data: brand }, { status: 201 });
   } catch (error) {
-    const status = error instanceof AdminApiError ? error.status : 503;
-    const message =
-      error instanceof Error ? error.message : "Unable to create brand.";
-    return NextResponse.json({ message }, { status });
+    return adminApiErrorResponse(error, "Unable to create brand.");
   }
 }

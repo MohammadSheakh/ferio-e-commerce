@@ -1,11 +1,6 @@
 import { NextResponse } from "next/server";
-import { AdminApiError, adminApi } from "@/lib/admin-api";
-
-function errorResponse(error: unknown, fallback: string) {
-  const status = error instanceof AdminApiError ? error.status : 503;
-  const message = error instanceof Error ? error.message : fallback;
-  return NextResponse.json({ message }, { status });
-}
+import { adminApi } from "@/lib/admin-api";
+import { adminApiErrorResponse } from "@/lib/bff-response";
 
 export async function GET() {
   try {
@@ -23,7 +18,10 @@ export async function GET() {
     }
     return NextResponse.json({ data: slides });
   } catch (error) {
-    return errorResponse(error, "Unable to load hero showcase settings.");
+    return adminApiErrorResponse(
+      error,
+      "Unable to load hero showcase settings.",
+    );
   }
 }
 
@@ -44,6 +42,9 @@ export async function POST(request: Request) {
     );
     return NextResponse.json({ success: true, data: settings });
   } catch (error) {
-    return errorResponse(error, "Unable to save hero showcase settings.");
+    return adminApiErrorResponse(
+      error,
+      "Unable to save hero showcase settings.",
+    );
   }
 }

@@ -12,6 +12,7 @@ export default function ServiceDetailScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const [service, setService] = useState<CatalogService | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
 
   // Booking Form State
   const [name, setName] = useState('');
@@ -29,18 +30,8 @@ export default function ServiceDetailScreen() {
       try {
         const res = await apiGet<CatalogService>(`/services/${slug}`);
         if (res) setService(res);
-      } catch {
-        // Fallback default
-        setService({
-          id: 's1',
-          slug: slug || 'interior-design-consultation',
-          name: 'Interior Design Consultation',
-          description: '1-on-1 space planning and material selection with our senior interior architects.',
-          price: 500000,
-          durationMinutes: 60,
-          imageUrl: 'https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=800&q=80',
-          category: { name: 'Consultation' },
-        });
+      } catch (error) {
+        setLoadError(error instanceof Error ? error.message : 'Unable to load this service.');
       } finally {
         setLoading(false);
       }
@@ -53,22 +44,25 @@ export default function ServiceDetailScreen() {
       setError('Please fill in your name, phone, preferred date, and address.');
       return;
     }
+    const preferredAt = new Date(date.trim());
+    if (Number.isNaN(preferredAt.getTime())) {
+      setError('Enter a valid date and time, for example 2026-08-25 14:30.');
+      return;
+    }
     setSubmitting(true);
     setError('');
     try {
-      const res = await apiPost<{ reference: string }>('/service-booking', {
+      const res = await apiPost<{ reference: string }>('/services/bookings/request', {
         serviceId: service?.id,
-        serviceSlug: slug,
-        name: name.trim(),
+        customerName: name.trim(),
         phone: phone.trim(),
-        date: date.trim(),
+        preferredAt: preferredAt.toISOString(),
         address: address.trim(),
-        note: note.trim() || undefined,
+        customerNote: note.trim() || undefined,
       });
-      setBookedRef(res.reference || `SRV-${Date.now().toString().slice(-6)}`);
-    } catch {
-      // Fallback generate reference
-      setBookedRef(`SRV-${Date.now().toString().slice(-6)}`);
+      setBookedRef(res.reference);
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : 'Unable to request this service.');
     } finally {
       setSubmitting(false);
     }
@@ -88,7 +82,7 @@ export default function ServiceDetailScreen() {
       <SafeAreaView style={styles.safe}>
         <FerioHeader />
         <View style={styles.container}>
-          <Text style={styles.title}>Service not found</Text>
+          <Text style={styles.title}>{loadError || 'Service not found'}</Text>
         </View>
       </SafeAreaView>
     );
@@ -153,7 +147,7 @@ export default function ServiceDetailScreen() {
                 <TextInput
                   value={date}
                   onChangeText={setDate}
-                  placeholder="e.g. Next Monday afternoon"
+                  placeholder="2026-08-25 14:30"
                   placeholderTextColor="#9a9a9e"
                   style={styles.input}
                 />

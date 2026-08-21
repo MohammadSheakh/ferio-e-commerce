@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { AdminApiError, adminApi } from "@/lib/admin-api";
+import { adminApi } from "@/lib/admin-api";
+import { adminApiErrorResponse } from "@/lib/bff-response";
 import type { Shipment } from "@/lib/shipping";
 
 export async function GET() {
@@ -8,10 +9,6 @@ export async function GET() {
       data: await adminApi<Shipment[]>("/admin/shipping/shipments"),
     });
   } catch (error) {
-    const status = error instanceof AdminApiError ? error.status : 503;
-    return NextResponse.json(
-      { message: error instanceof Error ? error.message : "Unable to load shipments." },
-      { status },
-    );
+    return adminApiErrorResponse(error, "Unable to load shipments.");
   }
 }

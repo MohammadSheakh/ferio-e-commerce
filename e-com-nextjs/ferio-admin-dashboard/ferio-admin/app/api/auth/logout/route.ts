@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getBackendUrl } from "@/lib/backend";
+import { forwardedHeaders } from "@/lib/bff-response";
 
 export async function POST(request: NextRequest) {
   const refreshToken = request.cookies.get("ferio_admin_refresh")?.value;
@@ -8,9 +9,9 @@ export async function POST(request: NextRequest) {
     try {
       await fetch(getBackendUrl("/auth/logout"), {
         method: "POST",
-        headers: {
+        headers: forwardedHeaders(request, {
           Cookie: `refreshToken=${refreshToken}`,
-        },
+        }),
         cache: "no-store",
       });
     } catch {}

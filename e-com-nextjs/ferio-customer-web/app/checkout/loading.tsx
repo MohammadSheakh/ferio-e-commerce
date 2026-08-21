@@ -1,14 +1,13 @@
 export default function CheckoutLoading() {
   return (
-    <div className="mx-auto max-w-5xl px-6 py-10 space-y-8 animate-pulse">
+    <div className="mx-auto max-w-5xl space-y-8 px-6 py-10 motion-safe:animate-pulse">
       <div className="flex items-center gap-3 border-b border-line pb-4">
         <div className="h-8 w-44 rounded-lg bg-slate-300" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Left: Shipping & Delivery Address Form (7 cols) */}
         <div className="lg:col-span-7 space-y-6">
-          <div className="rounded-card border border-line bg-paper p-6 space-y-5 shadow-xs">
+          <div className="space-y-5 rounded-card border border-line bg-paper p-6">
             <div className="flex items-center gap-2 border-b border-line pb-3">
               <div className="h-5 w-5 rounded-full bg-slate-300" />
               <div className="h-5 w-44 rounded bg-slate-300 font-semibold" />
@@ -38,7 +37,7 @@ export default function CheckoutLoading() {
             </div>
           </div>
 
-          <div className="rounded-card border border-line bg-paper p-6 space-y-4 shadow-xs">
+          <div className="space-y-4 rounded-card border border-line bg-paper p-6">
             <div className="flex items-center gap-2 border-b border-line pb-3">
               <div className="h-5 w-5 rounded-full bg-slate-300" />
               <div className="h-5 w-40 rounded bg-slate-300 font-semibold" />
@@ -50,9 +49,8 @@ export default function CheckoutLoading() {
           </div>
         </div>
 
-        {/* Right: Order Summary Sidebar (5 cols) */}
         <div className="lg:col-span-5">
-          <div className="rounded-card border border-line bg-surface p-6 space-y-6 shadow-xs">
+          <div className="space-y-6 rounded-card border border-line bg-surface p-6">
             <div className="h-5 w-36 rounded bg-slate-300 font-semibold" />
             <div className="space-y-4 divide-y divide-line">
               {[...Array(2)].map((_, i) => (

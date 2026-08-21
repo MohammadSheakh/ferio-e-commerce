@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { AdminApiError, adminApi } from "@/lib/admin-api";
+import { adminApi } from "@/lib/admin-api";
+import { adminApiErrorResponse } from "@/lib/bff-response";
 
 export async function POST(
   _request: Request,
@@ -12,15 +13,6 @@ export async function POST(
       }),
     });
   } catch (error) {
-    const status = error instanceof AdminApiError ? error.status : 503;
-    return NextResponse.json(
-      {
-        message:
-          error instanceof Error
-            ? error.message
-            : "Unable to queue callback retry.",
-      },
-      { status },
-    );
+    return adminApiErrorResponse(error, "Unable to queue callback retry.");
   }
 }

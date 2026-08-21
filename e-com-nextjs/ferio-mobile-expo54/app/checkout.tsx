@@ -1,10 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Crypto from 'expo-crypto';
+import * as WebBrowser from 'expo-web-browser';
 import { Link, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FerioHeader } from '@/components/FerioHeader';
-import { apiGet, apiPost } from '@/lib/api';
+import { apiPost, apiRequest } from '@/lib/api';
+import { clearServerCartToken, syncCheckoutCart } from '@/lib/server-cart';
 import { formatTaka } from '@/lib/catalog';
 import { colors, radii } from '@/lib/theme';
 import { useCart } from '@/state/cart';
@@ -14,6 +17,8 @@ const STORAGE_KEY = 'ferio_mobile_checkout_details_v2';
 export interface DeliveryOption {
   id: string;
   name: string;
+  deliveryFee?: number;
+  freeDeliveryThreshold?: number | null;
   districts: Array<{ id: string; name: string }>;
 }
 
@@ -28,6 +33,7 @@ export interface CheckoutPreview {
 }
 
 export interface CheckoutOrderResult {
+  id: string;
   reference: string;
   status: string;
   payment?: {
@@ -56,11 +62,10 @@ export default function CheckoutScreen() {
   const { items, subtotal, clear } = useCart();
   const [form, setForm] = useState(initialForm);
   const [preview, setPreview] = useState<CheckoutPreview | null>(null);
-  const [deliveryOptions, setDeliveryOptions] = useState<DeliveryOption[]>([]);
-  const [loadingOptions, setLoadingOptions] = useState(false);
   const [previewing, setPreviewing] = useState(false);
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState('');
+  const [cartToken, setCartToken] = useState('');
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY)
@@ -73,21 +78,6 @@ export default function CheckoutScreen() {
   useEffect(() => {
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(form)).catch(() => {});
   }, [form]);
-
-  useEffect(() => {
-    async function loadDelivery() {
-      setLoadingOptions(true);
-      try {
-        const res = await apiGet<DeliveryOption[]>('/checkout/delivery-options');
-        if (Array.isArray(res)) setDeliveryOptions(res);
-      } catch {
-        // Fallback default zones if API is unreachable
-      } finally {
-        setLoadingOptions(false);
-      }
-    }
-    void loadDelivery();
-  }, []);
 
   function updateForm<K extends keyof typeof form>(key: K, value: typeof form[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -103,11 +93,17 @@ export default function CheckoutScreen() {
     setPreviewing(true);
     setError('');
     try {
-      const res = await apiPost<CheckoutPreview>('/checkout/preview', {
-        ...form,
-        email: form.email || undefined,
-        landmark: form.landmark || undefined,
+      const nextCartToken = await syncCheckoutCart(items);
+      const res = await apiRequest<CheckoutPreview>('/checkout/preview', {
+        method: 'POST',
+        headers: { 'x-cart-token': nextCartToken },
+        body: {
+          ...form,
+          email: form.email || undefined,
+          landmark: form.landmark || undefined,
+        },
       });
+      setCartToken(nextCartToken);
       setPreview(res);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to calculate checkout total.');
@@ -123,22 +119,42 @@ export default function CheckoutScreen() {
     }
     setPlacing(true);
     setError('');
-    const idempotencyKey = `mob_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    if (!preview || !cartToken) {
+      setError('Calculate the server total before placing your order.');
+      setPlacing(false);
+      return;
+    }
+    const idempotencyKey = `mob_${Crypto.randomUUID()}`;
     try {
-      const res = await apiPost<CheckoutOrderResult>('/checkout/order', {
-        idempotencyKey,
-        paymentMethod: form.paymentMethod,
-        paymentProvider: form.paymentMethod === 'PREPAID' ? form.paymentProvider : undefined,
+      const order = await apiRequest<CheckoutOrderResult>('/checkout/orders', {
+        method: 'POST',
+        headers: {
+          'x-cart-token': cartToken,
+          'Idempotency-Key': idempotencyKey,
+        },
+        body: { paymentMethod: form.paymentMethod },
       });
 
+      let status = order.status;
+      if (form.paymentMethod === 'PREPAID') {
+        const payment = await apiPost<{ redirectUrl?: string }>('/payments/initiate', {
+          orderId: order.id,
+          provider: form.paymentProvider,
+        });
+        if (!payment.redirectUrl) throw new Error('The payment provider did not return a redirect URL.');
+        await WebBrowser.openBrowserAsync(payment.redirectUrl);
+        status = 'PAYMENT_PENDING';
+      }
+
       await clear();
+      await clearServerCartToken();
       await AsyncStorage.removeItem(STORAGE_KEY);
 
       router.replace({
         pathname: '/order-confirmation',
         params: {
-          reference: res.reference,
-          status: res.status,
+          reference: order.reference,
+          status,
         },
       });
     } catch (err) {
@@ -147,14 +163,12 @@ export default function CheckoutScreen() {
     }
   }
 
-  const finalTotal = preview ? preview.pricing.total : subtotal + (form.district === 'Dhaka' ? 6000 : 12000);
+  const finalTotal = preview ? preview.pricing.total : subtotal;
   const deliveryFeeText = preview
     ? preview.pricing.deliveryFee === 0
       ? 'Free'
       : formatTaka(preview.pricing.deliveryFee)
-    : form.district === 'Dhaka'
-    ? '৳60 (Dhaka City)'
-    : '৳120 (Outside Dhaka)';
+    : 'Calculated after address validation';
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -280,6 +294,29 @@ export default function CheckoutScreen() {
               </Text>
             </Pressable>
           </View>
+          {form.paymentMethod === 'PREPAID' ? (
+            <View style={styles.providerRow}>
+              {(['SSLCOMMERZ', 'AAMARPAY'] as const).map((provider) => (
+                <Pressable
+                  key={provider}
+                  onPress={() => updateForm('paymentProvider', provider)}
+                  style={[
+                    styles.provider,
+                    form.paymentProvider === provider && styles.providerActive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.providerText,
+                      form.paymentProvider === provider && styles.providerTextActive,
+                    ]}
+                  >
+                    {provider === 'SSLCOMMERZ' ? 'SSLCommerz' : 'aamarPay'}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          ) : null}
         </View>
 
         <View style={styles.section}>
@@ -342,9 +379,9 @@ export default function CheckoutScreen() {
         ) : null}
 
         <Pressable
-          disabled={!items.length || !form.termsAccepted || placing}
+          disabled={!items.length || !form.termsAccepted || !preview || placing}
           onPress={handlePlaceOrder}
-          style={[styles.place, (!items.length || !form.termsAccepted || placing) && styles.disabled]}
+          style={[styles.place, (!items.length || !form.termsAccepted || !preview || placing) && styles.disabled]}
         >
           {placing ? (
             <ActivityIndicator color="#fff" />
@@ -419,6 +456,17 @@ const styles = StyleSheet.create({
   paymentActive: { backgroundColor: colors.ink, borderColor: colors.ink },
   paymentText: { fontSize: 12, color: colors.ink2 },
   paymentTextActive: { color: '#fff' },
+  providerRow: { marginTop: 10, flexDirection: 'row', gap: 8 },
+  provider: {
+    flex: 1,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.line,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  providerActive: { borderBottomColor: colors.ink },
+  providerText: { fontSize: 12, color: colors.ink2 },
+  providerTextActive: { color: colors.ink, fontWeight: '600' },
   toggle: {
     minHeight: 52,
     flexDirection: 'row',

@@ -14,6 +14,19 @@ export type OrderPaymentStatus =
   | "PARTIALLY_REFUNDED"
   | "REFUNDED";
 
+export type OrderPaymentMethod = "COD" | "PREPAID" | "PAY_AT_STORE";
+
+export type StorePickupStatus =
+  | "NOT_APPLICABLE"
+  | "CHECKING_AVAILABILITY"
+  | "AVAILABLE_IN_STORE"
+  | "TRANSFER_REQUIRED"
+  | "IN_TRANSFER"
+  | "READY_FOR_PICKUP"
+  | "SCHEDULED_BY_CUSTOMER"
+  | "COMPLETED"
+  | "CANCELLED";
+
 export type OrderFulfillmentStatus =
   | "UNFULFILLED"
   | "READY_FOR_FULFILLMENT"
@@ -33,7 +46,7 @@ export type OrderListItem = {
   fulfillmentStatus: OrderFulfillmentStatus;
   codVerification: string;
   total: number;
-  paymentMethod: "COD" | "PREPAID";
+  paymentMethod: OrderPaymentMethod;
   createdAt: string;
   customer: { id: string; name: string; phoneNormalized: string };
   address: { district: string; area: string } | null;
@@ -61,7 +74,28 @@ export type OrderDetail = {
   returnStatus: string;
   refundStatus: string;
   codVerification: string;
-  paymentMethod: "COD" | "PREPAID";
+  paymentMethod: OrderPaymentMethod;
+  deliveryMethod: "HOME_DELIVERY" | "STORE_PICKUP";
+  pickupStoreId: string | null;
+  pickupStore: {
+    id: string;
+    code: string;
+    name: string;
+    phone: string | null;
+    email: string | null;
+    district: string | null;
+    area: string | null;
+    address: string | null;
+    operatingHours: string | null;
+    operatingDays: string | null;
+    pickupInstructions: string | null;
+  } | null;
+  preferredPickupDate: string | null;
+  preferredPickupSlot: string | null;
+  storePickupStatus: StorePickupStatus;
+  storePickupOtp: string | null;
+  customerPickupNotes: string | null;
+  pickupScheduledAt: string | null;
   currency: "BDT";
   subtotal: number;
   discountTotal: number;
@@ -141,6 +175,23 @@ export type OrderDetail = {
     resolvedAt: string | null;
     orderItem: { id: string; productName: string; variantName: string } | null;
   }>;
+  operationalTimeline: OrderOperationalTimelineItem[];
+};
+
+export type OrderOperationalTimelineItem = {
+  id: string;
+  type:
+    | "ORDER"
+    | "FULFILLMENT"
+    | "PAYMENT"
+    | "SHIPMENT"
+    | "RETURN"
+    | "REFUND"
+    | "MESSAGE";
+  title: string;
+  status: string;
+  detail: string | null;
+  occurredAt: string;
 };
 
 export type CodPolicy = {

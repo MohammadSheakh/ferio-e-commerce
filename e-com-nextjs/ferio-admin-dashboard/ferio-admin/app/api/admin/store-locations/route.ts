@@ -1,14 +1,13 @@
 import { NextResponse } from "next/server";
-import { AdminApiError, adminApi } from "@/lib/admin-api";
+import { adminApi } from "@/lib/admin-api";
+import { adminApiErrorResponse } from "@/lib/bff-response";
 
 export async function GET() {
   try {
     const stores = await adminApi("/admin/store-locations");
     return NextResponse.json(stores);
   } catch (error) {
-    const status = error instanceof AdminApiError ? error.status : 500;
-    const message = error instanceof Error ? error.message : "Unable to load store locations.";
-    return NextResponse.json({ message }, { status });
+    return adminApiErrorResponse(error, "Unable to load store locations.");
   }
 }
 
@@ -22,8 +21,6 @@ export async function POST(request: Request) {
     });
     return NextResponse.json(store);
   } catch (error) {
-    const status = error instanceof AdminApiError ? error.status : 500;
-    const message = error instanceof Error ? error.message : "Unable to create store location.";
-    return NextResponse.json({ message }, { status });
+    return adminApiErrorResponse(error, "Unable to create store location.");
   }
 }

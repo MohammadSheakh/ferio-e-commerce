@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { AdminApiError, adminApi } from "@/lib/admin-api";
+import { adminApi } from "@/lib/admin-api";
+import { adminApiErrorResponse } from "@/lib/bff-response";
 import type { SettlementReportTemplate } from "@/lib/settlements";
 
 export async function GET() {
@@ -10,15 +11,9 @@ export async function GET() {
       ),
     });
   } catch (error) {
-    const status = error instanceof AdminApiError ? error.status : 503;
-    return NextResponse.json(
-      {
-        message:
-          error instanceof Error
-            ? error.message
-            : "Unable to download settlement template.",
-      },
-      { status },
+    return adminApiErrorResponse(
+      error,
+      "Unable to download settlement template.",
     );
   }
 }

@@ -6,6 +6,23 @@ import type {
   RefundEligibility,
   ReturnCase,
 } from "@/lib/returns";
+import { createBrowserUuid } from "@/lib/browser-uuid";
+
+const fieldClass =
+  "rounded-card border border-line bg-paper px-3 py-2 text-[11px] text-ink focus-visible:border-ink focus-visible:outline-none";
+
+function formatEnum(value: string) {
+  const label = value.replaceAll("_", " ").toLowerCase();
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+function refundStatusClass(status: CommerceRefund["status"]) {
+  if (status === "SUCCEEDED") return "bg-emerald-50 text-emerald-700";
+  if (status === "FAILED" || status === "CANCELLED")
+    return "bg-rose-50 text-rose-700";
+  if (status === "REQUIRES_ACTION") return "bg-amber-50 text-amber-700";
+  return "bg-surface text-ink2";
+}
 
 const money = (amount: number, currency: string) =>
   `${currency} ${(amount / 100).toLocaleString("en-BD", { minimumFractionDigits: 2 })}`;
@@ -19,6 +36,8 @@ function ResultForm({
 }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [executionMode, setExecutionMode] = useState("MANUAL");
+  const [outcome, setOutcome] = useState("SUCCEEDED");
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -29,7 +48,7 @@ function ResultForm({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Idempotency-Key": crypto.randomUUID(),
+          "Idempotency-Key": createBrowserUuid(),
         },
         body: JSON.stringify({
           executionMode: form.get("executionMode"),
@@ -62,35 +81,57 @@ function ResultForm({
       onSubmit={submit}
       className="mt-3 grid gap-2 border-t border-line pt-3 md:grid-cols-2 xl:grid-cols-5"
     >
-      <select
-        name="executionMode"
-        className="rounded-card border border-line px-3 py-2 text-[11px]"
-      >
-        <option value="MANUAL">Manual settlement</option>
-        <option value="PROVIDER">Provider result</option>
-      </select>
-      <select
-        name="outcome"
-        className="rounded-card border border-line px-3 py-2 text-[11px]"
-      >
-        <option value="SUCCEEDED">Succeeded</option>
-        <option value="FAILED">Failed</option>
-      </select>
-      <input
-        name="provider"
-        placeholder="Provider (required for provider)"
-        className="rounded-card border border-line px-3 py-2 text-[11px]"
-      />
-      <input
-        name="externalReference"
-        placeholder="Receipt/reference (required on success)"
-        className="rounded-card border border-line px-3 py-2 text-[11px]"
-      />
-      <input
-        name="failureReason"
-        placeholder="Failure reason (required on failure)"
-        className="rounded-card border border-line px-3 py-2 text-[11px]"
-      />
+      <label className="text-[10px] text-ink2">
+        Execution
+        <select
+          name="executionMode"
+          value={executionMode}
+          onChange={(event) => setExecutionMode(event.target.value)}
+          className={`mt-1 w-full ${fieldClass}`}
+        >
+          <option value="MANUAL">Manual settlement</option>
+          <option value="PROVIDER">Provider result</option>
+        </select>
+      </label>
+      <label className="text-[10px] text-ink2">
+        Outcome
+        <select
+          name="outcome"
+          value={outcome}
+          onChange={(event) => setOutcome(event.target.value)}
+          className={`mt-1 w-full ${fieldClass}`}
+        >
+          <option value="SUCCEEDED">Succeeded</option>
+          <option value="FAILED">Failed</option>
+        </select>
+      </label>
+      <label className="text-[10px] text-ink2">
+        Provider
+        <input
+          name="provider"
+          required={executionMode === "PROVIDER"}
+          placeholder={executionMode === "PROVIDER" ? "Required" : "Optional"}
+          className={`mt-1 w-full ${fieldClass}`}
+        />
+      </label>
+      <label className="text-[10px] text-ink2">
+        Receipt or reference
+        <input
+          name="externalReference"
+          required={outcome === "SUCCEEDED"}
+          placeholder={outcome === "SUCCEEDED" ? "Required" : "Optional"}
+          className={`mt-1 w-full ${fieldClass}`}
+        />
+      </label>
+      <label className="text-[10px] text-ink2">
+        Failure reason
+        <input
+          name="failureReason"
+          required={outcome === "FAILED"}
+          placeholder={outcome === "FAILED" ? "Required" : "Optional"}
+          className={`mt-1 w-full ${fieldClass}`}
+        />
+      </label>
       <div className="md:col-span-2 xl:col-span-5">
         <button
           disabled={saving}
@@ -140,14 +181,20 @@ export default function RefundPanel({
         data?: CommerceRefund[];
         message?: string;
       };
-      if (!eligibilityResponse.ok || !eligibilityPayload.data)
-        throw new Error(
+      const failures: string[] = [];
+      if (eligibilityResponse.ok && eligibilityPayload.data) {
+        setEligibility(eligibilityPayload.data);
+      } else {
+        failures.push(
           eligibilityPayload.message || "Unable to load refund eligibility.",
         );
-      if (!refundsResponse.ok || !refundsPayload.data)
-        throw new Error(refundsPayload.message || "Unable to load refunds.");
-      setEligibility(eligibilityPayload.data);
-      setRefunds(refundsPayload.data);
+      }
+      if (refundsResponse.ok && refundsPayload.data) {
+        setRefunds(refundsPayload.data);
+      } else {
+        failures.push(refundsPayload.message || "Unable to load refunds.");
+      }
+      setError(failures.join(" "));
     } catch (loadError) {
       setError(
         loadError instanceof Error
@@ -171,7 +218,7 @@ export default function RefundPanel({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Idempotency-Key": crypto.randomUUID(),
+          "Idempotency-Key": createBrowserUuid(),
         },
         body: JSON.stringify({
           amount: Math.round(Number(form.get("amount")) * 100),
@@ -223,13 +270,23 @@ export default function RefundPanel({
           </div>
         )}
       </div>
-      {loading && (
+      {loading && refunds.length === 0 && (
         <p className="mt-3 text-[11px] text-ink2">Loading refund ledger…</p>
       )}
       {error && (
-        <p role="alert" className="mt-3 text-[11px] text-rose-700">
-          {error}
-        </p>
+        <div
+          role="alert"
+          className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-card border border-rose-200 bg-rose-50 p-3 text-[11px] text-rose-700"
+        >
+          <span>{error}</span>
+          <button
+            type="button"
+            onClick={() => void load()}
+            className="rounded-full border border-rose-200 px-3 py-1.5 font-medium"
+          >
+            Retry refund data
+          </button>
+        </div>
       )}
       {eligibility && eligibility.remainingAmount > 0 && (
         <form
@@ -246,14 +303,14 @@ export default function RefundPanel({
               max={eligibility.remainingAmount / 100}
               step="0.01"
               defaultValue={(eligibility.remainingAmount / 100).toFixed(2)}
-              className="mt-1 w-full rounded-card border border-line px-3 py-2 text-[12px]"
+              className={`mt-1 w-full text-[12px] ${fieldClass}`}
             />
           </label>
           <label className="text-[11px] text-ink2">
             Method
             <select
               name="method"
-              className="mt-1 w-full rounded-card border border-line px-3 py-2 text-[12px]"
+              className={`mt-1 w-full text-[12px] ${fieldClass}`}
             >
               <option value="BANK_TRANSFER">Bank transfer</option>
               <option value="BKASH">bKash</option>
@@ -271,7 +328,7 @@ export default function RefundPanel({
             <input
               name="sourcePaymentReference"
               placeholder="Required for original payment"
-              className="mt-1 w-full rounded-card border border-line px-3 py-2 text-[12px]"
+              className={`mt-1 w-full text-[12px] ${fieldClass}`}
             />
           </label>
           <label className="text-[11px] text-ink2">
@@ -282,7 +339,7 @@ export default function RefundPanel({
               minLength={3}
               maxLength={1000}
               defaultValue={`Accepted return ${entry.rmaReference}`}
-              className="mt-1 w-full rounded-card border border-line px-3 py-2 text-[12px]"
+              className={`mt-1 w-full text-[12px] ${fieldClass}`}
             />
           </label>
           <div className="md:col-span-2 xl:col-span-4">
@@ -307,14 +364,13 @@ export default function RefundPanel({
                   {refund.reference} · {money(refund.amount, refund.currency)}
                 </p>
                 <p className="mt-1 text-[11px] text-ink2">
-                  {refund.method.replaceAll("_", " ").toLowerCase()} ·{" "}
-                  {refund.reason}
+                  {formatEnum(refund.method)} · {refund.reason}
                 </p>
               </div>
               <span
-                className={`h-fit rounded-full px-2.5 py-1 text-[10px] ${refund.status === "SUCCEEDED" ? "bg-emerald-50 text-emerald-700" : refund.status === "FAILED" ? "bg-rose-50 text-rose-700" : "bg-amber-50 text-amber-700"}`}
+                className={`h-fit rounded-full px-2.5 py-1 text-[10px] ${refundStatusClass(refund.status)}`}
               >
-                {refund.status.toLowerCase()}
+                {formatEnum(refund.status)}
               </span>
             </div>
             {refund.attempts.length > 0 && (
@@ -322,8 +378,8 @@ export default function RefundPanel({
                 {refund.attempts.map((attempt) => (
                   <p key={attempt.id}>
                     Attempt {attempt.attemptNumber}:{" "}
-                    {attempt.outcome.toLowerCase()} via{" "}
-                    {attempt.executionMode.toLowerCase()}
+                    {formatEnum(attempt.outcome)} via{" "}
+                    {formatEnum(attempt.executionMode).toLowerCase()}
                     {attempt.externalReference
                       ? ` · ${attempt.externalReference}`
                       : ""}
@@ -337,6 +393,11 @@ export default function RefundPanel({
             )}
           </article>
         ))}
+        {!loading && refunds.length === 0 && (
+          <p className="py-4 text-[11px] text-ink2">
+            No refund instructions recorded.
+          </p>
+        )}
       </div>
     </section>
   );

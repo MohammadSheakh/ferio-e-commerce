@@ -10,6 +10,9 @@ export type CommerceSettings = {
   defaultReturnWindowDays: number | null;
   codEnabled: boolean;
   prepaidEnabled: boolean;
+  serviceBookingEnabled: boolean;
+  warrantyClaimsEnabled: boolean;
+  storefrontAnalyticsEnabled: boolean;
   purchaseActivityEnabled: boolean;
   purchaseHistoryEnabled: boolean;
   purchaseActivityShowDistrict: boolean;

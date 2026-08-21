@@ -1,28 +1,36 @@
-import { NextResponse } from "next/server";
+import {
+  bffErrorResponse,
+  forwardedHeaders,
+  proxyBackendResponse,
+} from "@/lib/bff-response";
 
 export async function GET(request: Request) {
   try {
     const authHeader = request.headers.get("authorization");
     if (!authHeader) {
-      return NextResponse.json({ message: "Unauthorized." }, { status: 401 });
+      return bffErrorResponse(
+        "Unauthorized.",
+        401,
+        "AUTHENTICATION_REQUIRED",
+      );
     }
 
     const backendUrl =
       process.env.NEXT_PUBLIC_FERIO_API_URL ?? "http://localhost:6733/api/v1";
     const res = await fetch(`${backendUrl}/delivery-personnel/my-orders`, {
-      headers: {
+      headers: forwardedHeaders(request, {
         Authorization: authHeader,
         Accept: "application/json",
-      },
+      }),
       cache: "no-store",
     });
 
-    const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
+    return proxyBackendResponse(res, "Unable to load delivery orders.");
   } catch {
-    return NextResponse.json(
-      { message: "Unable to connect to backend server." },
-      { status: 503 },
+    return bffErrorResponse(
+      "Unable to connect to backend server.",
+      503,
+      "SERVICE_UNAVAILABLE",
     );
   }
 }

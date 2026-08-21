@@ -1,4 +1,8 @@
-import { NextResponse } from "next/server";
+import {
+  bffErrorResponse,
+  forwardedHeaders,
+  proxyBackendResponse,
+} from "@/lib/bff-response";
 
 export async function PATCH(
   request: Request,
@@ -7,7 +11,11 @@ export async function PATCH(
   try {
     const authHeader = request.headers.get("authorization");
     if (!authHeader) {
-      return NextResponse.json({ message: "Unauthorized." }, { status: 401 });
+      return bffErrorResponse(
+        "Unauthorized.",
+        401,
+        "AUTHENTICATION_REQUIRED",
+      );
     }
 
     const body = await request.json();
@@ -17,20 +25,20 @@ export async function PATCH(
       `${backendUrl}/delivery-personnel/my-orders/${params.id}/status`,
       {
         method: "PATCH",
-        headers: {
+        headers: forwardedHeaders(request, {
           Authorization: authHeader,
           "Content-Type": "application/json",
-        },
+        }),
         body: JSON.stringify(body),
       },
     );
 
-    const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
+    return proxyBackendResponse(res, "Unable to update delivery status.");
   } catch {
-    return NextResponse.json(
-      { message: "Unable to update delivery status." },
-      { status: 503 },
+    return bffErrorResponse(
+      "Unable to update delivery status.",
+      503,
+      "SERVICE_UNAVAILABLE",
     );
   }
 }

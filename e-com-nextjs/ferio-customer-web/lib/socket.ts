@@ -13,21 +13,26 @@ export function getCustomerSocket(token?: string, guestId?: string): Socket {
       auth: {
         token: token || "",
         guestId: guestId || "",
-        role: "customer",
       },
       query: {
         guestId: guestId || "",
-        role: "customer",
         page: typeof window !== "undefined" ? window.location.pathname : "/",
       },
     });
   } else {
+    const previousToken =
+      typeof socket.auth === "object" && "token" in socket.auth
+        ? socket.auth.token
+        : "";
     socket.auth = {
       ...(typeof socket.auth === "object" ? socket.auth : {}),
-      role: "customer",
-      ...(token ? { token } : {}),
+      token: token || "",
       ...(guestId ? { guestId } : {}),
     };
+
+    if (socket.connected && token && previousToken !== token) {
+      socket.disconnect();
+    }
   }
 
   if (!socket.connected) {

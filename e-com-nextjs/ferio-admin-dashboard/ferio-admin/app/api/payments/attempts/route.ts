@@ -1,11 +1,17 @@
 import { NextResponse } from "next/server";
-import { AdminApiError, adminApi } from "@/lib/admin-api";
-import type { PaymentAttempt } from "@/lib/payments";
+import { adminApi } from "@/lib/admin-api";
+import { adminApiErrorResponse } from "@/lib/bff-response";
+import type { PaymentAttemptPage } from "@/lib/payments";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    return NextResponse.json({ data: await adminApi<PaymentAttempt[]>("/admin/payments/attempts") });
+    const query = new URL(request.url).search;
+    return NextResponse.json({
+      data: await adminApi<PaymentAttemptPage>(
+        `/admin/payments/attempts${query}`,
+      ),
+    });
   } catch (error) {
-    return NextResponse.json({ message: error instanceof Error ? error.message : "Unable to load payment attempts." }, { status: error instanceof AdminApiError ? error.status : 503 });
+    return adminApiErrorResponse(error, "Unable to load payment attempts.");
   }
 }

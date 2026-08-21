@@ -44,13 +44,17 @@ async function refreshSession(
       return null;
     }
 
-    const response = NextResponse.next();
+    request.cookies.set("ferio_admin_access", payload.data.accessToken);
+    request.cookies.set("ferio_admin_refresh", nextRefreshToken);
+    const response = NextResponse.next({
+      request: { headers: request.headers },
+    });
     const secure = process.env.NODE_ENV === "production";
     response.cookies.set("ferio_admin_access", payload.data.accessToken, {
       httpOnly: true,
       secure,
       sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60,
+      maxAge: 15 * 60,
       path: "/",
     });
     response.cookies.set("ferio_admin_refresh", nextRefreshToken, {

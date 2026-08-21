@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useState } from "react";
+import Pagination from "@/components/Pagination";
+import { createBrowserUuid } from "@/lib/browser-uuid";
 import type {
   ReconciliationFinding,
   ReconciliationFindingPage,
@@ -11,10 +13,22 @@ import type {
 
 const severityClass: Record<ReconciliationFinding["severity"], string> = {
   LOW: "bg-surface text-ink2",
-  MEDIUM: "bg-amber-50 text-amber-700",
-  HIGH: "bg-orange-50 text-orange-700",
+  MEDIUM: "bg-surface text-ink2",
+  HIGH: "bg-amber-50 text-amber-700",
   CRITICAL: "bg-rose-50 text-rose-700",
 };
+
+const fieldClass =
+  "rounded-card border border-line bg-paper px-3 py-2 text-[11px] text-ink focus-visible:border-ink focus-visible:outline-none";
+
+function formatEnum(value: string) {
+  const label = value.replaceAll("_", " ").toLowerCase();
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+function failureMessage(reason: unknown, fallback: string) {
+  return reason instanceof Error ? reason.message : fallback;
+}
 
 function ageLabel(value: string) {
   const hours = Math.max(
@@ -42,11 +56,13 @@ function ActionForm({
 }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     setSaving(true);
     setError("");
+    setNotice("");
     try {
       const response = await fetch(
         `/api/reconciliation/findings/${entry.id}/action`,
@@ -65,6 +81,7 @@ function ActionForm({
       };
       if (!response.ok || !payload.data)
         throw new Error(payload.message || "Unable to update finding.");
+      setNotice(`${formatEnum(String(form.get("action")))} recorded.`);
       reload();
     } catch (actionError) {
       setError(
@@ -83,9 +100,10 @@ function ActionForm({
     >
       <select
         name="action"
-        className="rounded-card border border-line px-3 py-2 text-[11px]"
+        aria-label={`Action for ${entry.title}`}
+        className={fieldClass}
       >
-        <option value="CLAIM">Claim</option>
+        {entry.status !== "RESOLVED" && <option value="CLAIM">Claim</option>}
         {entry.status !== "RESOLVED" && (
           <option value="ACKNOWLEDGE">Acknowledge</option>
         )}
@@ -101,17 +119,23 @@ function ActionForm({
         minLength={3}
         maxLength={1000}
         placeholder="Required action note"
-        className="min-w-64 flex-1 rounded-card border border-line px-3 py-2 text-[11px]"
+        aria-label={`Action note for ${entry.title}`}
+        className={`min-w-64 flex-1 ${fieldClass}`}
       />
       <button
         disabled={saving}
-        className="rounded-full bg-ink px-4 py-2 text-[11px] text-white disabled:opacity-40"
+        className="rounded-full bg-ink px-4 py-2 text-[11px] text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:opacity-40"
       >
         {saving ? "Saving…" : "Apply action"}
       </button>
       {error && (
         <p role="alert" className="w-full text-[11px] text-rose-700">
           {error}
+        </p>
+      )}
+      {notice && (
+        <p role="status" className="w-full text-[11px] text-emerald-700">
+          {notice}
         </p>
       )}
     </form>
@@ -123,63 +147,88 @@ export default function FindingsQueue() {
   const [status, setStatus] = useState("OPEN");
   const [domain, setDomain] = useState("");
   const [severity, setSeverity] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 30;
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
-  const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const [operationError, setOperationError] = useState("");
   const [lastRun, setLastRun] = useState<ReconciliationRun | null>(null);
   const [queueHealth, setQueueHealth] =
     useState<ReconciliationQueueHealth | null>(null);
   const [retrying, setRetrying] = useState("");
   const load = useCallback(async () => {
     setLoading(true);
-    setError("");
-    try {
-      const query = new URLSearchParams({ limit: "100" });
-      if (status) query.set("status", status);
-      if (domain) query.set("domain", domain);
-      if (severity) query.set("severity", severity);
-      const [response, healthResponse] = await Promise.all([
-        fetch(`/api/reconciliation/findings?${query}`, { cache: "no-store" }),
-        fetch("/api/reconciliation/queue-health", { cache: "no-store" }),
-      ]);
-      const payload = (await response.json()) as {
-        data?: ReconciliationFindingPage;
-        message?: string;
-      };
-      const healthPayload = (await healthResponse.json()) as {
-        data?: ReconciliationQueueHealth;
-        message?: string;
-      };
-      if (!response.ok || !payload.data)
-        throw new Error(payload.message || "Unable to load findings.");
-      if (!healthResponse.ok || !healthPayload.data)
-        throw new Error(
-          healthPayload.message || "Unable to load queue health.",
-        );
-      setPage(payload.data);
-      setQueueHealth(healthPayload.data);
-    } catch (loadError) {
-      setError(
-        loadError instanceof Error
-          ? loadError.message
-          : "Unable to load findings.",
+    setLoadError("");
+    const query = new URLSearchParams({
+      limit: String(pageSize),
+      page: String(currentPage),
+    });
+    if (status) query.set("status", status);
+    if (domain) query.set("domain", domain);
+    if (severity) query.set("severity", severity);
+    const [findingsResult, healthResult] = await Promise.allSettled([
+      (async () => {
+        const response = await fetch(`/api/reconciliation/findings?${query}`, {
+          cache: "no-store",
+        });
+        const payload = (await response.json()) as {
+          data?: ReconciliationFindingPage;
+          message?: string;
+        };
+        if (!response.ok || !payload.data)
+          throw new Error(payload.message || "Unable to load findings.");
+        return payload.data;
+      })(),
+      (async () => {
+        const response = await fetch("/api/reconciliation/queue-health", {
+          cache: "no-store",
+        });
+        const payload = (await response.json()) as {
+          data?: ReconciliationQueueHealth;
+          message?: string;
+        };
+        if (!response.ok || !payload.data)
+          throw new Error(payload.message || "Unable to load queue health.");
+        return payload.data;
+      })(),
+    ]);
+    const failures: string[] = [];
+    if (findingsResult.status === "fulfilled") {
+      setPage(findingsResult.value);
+      if (
+        findingsResult.value.totalPages > 0 &&
+        currentPage > findingsResult.value.totalPages
+      ) {
+        setCurrentPage(findingsResult.value.totalPages);
+      }
+    } else {
+      failures.push(
+        failureMessage(findingsResult.reason, "Unable to load findings."),
       );
-    } finally {
-      setLoading(false);
     }
-  }, [domain, severity, status]);
+    if (healthResult.status === "fulfilled") {
+      setQueueHealth(healthResult.value);
+    } else {
+      failures.push(
+        failureMessage(healthResult.reason, "Unable to load queue health."),
+      );
+    }
+    setLoadError(failures.join(" "));
+    setLoading(false);
+  }, [currentPage, domain, severity, status]);
   useEffect(() => {
     void load();
   }, [load]);
   async function scan() {
     setScanning(true);
-    setError("");
+    setOperationError("");
     try {
       const response = await fetch("/api/reconciliation/scan", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Idempotency-Key": crypto.randomUUID(),
+          "Idempotency-Key": createBrowserUuid(),
         },
         body: JSON.stringify({ overdueHours: 168 }),
       });
@@ -192,7 +241,7 @@ export default function FindingsQueue() {
       setLastRun(payload.data);
       await load();
     } catch (scanError) {
-      setError(
+      setOperationError(
         scanError instanceof Error ? scanError.message : "Unable to run scan.",
       );
     } finally {
@@ -201,12 +250,11 @@ export default function FindingsQueue() {
   }
   async function retry(runId: string) {
     setRetrying(runId);
-    setError("");
+    setOperationError("");
     try {
-      const response = await fetch(
-        `/api/reconciliation/runs/${runId}/retry`,
-        { method: "POST" },
-      );
+      const response = await fetch(`/api/reconciliation/runs/${runId}/retry`, {
+        method: "POST",
+      });
       const payload = (await response.json()) as {
         data?: { jobId: string };
         message?: string;
@@ -215,7 +263,7 @@ export default function FindingsQueue() {
         throw new Error(payload.message || "Unable to queue retry.");
       await load();
     } catch (retryError) {
-      setError(
+      setOperationError(
         retryError instanceof Error
           ? retryError.message
           : "Unable to queue retry.",
@@ -240,7 +288,7 @@ export default function FindingsQueue() {
         <button
           onClick={() => void scan()}
           disabled={scanning}
-          className="rounded-full border border-line px-4 py-2 text-[12px] text-ink disabled:opacity-40"
+          className="rounded-full border border-line px-4 py-2 text-[12px] text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:opacity-40"
         >
           {scanning ? "Scanning…" : "Run reconciliation scan"}
         </button>
@@ -268,14 +316,15 @@ export default function FindingsQueue() {
               <p className="text-[11px] text-ink2">
                 Waiting {queueHealth.counts.waiting} · active{" "}
                 {queueHealth.counts.active} · delayed{" "}
-                {queueHealth.counts.delayed} · failed {queueHealth.counts.failed}
+                {queueHealth.counts.delayed} · failed{" "}
+                {queueHealth.counts.failed}
               </p>
             )}
           </div>
           {queueHealth.scheduler && (
             <p className="mt-2 text-[10px] text-ink2">
               Next scheduled scan{" "}
-              {new Date(queueHealth.scheduler.next).toLocaleString()}
+              {new Date(queueHealth.scheduler.next).toLocaleString("en-BD")}
             </p>
           )}
           <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-[10px] text-ink2">
@@ -301,7 +350,7 @@ export default function FindingsQueue() {
               {queueHealth.operations.lastSuccess?.completedAt
                 ? new Date(
                     queueHealth.operations.lastSuccess.completedAt,
-                  ).toLocaleString()
+                  ).toLocaleString("en-BD")
                 : "not recorded"}
             </p>
           </div>
@@ -330,7 +379,7 @@ export default function FindingsQueue() {
                     <button
                       onClick={() => void retry(run.id)}
                       disabled={retrying === run.id || !queueHealth.available}
-                      className="rounded-full border border-line px-3 py-1.5 text-[10px] text-ink disabled:opacity-40"
+                      className="rounded-full border border-line px-3 py-1.5 text-[10px] text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:opacity-40"
                     >
                       {retrying === run.id ? "Queuing…" : "Retry failed run"}
                     </button>
@@ -342,9 +391,13 @@ export default function FindingsQueue() {
       )}
       <div className="mt-4 flex flex-wrap gap-2">
         <select
+          aria-label="Filter findings by status"
           value={status}
-          onChange={(event) => setStatus(event.target.value)}
-          className="rounded-full border border-line px-3 py-2 text-[11px]"
+          onChange={(event) => {
+            setStatus(event.target.value);
+            setCurrentPage(1);
+          }}
+          className={`${fieldClass} rounded-full`}
         >
           <option value="OPEN">Open</option>
           <option value="ACKNOWLEDGED">Acknowledged</option>
@@ -352,9 +405,13 @@ export default function FindingsQueue() {
           <option value="">All statuses</option>
         </select>
         <select
+          aria-label="Filter findings by domain"
           value={domain}
-          onChange={(event) => setDomain(event.target.value)}
-          className="rounded-full border border-line px-3 py-2 text-[11px]"
+          onChange={(event) => {
+            setDomain(event.target.value);
+            setCurrentPage(1);
+          }}
+          className={`${fieldClass} rounded-full`}
         >
           <option value="">All domains</option>
           {["INVENTORY", "PAYMENT", "SHIPPING", "REFUND", "SETTLEMENT"].map(
@@ -364,9 +421,13 @@ export default function FindingsQueue() {
           )}
         </select>
         <select
+          aria-label="Filter findings by severity"
           value={severity}
-          onChange={(event) => setSeverity(event.target.value)}
-          className="rounded-full border border-line px-3 py-2 text-[11px]"
+          onChange={(event) => {
+            setSeverity(event.target.value);
+            setCurrentPage(1);
+          }}
+          className={`${fieldClass} rounded-full`}
         >
           <option value="">All severity</option>
           {["CRITICAL", "HIGH", "MEDIUM", "LOW"].map((value) => (
@@ -385,9 +446,24 @@ export default function FindingsQueue() {
           {lastRun.openedCount}, auto-resolved {lastRun.autoResolvedCount}.
         </p>
       )}
-      {error && (
+      {loadError && (
+        <div
+          role="alert"
+          className="mt-3 flex flex-wrap items-center justify-between gap-3 border-y border-rose-200 bg-rose-50 px-4 py-3 text-[11px] text-rose-700"
+        >
+          <p>{loadError}</p>
+          <button
+            type="button"
+            onClick={() => void load()}
+            className="rounded-full border border-rose-200 px-3 py-1.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-700"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+      {operationError && (
         <p role="alert" className="mt-3 text-[11px] text-rose-700">
-          {error}
+          {operationError}
         </p>
       )}
       <div className="mt-5 divide-y divide-line border-y border-line">
@@ -401,7 +477,7 @@ export default function FindingsQueue() {
                     <span
                       className={`rounded-full px-2.5 py-1 text-[10px] ${severityClass[entry.severity]}`}
                     >
-                      {entry.severity.toLowerCase()}
+                      {formatEnum(entry.severity)}
                     </span>
                     <span className="text-[10px] uppercase tracking-eyebrow text-ink2">
                       {entry.domain} · age {ageLabel(entry.firstDetectedAt)} ·
@@ -424,7 +500,7 @@ export default function FindingsQueue() {
                   )}
                 </div>
                 <div className="text-right text-[10px] text-ink2">
-                  <p>{entry.status.toLowerCase()}</p>
+                  <p>{formatEnum(entry.status)}</p>
                   <p className="mt-1">
                     Owner {entry.ownerActorId || "unassigned"}
                   </p>
@@ -439,7 +515,7 @@ export default function FindingsQueue() {
             </article>
           );
         })}
-        {loading && (
+        {loading && !page?.items.length && (
           <p className="py-12 text-center text-[12px] text-ink2">
             Loading reconciliation findings…
           </p>
@@ -450,6 +526,16 @@ export default function FindingsQueue() {
           </p>
         )}
       </div>
+      {page && (
+        <Pagination
+          currentPage={page.page}
+          totalPages={page.totalPages}
+          totalItems={page.total}
+          pageSize={page.limit}
+          onPageChange={setCurrentPage}
+          isLoading={loading}
+        />
+      )}
     </section>
   );
 }

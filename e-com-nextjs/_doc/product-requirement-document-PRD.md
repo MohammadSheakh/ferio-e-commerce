@@ -2,7 +2,7 @@
 
 **Document status:** Baseline for product, design, and engineering
 
-**Version:** 1.0
+**Version:** 1.1
 
 **Date:** August 4, 2026
 
@@ -12,7 +12,7 @@
 
 **Initial operating model:** Single seller, single brand, one warehouse
 
-**Primary applications:** Customer Web and Admin Web
+**Primary applications:** Customer Web, Admin Web, Customer Mobile App, and NestJS Backend
 
 **Primary language:** Bangla and English, with Banglish-compatible customer data and messaging
 
@@ -42,17 +42,18 @@ The future-state architecture diagrams remain useful directional references. The
 
 Ferio will help a single-seller e-commerce business sell reliably, manage Bangladesh-specific COD operations, own its customer relationships, and make repeat purchases measurably more profitable than first purchases.
 
-The product consists initially of two responsive web applications sharing one backend:
+The product consists of two responsive web applications and one Expo customer application sharing one NestJS backend:
 
 1. **Customer Web** — discovery, product browsing, cart, checkout, payment, order tracking, and post-purchase actions.
 2. **Admin Web** — catalog, inventory, orders, customers, CRM, shipping, returns, marketing, reconciliation, reports, settings, and audit history.
+3. **Customer Mobile App** — Expo-based access to the same customer identity, commerce, service, tracking, and support capabilities through shared backend contracts.
 
 The platform's central business loop is:
 
 ```text
 Rented acquisition channel
         ↓
-Ferio website or lead capture
+Ferio Web, Mobile App, or lead capture
         ↓
 First-party customer identity and consent
         ↓
@@ -208,7 +209,7 @@ The following are explicitly outside Release 1 and should not influence its arch
 - ClickHouse or a dedicated analytics warehouse;
 - complete ERP accounting, payroll, tax, fixed assets, or general ledger;
 - custom courier/rider application for third-party delivery partners;
-- native customer mobile application;
+- a separate delivery-partner application for third-party couriers; the customer Expo application is now an approved product surface;
 - full Meta Ads Manager replacement;
 - full email service provider replacement;
 - machine-learning recommendations, churn prediction, or autonomous campaign decisions;
@@ -385,6 +386,20 @@ Jobs and Reconciliation
 
 These are modules, not separately deployable services in the initial product.
 
+### 9.4 Customer Mobile App
+
+The Expo 54 application is a supported Ferio customer surface, not a separate product. It must use the same backend domain rules and customer identity as Customer Web.
+
+Required capabilities include:
+
+- registration, verified sign-in, Google sign-in, logout, and recoverable sessions;
+- catalog, search, product details, cart, checkout, COD, prepaid redirect/result, order history, and tracking;
+- saved addresses, product requests, service booking, warranty entry points, and customer support chat;
+- native-safe loading, empty, offline, error, retry, and deep-link behavior;
+- no production fallback catalog, services, reviews, or Q&A that can be mistaken for server data.
+
+Mobile completion requires contract-level parity with the backend. A rendered screen or local-only AsyncStorage flow is not sufficient evidence of completion.
+
 ---
 
 ## 10. Release Strategy
@@ -424,6 +439,12 @@ Scope:
 - operational, delivered-order, and contribution reporting;
 - reconciliation jobs;
 - security, audit, backup, monitoring, and launch operations.
+- Customer Web and Mobile App account access, saved addresses, and order history;
+- real-time customer support chat with authenticated staff access;
+- product requests, product-linked YouTube review moderation, warranty claims, and category-scoped service booking;
+- store pickup, outlets, pickup OTP handover, delivery-personnel operations, and live location where enabled;
+- consented purchase-activity social proof and configurable public history;
+- provider-neutral multi-courier routing while requiring at least one provider to pass launch verification.
 
 ### 10.3 Release 2 — Retain customers
 
@@ -455,7 +476,7 @@ Candidate scope, subject to data and business validation:
 - AI-assisted copy, segmentation, support, and anomaly detection;
 - advanced fraud or COD risk scoring;
 - analytics warehouse;
-- multiple courier optimization;
+- advanced courier optimization beyond the implemented deterministic provider scorecard;
 - warehouse-optimized scanner interface;
 - additional warehouse support;
 - selective module extraction when deployment or team ownership requires it.
@@ -864,6 +885,44 @@ Every formula must declare its included costs, date basis, and handling of late 
 | FR-SET-006 | P0 | Audit records must be append-only for normal users. |
 | FR-SET-007 | P1 | Feature flags may control risky staged rollouts. |
 
+### 12.18 Omnichannel customer experience
+
+| ID | Priority | Requirement |
+|---|---|---|
+| FR-OMNI-001 | P0 | Customer Web and Mobile App must use the same backend identity, catalog, cart, checkout, order, payment, service, and support contracts. |
+| FR-OMNI-002 | P0 | Mobile registration and Google sign-in payloads must match the verified backend authentication contract. |
+| FR-OMNI-003 | P0 | Mobile checkout must use the server cart, required idempotency and cart headers, and the canonical order endpoint. |
+| FR-OMNI-004 | P0 | Mobile prepaid checkout must open the provider redirect URL and safely handle success, failure, cancellation, and retry. |
+| FR-OMNI-005 | P0 | Mobile sessions must use secure device storage and the same refresh, revocation, and expiry policy as supported customer sessions. |
+| FR-OMNI-006 | P0 | Production customer surfaces must not silently substitute static fallback content for failed backend data. |
+| FR-OMNI-007 | P1 | Customer capabilities should retain consistent labels, status meaning, and recovery actions across web and mobile. |
+
+### 12.19 Support, requests, reviews, services, and warranty
+
+| ID | Priority | Requirement |
+|---|---|---|
+| FR-EXT-001 | P1 | Authenticated customers may start support conversations and exchange persisted real-time messages with authorized staff. |
+| FR-EXT-002 | P0 | Conversation lists, message history, socket rooms, and staff identity must be authorized server-side; clients cannot self-assign an admin role. |
+| FR-EXT-003 | P1 | Customers may submit requested products and Admin may review and manage the request lifecycle. |
+| FR-EXT-004 | P1 | Authenticated customers may submit product-linked YouTube reviews; Admin may add, edit, approve, feature, reject, or delete them. |
+| FR-EXT-005 | P1 | Admin may manage product review banners shown on eligible product-detail pages. |
+| FR-EXT-006 | P1 | Admin may create category-scoped service offerings and customers may submit validated booking requests with immutable service snapshots. |
+| FR-EXT-007 | P1 | Eligible delivered order items may open warranty claims with issue details and image evidence. |
+| FR-EXT-008 | P1 | Warranty history must support received, repaired, sent-to-brand, received-from-brand, resolved, and rejected-with-cause outcomes without erasing prior states. |
+
+### 12.20 Pickup, delivery workforce, and public activity
+
+| ID | Priority | Requirement |
+|---|---|---|
+| FR-OPS-001 | P1 | Admin may manage store outlets and eligible customers may select click-and-collect with PAY_AT_STORE where enabled. |
+| FR-OPS-002 | P1 | Pickup orders must have an explicit lifecycle and OTP-verified handover with audit evidence. |
+| FR-OPS-003 | P1 | Delivery personnel may apply, be reviewed, receive assignments, and submit authorized location updates. |
+| FR-OPS-004 | P1 | Admin may inspect delivery assignment and live-location state without exposing location data publicly. |
+| FR-OPS-005 | P1 | Public purchase activity must be derived only from eligible real orders with explicit consent, masked identity, bounded locality, and configurable visibility. |
+| FR-OPS-006 | P1 | The public activity popup must disappear after approximately four seconds and the paginated history must aggregate each order as one lead product plus an item count. |
+| FR-OPS-007 | P1 | Admin may configure activity surfaces, age window, locality, timing, and product exclusions without creating fake purchase records. |
+| FR-OPS-008 | P1 | Admin may view active page-visitor aggregates; analytics must avoid unnecessary personal data and clearly distinguish live estimates from durable business reports. |
+
 ---
 
 ## 13. Domain State Models
@@ -1086,7 +1145,7 @@ Consent history must not be overwritten when current status changes.
 
 ### 16.1 Payment adapters
 
-Target examples include bKash, Nagad, Rocket, SSLCOMMERZ, ShurjoPay, and card networks. Release 1 does not require every provider.
+Implemented provider strategies include SSLCOMMERZ and aamarPay behind an abstract gateway and registry. Additional targets may include bKash, Nagad, Rocket, ShurjoPay, and card networks; Release 1 does not require every provider.
 
 The adapter contract must support:
 
@@ -1099,7 +1158,7 @@ The adapter contract must support:
 
 ### 16.2 Courier adapters
 
-Target examples include Pathao, Steadfast, RedX, Paperfly, Sundarban, and eCourier. Release 1 begins with one production integration and a provider-neutral contract.
+Implemented adapter candidates include Pathao, Steadfast, REDX, eCourier, Paperfly, and CarryBee behind a provider-neutral registry, recommender, and scorecard. Release 1 still requires one selected provider to pass sandbox and production-readiness verification; breadth of adapters does not replace end-to-end proof.
 
 The adapter contract must support where available:
 
@@ -1275,11 +1334,14 @@ Ferio must not claim causal attribution when only correlation is available. Repo
 - Uploads must validate MIME type, size, and filename handling.
 - Rate limiting applies to login, OTP, checkout, tracking lookup, webhooks, and abuse-prone endpoints.
 - Secrets must use environment/secret management and support rotation.
+- Credentials or webhook secrets discovered in source code, documentation, logs, or progress records must be revoked, rotated, removed from history where practical, and treated as a launch blocker until verified.
 - Dependency and image scanning should be part of CI.
 
 ### 19.2 Authorization and sensitive data
 
 - Permissions are least-privilege and enforced server-side.
+- WebSocket and HTTP authorization must derive staff identity and role from a verified session/token; handshake fields supplied by the client are never authority.
+- Conversation lists and message history must not be public and must enforce participant or staff permission checks.
 - Customer exports, refunds, manual stock adjustments, settings, and user management require explicit permissions.
 - Sensitive data is masked in list views and logs where full values are unnecessary.
 - Audit logs must avoid storing secrets, full payment credentials, or message bodies unnecessarily.
@@ -1369,6 +1431,7 @@ Every screen must remain understandable if all non-semantic color is removed. Co
 
 - Customer Web: existing Next.js App Router application;
 - Admin Web: existing Next.js App Router application;
+- Customer Mobile App: Expo 54 / React Native application using the same versioned backend contracts;
 - Backend: NestJS with TypeScript;
 - Primary database: PostgreSQL;
 - Cache and job queue: Redis with BullMQ or equivalent;
@@ -1393,6 +1456,7 @@ Every screen must remain understandable if all non-semantic color is removed. Co
 - Pagination, sorting, and filtering follow consistent conventions.
 - Mutation endpoints accept idempotency keys where retries can create duplicates.
 - Correlation IDs propagate across API, jobs, and provider calls.
+- Web and mobile clients must share documented endpoint, payload, status, and authentication contracts; contract tests must detect drift before release.
 
 ---
 
@@ -1580,6 +1644,9 @@ Release 1 is launch-ready only when:
 - dashboards distinguish placed, delivered, cancelled, returned, and RTO outcomes;
 - design review confirms compliance with Ferio design language and core accessibility requirements;
 - critical and high-severity security findings are resolved or explicitly accepted by the owner.
+- Mobile App authentication, server-cart checkout, service booking, prepaid redirect, and refresh lifecycle pass backend contract and end-to-end tests without static production fallbacks.
+- support chat proves authenticated staff sockets, private conversation/history access, participant authorization, and restricted production origins.
+- any secret exposed in repository documentation or history is rotated and the deployed environment is verified to use the replacement.
 
 ### 26.2 Release 2 exit criteria
 
@@ -1620,6 +1687,7 @@ Integration tests are required for:
 - job retry/idempotency;
 - customer merge and history preservation;
 - reconciliation jobs.
+- web/mobile API contract compatibility for authentication, cart, checkout, payment redirects, service booking, and chat authorization.
 
 End-to-end tests are required for:
 
@@ -1630,6 +1698,8 @@ End-to-end tests are required for:
 - cancellation and reservation release;
 - return to refund;
 - promotional opt-out and suppression in Release 2.
+- Mobile App registration/Google sign-in, server-cart COD and prepaid checkout, service booking, order tracking, and chat.
+- click-and-collect selection through OTP handover, where enabled.
 
 ### 27.2 Manual validation
 
@@ -1754,6 +1824,7 @@ Technical dependencies:
 - Ferio begins as a single-seller platform.
 - Initial operation uses one warehouse.
 - Customer Web and Admin Web are separate applications.
+- Customer Mobile App is an approved Expo 54 surface and must remain contract-compatible with Customer Web and Backend.
 - Staff functions remain role-based modules inside Admin Web initially.
 - Backend is a modular monolith.
 - PostgreSQL is the source of truth.
@@ -1767,6 +1838,9 @@ Technical dependencies:
 - Reporting prioritizes delivered outcomes and contribution.
 - AI, microservices, Kubernetes, Kafka, and analytics warehouse are deferred.
 - Ferio uses the restrained design language defined in `_doc/design-language.md`.
+- Payment implementations use an abstract gateway and registry; SSLCOMMERZ and aamarPay are the current hosted-payment strategies.
+- Courier implementations use a provider-neutral adapter registry; Pathao, Steadfast, REDX, eCourier, Paperfly, and CarryBee are current candidates, while launch approval still requires one proven provider.
+- Customer accounts, saved addresses, product requests, support chat, moderated YouTube reviews, services, warranty, store pickup, delivery personnel, and consented public purchase activity are now part of the product scope.
 
 ---
 
@@ -1775,8 +1849,8 @@ Technical dependencies:
 These decisions do not prevent the PRD baseline but must be resolved before the relevant implementation milestone:
 
 1. Exact Release 1 product categories and variant model.
-2. First production payment provider and whether prepaid is mandatory at first public launch.
-3. First production courier provider and service-area rules.
+2. Which implemented prepaid provider is enabled at first public launch and whether another provider is kept as failover.
+3. Which implemented courier is primary at launch, with approved service-area, pricing, callback/polling, and failover rules.
 4. COD verification method: call, OTP, WhatsApp confirmation, risk-based combination, or manual policy.
 5. Stock reservation timing for COD and prepaid orders.
 6. Return windows and product/category exceptions.
@@ -1787,7 +1861,7 @@ These decisions do not prevent the PRD baseline but must be resolved before the 
 11. Customer-facing Bangla/English content strategy.
 12. Data retention and deletion periods after legal/business review.
 13. Hosting providers and recovery objectives.
-14. Whether customer accounts ship in Release 1 or secure guest tracking is sufficient.
+14. Mobile distribution, privacy disclosures, and store-release ownership for Android/iOS.
 
 Each approved decision should be recorded in a decision log and reflected in acceptance tests.
 
@@ -1805,7 +1879,7 @@ Introduce additional infrastructure only when a trigger is observed:
 | Microservice extraction | Independent teams/deployments, fault isolation, or scaling needs outweigh monolith simplicity |
 | Kubernetes | Deployment count and operational scale justify dedicated orchestration expertise |
 | Dedicated warehouse app | Scanner/device workflow and warehouse throughput cannot be served well in Admin Web |
-| Customer mobile app | Repeat usage and app-specific value justify acquisition and maintenance cost |
+| Separate delivery-partner app | Delivery volume and workforce workflow cannot be served safely by the current assigned-personnel surface |
 | AI personalization | Clean data volume, measurable baseline, evaluation plan, and human policy are available |
 | Multiple warehouses | Real inventory routing and fulfillment demand exists |
 | Marketplace | Separate business approval accepts major seller, offer, settlement, and dispute redesign |

@@ -23,6 +23,15 @@ type RiderMapItem = {
   locationHistory: LocationHistoryItem[];
 };
 
+function escapeHtml(value: unknown) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
 export default function RiderLocationMapModal({
   riderId,
   riderName,
@@ -36,6 +45,7 @@ export default function RiderLocationMapModal({
   const [loading, setLoading] = useState(true);
   const [clearing, setClearing] = useState(false);
   const [error, setError] = useState("");
+  const [mapError, setMapError] = useState("");
 
   const mapRef = useRef<HTMLDivElement>(null);
   const leafletInstanceRef = useRef<any>(null);
@@ -62,9 +72,7 @@ export default function RiderLocationMapModal({
       }
     } catch (err) {
       setError(
-        err instanceof Error
-          ? err.message
-          : "Error loading location history.",
+        err instanceof Error ? err.message : "Error loading location history.",
       );
     } finally {
       setLoading(false);
@@ -99,6 +107,7 @@ export default function RiderLocationMapModal({
         script.id = "leaflet-js";
         script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
         script.onload = () => initMap();
+        script.onerror = () => setMapError("Unable to load the map library.");
         document.body.appendChild(script);
       } else {
         existingScript.addEventListener("load", () => initMap());
@@ -122,6 +131,7 @@ export default function RiderLocationMapModal({
 
       leafletInstanceRef.current = map;
       layerGroupRef.current = L.layerGroup().addTo(map);
+      setMapError("");
     }
 
     renderRiderMap();
@@ -149,7 +159,7 @@ export default function RiderLocationMapModal({
       points.push([loc.latitude, loc.longitude]);
       bounds.push([loc.latitude, loc.longitude]);
 
-      const seqHtml = `<div style="background-color: ${color}; color: white; border-radius: 9999px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.2);">${loc.sequence}</div>`;
+      const seqHtml = `<div style="background-color: ${color}; color: white; border-radius: 9999px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; border: 2px solid white;">${loc.sequence}</div>`;
 
       const icon = L.divIcon({
         html: seqHtml,
@@ -158,11 +168,11 @@ export default function RiderLocationMapModal({
         iconAnchor: [12, 12],
       });
 
-      L.marker([loc.latitude, loc.longitude], { icon })
-        .addTo(layerGroupRef.current)
-        .bindPopup(`
+      L.marker([loc.latitude, loc.longitude], { icon }).addTo(
+        layerGroupRef.current,
+      ).bindPopup(`
           <div style="font-size: 12px; font-family: sans-serif;">
-            <strong>${rider.name}</strong> (Waypoint #${loc.sequence})<br/>
+            <strong>${escapeHtml(rider.name)}</strong> (Waypoint #${loc.sequence})<br/>
             Time: ${new Date(loc.createdAt).toLocaleTimeString()}
           </div>
         `);
@@ -179,10 +189,10 @@ export default function RiderLocationMapModal({
     }
 
     // Render Current Location Pin
-    if (rider.currentLat && rider.currentLng) {
+    if (rider.currentLat !== null && rider.currentLng !== null) {
       bounds.push([rider.currentLat, rider.currentLng]);
 
-      const currentHtml = `<div style="background-color: #111114; color: white; border-radius: 9999px; padding: 5px 10px; font-size: 12px; font-weight: bold; border: 2px solid #e11d48; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">📍 ${rider.name} (Current Location)</div>`;
+      const currentHtml = `<div style="background-color: #111114; color: white; border-radius: 9999px; padding: 5px 10px; font-size: 12px; font-weight: 600; border: 2px solid #e11d48; white-space: nowrap;">${escapeHtml(rider.name)} · Current</div>`;
 
       const icon = L.divIcon({
         html: currentHtml,
@@ -191,13 +201,13 @@ export default function RiderLocationMapModal({
         iconAnchor: [80, 14],
       });
 
-      L.marker([rider.currentLat, rider.currentLng], { icon })
-        .addTo(layerGroupRef.current)
-        .bindPopup(`
+      L.marker([rider.currentLat, rider.currentLng], { icon }).addTo(
+        layerGroupRef.current,
+      ).bindPopup(`
           <div style="font-size: 13px; font-family: sans-serif;">
-            <strong style="color: #e11d48;">${rider.name}</strong><br/>
-            Current Location Pin<br/>
-            Last Ping: ${rider.lastLocationAt ? new Date(rider.lastLocationAt).toLocaleTimeString() : "N/A"}
+            <strong>${escapeHtml(rider.name)}</strong><br/>
+            Current location<br/>
+            Last ping: ${rider.lastLocationAt ? new Date(rider.lastLocationAt).toLocaleTimeString() : "N/A"}
           </div>
         `);
     }
@@ -236,14 +246,21 @@ export default function RiderLocationMapModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/60 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-4xl rounded-card border border-line bg-paper p-6 shadow-2xl flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/60 p-4">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="rider-map-dialog-title"
+        className="flex max-h-[90vh] w-full max-w-4xl flex-col rounded-card border border-line bg-paper p-6"
+      >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-line pb-4">
           <div>
-            <h2 className="text-[18px] font-semibold text-ink">
-              Rider Live Route Map:{" "}
-              <span className="text-rose-600">{riderName}</span>
+            <h2
+              id="rider-map-dialog-title"
+              className="text-[18px] font-semibold text-ink"
+            >
+              Rider live route: {riderName}
             </h2>
             <p className="text-[12px] text-ink2">
               Viewing sequential location history pins (1, 2, 3...) and live
@@ -254,12 +271,12 @@ export default function RiderLocationMapModal({
             onClick={onClose}
             className="rounded-full p-2 text-ink2 hover:bg-surface hover:text-ink transition"
           >
-            ✕
+            Close
           </button>
         </div>
 
         {/* Action Controls Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 py-3 border-b border-line bg-surface/50 px-3 my-2 rounded-card text-[12px]">
+        <div className="my-2 flex flex-wrap items-center justify-between gap-3 border-b border-line py-3 text-[12px]">
           <div className="flex items-center gap-4 text-ink">
             <span>
               Waypoints recorded:{" "}
@@ -280,21 +297,24 @@ export default function RiderLocationMapModal({
                 disabled={clearing}
                 className="rounded-full bg-rose-50 border border-rose-200 px-3.5 py-1.5 font-medium text-rose-700 hover:bg-rose-100 transition"
               >
-                {clearing ? "Clearing..." : "Clear Location History"}
+                {clearing ? "Clearing…" : "Clear location history"}
               </button>
             )}
 
             <Link
               href="/dashboard/delivery-map"
-              className="rounded-full bg-ink px-4 py-1.5 font-medium text-white hover:opacity-90 transition inline-flex items-center gap-1"
+              className="rounded-full bg-ink px-4 py-1.5 font-medium text-white transition hover:opacity-90"
             >
-              🗺️ Open All Riders Fleet Map
+              Open fleet map
             </Link>
           </div>
         </div>
 
         {error && (
-          <div className="my-2 rounded-card bg-rose-50 border border-rose-200 p-3 text-[12px] text-rose-700">
+          <div
+            role="alert"
+            className="my-2 rounded-card border border-rose-200 bg-rose-50 p-3 text-[12px] text-rose-700"
+          >
             {error}
           </div>
         )}
@@ -304,7 +324,15 @@ export default function RiderLocationMapModal({
           <div ref={mapRef} className="w-full h-full min-h-[420px] z-0" />
           {loading && (
             <div className="absolute inset-0 z-10 flex items-center justify-center bg-paper/80 text-[13px] text-ink2">
-              Loading OpenStreetMap route data...
+              Loading route data…
+            </div>
+          )}
+          {mapError && !loading && (
+            <div
+              role="alert"
+              className="absolute inset-0 z-10 flex items-center justify-center bg-paper p-8 text-center text-[13px] text-rose-700"
+            >
+              {mapError}
             </div>
           )}
         </div>

@@ -21,7 +21,11 @@ export default function RichTextEditor({
 }: RichTextEditorProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const insertTag = (before: string, after: string = "", defaultText: string = "") => {
+  const insertTag = (
+    before: string,
+    after: string = "",
+    defaultText: string = "",
+  ) => {
     const textarea = textareaRef.current;
     if (!textarea) return;
 
@@ -43,10 +47,7 @@ export default function RichTextEditor({
     setTimeout(() => {
       textarea.focus();
       const newCursorPos = start + before.length + textToWrap.length;
-      textarea.setSelectionRange(
-        start + before.length,
-        newCursorPos
-      );
+      textarea.setSelectionRange(start + before.length, newCursorPos);
     }, 0);
   };
 
@@ -119,9 +120,11 @@ export default function RichTextEditor({
     const url = prompt("Enter Image URL (e.g. https://...):", "https://");
     if (!url) return;
 
-    const alt = prompt("Enter optional image description / alt text:", "") || "Product detail image";
+    const alt =
+      prompt("Enter optional image description / alt text:", "") ||
+      "Product detail image";
 
-    const imgHtml = `\n<img src="${url}" alt="${alt}" class="my-4 max-w-full rounded-xl h-auto shadow-sm border border-line/40" />\n`;
+    const imgHtml = `\n<img src="${url}" alt="${alt}" class="my-4 max-w-full rounded-card h-auto border border-line" />\n`;
     const newValue =
       textarea.value.substring(0, start) +
       imgHtml +
@@ -136,7 +139,9 @@ export default function RichTextEditor({
   };
 
   return (
-    <div className={`rounded-card border border-line bg-white shadow-sm overflow-hidden ${className}`}>
+    <div
+      className={`overflow-hidden rounded-card border border-line bg-white ${className}`}
+    >
       {/* Rich Text Toolbar */}
       <div className="flex flex-wrap items-center gap-1 border-b border-line bg-neutral-50/80 p-2 text-ink">
         {/* Basic formatting */}
@@ -251,7 +256,7 @@ export default function RichTextEditor({
         rows={rows}
         placeholder={placeholder}
         required
-        className="w-full p-3 text-[14px] leading-relaxed outline-none focus:ring-1 focus:ring-ink/20 resize-y bg-white text-ink border-none"
+        className="w-full resize-y border-none bg-white p-3 text-[14px] leading-relaxed text-ink"
       />
     </div>
   );

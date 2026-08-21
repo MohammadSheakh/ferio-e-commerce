@@ -4,10 +4,14 @@ import {
   extractRefreshToken,
   setCustomerSession,
 } from "@/lib/customer-session";
+import { withCorrelationId } from "@/lib/correlation";
+import { cookies } from "next/headers";
 
 type BackendAuthPayload = {
   data?: { accessToken?: string; user?: unknown };
   message?: string | string[];
+  code?: string;
+  correlationId?: string;
 };
 
 export function backendMessage(
@@ -26,14 +30,18 @@ export async function proxyCustomerSession(
   try {
     const upstream = await fetch(`${backendApiUrl}${path}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: withCorrelationId({ "Content-Type": "application/json" }),
       body: JSON.stringify(body),
       cache: "no-store",
     });
     const payload = (await upstream.json()) as BackendAuthPayload;
     if (!upstream.ok || !payload.data?.accessToken) {
       return NextResponse.json(
-        { message: backendMessage(payload, "Authentication failed.") },
+        {
+          message: backendMessage(payload, "Authentication failed."),
+          code: payload.code,
+          correlationId: payload.correlationId,
+        },
         { status: upstream.status },
       );
     }
@@ -48,7 +56,27 @@ export async function proxyCustomerSession(
       );
     }
     setCustomerSession(payload.data.accessToken, refreshToken);
-    return NextResponse.json({ data: payload.data.user });
+    const cartToken = cookies().get("ferio_cart")?.value;
+    let cartMerged = false;
+    if (cartToken) {
+      try {
+        const merge = await fetch(`${backendApiUrl}/cart/merge`, {
+          method: "POST",
+          headers: withCorrelationId({
+            Authorization: `Bearer ${payload.data.accessToken}`,
+            "X-Cart-Token": cartToken,
+          }),
+          cache: "no-store",
+        });
+        cartMerged = merge.ok;
+        if (merge.status === 409) {
+          cookies().set("ferio_cart", "", { maxAge: 0, path: "/" });
+        }
+      } catch {
+        cartMerged = false;
+      }
+    }
+    return NextResponse.json({ data: payload.data.user, cartMerged });
   } catch {
     return NextResponse.json(
       { message: "The Ferio API is unavailable. Try again shortly." },

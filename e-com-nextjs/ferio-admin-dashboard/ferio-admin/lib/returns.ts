@@ -146,7 +146,11 @@ export type ReturnCasePage = {
 };
 
 export function returnStatusClass(status: ReturnCaseStatus) {
-  if (status === "APPROVED" || status === "PARTIALLY_APPROVED")
+  if (
+    status === "APPROVED" ||
+    status === "PARTIALLY_APPROVED" ||
+    status === "INSPECTED"
+  )
     return "bg-emerald-50 text-emerald-700";
   if (status === "REJECTED" || status === "CANCELLED")
     return "bg-rose-50 text-rose-700";

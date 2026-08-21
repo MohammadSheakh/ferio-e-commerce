@@ -35,6 +35,7 @@ export default function LiveChatWidget() {
   const [customerUser, setCustomerUser] = useState<{ id: string; userId?: string; name: string; email?: string } | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   const [isConnected, setIsConnected] = useState<boolean>(false);
+  const [socketToken, setSocketToken] = useState("");
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const socketRef = useRef<ReturnType<typeof getCustomerSocket> | null>(null);
@@ -42,8 +43,8 @@ export default function LiveChatWidget() {
   // Initialize or restore Customer User Profile / Guest ID / Saved Messages
   useEffect(() => {
     let savedGuestId = localStorage.getItem("ferio_chat_guest_id");
-    if (!savedGuestId) {
-      savedGuestId = `gst_${Math.floor(1000 + Math.random() * 9000)}`;
+    if (!savedGuestId || !/^gst_[0-9a-f-]{36}$/i.test(savedGuestId)) {
+      savedGuestId = `gst_${crypto.randomUUID()}`;
       localStorage.setItem("ferio_chat_guest_id", savedGuestId);
     }
     setGuestId(savedGuestId);
@@ -113,12 +114,29 @@ export default function LiveChatWidget() {
     guestIdRef.current = guestId;
   }, [guestId]);
 
+  useEffect(() => {
+    if (!guestId) return;
+    const refreshTicket = () => {
+      fetch("/api/chat/socket-ticket", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ guestId }),
+      })
+        .then((response) => response.json())
+        .then((payload) => setSocketToken(payload.data?.token || ""))
+        .catch(() => setSocketToken(""));
+    };
+    refreshTicket();
+    const intervalId = window.setInterval(refreshTicket, 4 * 60 * 1000);
+    return () => window.clearInterval(intervalId);
+  }, [guestId, isLoggedIn]);
+
   // Connect to Socket.IO server and listen for real-time events
   useEffect(() => {
-    if (!activeUserId) return;
+    if (!activeUserId || !socketToken) return;
 
     const convId = `conv-${activeUserId}`;
-    const socket = getCustomerSocket(undefined, activeUserId);
+    const socket = getCustomerSocket(socketToken, activeUserId);
     socketRef.current = socket;
 
     const joinAllRooms = () => {
@@ -214,7 +232,7 @@ export default function LiveChatWidget() {
       socket.off("disconnect");
       socket.off("new-message-received");
     };
-  }, [activeUserId, guestId, isOpen]);
+  }, [activeUserId, guestId, isOpen, socketToken]);
 
   // Save messages to LocalStorage
   useEffect(() => {
@@ -234,7 +252,9 @@ export default function LiveChatWidget() {
     const targetConvId = `conv-${activeUserId}`;
     async function loadDbHistory() {
       try {
-        const res = await fetch(`/api/chat/messages?conversationId=${encodeURIComponent(targetConvId)}`);
+        const res = await fetch(`/api/chat/messages?conversationId=${encodeURIComponent(targetConvId)}`, {
+          headers: { "x-chat-guest-id": guestId },
+        });
         if (res.ok) {
           const json = await res.json();
           const rawMsgs = json.data?.results || [];
@@ -261,7 +281,7 @@ export default function LiveChatWidget() {
     }
 
     loadDbHistory();
-  }, [activeUserId]);
+  }, [activeUserId, guestId]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });

@@ -1,1 +1,32 @@
-import{NextResponse}from'next/server';import{AdminApiError,adminApi}from'@/lib/admin-api';async function call(request:Request,path:string[],method:string){try{const body=method==='GET'||method==='DELETE'?undefined:JSON.stringify(await request.json());const data=await adminApi(`/admin/services${path.length?'/'+path.join('/'):''}`,{method,headers:body?{'Content-Type':'application/json'}:undefined,body});return NextResponse.json({data});}catch(e){return NextResponse.json({message:e instanceof Error?e.message:'Request failed'},{status:e instanceof AdminApiError?e.status:503})}}export const GET=(r:Request,c:{params:{path:string[]}})=>call(r,c.params.path,'GET');export const POST=(r:Request,c:{params:{path:string[]}})=>call(r,c.params.path,'POST');export const PATCH=(r:Request,c:{params:{path:string[]}})=>call(r,c.params.path,'PATCH');export const DELETE=(r:Request,c:{params:{path:string[]}})=>call(r,c.params.path,'DELETE');
+import { NextResponse } from "next/server";
+import { adminApi } from "@/lib/admin-api";
+import { adminApiErrorResponse } from "@/lib/bff-response";
+
+async function call(request: Request, path: string[], method: string) {
+  try {
+    const body =
+      method === "GET" || method === "DELETE"
+        ? undefined
+        : JSON.stringify(await request.json());
+    const data = await adminApi(
+      `/admin/services${path.length ? `/${path.join("/")}` : ""}`,
+      {
+        method,
+        headers: body ? { "Content-Type": "application/json" } : undefined,
+        body,
+      },
+    );
+    return NextResponse.json({ data });
+  } catch (error) {
+    return adminApiErrorResponse(error, "Request failed.");
+  }
+}
+
+export const GET = (request: Request, context: { params: { path: string[] } }) =>
+  call(request, context.params.path, "GET");
+export const POST = (request: Request, context: { params: { path: string[] } }) =>
+  call(request, context.params.path, "POST");
+export const PATCH = (request: Request, context: { params: { path: string[] } }) =>
+  call(request, context.params.path, "PATCH");
+export const DELETE = (request: Request, context: { params: { path: string[] } }) =>
+  call(request, context.params.path, "DELETE");

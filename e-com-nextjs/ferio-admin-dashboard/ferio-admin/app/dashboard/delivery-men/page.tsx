@@ -64,13 +64,18 @@ const emptyForm: CreateForm = {
 
 export default function DeliveryMenPage() {
   const [personnel, setPersonnel] = useState<DeliveryPersonnel[]>([]);
-  const [activeTab, setActiveTab] = useState<"ACTIVE" | "PENDING" | "ALL">("PENDING");
+  const [activeTab, setActiveTab] = useState<"ACTIVE" | "PENDING" | "ALL">(
+    "PENDING",
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [mapModalRider, setMapModalRider] = useState<{ id: string; name: string } | null>(null);
+  const [mapModalRider, setMapModalRider] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
   const [form, setForm] = useState<CreateForm>(emptyForm);
 
   const [editingForm, setEditingForm] = useState<EditForm | null>(null);
@@ -83,13 +88,17 @@ export default function DeliveryMenPage() {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch("/api/delivery-personnel", { cache: "no-store" });
+      const response = await fetch("/api/delivery-personnel", {
+        cache: "no-store",
+      });
       const payload = (await response.json()) as {
         data?: { items: DeliveryPersonnel[]; total: number };
         message?: string;
       };
       if (!response.ok || !payload.data) {
-        throw new Error(payload.message || "Unable to load delivery personnel.");
+        throw new Error(
+          payload.message || "Unable to load delivery personnel.",
+        );
       }
       setPersonnel(payload.data.items);
     } catch (err) {
@@ -172,7 +181,10 @@ export default function DeliveryMenPage() {
     }
   };
 
-  const handleApprovalAction = async (id: string, status: "APPROVED" | "REJECTED") => {
+  const handleApprovalAction = async (
+    id: string,
+    status: "APPROVED" | "REJECTED",
+  ) => {
     setSubmitting(true);
     setError("");
     setSuccessMsg("");
@@ -247,29 +259,41 @@ export default function DeliveryMenPage() {
   };
 
   const inputClass =
-    "mt-1.5 w-full rounded-card border border-line px-3.5 py-2.5 text-[14px] outline-none focus:border-ink";
+    "mt-1.5 w-full rounded-card border border-line px-3.5 py-2.5 text-[14px] focus:border-ink";
 
   return (
     <>
       <Topbar
-        title="Delivery Personnel"
-        subtitle="Manage riders, edit account details, reset passwords, and approve applications"
+        title="Delivery personnel"
+        subtitle="Review applications, accounts, status, and location evidence"
       />
 
-      <div className="p-8 space-y-6">
+      <div className="space-y-6 p-4 xl:p-8">
         {/* Metric Cards */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div className="rounded-card border border-line p-5 bg-paper">
-            <p className="text-[11px] uppercase tracking-eyebrow text-ink2">Active Riders</p>
-            <p className="mt-2 text-[26px] font-semibold text-ink">{activeList.length}</p>
+          <div className="border-y border-line p-5">
+            <p className="text-[11px] uppercase tracking-eyebrow text-ink2">
+              Active riders
+            </p>
+            <p className="mt-2 text-[26px] font-semibold text-ink">
+              {activeList.length}
+            </p>
           </div>
-          <div className="rounded-card border border-amber-200 bg-amber-50 p-5">
-            <p className="text-[11px] uppercase tracking-eyebrow text-amber-800">Pending Applications</p>
-            <p className="mt-2 text-[26px] font-semibold text-amber-900">{pendingList.length}</p>
+          <div className="border-y border-line p-5">
+            <p className="text-[11px] uppercase tracking-eyebrow text-ink2">
+              Pending applications
+            </p>
+            <p className="mt-2 text-[26px] font-semibold text-ink">
+              {pendingList.length}
+            </p>
           </div>
-          <div className="rounded-card border border-line p-5 bg-paper">
-            <p className="text-[11px] uppercase tracking-eyebrow text-ink2">Total Registered</p>
-            <p className="mt-2 text-[26px] font-semibold text-ink">{personnel.length}</p>
+          <div className="border-y border-line p-5">
+            <p className="text-[11px] uppercase tracking-eyebrow text-ink2">
+              Total registered
+            </p>
+            <p className="mt-2 text-[26px] font-semibold text-ink">
+              {personnel.length}
+            </p>
           </div>
         </div>
 
@@ -313,35 +337,41 @@ export default function DeliveryMenPage() {
               href="/dashboard/delivery-map"
               className="rounded-full border border-line bg-paper px-4 py-2 text-[13px] font-medium text-ink hover:bg-surface transition inline-flex items-center gap-1.5"
             >
-              🗺️ Live Fleet Map
+              Live fleet map
             </Link>
 
             <button
               onClick={() => setShowCreateModal(true)}
               className="rounded-full bg-ink px-5 py-2 text-[13px] font-medium text-white hover:opacity-90 transition"
             >
-              Add Rider Account
+              Add rider account
             </button>
           </div>
         </div>
 
         {error && (
-          <div className="rounded-card border border-rose-200 bg-rose-50 p-4 text-[13px] text-rose-700">
+          <div
+            role="alert"
+            className="rounded-card border border-rose-200 bg-rose-50 p-4 text-[13px] text-rose-700"
+          >
             {error}
           </div>
         )}
 
         {successMsg && (
-          <div className="rounded-card border border-emerald-200 bg-emerald-50 p-4 text-[13px] text-emerald-700">
+          <div
+            role="status"
+            className="rounded-card border border-emerald-200 bg-emerald-50 p-4 text-[13px] text-emerald-700"
+          >
             {successMsg}
           </div>
         )}
 
         {/* Table View */}
-        <div className="overflow-x-auto rounded-card border border-line bg-paper">
-          <table className="w-full text-left border-collapse">
+        <div className="overflow-x-auto border-y border-line bg-paper">
+          <table className="w-full min-w-[1000px] border-collapse text-left">
             <thead>
-              <tr className="border-b border-line bg-surface text-[11px] uppercase tracking-eyebrow text-ink2">
+              <tr className="border-b border-line text-[11px] uppercase tracking-eyebrow text-ink2">
                 <th className="w-24 px-4 py-3 font-normal">ID</th>
                 <th className="px-4 py-3 font-normal">Applicant</th>
                 <th className="px-4 py-3 font-normal">Contact & NID</th>
@@ -353,7 +383,7 @@ export default function DeliveryMenPage() {
             </thead>
             <tbody className="divide-y divide-line text-[13px]">
               {currentList.map((p) => (
-                <tr key={p.id} className="hover:bg-surface/50 transition">
+                <tr key={p.id}>
                   <td className="w-24 px-4 py-3.5 align-top">
                     <CopyableId id={p.id} />
                   </td>
@@ -365,16 +395,22 @@ export default function DeliveryMenPage() {
                   </td>
                   <td className="px-4 py-3.5 align-top space-y-0.5">
                     <p className="text-ink text-[12px]">{p.phoneOriginal}</p>
-                    {p.email && <p className="text-[11px] text-ink2">{p.email}</p>}
+                    {p.email && (
+                      <p className="text-[11px] text-ink2">{p.email}</p>
+                    )}
                     {p.nidNumber && (
-                      <p className="text-[11px] text-ink2">NID: {p.nidNumber}</p>
+                      <p className="text-[11px] text-ink2">
+                        NID: {p.nidNumber}
+                      </p>
                     )}
                   </td>
                   <td className="px-4 py-3.5 align-top space-y-0.5">
                     <span className="inline-block rounded-full bg-surface px-2.5 py-0.5 text-[11px] text-ink border border-line">
                       {vehicleLabel(p.vehicleType)}
                     </span>
-                    <p className="text-[12px] text-ink2">{p.operatingZone || "Unassigned"}</p>
+                    <p className="text-[12px] text-ink2">
+                      {p.operatingZone || "Unassigned"}
+                    </p>
                   </td>
                   <td className="px-4 py-3.5 align-top">
                     <span
@@ -382,32 +418,38 @@ export default function DeliveryMenPage() {
                         p.status === "APPROVED"
                           ? "bg-emerald-50 text-emerald-700"
                           : p.status === "PENDING_APPROVAL"
-                            ? "bg-amber-50 text-amber-800"
+                            ? "bg-surface text-ink2"
                             : "bg-rose-50 text-rose-700"
                       }`}
                     >
-                      {p.status === "PENDING_APPROVAL" ? "Pending" : p.status.toLowerCase()}
+                      {p.status === "PENDING_APPROVAL"
+                        ? "Pending"
+                        : p.status.toLowerCase()}
                     </span>
                   </td>
                   <td className="px-4 py-3.5 align-top text-[12px] text-ink2">
-                    {p.currentLat && p.currentLng ? (
+                    {p.currentLat !== null && p.currentLng !== null ? (
                       <div>
                         <p className="text-[11px] font-mono">
                           {p.currentLat.toFixed(4)}, {p.currentLng.toFixed(4)}
                         </p>
                         <button
-                          onClick={() => setMapModalRider({ id: p.id, name: p.name })}
-                          className="mt-0.5 inline-flex items-center gap-1 text-[11px] font-medium text-rose-600 underline decoration-rose-300 underline-offset-4 hover:text-rose-800 transition"
+                          onClick={() =>
+                            setMapModalRider({ id: p.id, name: p.name })
+                          }
+                          className="mt-0.5 text-[11px] font-medium text-ink underline decoration-line underline-offset-4"
                         >
-                          🗺️ View Map & Route
+                          View map and route
                         </button>
                       </div>
                     ) : (
                       <button
-                        onClick={() => setMapModalRider({ id: p.id, name: p.name })}
-                        className="inline-flex items-center gap-1 text-[11px] text-ink2 hover:text-ink underline underline-offset-4"
+                        onClick={() =>
+                          setMapModalRider({ id: p.id, name: p.name })
+                        }
+                        className="text-[11px] text-ink2 underline decoration-line underline-offset-4 hover:text-ink"
                       >
-                        🗺️ View Map
+                        View map
                       </button>
                     )}
                   </td>
@@ -434,7 +476,7 @@ export default function DeliveryMenPage() {
                       onClick={() => openEditModal(p)}
                       className="rounded-full border border-line px-3 py-1 text-[12px] text-ink hover:bg-surface transition"
                     >
-                      Edit Info
+                      Edit info
                     </button>
                   </td>
                 </tr>
@@ -442,7 +484,10 @@ export default function DeliveryMenPage() {
 
               {!loading && currentList.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-5 py-12 text-center text-[13px] text-ink2">
+                  <td
+                    colSpan={7}
+                    className="px-5 py-12 text-center text-[13px] text-ink2"
+                  >
                     No records found for the selected tab.
                   </td>
                 </tr>
@@ -450,8 +495,11 @@ export default function DeliveryMenPage() {
 
               {loading && (
                 <tr>
-                  <td colSpan={7} className="px-5 py-12 text-center text-[13px] text-ink2">
-                    Loading delivery personnel...
+                  <td
+                    colSpan={7}
+                    className="px-5 py-12 text-center text-[13px] text-ink2"
+                  >
+                    Loading delivery personnel…
                   </td>
                 </tr>
               )}
@@ -462,15 +510,25 @@ export default function DeliveryMenPage() {
 
       {/* Edit Rider Modal */}
       {editingForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4 overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/60 p-4">
           <form
             onSubmit={handleEditSubmit}
-            className="w-full max-w-lg rounded-card border border-line bg-paper p-6 space-y-4 my-8"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="edit-rider-dialog-title"
+            className="my-8 w-full max-w-lg space-y-4 rounded-card border border-line bg-paper p-6"
           >
             <div className="flex items-center justify-between border-b border-line pb-3">
               <div>
-                <h3 className="text-[16px] font-medium text-ink">Edit Rider Profile</h3>
-                <p className="text-[12px] text-ink2">Update profile information and reset login password</p>
+                <h3
+                  id="edit-rider-dialog-title"
+                  className="text-[16px] font-medium text-ink"
+                >
+                  Edit rider profile
+                </h3>
+                <p className="text-[12px] text-ink2">
+                  Update profile information and reset login password
+                </p>
               </div>
               <button
                 type="button"
@@ -481,13 +539,15 @@ export default function DeliveryMenPage() {
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-3 sm:grid-cols-2">
               <label className="block text-[12px] text-ink2">
                 Rider Full Name *
                 <input
                   required
                   value={editingForm.name}
-                  onChange={(e) => setEditingForm({ ...editingForm, name: e.target.value })}
+                  onChange={(e) =>
+                    setEditingForm({ ...editingForm, name: e.target.value })
+                  }
                   className={inputClass}
                 />
               </label>
@@ -496,19 +556,23 @@ export default function DeliveryMenPage() {
                 <input
                   required
                   value={editingForm.phone}
-                  onChange={(e) => setEditingForm({ ...editingForm, phone: e.target.value })}
+                  onChange={(e) =>
+                    setEditingForm({ ...editingForm, phone: e.target.value })
+                  }
                   className={inputClass}
                 />
               </label>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-3 sm:grid-cols-2">
               <label className="block text-[12px] text-ink2">
                 Email Address
                 <input
                   type="email"
                   value={editingForm.email}
-                  onChange={(e) => setEditingForm({ ...editingForm, email: e.target.value })}
+                  onChange={(e) =>
+                    setEditingForm({ ...editingForm, email: e.target.value })
+                  }
                   placeholder="rider@example.com"
                   className={inputClass}
                 />
@@ -518,20 +582,25 @@ export default function DeliveryMenPage() {
                 <input
                   type="password"
                   value={editingForm.password}
-                  onChange={(e) => setEditingForm({ ...editingForm, password: e.target.value })}
+                  onChange={(e) =>
+                    setEditingForm({ ...editingForm, password: e.target.value })
+                  }
                   placeholder="Leave blank to keep current"
                   className={inputClass}
                 />
               </label>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-3 sm:grid-cols-2">
               <label className="block text-[12px] text-ink2">
                 Vehicle Type
                 <select
                   value={editingForm.vehicleType}
                   onChange={(e) =>
-                    setEditingForm({ ...editingForm, vehicleType: e.target.value as any })
+                    setEditingForm({
+                      ...editingForm,
+                      vehicleType: e.target.value as any,
+                    })
                   }
                   className={inputClass}
                 >
@@ -548,7 +617,10 @@ export default function DeliveryMenPage() {
                 <input
                   value={editingForm.operatingZone}
                   onChange={(e) =>
-                    setEditingForm({ ...editingForm, operatingZone: e.target.value })
+                    setEditingForm({
+                      ...editingForm,
+                      operatingZone: e.target.value,
+                    })
                   }
                   placeholder="e.g. Dhaka Metro"
                   className={inputClass}
@@ -556,12 +628,17 @@ export default function DeliveryMenPage() {
               </label>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-3 sm:grid-cols-2">
               <label className="block text-[12px] text-ink2">
                 NID Number
                 <input
                   value={editingForm.nidNumber}
-                  onChange={(e) => setEditingForm({ ...editingForm, nidNumber: e.target.value })}
+                  onChange={(e) =>
+                    setEditingForm({
+                      ...editingForm,
+                      nidNumber: e.target.value,
+                    })
+                  }
                   className={inputClass}
                 />
               </label>
@@ -570,7 +647,10 @@ export default function DeliveryMenPage() {
                 <input
                   value={editingForm.emergencyPhone}
                   onChange={(e) =>
-                    setEditingForm({ ...editingForm, emergencyPhone: e.target.value })
+                    setEditingForm({
+                      ...editingForm,
+                      emergencyPhone: e.target.value,
+                    })
                   }
                   className={inputClass}
                 />
@@ -590,7 +670,7 @@ export default function DeliveryMenPage() {
                 disabled={submitting}
                 className="rounded-full bg-ink px-5 py-2 text-[13px] font-medium text-white hover:opacity-90 disabled:opacity-50"
               >
-                {submitting ? "Saving..." : "Save Changes"}
+                {submitting ? "Saving…" : "Save changes"}
               </button>
             </div>
           </form>
@@ -599,9 +679,19 @@ export default function DeliveryMenPage() {
 
       {/* Approve Modal */}
       {approvingId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
-          <div className="w-full max-w-md rounded-card border border-line bg-paper p-6 space-y-4">
-            <h3 className="text-[16px] font-medium text-ink">Approve Rider Application</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="approve-rider-dialog-title"
+            className="w-full max-w-md space-y-4 rounded-card border border-line bg-paper p-6"
+          >
+            <h3
+              id="approve-rider-dialog-title"
+              className="text-[16px] font-medium text-ink"
+            >
+              Approve rider application
+            </h3>
             <p className="text-[13px] text-ink2">
               Approving will create an active login account for this rider.
             </p>
@@ -629,7 +719,7 @@ export default function DeliveryMenPage() {
                 disabled={submitting}
                 className="rounded-full bg-emerald-700 px-4 py-2 text-[13px] font-medium text-white hover:bg-emerald-800 disabled:opacity-50"
               >
-                {submitting ? "Approving..." : "Confirm Approval"}
+                {submitting ? "Approving…" : "Confirm approval"}
               </button>
             </div>
           </div>
@@ -638,13 +728,21 @@ export default function DeliveryMenPage() {
 
       {/* Direct Add Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4 overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/60 p-4">
           <form
             onSubmit={handleCreateSubmit}
-            className="w-full max-w-lg rounded-card border border-line bg-paper p-6 space-y-4 my-8"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="create-rider-dialog-title"
+            className="my-8 w-full max-w-lg space-y-4 rounded-card border border-line bg-paper p-6"
           >
             <div className="flex items-center justify-between border-b border-line pb-3">
-              <h3 className="text-[16px] font-medium text-ink">Add Rider Account</h3>
+              <h3
+                id="create-rider-dialog-title"
+                className="text-[16px] font-medium text-ink"
+              >
+                Add rider account
+              </h3>
               <button
                 type="button"
                 onClick={() => setShowCreateModal(false)}
@@ -654,7 +752,7 @@ export default function DeliveryMenPage() {
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-3 sm:grid-cols-2">
               <label className="block text-[12px] text-ink2">
                 Rider Full Name *
                 <input
@@ -677,7 +775,7 @@ export default function DeliveryMenPage() {
               </label>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-3 sm:grid-cols-2">
               <label className="block text-[12px] text-ink2">
                 Email Address *
                 <input
@@ -695,19 +793,23 @@ export default function DeliveryMenPage() {
                   required
                   type="password"
                   value={form.password}
-                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, password: e.target.value })
+                  }
                   placeholder="Password"
                   className={inputClass}
                 />
               </label>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-3 sm:grid-cols-2">
               <label className="block text-[12px] text-ink2">
                 Vehicle Type
                 <select
                   value={form.vehicleType}
-                  onChange={(e) => setForm({ ...form, vehicleType: e.target.value as any })}
+                  onChange={(e) =>
+                    setForm({ ...form, vehicleType: e.target.value as any })
+                  }
                   className={inputClass}
                 >
                   <option value="BIKE">Motorcycle</option>
@@ -722,19 +824,23 @@ export default function DeliveryMenPage() {
                 Operating Zone
                 <input
                   value={form.operatingZone}
-                  onChange={(e) => setForm({ ...form, operatingZone: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, operatingZone: e.target.value })
+                  }
                   placeholder="e.g. Dhaka Metro"
                   className={inputClass}
                 />
               </label>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-3 sm:grid-cols-2">
               <label className="block text-[12px] text-ink2">
                 NID Number
                 <input
                   value={form.nidNumber}
-                  onChange={(e) => setForm({ ...form, nidNumber: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, nidNumber: e.target.value })
+                  }
                   placeholder="National ID"
                   className={inputClass}
                 />
@@ -743,7 +849,9 @@ export default function DeliveryMenPage() {
                 Emergency Phone
                 <input
                   value={form.emergencyPhone}
-                  onChange={(e) => setForm({ ...form, emergencyPhone: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, emergencyPhone: e.target.value })
+                  }
                   placeholder="Emergency contact"
                   className={inputClass}
                 />
@@ -763,7 +871,7 @@ export default function DeliveryMenPage() {
                 disabled={submitting}
                 className="rounded-full bg-ink px-5 py-2 text-[13px] font-medium text-white hover:opacity-90 disabled:opacity-50"
               >
-                {submitting ? "Creating..." : "Create Account"}
+                {submitting ? "Creating…" : "Create account"}
               </button>
             </div>
           </form>

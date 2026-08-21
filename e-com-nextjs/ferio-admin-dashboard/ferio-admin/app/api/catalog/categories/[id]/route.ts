@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { AdminApiError, adminApi } from "@/lib/admin-api";
+import { adminApi } from "@/lib/admin-api";
+import { adminApiErrorResponse } from "@/lib/bff-response";
 import type { CatalogCategory } from "@/lib/catalog";
 
 export async function PATCH(
@@ -18,10 +19,7 @@ export async function PATCH(
     );
     return NextResponse.json({ data: category });
   } catch (error) {
-    const status = error instanceof AdminApiError ? error.status : 503;
-    const message =
-      error instanceof Error ? error.message : "Unable to update category.";
-    return NextResponse.json({ message }, { status });
+    return adminApiErrorResponse(error, "Unable to update category.");
   }
 }
 
@@ -36,9 +34,6 @@ export async function DELETE(
     );
     return NextResponse.json({ data: result });
   } catch (error) {
-    const status = error instanceof AdminApiError ? error.status : 503;
-    const message =
-      error instanceof Error ? error.message : "Unable to delete category.";
-    return NextResponse.json({ message }, { status });
+    return adminApiErrorResponse(error, "Unable to delete category.");
   }
 }

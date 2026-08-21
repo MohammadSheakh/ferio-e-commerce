@@ -19,14 +19,12 @@ export function getMobileSocket(token?: string, guestId?: string): Socket {
       auth: {
         token: token || "",
         guestId: guestId || "",
-        role: "customer",
       },
     });
   } else {
     socket.auth = {
       ...(typeof socket.auth === "object" ? socket.auth : {}),
-      role: "customer",
-      ...(token ? { token } : {}),
+      token: token || "",
       ...(guestId ? { guestId } : {}),
     };
   }

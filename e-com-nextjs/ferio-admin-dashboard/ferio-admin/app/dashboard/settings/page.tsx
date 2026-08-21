@@ -36,6 +36,9 @@ function toForm(settings: CommerceSettings): SettingsForm {
         : String(settings.defaultReturnWindowDays),
     codEnabled: settings.codEnabled,
     prepaidEnabled: settings.prepaidEnabled,
+    serviceBookingEnabled: settings.serviceBookingEnabled,
+    warrantyClaimsEnabled: settings.warrantyClaimsEnabled,
+    storefrontAnalyticsEnabled: settings.storefrontAnalyticsEnabled,
     categoryTopNavEnabled: settings.categoryTopNavEnabled ?? true,
     categorySideNavEnabled: settings.categorySideNavEnabled ?? true,
     termsUrl: settings.termsUrl,
@@ -221,6 +224,61 @@ export default function SettingsPage() {
                   <Link href="/dashboard/orders" className="text-ink2 underline decoration-line underline-offset-4 hover:text-ink">COD verification</Link>
                   <Link href="/dashboard/delivery" className="text-ink2 underline decoration-line underline-offset-4 hover:text-ink">Delivery regions and fees</Link>
                 </div>
+              </div>
+            </section>
+
+            <section className="border-b border-line pb-10">
+              <div className="mb-5">
+                <p className="text-[11px] uppercase tracking-eyebrow text-ink2">
+                  Staged rollout
+                </p>
+                <h2 className="mt-1 text-[17px] font-medium text-ink">
+                  Risk controls
+                </h2>
+                <p className="mt-1 max-w-2xl text-[12px] leading-5 text-ink2">
+                  Changes take effect at the backend immediately. Pausing a
+                  capability blocks new customer activity but keeps existing
+                  operational records available to staff.
+                </p>
+              </div>
+              <div className="grid gap-4 md:grid-cols-3">
+                {(
+                  [
+                    [
+                      "serviceBookingEnabled",
+                      "Service booking",
+                      "Show active services and accept new booking requests.",
+                    ],
+                    [
+                      "warrantyClaimsEnabled",
+                      "Warranty submissions",
+                      "Allow verification, evidence uploads, and new claims.",
+                    ],
+                    [
+                      "storefrontAnalyticsEnabled",
+                      "Storefront analytics",
+                      "Persist product, search, filter, and cart events.",
+                    ],
+                  ] as const
+                ).map(([key, label, description]) => (
+                  <label
+                    key={key}
+                    className="flex cursor-pointer items-start gap-3 rounded-card border border-line p-4 text-[13px] text-ink transition hover:border-ink"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={form[key]}
+                      onChange={(event) => set(key, event.target.checked)}
+                      className="mt-0.5 h-4 w-4 accent-ink"
+                    />
+                    <span>
+                      {label}
+                      <span className="mt-1 block text-[11px] leading-4 text-ink2">
+                        {description}
+                      </span>
+                    </span>
+                  </label>
+                ))}
               </div>
             </section>
 

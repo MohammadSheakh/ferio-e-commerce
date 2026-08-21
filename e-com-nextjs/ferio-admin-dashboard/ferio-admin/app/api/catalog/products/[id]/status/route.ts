@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { AdminApiError, adminApi } from "@/lib/admin-api";
+import { adminApi } from "@/lib/admin-api";
+import { adminApiErrorResponse } from "@/lib/bff-response";
 import type { CatalogProduct } from "@/lib/catalog";
 
 export async function PATCH(
@@ -18,11 +19,6 @@ export async function PATCH(
     );
     return NextResponse.json({ data: product });
   } catch (error) {
-    const status = error instanceof AdminApiError ? error.status : 503;
-    const message =
-      error instanceof Error
-        ? error.message
-        : "Unable to change product status.";
-    return NextResponse.json({ message }, { status });
+    return adminApiErrorResponse(error, "Unable to change product status.");
   }
 }

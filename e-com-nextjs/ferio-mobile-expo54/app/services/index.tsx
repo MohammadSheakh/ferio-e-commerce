@@ -18,58 +18,24 @@ export interface CatalogService {
   category: { name: string };
 }
 
-const defaultServices: CatalogService[] = [
-  {
-    id: 's1',
-    slug: 'interior-design-consultation',
-    name: 'Interior Design Consultation',
-    description: '1-on-1 space planning and material selection with our senior interior architects.',
-    price: 500000,
-    durationMinutes: 60,
-    imageUrl: 'https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=800&q=80',
-    category: { name: 'Consultation' },
-  },
-  {
-    id: 's2',
-    slug: 'product-assembly-warranty-care',
-    name: 'Product Assembly & Warranty Care',
-    description: 'Professional white-glove setup and structural inspection by Ferio specialists.',
-    price: 150000,
-    durationMinutes: 45,
-    imageUrl: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?auto=format&fit=crop&w=800&q=80',
-    category: { name: 'White Glove' },
-  },
-  {
-    id: 's3',
-    slug: 'custom-wood-metal-crafting',
-    name: 'Custom Wood & Metal Customization',
-    description: 'Bespoke dimension adjustment, wood stain tinting, and powder coat metal finishing.',
-    price: 800000,
-    durationMinutes: 90,
-    imageUrl: 'https://images.unsplash.com/photo-1538688525198-9b88f6f53126?auto=format&fit=crop&w=800&q=80',
-    category: { name: 'Bespoke Crafting' },
-  },
-];
-
 export default function ServicesScreen() {
-  const [services, setServices] = useState<CatalogService[]>(defaultServices);
+  const [services, setServices] = useState<CatalogService[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     async function load() {
       try {
         const res = await apiGet<CatalogService[]>('/services');
-        if (Array.isArray(res) && res.length > 0) setServices(res);
-      } catch {
-        // Fallback default services
+        setServices(Array.isArray(res) ? res : []);
+      } catch (loadError) {
+        setError(loadError instanceof Error ? loadError.message : 'Unable to load services.');
       } finally {
         setLoading(false);
       }
     }
     void load();
   }, []);
-
-  const safeServices = Array.isArray(services) && services.length > 0 ? services : defaultServices;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -83,9 +49,13 @@ export default function ServicesScreen() {
 
         {loading ? (
           <ActivityIndicator style={{ marginTop: 40 }} />
+        ) : error ? (
+          <Text style={styles.stateText}>{error}</Text>
+        ) : services.length === 0 ? (
+          <Text style={styles.stateText}>No services are available right now.</Text>
         ) : (
           <View style={styles.list}>
-            {safeServices.map((s) => (
+            {services.map((s) => (
               <Link key={s.id} href={`/services/${s.slug}` as any} asChild>
                 <Pressable style={styles.card}>
                   {s.imageUrl ? <Image source={{ uri: s.imageUrl }} style={styles.image} /> : null}
@@ -125,4 +95,5 @@ const styles = StyleSheet.create({
   metaRow: { marginTop: 14, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   price: { fontSize: 15, fontWeight: '600', color: colors.ink },
   duration: { fontSize: 12, color: colors.ink2 },
+  stateText: { marginTop: 30, fontSize: 13, lineHeight: 20, color: colors.ink2 },
 });

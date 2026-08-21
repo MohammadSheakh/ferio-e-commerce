@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import type { ApiEnvelope } from "@/lib/backend";
 import type { OrderTracking } from "@/lib/tracking";
+import {
+  backendErrorResponse,
+  bffErrorResponse,
+  forwardedHeaders,
+} from "@/lib/bff-response";
 
 const backendApiUrl =
   process.env.NEXT_PUBLIC_FERIO_API_URL ?? "http://localhost:6733/api/v1";
@@ -10,10 +15,10 @@ export async function POST(request: Request) {
     const body = await request.json();
     const response = await fetch(`${backendApiUrl}/orders/track`, {
       method: "POST",
-      headers: {
+      headers: forwardedHeaders(request, {
         Accept: "application/json",
         "Content-Type": "application/json",
-      },
+      }),
       body: JSON.stringify(body),
       cache: "no-store",
     });
@@ -21,19 +26,18 @@ export async function POST(request: Request) {
       message?: string | string[];
     };
     if (!response.ok) {
-      const message = Array.isArray(payload.message)
-        ? payload.message.join(" ")
-        : payload.message;
-      return NextResponse.json(
-        { message: message || "Order details could not be verified." },
-        { status: response.status },
+      return backendErrorResponse(
+        payload,
+        response.status,
+        "Order details could not be verified.",
       );
     }
     return NextResponse.json({ data: payload.data });
   } catch {
-    return NextResponse.json(
-      { message: "Tracking is temporarily unavailable." },
-      { status: 503 },
+    return bffErrorResponse(
+      "Tracking is temporarily unavailable.",
+      503,
+      "SERVICE_UNAVAILABLE",
     );
   }
 }

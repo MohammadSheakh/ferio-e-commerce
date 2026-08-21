@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { AdminApiError, adminApi } from "@/lib/admin-api";
+import { adminApi } from "@/lib/admin-api";
+import { adminApiErrorResponse } from "@/lib/bff-response";
 import type { CourierSettlementImport } from "@/lib/settlements";
 
 export async function GET() {
@@ -10,16 +11,7 @@ export async function GET() {
       ),
     });
   } catch (error) {
-    const status = error instanceof AdminApiError ? error.status : 503;
-    return NextResponse.json(
-      {
-        message:
-          error instanceof Error
-            ? error.message
-            : "Unable to load settlement imports.",
-      },
-      { status },
-    );
+    return adminApiErrorResponse(error, "Unable to load settlement imports.");
   }
 }
 
@@ -39,15 +31,6 @@ export async function POST(request: Request) {
     );
     return NextResponse.json({ data: result });
   } catch (error) {
-    const status = error instanceof AdminApiError ? error.status : 503;
-    return NextResponse.json(
-      {
-        message:
-          error instanceof Error
-            ? error.message
-            : "Unable to import settlement report.",
-      },
-      { status },
-    );
+    return adminApiErrorResponse(error, "Unable to import settlement report.");
   }
 }

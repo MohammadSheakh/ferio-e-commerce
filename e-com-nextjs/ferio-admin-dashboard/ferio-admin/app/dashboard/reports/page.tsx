@@ -4,7 +4,11 @@ import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import Topbar from "@/components/Topbar";
 import { formatTaka } from "@/lib/catalog";
-import type { ReportCount, ReportsOverview } from "@/lib/reports";
+import type {
+  ReportCount,
+  ReportOrdersExport,
+  ReportsOverview,
+} from "@/lib/reports";
 
 function dateDaysAgo(days: number) {
   return new Date(Date.now() - days * 24 * 60 * 60 * 1000)
@@ -36,15 +40,22 @@ export default function ReportsPage() {
   const [provider, setProvider] = useState("");
   const [report, setReport] = useState<ReportsOverview | null>(null);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const [error, setError] = useState("");
+  const [exportMessage, setExportMessage] = useState("");
+
+  const reportQuery = useCallback(() => {
+    const query = new URLSearchParams({ dateFrom, dateTo });
+    if (source.trim()) query.set("source", source.trim());
+    if (provider) query.set("provider", provider);
+    return query;
+  }, [dateFrom, dateTo, provider, source]);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const query = new URLSearchParams({ dateFrom, dateTo });
-      if (source.trim()) query.set("source", source.trim());
-      if (provider) query.set("provider", provider);
+      const query = reportQuery();
       const response = await fetch(`/api/reports/overview?${query}`, {
         cache: "no-store",
       });
@@ -65,7 +76,7 @@ export default function ReportsPage() {
     } finally {
       setLoading(false);
     }
-  }, [dateFrom, dateTo, provider, source]);
+  }, [reportQuery]);
 
   useEffect(() => {
     void load();
@@ -74,6 +85,47 @@ export default function ReportsPage() {
   function applyFilters(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     void load();
+  }
+
+  async function exportOrders() {
+    setExporting(true);
+    setError("");
+    setExportMessage("");
+    try {
+      const response = await fetch(
+        `/api/reports/orders-export?${reportQuery()}`,
+        { cache: "no-store" },
+      );
+      const payload = (await response.json()) as {
+        data?: ReportOrdersExport;
+        message?: string;
+      };
+      if (!response.ok || !payload.data) {
+        throw new Error(payload.message || "Unable to export orders.");
+      }
+      const blob = new Blob([payload.data.content], {
+        type: payload.data.contentType,
+      });
+      const href = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = href;
+      link.download = payload.data.fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(href);
+      setExportMessage(
+        `${payload.data.rowCount} rows exported. Customer fields were ${payload.data.customerFields}.`,
+      );
+    } catch (exportError) {
+      setError(
+        exportError instanceof Error
+          ? exportError.message
+          : "Unable to export orders.",
+      );
+    } finally {
+      setExporting(false);
+    }
   }
 
   const inputClass =
@@ -146,11 +198,24 @@ export default function ReportsPage() {
           >
             {loading ? "Loading…" : "Apply"}
           </button>
+          <button
+            type="button"
+            disabled={loading || exporting}
+            onClick={() => void exportOrders()}
+            className="rounded-full border border-ink px-5 py-2.5 text-[13px] font-medium text-ink transition hover:bg-surface disabled:cursor-not-allowed disabled:border-line disabled:text-ink2"
+          >
+            {exporting ? "Preparing CSV…" : "Export orders CSV"}
+          </button>
         </form>
 
         {error && (
           <p role="alert" className="text-[12px] text-rose-700">
             {error}
+          </p>
+        )}
+        {exportMessage && (
+          <p role="status" className="text-[12px] text-emerald-700">
+            {exportMessage}
           </p>
         )}
         {report && (

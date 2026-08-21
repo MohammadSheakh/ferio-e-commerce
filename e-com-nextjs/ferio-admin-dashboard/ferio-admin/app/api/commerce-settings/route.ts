@@ -1,12 +1,7 @@
 import { NextResponse } from "next/server";
-import { AdminApiError, adminApi } from "@/lib/admin-api";
+import { adminApi } from "@/lib/admin-api";
+import { adminApiErrorResponse } from "@/lib/bff-response";
 import type { CommerceSettings } from "@/lib/commerce-settings";
-
-function errorResponse(error: unknown, fallback: string) {
-  const status = error instanceof AdminApiError ? error.status : 503;
-  const message = error instanceof Error ? error.message : fallback;
-  return NextResponse.json({ message }, { status });
-}
 
 export async function GET() {
   try {
@@ -15,7 +10,7 @@ export async function GET() {
     );
     return NextResponse.json({ data: settings });
   } catch (error) {
-    return errorResponse(error, "Unable to load commerce settings.");
+    return adminApiErrorResponse(error, "Unable to load commerce settings.");
   }
 }
 
@@ -32,6 +27,6 @@ export async function PATCH(request: Request) {
     );
     return NextResponse.json({ data: settings });
   } catch (error) {
-    return errorResponse(error, "Unable to save commerce settings.");
+    return adminApiErrorResponse(error, "Unable to save commerce settings.");
   }
 }

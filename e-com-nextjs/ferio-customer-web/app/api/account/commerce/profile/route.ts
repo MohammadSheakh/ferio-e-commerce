@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 import { customerSessionFetch } from "@/lib/customer-session";
+import {
+  backendErrorResponse,
+  bffErrorResponse,
+  type BackendErrorPayload,
+} from "@/lib/bff-response";
 
 export async function PUT(request: Request) {
   const body = JSON.stringify(await request.json());
@@ -10,14 +15,24 @@ export async function PUT(request: Request) {
   });
 
   if (!result) {
-    return NextResponse.json({ message: "Sign in to update your account." }, { status: 401 });
+    return bffErrorResponse(
+      "Sign in to update your account.",
+      401,
+      "AUTHENTICATION_REQUIRED",
+    );
   }
 
-  const payload = await result.response.json();
+  const payload = (await result.response.json()) as BackendErrorPayload & {
+    data?: Record<string, unknown>;
+    account?: unknown;
+    linked?: unknown;
+    customer?: unknown;
+  };
   if (!result.response.ok) {
-    return NextResponse.json(
-      { message: Array.isArray(payload.message) ? payload.message.join(" ") : payload.message },
-      { status: result.response.status },
+    return backendErrorResponse(
+      payload,
+      result.response.status,
+      "Unable to update the customer account.",
     );
   }
 

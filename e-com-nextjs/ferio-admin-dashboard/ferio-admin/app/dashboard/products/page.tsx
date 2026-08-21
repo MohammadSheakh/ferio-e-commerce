@@ -51,7 +51,7 @@ export default function ProductsPage() {
       setError(
         requestError instanceof Error
           ? requestError.message
-          : "Unable to load products."
+          : "Unable to load products.",
       );
     } finally {
       setLoading(false);
@@ -79,7 +79,7 @@ export default function ProductsPage() {
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               placeholder="Search product name or SKU"
-              className="min-w-0 flex-1 rounded-full border border-line px-4 py-2 text-[13px] outline-none focus:border-ink"
+              className="min-w-0 flex-1 rounded-full border border-line px-4 py-2 text-[13px] focus:border-ink"
             />
             <button className="rounded-full bg-ink px-5 py-2 text-[13px] text-white">
               Search
@@ -115,7 +115,7 @@ export default function ProductsPage() {
               href="/dashboard/products/new"
               className="rounded-full bg-ink px-5 py-2 text-[13px] font-medium text-white hover:opacity-85"
             >
-              + Add product
+              Add product
             </Link>
           </div>
         </div>
@@ -126,8 +126,8 @@ export default function ProductsPage() {
           </p>
         )}
 
-        <div className="mt-6 overflow-hidden rounded-card border border-line">
-          <table className="w-full text-left">
+        <div className="mt-6 overflow-x-auto border-y border-line">
+          <table className="w-full min-w-[760px] text-left">
             <thead>
               <tr className="text-[11px] uppercase tracking-eyebrow text-ink2">
                 <th className="px-4 py-3 font-normal w-24">Id</th>

@@ -31,7 +31,7 @@ export default async function RelatedProductsSection({
           href={`/products${categorySlug ? `?category=${categorySlug}` : ""}`}
           className="text-[13px] text-ink2 hover:text-ink font-medium"
         >
-          View all →
+          View all
         </Link>
       </div>
 

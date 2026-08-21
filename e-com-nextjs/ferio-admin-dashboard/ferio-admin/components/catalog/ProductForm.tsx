@@ -49,7 +49,7 @@ type SpecificationForm = {
 };
 
 const inputClass =
-  "mt-1.5 w-full rounded-card border border-line px-3.5 py-2.5 text-[14px] outline-none focus:border-ink";
+  "mt-1.5 w-full rounded-card border border-line px-3.5 py-2.5 text-[14px] focus:border-ink";
 
 function variantToForm(variant: CatalogVariant): VariantForm {
   return {
@@ -107,7 +107,7 @@ export default function ProductForm({
       title: item.title ?? "",
       reviewerName: item.reviewerName ?? "",
       isFeatured: item.isFeatured ?? false,
-    })) ?? []
+    })) ?? [],
   );
   const [features, setFeatures] = useState<FeatureForm[]>(
     product?.features?.map((item) => ({
@@ -115,14 +115,14 @@ export default function ProductForm({
       tag: item.tag ?? "",
       image: item.image ?? "",
       description: item.description,
-    })) ?? []
+    })) ?? [],
   );
   const [specifications, setSpecifications] = useState<SpecificationForm[]>(
     product?.specifications?.map((item) => ({
       group: item.group ?? "General",
       key: item.key,
       value: item.value,
-    })) ?? []
+    })) ?? [],
   );
   const [description, setDescription] = useState(product?.description ?? "");
 
@@ -152,11 +152,19 @@ export default function ProductForm({
   function addYoutubeReview() {
     setYoutubeReviews((current) => [
       ...current,
-      { youtubeUrl: "", title: "", reviewerName: "", isFeatured: current.length === 0 },
+      {
+        youtubeUrl: "",
+        title: "",
+        reviewerName: "",
+        isFeatured: current.length === 0,
+      },
     ]);
   }
 
-  function updateYoutubeReview(index: number, patch: Partial<YoutubeReviewForm>) {
+  function updateYoutubeReview(
+    index: number,
+    patch: Partial<YoutubeReviewForm>,
+  ) {
     setYoutubeReviews((current) =>
       current.map((item, itemIndex) => {
         if (itemIndex === index) {
@@ -164,7 +172,7 @@ export default function ProductForm({
           return next;
         }
         return patch.isFeatured ? { ...item, isFeatured: false } : item;
-      })
+      }),
     );
   }
 
@@ -198,7 +206,10 @@ export default function ProductForm({
     ]);
   }
 
-  function updateSpecification(index: number, patch: Partial<SpecificationForm>) {
+  function updateSpecification(
+    index: number,
+    patch: Partial<SpecificationForm>,
+  ) {
     setSpecifications((current) =>
       current.map((item, itemIndex) =>
         itemIndex === index ? { ...item, ...patch } : item,
@@ -305,7 +316,9 @@ export default function ProductForm({
         ...(product ? {} : { status: String(form.get("status")) }),
       };
       const response = await fetch(
-        product ? `/api/catalog/products/${product.id}` : "/api/catalog/products",
+        product
+          ? `/api/catalog/products/${product.id}`
+          : "/api/catalog/products",
         {
           method: product ? "PATCH" : "POST",
           headers: { "Content-Type": "application/json" },
@@ -320,7 +333,9 @@ export default function ProductForm({
       router.refresh();
     } catch (saveError) {
       setError(
-        saveError instanceof Error ? saveError.message : "Unable to save product.",
+        saveError instanceof Error
+          ? saveError.message
+          : "Unable to save product.",
       );
       setSaving(false);
     }
@@ -332,11 +347,14 @@ export default function ProductForm({
     setError("");
 
     try {
-      const response = await fetch(`/api/catalog/products/${product.id}/status`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
-      });
+      const response = await fetch(
+        `/api/catalog/products/${product.id}/status`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status }),
+        },
+      );
       const payload = (await response.json()) as { message?: string };
       if (!response.ok) {
         throw new Error(payload.message || "Unable to change status.");
@@ -358,7 +376,9 @@ export default function ProductForm({
       {product && (
         <div className="flex items-center justify-between rounded-card border border-line p-5">
           <div>
-            <p className="text-[12px] uppercase tracking-eyebrow text-ink2">Status</p>
+            <p className="text-[12px] uppercase tracking-eyebrow text-ink2">
+              Status
+            </p>
             <p className="text-[16px] font-medium text-ink">{product.status}</p>
           </div>
           <div className="flex gap-2">
@@ -447,7 +467,9 @@ export default function ProductForm({
         </div>
 
         <div>
-          <label className="block text-[12px] text-ink2 mb-1.5 font-medium">Description</label>
+          <label className="block text-[12px] text-ink2 mb-1.5 font-medium">
+            Description
+          </label>
           <RichTextEditor
             name="description"
             value={description}
@@ -462,7 +484,8 @@ export default function ProductForm({
           <div>
             <h2 className="text-[16px] font-medium text-ink">Media Images</h2>
             <p className="mt-1 text-[12px] text-ink2">
-              Add image URLs for this product. The first image will be used as primary preview.
+              Add image URLs for this product. The first image will be used as
+              primary preview.
             </p>
           </div>
           <button
@@ -475,15 +498,20 @@ export default function ProductForm({
         </div>
 
         {media.map((item, index) => (
-          <div key={index} className="grid gap-3 sm:grid-cols-[2fr_1fr_auto] items-center">
+          <div
+            key={index}
+            className="grid gap-3 sm:grid-cols-[2fr_1fr_auto] items-center"
+          >
             <div>
-              <label className="block text-[11px] text-ink2">Image URL {index === 0 ? "(Primary)" : ""}</label>
+              <label className="block text-[11px] text-ink2">
+                Image URL {index === 0 ? "(Primary)" : ""}
+              </label>
               <input
                 type="url"
                 placeholder="https://..."
                 value={item.url}
                 onChange={(e) => updateMedia(index, { url: e.target.value })}
-                className="mt-1 w-full rounded-card border border-line px-3.5 py-2 text-[13px] outline-none focus:border-ink"
+                className="mt-1 w-full rounded-card border border-line px-3.5 py-2 text-[13px] focus:border-ink"
               />
             </div>
             <div>
@@ -492,8 +520,10 @@ export default function ProductForm({
                 type="text"
                 placeholder="Description"
                 value={item.altText}
-                onChange={(e) => updateMedia(index, { altText: e.target.value })}
-                className="mt-1 w-full rounded-card border border-line px-3.5 py-2 text-[13px] outline-none focus:border-ink"
+                onChange={(e) =>
+                  updateMedia(index, { altText: e.target.value })
+                }
+                className="mt-1 w-full rounded-card border border-line px-3.5 py-2 text-[13px] focus:border-ink"
               />
             </div>
             {media.length > 1 && (
@@ -513,9 +543,13 @@ export default function ProductForm({
       <div className="space-y-4 rounded-card border border-line p-5">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-[16px] font-medium text-ink">YouTube Video Reviews</h2>
+            <h2 className="text-[16px] font-medium text-ink">
+              YouTube Video Reviews
+            </h2>
             <p className="mt-1 text-[12px] text-ink2">
-              Add video review links for this product. Check &quot;Featured&quot; to highlight a video review on the storefront.
+              Add video review links for this product. Check
+              &quot;Featured&quot; to highlight a video review on the
+              storefront.
             </p>
           </div>
           <button
@@ -528,16 +562,23 @@ export default function ProductForm({
         </div>
 
         {youtubeReviews.map((item, index) => (
-          <div key={index} className="grid gap-3 rounded-card border border-line/60 bg-neutral-50/50 p-4 sm:grid-cols-[2fr_1fr_1fr_auto_auto] items-center">
+          <div
+            key={index}
+            className="grid gap-3 rounded-card border border-line/60 bg-neutral-50/50 p-4 sm:grid-cols-[2fr_1fr_1fr_auto_auto] items-center"
+          >
             <div>
-              <label className="block text-[11px] text-ink2">YouTube URL *</label>
+              <label className="block text-[11px] text-ink2">
+                YouTube URL *
+              </label>
               <input
                 type="url"
                 required
                 placeholder="https://youtube.com/watch?v=..."
                 value={item.youtubeUrl}
-                onChange={(e) => updateYoutubeReview(index, { youtubeUrl: e.target.value })}
-                className="mt-1 w-full rounded-card border border-line px-3.5 py-2 text-[13px] outline-none focus:border-ink bg-white"
+                onChange={(e) =>
+                  updateYoutubeReview(index, { youtubeUrl: e.target.value })
+                }
+                className="mt-1 w-full rounded-card border border-line bg-white px-3.5 py-2 text-[13px] focus:border-ink"
               />
             </div>
             <div>
@@ -546,18 +587,24 @@ export default function ProductForm({
                 type="text"
                 placeholder="Unboxing & Review"
                 value={item.title}
-                onChange={(e) => updateYoutubeReview(index, { title: e.target.value })}
-                className="mt-1 w-full rounded-card border border-line px-3.5 py-2 text-[13px] outline-none focus:border-ink bg-white"
+                onChange={(e) =>
+                  updateYoutubeReview(index, { title: e.target.value })
+                }
+                className="mt-1 w-full rounded-card border border-line bg-white px-3.5 py-2 text-[13px] focus:border-ink"
               />
             </div>
             <div>
-              <label className="block text-[11px] text-ink2">Reviewer Name</label>
+              <label className="block text-[11px] text-ink2">
+                Reviewer Name
+              </label>
               <input
                 type="text"
                 placeholder="Reviewer name"
                 value={item.reviewerName}
-                onChange={(e) => updateYoutubeReview(index, { reviewerName: e.target.value })}
-                className="mt-1 w-full rounded-card border border-line px-3.5 py-2 text-[13px] outline-none focus:border-ink bg-white"
+                onChange={(e) =>
+                  updateYoutubeReview(index, { reviewerName: e.target.value })
+                }
+                className="mt-1 w-full rounded-card border border-line bg-white px-3.5 py-2 text-[13px] focus:border-ink"
               />
             </div>
             <div className="flex items-center gap-1.5 pt-5">
@@ -565,10 +612,15 @@ export default function ProductForm({
                 type="checkbox"
                 id={`yt-feat-${index}`}
                 checked={item.isFeatured}
-                onChange={(e) => updateYoutubeReview(index, { isFeatured: e.target.checked })}
+                onChange={(e) =>
+                  updateYoutubeReview(index, { isFeatured: e.target.checked })
+                }
                 className="h-4 w-4 rounded border-line"
               />
-              <label htmlFor={`yt-feat-${index}`} className="text-[12px] font-medium text-ink cursor-pointer">
+              <label
+                htmlFor={`yt-feat-${index}`}
+                className="text-[12px] font-medium text-ink cursor-pointer"
+              >
                 Featured
               </label>
             </div>
@@ -585,7 +637,9 @@ export default function ProductForm({
         ))}
 
         {youtubeReviews.length === 0 && (
-          <p className="text-[12px] text-ink2 italic">No YouTube reviews added yet for this product.</p>
+          <p className="text-[12px] text-ink2 italic">
+            No YouTube reviews added yet for this product.
+          </p>
         )}
       </div>
 
@@ -613,7 +667,9 @@ export default function ProductForm({
               {variants.length > 1 && (
                 <button
                   type="button"
-                  onClick={() => setVariants((v) => v.filter((_, i) => i !== index))}
+                  onClick={() =>
+                    setVariants((v) => v.filter((_, i) => i !== index))
+                  }
                   className="text-[12px] text-rose-600 hover:underline"
                 >
                   Delete variant
@@ -623,12 +679,16 @@ export default function ProductForm({
 
             <div className="grid gap-3 sm:grid-cols-3">
               <div>
-                <label className="block text-[11px] text-ink2">Variant Name</label>
+                <label className="block text-[11px] text-ink2">
+                  Variant Name
+                </label>
                 <input
                   required
                   value={variant.name}
-                  onChange={(e) => updateVariant(index, { name: e.target.value })}
-                  className="mt-1 w-full rounded-card border border-line px-3 py-2 text-[13px] outline-none focus:border-ink bg-white"
+                  onChange={(e) =>
+                    updateVariant(index, { name: e.target.value })
+                  }
+                  className="mt-1 w-full rounded-card border border-line bg-white px-3 py-2 text-[13px] focus:border-ink"
                 />
               </div>
 
@@ -637,8 +697,10 @@ export default function ProductForm({
                 <input
                   required
                   value={variant.sku}
-                  onChange={(e) => updateVariant(index, { sku: e.target.value })}
-                  className="mt-1 w-full rounded-card border border-line px-3 py-2 text-[13px] outline-none focus:border-ink bg-white uppercase"
+                  onChange={(e) =>
+                    updateVariant(index, { sku: e.target.value })
+                  }
+                  className="mt-1 w-full rounded-card border border-line bg-white px-3 py-2 text-[13px] uppercase focus:border-ink"
                 />
               </div>
 
@@ -650,15 +712,19 @@ export default function ProductForm({
                   step="0.01"
                   min="0"
                   value={variant.price}
-                  onChange={(e) => updateVariant(index, { price: e.target.value })}
-                  className="mt-1 w-full rounded-card border border-line px-3 py-2 text-[13px] outline-none focus:border-ink bg-white"
+                  onChange={(e) =>
+                    updateVariant(index, { price: e.target.value })
+                  }
+                  className="mt-1 w-full rounded-card border border-line bg-white px-3 py-2 text-[13px] focus:border-ink"
                 />
               </div>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-3">
               <div>
-                <label className="block text-[11px] text-ink2">Compare-at Price ($)</label>
+                <label className="block text-[11px] text-ink2">
+                  Compare-at Price ($)
+                </label>
                 <input
                   type="number"
                   step="0.01"
@@ -667,13 +733,15 @@ export default function ProductForm({
                   onChange={(e) =>
                     updateVariant(index, { compareAtPrice: e.target.value })
                   }
-                  className="mt-1 w-full rounded-card border border-line px-3 py-2 text-[13px] outline-none focus:border-ink bg-white"
+                  className="mt-1 w-full rounded-card border border-line bg-white px-3 py-2 text-[13px] focus:border-ink"
                 />
               </div>
 
               {!product && (
                 <div>
-                  <label className="block text-[11px] text-ink2">Initial Stock</label>
+                  <label className="block text-[11px] text-ink2">
+                    Initial Stock
+                  </label>
                   <input
                     type="number"
                     min="0"
@@ -681,13 +749,15 @@ export default function ProductForm({
                     onChange={(e) =>
                       updateVariant(index, { initialStock: e.target.value })
                     }
-                    className="mt-1 w-full rounded-card border border-line px-3 py-2 text-[13px] outline-none focus:border-ink bg-white"
+                    className="mt-1 w-full rounded-card border border-line bg-white px-3 py-2 text-[13px] focus:border-ink"
                   />
                 </div>
               )}
 
               <div>
-                <label className="block text-[11px] text-ink2">Low Stock Threshold</label>
+                <label className="block text-[11px] text-ink2">
+                  Low Stock Threshold
+                </label>
                 <input
                   type="number"
                   min="0"
@@ -695,7 +765,7 @@ export default function ProductForm({
                   onChange={(e) =>
                     updateVariant(index, { lowStockThreshold: e.target.value })
                   }
-                  className="mt-1 w-full rounded-card border border-line px-3 py-2 text-[13px] outline-none focus:border-ink bg-white"
+                  className="mt-1 w-full rounded-card border border-line bg-white px-3 py-2 text-[13px] focus:border-ink"
                 />
               </div>
             </div>
@@ -752,7 +822,9 @@ export default function ProductForm({
           <label className="block text-[12px] text-ink2">Item Condition</label>
           <select
             value={condition}
-            onChange={(e) => setCondition(e.target.value as CatalogProduct["condition"])}
+            onChange={(e) =>
+              setCondition(e.target.value as CatalogProduct["condition"])
+            }
             className={inputClass}
           >
             <option value="NEW">NEW (Brand New)</option>
@@ -763,7 +835,9 @@ export default function ProductForm({
         {condition === "SECOND_HAND" && (
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-[12px] text-ink2">Condition Grade</label>
+              <label className="block text-[12px] text-ink2">
+                Condition Grade
+              </label>
               <select
                 name="conditionGrade"
                 defaultValue={product?.conditionGrade ?? "LIKE_NEW"}
@@ -776,7 +850,9 @@ export default function ProductForm({
             </div>
 
             <div>
-              <label className="block text-[12px] text-ink2">Condition Note</label>
+              <label className="block text-[12px] text-ink2">
+                Condition Note
+              </label>
               <input
                 name="conditionNote"
                 defaultValue={product?.conditionNote ?? ""}
@@ -789,7 +865,9 @@ export default function ProductForm({
 
         {!product && (
           <div>
-            <label className="block text-[12px] text-ink2">Publish Status</label>
+            <label className="block text-[12px] text-ink2">
+              Publish Status
+            </label>
             <select name="status" defaultValue="DRAFT" className={inputClass}>
               <option value="DRAFT">DRAFT (Hidden)</option>
               <option value="ACTIVE">ACTIVE (Published)</option>
@@ -803,7 +881,9 @@ export default function ProductForm({
       <div className="space-y-4 rounded-card border border-line p-5">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-[16px] font-medium text-ink">Product Features (Optional)</h2>
+            <h2 className="text-[16px] font-medium text-ink">
+              Product Features (Optional)
+            </h2>
             <p className="mt-1 text-[12px] text-ink2">
               Add custom features to highlight on the product details page.
             </p>
@@ -818,9 +898,14 @@ export default function ProductForm({
         </div>
 
         {features.map((item, index) => (
-          <div key={index} className="space-y-3 rounded-card border border-line/60 bg-neutral-50/50 p-4">
+          <div
+            key={index}
+            className="space-y-3 rounded-card border border-line/60 bg-neutral-50/50 p-4"
+          >
             <div className="flex items-center justify-between border-b border-line/40 pb-2">
-              <p className="text-[13px] font-medium text-ink">Feature #{index + 1}</p>
+              <p className="text-[13px] font-medium text-ink">
+                Feature #{index + 1}
+              </p>
               <button
                 type="button"
                 onClick={() => removeFeature(index)}
@@ -832,55 +917,73 @@ export default function ProductForm({
 
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
-                <label className="block text-[11px] text-ink2">Feature Title *</label>
+                <label className="block text-[11px] text-ink2">
+                  Feature Title *
+                </label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. Easy to clean velour"
                   value={item.title}
-                  onChange={(e) => updateFeature(index, { title: e.target.value })}
-                  className="mt-1 w-full rounded-card border border-line px-3.5 py-2 text-[13px] outline-none focus:border-ink bg-white"
+                  onChange={(e) =>
+                    updateFeature(index, { title: e.target.value })
+                  }
+                  className="mt-1 w-full rounded-card border border-line bg-white px-3.5 py-2 text-[13px] focus:border-ink"
                 />
               </div>
               <div>
-                <label className="block text-[11px] text-ink2">Tag / Badge (Optional)</label>
+                <label className="block text-[11px] text-ink2">
+                  Tag / Badge (Optional)
+                </label>
                 <input
                   type="text"
                   placeholder="e.g. Velour Fabric"
                   value={item.tag}
-                  onChange={(e) => updateFeature(index, { tag: e.target.value })}
-                  className="mt-1 w-full rounded-card border border-line px-3.5 py-2 text-[13px] outline-none focus:border-ink bg-white"
+                  onChange={(e) =>
+                    updateFeature(index, { tag: e.target.value })
+                  }
+                  className="mt-1 w-full rounded-card border border-line bg-white px-3.5 py-2 text-[13px] focus:border-ink"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-[11px] text-ink2">Feature Image URL (Optional)</label>
+              <label className="block text-[11px] text-ink2">
+                Feature Image URL (Optional)
+              </label>
               <input
                 type="url"
                 placeholder="https://images.unsplash.com/..."
                 value={item.image}
-                onChange={(e) => updateFeature(index, { image: e.target.value })}
-                className="mt-1 w-full rounded-card border border-line px-3.5 py-2 text-[13px] outline-none focus:border-ink bg-white"
+                onChange={(e) =>
+                  updateFeature(index, { image: e.target.value })
+                }
+                className="mt-1 w-full rounded-card border border-line bg-white px-3.5 py-2 text-[13px] focus:border-ink"
               />
             </div>
 
             <div>
-              <label className="block text-[11px] text-ink2">Description *</label>
+              <label className="block text-[11px] text-ink2">
+                Description *
+              </label>
               <textarea
                 required
                 rows={3}
                 placeholder="Detailed feature description..."
                 value={item.description}
-                onChange={(e) => updateFeature(index, { description: e.target.value })}
-                className="mt-1 w-full rounded-card border border-line px-3.5 py-2 text-[13px] outline-none focus:border-ink bg-white"
+                onChange={(e) =>
+                  updateFeature(index, { description: e.target.value })
+                }
+                className="mt-1 w-full rounded-card border border-line bg-white px-3.5 py-2 text-[13px] focus:border-ink"
               />
             </div>
           </div>
         ))}
 
         {features.length === 0 && (
-          <p className="text-[12px] text-ink2 italic">No custom features added yet for this product.</p>
+          <p className="text-[12px] text-ink2 italic">
+            No custom features added yet for this product.
+          </p>
         )}
       </div>
 
@@ -888,9 +991,12 @@ export default function ProductForm({
       <div className="space-y-4 rounded-card border border-line p-5">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-[16px] font-medium text-ink">Product Specifications</h2>
+            <h2 className="text-[16px] font-medium text-ink">
+              Product Specifications
+            </h2>
             <p className="mt-1 text-[12px] text-ink2">
-              Add technical specs grouped by categories (e.g. Display Features, Connectivity).
+              Add technical specs grouped by categories (e.g. Display Features,
+              Connectivity).
             </p>
           </div>
           <button
@@ -903,26 +1009,37 @@ export default function ProductForm({
         </div>
 
         {specifications.map((item, index) => (
-          <div key={index} className="grid gap-3 sm:grid-cols-[1fr_1.5fr_2fr_auto] items-center rounded-card border border-line/60 bg-neutral-50/50 p-4">
+          <div
+            key={index}
+            className="grid gap-3 sm:grid-cols-[1fr_1.5fr_2fr_auto] items-center rounded-card border border-line/60 bg-neutral-50/50 p-4"
+          >
             <div>
-              <label className="block text-[11px] text-ink2">Group / Category</label>
+              <label className="block text-[11px] text-ink2">
+                Group / Category
+              </label>
               <input
                 type="text"
                 placeholder="e.g. Display Features"
                 value={item.group}
-                onChange={(e) => updateSpecification(index, { group: e.target.value })}
-                className="mt-1 w-full rounded-card border border-line px-3 py-2 text-[13px] outline-none focus:border-ink bg-white"
+                onChange={(e) =>
+                  updateSpecification(index, { group: e.target.value })
+                }
+                className="mt-1 w-full rounded-card border border-line bg-white px-3 py-2 text-[13px] focus:border-ink"
               />
             </div>
             <div>
-              <label className="block text-[11px] text-ink2">Key / Attribute *</label>
+              <label className="block text-[11px] text-ink2">
+                Key / Attribute *
+              </label>
               <input
                 type="text"
                 required
                 placeholder="e.g. Display Size"
                 value={item.key}
-                onChange={(e) => updateSpecification(index, { key: e.target.value })}
-                className="mt-1 w-full rounded-card border border-line px-3 py-2 text-[13px] outline-none focus:border-ink bg-white"
+                onChange={(e) =>
+                  updateSpecification(index, { key: e.target.value })
+                }
+                className="mt-1 w-full rounded-card border border-line bg-white px-3 py-2 text-[13px] focus:border-ink"
               />
             </div>
             <div>
@@ -930,10 +1047,12 @@ export default function ProductForm({
               <input
                 type="text"
                 required
-                placeholder="e.g. 44.5&quot;"
+                placeholder='e.g. 44.5"'
                 value={item.value}
-                onChange={(e) => updateSpecification(index, { value: e.target.value })}
-                className="mt-1 w-full rounded-card border border-line px-3 py-2 text-[13px] outline-none focus:border-ink bg-white"
+                onChange={(e) =>
+                  updateSpecification(index, { value: e.target.value })
+                }
+                className="mt-1 w-full rounded-card border border-line bg-white px-3 py-2 text-[13px] focus:border-ink"
               />
             </div>
             <div className="pt-5">
@@ -949,11 +1068,14 @@ export default function ProductForm({
         ))}
 
         {specifications.length === 0 && (
-          <p className="text-[12px] text-ink2 italic">No specifications added yet. Click &quot;+ Add Specification&quot; above.</p>
+          <p className="text-[12px] text-ink2 italic">
+            No specifications added yet. Click &quot;+ Add Specification&quot;
+            above.
+          </p>
         )}
       </div>
 
-      <div className="sticky bottom-4 z-20 flex items-center justify-between rounded-card border border-line bg-white/95 p-4 backdrop-blur shadow-lg">
+      <div className="sticky bottom-0 z-20 flex items-center justify-between border-t border-line bg-white p-4">
         <div>
           {error && (
             <p role="alert" className="text-[13px] text-rose-700 font-medium">
@@ -971,7 +1093,7 @@ export default function ProductForm({
           </button>
           <button
             disabled={saving}
-            className="rounded-full bg-ink px-6 py-2.5 text-[14px] font-medium text-white disabled:opacity-50 shadow-sm"
+            className="rounded-full bg-ink px-6 py-2.5 text-[14px] font-medium text-white disabled:opacity-50"
           >
             {saving ? "Saving…" : product ? "Update product" : "Create product"}
           </button>

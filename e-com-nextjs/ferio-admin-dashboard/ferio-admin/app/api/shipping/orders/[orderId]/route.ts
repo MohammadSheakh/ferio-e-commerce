@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { AdminApiError, adminApi } from "@/lib/admin-api";
+import { adminApi } from "@/lib/admin-api";
+import { adminApiErrorResponse } from "@/lib/bff-response";
 import type { Shipment } from "@/lib/shipping";
 
 export async function GET(
@@ -13,11 +14,7 @@ export async function GET(
       ),
     });
   } catch (error) {
-    const status = error instanceof AdminApiError ? error.status : 503;
-    return NextResponse.json(
-      { message: error instanceof Error ? error.message : "Unable to load shipment." },
-      { status },
-    );
+    return adminApiErrorResponse(error, "Unable to load shipment.");
   }
 }
 
@@ -37,10 +34,6 @@ export async function POST(
     );
     return NextResponse.json({ data: shipment }, { status: 201 });
   } catch (error) {
-    const status = error instanceof AdminApiError ? error.status : 503;
-    return NextResponse.json(
-      { message: error instanceof Error ? error.message : "Unable to create shipment." },
-      { status },
-    );
+    return adminApiErrorResponse(error, "Unable to create shipment.");
   }
 }

@@ -1,1 +1,25 @@
-import{NextResponse}from'next/server';import{adminApi,AdminApiError}from'@/lib/admin-api';export async function GET(){try{return NextResponse.json({data:await adminApi('/admin/services')})}catch(e){return NextResponse.json({message:e instanceof Error?e.message:'Failed'},{status:e instanceof AdminApiError?e.status:503})}}export async function POST(r:Request){try{return NextResponse.json({data:await adminApi('/admin/services',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(await r.json())})})}catch(e){return NextResponse.json({message:e instanceof Error?e.message:'Failed'},{status:e instanceof AdminApiError?e.status:503})}}
+import { NextResponse } from "next/server";
+import { adminApi } from "@/lib/admin-api";
+import { adminApiErrorResponse } from "@/lib/bff-response";
+
+export async function GET() {
+  try {
+    return NextResponse.json({ data: await adminApi("/admin/services") });
+  } catch (error) {
+    return adminApiErrorResponse(error, "Unable to load services.");
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    return NextResponse.json({
+      data: await adminApi("/admin/services", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(await request.json()),
+      }),
+    });
+  } catch (error) {
+    return adminApiErrorResponse(error, "Unable to create service.");
+  }
+}

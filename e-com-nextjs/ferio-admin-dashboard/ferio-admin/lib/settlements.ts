@@ -162,6 +162,9 @@ export type ReconciliationFinding = {
 export type ReconciliationFindingPage = {
   items: ReconciliationFinding[];
   total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
   summary: { OPEN: number; ACKNOWLEDGED: number; RESOLVED: number };
 };
 

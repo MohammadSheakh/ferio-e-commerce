@@ -479,7 +479,7 @@
 
 1. **Browser Inspection & Credential Extraction**:
    - Inspected open CarryBee merchant portal (`merchant.carrybee.com/webhook/credentials`).
-   - Extracted API Base URL (`https://developers.carrybee.com`), Client headers (`Client-ID`, `Client-Secret`, `Client-Context`), handshake verification header (`X-CB-Webhook-Integration-Header`), and secret (`40489fe0-9386-4fc9-8e92-2b2fcb9d451c`).
+   - Extracted the API base URL, required client-header names, handshake verification header, and webhook credential from the provider portal. The credential value has been removed and must be rotated before launch.
 
 2. **Schema & Provider Support (`ferio-nest-prisma`)**:
    - Added `CARRYBEE` to `ShipmentProviderCode` enum in `shipping.prisma` and regenerated Prisma client.
@@ -560,7 +560,6 @@
 5. **Testing & Build Verification**:
    - **Unit Testing**: 5/5 unit tests passed in `store-locations.service.spec.ts`.
    - **Production Builds**: `ferio-nest-prisma` (Exit code 0), `ferio-admin` (Exit code 0), `ferio-customer-web` (Exit code 0).
-
 
 
 

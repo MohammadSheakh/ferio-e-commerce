@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { getCustomerSocket } from "@/lib/socket";
+import { createBrowserUuid } from "@/lib/browser-uuid";
 
 export default function PageTracker() {
   const pathname = usePathname();
@@ -10,8 +11,8 @@ export default function PageTracker() {
 
   useEffect(() => {
     let savedGuestId = localStorage.getItem("ferio_chat_guest_id");
-    if (!savedGuestId) {
-      savedGuestId = `gst_${Math.floor(1000 + Math.random() * 9000)}`;
+    if (!savedGuestId || !/^gst_[0-9a-f-]{36}$/i.test(savedGuestId)) {
+      savedGuestId = `gst_${createBrowserUuid()}`;
       localStorage.setItem("ferio_chat_guest_id", savedGuestId);
     }
 

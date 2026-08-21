@@ -1,4 +1,10 @@
 import { NextResponse } from "next/server";
+import {
+  backendErrorResponse,
+  bffErrorResponse,
+  forwardedHeaders,
+  type BackendErrorPayload,
+} from "@/lib/bff-response";
 
 const backendApiUrl =
   process.env.FERIO_API_URL ??
@@ -10,18 +16,28 @@ export async function POST(request: Request) {
     const body = await request.json();
     const res = await fetch(`${backendApiUrl}/store-locations/check-availability`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      headers: forwardedHeaders(request, {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      }),
       body: JSON.stringify(body),
       cache: "no-store",
     });
     if (!res.ok) {
-      const errData = await res.json();
-      throw new Error(errData.message || "Failed to check store availability");
+      const payload = (await res.json()) as BackendErrorPayload;
+      return backendErrorResponse(
+        payload,
+        res.status,
+        "Failed to check store availability.",
+      );
     }
     const data = await res.json();
     return NextResponse.json({ data: data.data || data });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unable to check store availability.";
-    return NextResponse.json({ message }, { status: 500 });
+  } catch {
+    return bffErrorResponse(
+      "Unable to check store availability.",
+      503,
+      "SERVICE_UNAVAILABLE",
+    );
   }
 }

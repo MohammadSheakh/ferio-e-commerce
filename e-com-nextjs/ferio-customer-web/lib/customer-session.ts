@@ -1,9 +1,13 @@
 import { cookies } from "next/headers";
+import { withCorrelationId } from "@/lib/correlation";
 
 const backendApiUrl =
   process.env.FERIO_API_URL ??
   process.env.NEXT_PUBLIC_FERIO_API_URL ??
   "http://localhost:6733/api/v1";
+
+const ACCESS_COOKIE_MAX_AGE = 15 * 60;
+const REFRESH_COOKIE_MAX_AGE = 7 * 24 * 60 * 60;
 
 export type CustomerSessionResult = {
   response: Response;
@@ -21,14 +25,14 @@ export function setCustomerSession(accessToken: string, refreshToken: string) {
     httpOnly: true,
     secure,
     sameSite: "lax",
-    maxAge: 7 * 24 * 60 * 60,
+    maxAge: ACCESS_COOKIE_MAX_AGE,
     path: "/",
   });
   store.set("ferio_customer_refresh", refreshToken, {
     httpOnly: true,
     secure,
     sameSite: "lax",
-    maxAge: 7 * 24 * 60 * 60,
+    maxAge: REFRESH_COOKIE_MAX_AGE,
     path: "/",
   });
 }
@@ -45,7 +49,7 @@ export async function refreshCustomerSession() {
   try {
     const upstream = await fetch(`${backendApiUrl}/auth/refresh`, {
       method: "POST",
-      headers: { Cookie: `refreshToken=${refreshToken}` },
+      headers: withCorrelationId({ Cookie: `refreshToken=${refreshToken}` }),
       cache: "no-store",
     });
     const payload = (await upstream.json()) as {
@@ -75,10 +79,10 @@ export async function customerSessionFetch(
   const call = (token: string) =>
     fetch(`${backendApiUrl}${path.startsWith("/") ? path : `/${path}`}`, {
       ...init,
-      headers: {
+      headers: withCorrelationId({
         Authorization: `Bearer ${token}`,
         ...init?.headers,
-      },
+      }),
       cache: "no-store",
     });
   let response = await call(accessToken);

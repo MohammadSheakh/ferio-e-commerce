@@ -18,7 +18,7 @@ export default function ProductImageGallery({
     new Set([
       ...(mainImage ? [mainImage] : []),
       ...(Array.isArray(images) ? images : []),
-    ])
+    ]),
   ).filter((img) => typeof img === "string" && img.trim().length > 0);
 
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -53,7 +53,7 @@ export default function ProductImageGallery({
 
   if (allImages.length === 0) {
     return (
-      <div className="aspect-[4/5] overflow-hidden rounded-card bg-surface flex items-center justify-center text-[13px] text-ink2">
+      <div className="flex aspect-[4/5] items-center justify-center overflow-hidden rounded-card border border-line bg-surface text-[13px] text-ink2">
         Product image coming soon
       </div>
     );
@@ -63,45 +63,61 @@ export default function ProductImageGallery({
 
   return (
     <div className="space-y-4">
-      {/* Main Display Image - Preserving original design aspect ratio and styling */}
-      <div className="group relative aspect-[4/5] overflow-hidden rounded-card bg-surface border border-line/40 shadow-sm">
+      <div className="group relative aspect-[4/5] overflow-hidden rounded-card border border-line bg-surface">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           key={currentImage}
           src={currentImage}
           alt={`${productName} - Image ${selectedIndex + 1}`}
-          className="h-full w-full object-cover transition-opacity duration-300"
+          className="h-full w-full object-cover motion-safe:transition-opacity motion-safe:duration-300"
         />
 
-        {/* Hover overlay arrows on the main image */}
         {allImages.length > 1 && (
-          <div className="absolute inset-x-3 top-1/2 flex -translate-y-1/2 justify-between opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+          <div className="absolute inset-x-3 top-1/2 flex -translate-y-1/2 justify-between opacity-100 sm:opacity-0 sm:transition-opacity sm:duration-200 sm:group-focus-within:opacity-100 sm:group-hover:opacity-100">
             <button
               onClick={handlePrev}
               aria-label="Previous image"
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-line bg-white/90 text-ink backdrop-blur-sm transition hover:bg-white active:scale-95 shadow-md"
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-line bg-white text-ink transition hover:border-ink"
             >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              <svg
+                className="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M15 19l-7-7 7-7"
+                />
               </svg>
             </button>
             <button
               onClick={handleNext}
               aria-label="Next image"
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-line bg-white/90 text-ink backdrop-blur-sm transition hover:bg-white active:scale-95 shadow-md"
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-line bg-white text-ink transition hover:border-ink"
             >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+              <svg
+                className="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M9 5l7 7-7 7"
+                />
               </svg>
             </button>
           </div>
         )}
       </div>
 
-      {/* Thumbnails Row Carousel & Left/Right Controls */}
       {allImages.length > 1 && (
         <div className="space-y-3">
-          {/* Scrollable Thumbnails Track */}
           <div
             ref={scrollContainerRef}
             className="flex gap-3 overflow-x-auto py-1 scrollbar-none snap-x snap-mandatory"
@@ -117,10 +133,11 @@ export default function ProductImageGallery({
                   }}
                   onClick={() => setSelectedIndex(index)}
                   aria-label={`View ${productName} image ${index + 1}`}
-                  className={`relative aspect-square w-[calc(25%-9px)] min-w-[70px] shrink-0 snap-start overflow-hidden rounded-card bg-white p-1 border transition-all duration-200 focus:outline-none ${
+                  aria-pressed={isSelected}
+                  className={`relative aspect-square w-[calc(25%-9px)] min-w-[70px] shrink-0 snap-start overflow-hidden rounded-card border bg-white p-1 transition-opacity duration-200 ${
                     isSelected
-                      ? "border-ink ring-2 ring-ink/20 opacity-100 shadow-sm"
-                      : "border-line/70 opacity-70 hover:opacity-100 hover:border-ink/50"
+                      ? "border-ink opacity-100"
+                      : "border-line opacity-60 hover:border-ink/50 hover:opacity-100"
                   }`}
                 >
                   <div className="h-full w-full overflow-hidden rounded-[inherit]">
@@ -136,26 +153,48 @@ export default function ProductImageGallery({
             })}
           </div>
 
-          {/* Left & Right Circular Arrow Buttons */}
-          <div className="flex items-center justify-end pt-1">
-            <div className="flex items-center gap-2.5">
+          <div className="flex items-center justify-between border-t border-line pt-3">
+            <p className="text-[11px] text-ink2">
+              Image {selectedIndex + 1} of {allImages.length}
+            </p>
+            <div className="flex items-center gap-2">
               <button
                 onClick={handlePrev}
                 aria-label="Previous image"
-                className="flex h-11 w-11 items-center justify-center rounded-full border border-neutral-400/80 bg-white text-ink transition hover:border-ink hover:bg-neutral-50 active:scale-95 shadow-sm"
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-line bg-white text-ink transition hover:border-ink"
               >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                <svg
+                  className="h-5 w-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                  />
                 </svg>
               </button>
 
               <button
                 onClick={handleNext}
                 aria-label="Next image"
-                className="flex h-11 w-11 items-center justify-center rounded-full border border-neutral-400/80 bg-white text-ink transition hover:border-ink hover:bg-neutral-50 active:scale-95 shadow-sm"
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-line bg-white text-ink transition hover:border-ink"
               >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                <svg
+                  className="h-5 w-5"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M14 5l7 7m0 0l-7 7m7-7H3"
+                  />
                 </svg>
               </button>
             </div>

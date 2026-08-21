@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { AdminApiError, adminApi } from "@/lib/admin-api";
+import { adminApi } from "@/lib/admin-api";
+import { adminApiErrorResponse } from "@/lib/bff-response";
 import type { DeliveryZone } from "@/lib/delivery";
 
 export async function GET() {
@@ -7,10 +8,7 @@ export async function GET() {
     const zones = await adminApi<DeliveryZone[]>("/admin/delivery-zones");
     return NextResponse.json({ data: zones });
   } catch (error) {
-    const status = error instanceof AdminApiError ? error.status : 503;
-    const message =
-      error instanceof Error ? error.message : "Unable to load delivery zones.";
-    return NextResponse.json({ message }, { status });
+    return adminApiErrorResponse(error, "Unable to load delivery zones.");
   }
 }
 
@@ -24,9 +22,6 @@ export async function POST(request: Request) {
     });
     return NextResponse.json({ data: zone }, { status: 201 });
   } catch (error) {
-    const status = error instanceof AdminApiError ? error.status : 503;
-    const message =
-      error instanceof Error ? error.message : "Unable to create delivery zone.";
-    return NextResponse.json({ message }, { status });
+    return adminApiErrorResponse(error, "Unable to create delivery zone.");
   }
 }

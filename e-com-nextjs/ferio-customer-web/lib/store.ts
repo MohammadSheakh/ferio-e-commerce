@@ -10,6 +10,9 @@ export type PublicStoreConfig = {
   defaultReturnWindowDays: number | null;
   codEnabled: boolean;
   prepaidEnabled: boolean;
+  serviceBookingEnabled: boolean;
+  warrantyClaimsEnabled: boolean;
+  storefrontAnalyticsEnabled: boolean;
   purchaseActivityEnabled: boolean;
   purchaseHistoryEnabled: boolean;
   termsUrl: string | null;
@@ -29,6 +32,9 @@ export const fallbackStoreConfig: PublicStoreConfig = {
   defaultReturnWindowDays: null,
   codEnabled: true,
   prepaidEnabled: false,
+  serviceBookingEnabled: true,
+  warrantyClaimsEnabled: true,
+  storefrontAnalyticsEnabled: true,
   purchaseActivityEnabled: false,
   purchaseHistoryEnabled: false,
   termsUrl: null,

@@ -53,37 +53,59 @@ const RIDER_COLORS = [
   "#4f46e5", // Indigo
 ];
 
+function escapeHtml(value: unknown) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
 export default function DeliveryMapPage() {
   const [riders, setRiders] = useState<RiderMapItem[]>([]);
   const [orders, setOrders] = useState<OrderMapItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
+  const [mapError, setMapError] = useState("");
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
   const [clearingId, setClearingId] = useState<string | null>(null);
 
   const mapRef = useRef<HTMLDivElement>(null);
   const leafletInstanceRef = useRef<any>(null);
   const layerGroupRef = useRef<any>(null);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
+  const loadData = useCallback(async (showInitialLoading = true) => {
+    if (showInitialLoading) setLoading(true);
+    else setRefreshing(true);
     setError("");
     try {
-      const res = await fetch("/api/delivery-personnel/map-data", { cache: "no-store" });
+      const res = await fetch("/api/delivery-personnel/map-data", {
+        cache: "no-store",
+      });
       const payload = await res.json();
       if (!res.ok || !payload.data) {
         throw new Error(payload.message || "Failed to load map data.");
       }
       setRiders(payload.data.riders || []);
       setOrders(payload.data.activeOrders || []);
+      setLastUpdatedAt(new Date());
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error loading data.");
     } finally {
-      setLoading(false);
+      if (showInitialLoading) setLoading(false);
+      else setRefreshing(false);
     }
   }, []);
 
   useEffect(() => {
     void loadData();
+  }, [loadData]);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => void loadData(false), 30_000);
+    return () => window.clearInterval(intervalId);
   }, [loadData]);
 
   // Dynamically load Leaflet JS & CSS
@@ -110,6 +132,10 @@ export default function DeliveryMapPage() {
         script.id = "leaflet-js";
         script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
         script.onload = () => initMap();
+        script.onerror = () =>
+          setMapError(
+            "Unable to load the map library. Rider and order details remain available.",
+          );
         document.body.appendChild(script);
       } else {
         existingScript.addEventListener("load", () => initMap());
@@ -128,12 +154,14 @@ export default function DeliveryMapPage() {
       const map = L.map(mapRef.current).setView([23.8103, 90.4125], 11);
 
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        attribution:
+          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
         maxZoom: 19,
       }).addTo(map);
 
       leafletInstanceRef.current = map;
       layerGroupRef.current = L.layerGroup().addTo(map);
+      setMapError("");
     }
 
     renderMarkers();
@@ -174,12 +202,12 @@ export default function DeliveryMapPage() {
           iconAnchor: [11, 11],
         });
 
-        L.marker([loc.latitude, loc.longitude], { icon })
-          .addTo(layerGroupRef.current)
-          .bindPopup(`
+        L.marker([loc.latitude, loc.longitude], { icon }).addTo(
+          layerGroupRef.current,
+        ).bindPopup(`
             <div style="font-size: 12px; font-family: sans-serif;">
-              <strong>${rider.name}</strong> (Point #${loc.sequence})<br/>
-              Phone: ${rider.phoneOriginal}<br/>
+              <strong>${escapeHtml(rider.name)}</strong> (Point #${loc.sequence})<br/>
+              Phone: ${escapeHtml(rider.phoneOriginal)}<br/>
               Time: ${new Date(loc.createdAt).toLocaleTimeString()}
             </div>
           `);
@@ -187,16 +215,19 @@ export default function DeliveryMapPage() {
 
       // Connect sequence waypoints with a colored line
       if (points.length > 1) {
-        L.polyline(points, { color, weight: 3, opacity: 0.8, dashArray: "5, 10" }).addTo(
-          layerGroupRef.current,
-        );
+        L.polyline(points, {
+          color,
+          weight: 3,
+          opacity: 0.8,
+          dashArray: "5, 10",
+        }).addTo(layerGroupRef.current);
       }
 
       // Latest Current Location Pin for Rider
-      if (rider.currentLat && rider.currentLng) {
+      if (rider.currentLat !== null && rider.currentLng !== null) {
         bounds.push([rider.currentLat, rider.currentLng]);
 
-        const currentHtml = `<div style="background-color: ${color}; color: white; border-radius: 9999px; padding: 4px 8px; font-size: 11px; font-weight: bold; border: 2px solid white; white-space: nowrap;">📍 ${rider.name}</div>`;
+        const currentHtml = `<div style="background-color: ${color}; color: white; border-radius: 9999px; padding: 4px 8px; font-size: 11px; font-weight: 600; border: 2px solid white; white-space: nowrap;">${escapeHtml(rider.name)}</div>`;
 
         const icon = L.divIcon({
           html: currentHtml,
@@ -205,14 +236,14 @@ export default function DeliveryMapPage() {
           iconAnchor: [50, 13],
         });
 
-        L.marker([rider.currentLat, rider.currentLng], { icon })
-          .addTo(layerGroupRef.current)
-          .bindPopup(`
+        L.marker([rider.currentLat, rider.currentLng], { icon }).addTo(
+          layerGroupRef.current,
+        ).bindPopup(`
             <div style="font-size: 13px; font-family: sans-serif; min-width: 160px;">
-              <strong style="color: ${color};">${rider.name}</strong> (Active Rider)<br/>
-              Phone: ${rider.phoneOriginal}<br/>
-              Zone: ${rider.operatingZone || "N/A"}<br/>
-              Vehicle: ${rider.vehicleType}<br/>
+              <strong>${escapeHtml(rider.name)}</strong> (Active rider)<br/>
+              Phone: ${escapeHtml(rider.phoneOriginal)}<br/>
+              Zone: ${escapeHtml(rider.operatingZone || "N/A")}<br/>
+              Vehicle: ${escapeHtml(rider.vehicleType)}<br/>
               Waypoints recorded: ${history.length}
             </div>
           `);
@@ -224,10 +255,15 @@ export default function DeliveryMapPage() {
       const lat = order.address?.latitude;
       const lng = order.address?.longitude;
 
-      if (lat && lng) {
+      if (
+        lat !== null &&
+        lat !== undefined &&
+        lng !== null &&
+        lng !== undefined
+      ) {
         bounds.push([lat, lng]);
 
-        const orderHtml = `<div style="background-color: #111114; color: white; border-radius: 9999px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; border: 2px solid white;">📦</div>`;
+        const orderHtml = `<div style="background-color: #111114; color: white; border-radius: 9999px; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 600; border: 2px solid white;">O</div>`;
 
         const icon = L.divIcon({
           html: orderHtml,
@@ -236,17 +272,17 @@ export default function DeliveryMapPage() {
           iconAnchor: [12, 12],
         });
 
-        const assignedRider = riders.find((r) => r.id === order.assignedDeliveryPersonnelId);
+        const assignedRider = riders.find(
+          (r) => r.id === order.assignedDeliveryPersonnelId,
+        );
 
-        L.marker([lat, lng], { icon })
-          .addTo(layerGroupRef.current)
-          .bindPopup(`
+        L.marker([lat, lng], { icon }).addTo(layerGroupRef.current).bindPopup(`
             <div style="font-size: 13px; font-family: sans-serif;">
-              <strong>Order #${order.reference}</strong><br/>
-              Recipient: ${order.address?.recipientName || "Customer"}<br/>
-              Address: ${order.address?.detailedAddress || ""}, ${order.address?.district || ""}<br/>
-              Assigned Rider: ${assignedRider ? assignedRider.name : "Unassigned"}<br/>
-              Status: ${order.shipmentStatus}
+              <strong>Order #${escapeHtml(order.reference)}</strong><br/>
+              Recipient: ${escapeHtml(order.address?.recipientName || "Customer")}<br/>
+              Address: ${escapeHtml(order.address?.detailedAddress || "")}, ${escapeHtml(order.address?.district || "")}<br/>
+              Assigned rider: ${escapeHtml(assignedRider ? assignedRider.name : "Unassigned")}<br/>
+              Status: ${escapeHtml(order.shipmentStatus)}
             </div>
           `);
       }
@@ -258,14 +294,21 @@ export default function DeliveryMapPage() {
   };
 
   const handleClearHistory = async (riderId: string, riderName: string) => {
-    if (!confirm(`Are you sure you want to clear all location waypoints for ${riderName}? This will remove points 1, 2, 3... and keep only their current position pin.`)) {
+    if (
+      !confirm(
+        `Are you sure you want to clear all location waypoints for ${riderName}? This will remove points 1, 2, 3... and keep only their current position pin.`,
+      )
+    ) {
       return;
     }
     setClearingId(riderId);
     try {
-      const res = await fetch(`/api/delivery-personnel/${riderId}/location-history`, {
-        method: "DELETE",
-      });
+      const res = await fetch(
+        `/api/delivery-personnel/${riderId}/location-history`,
+        {
+          method: "DELETE",
+        },
+      );
       if (res.ok) {
         await loadData();
       } else {
@@ -281,52 +324,96 @@ export default function DeliveryMapPage() {
   return (
     <>
       <Topbar
-        title="Live Delivery Map"
-        subtitle="Visual OpenStreetMap tracking for active delivery riders & customer orders"
+        title="Live delivery map"
+        subtitle="Private rider locations and active delivery assignments"
       />
 
-      <div className="p-8 space-y-6">
+      <div className="space-y-6 p-4 xl:p-8">
+        <div className="flex flex-col justify-between gap-4 border-b border-line pb-5 sm:flex-row sm:items-end">
+          <div>
+            <p className="text-[11px] uppercase tracking-eyebrow text-ink2">
+              Delivery operations
+            </p>
+            <p className="mt-1 text-[13px] text-ink">
+              {riders.length} active riders · {orders.length} active orders
+            </p>
+            <p className="mt-1 text-[11px] text-ink2">
+              {lastUpdatedAt
+                ? `Last updated ${lastUpdatedAt.toLocaleTimeString("en-BD", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit",
+                  })}`
+                : "Waiting for the first location update"}
+              {" · Refreshes every 30 seconds"}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void loadData(false)}
+            disabled={loading || refreshing}
+            className="self-start rounded-full border border-line px-5 py-2 text-[12px] font-medium text-ink hover:border-ink disabled:opacity-50 sm:self-auto"
+          >
+            {refreshing ? "Refreshing…" : "Refresh now"}
+          </button>
+        </div>
+
         {error && (
-          <div className="rounded-card border border-rose-200 bg-rose-50 p-4 text-[13px] text-rose-700">
+          <div
+            role="alert"
+            className="rounded-card border border-rose-200 bg-rose-50 p-4 text-[13px] text-rose-700"
+          >
             {error}
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[340px_1fr]">
-          {/* Controls & Riders List */}
-          <div className="space-y-4">
-            <div className="rounded-card border border-line bg-paper p-5 space-y-3">
-              <h3 className="text-[14px] font-semibold text-ink">Active Riders Map Legend</h3>
-              <p className="text-[12px] text-ink2 leading-relaxed">
-                Each rider is assigned a unique color pin. Waypoints show their sequence path (1, 2, 3...) when they update GPS location.
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[320px_1fr]">
+          <aside className="space-y-8">
+            <section>
+              <h2 className="text-[14px] font-semibold text-ink">
+                Active riders
+              </h2>
+              <p className="mt-1 text-[12px] leading-relaxed text-ink2">
+                Color identifies each rider path; numbered points show location
+                update sequence.
               </p>
 
-              <div className="space-y-2 pt-2 divide-y divide-line">
-                {riders.map((r, i) => {
-                  const color = RIDER_COLORS[i % RIDER_COLORS.length];
+              <div className="mt-4 divide-y divide-line border-y border-line">
+                {riders.map((rider, index) => {
+                  const color = RIDER_COLORS[index % RIDER_COLORS.length];
                   return (
-                    <div key={r.id} className="pt-2 flex items-start justify-between gap-2 text-[13px]">
+                    <div
+                      key={rider.id}
+                      className="flex items-start justify-between gap-3 py-3 text-[13px]"
+                    >
                       <div className="flex items-center gap-2">
                         <span
-                          className="h-3 w-3 rounded-full shrink-0"
+                          className="h-3 w-3 shrink-0 rounded-full"
                           style={{ backgroundColor: color }}
+                          aria-hidden="true"
                         />
                         <div>
-                          <p className="font-medium text-ink">{r.name}</p>
-                          <p className="text-[11px] text-ink2">{r.phoneOriginal}</p>
-                          <p className="text-[11px] text-ink2 font-mono">
-                            {r.locationHistory?.length || 0} waypoints recorded
+                          <p className="font-medium text-ink">{rider.name}</p>
+                          <p className="text-[11px] text-ink2">
+                            {rider.phoneOriginal}
+                          </p>
+                          <p className="font-mono text-[11px] text-ink2">
+                            {rider.locationHistory?.length || 0} waypoints ·{" "}
+                            {rider.vehicleType.toLowerCase()}
                           </p>
                         </div>
                       </div>
 
-                      {(r.locationHistory?.length || 0) > 0 && (
+                      {(rider.locationHistory?.length || 0) > 0 && (
                         <button
-                          onClick={() => handleClearHistory(r.id, r.name)}
-                          disabled={clearingId === r.id}
-                          className="rounded-full border border-line px-2.5 py-1 text-[11px] text-rose-700 hover:bg-rose-50 transition shrink-0"
+                          type="button"
+                          onClick={() =>
+                            handleClearHistory(rider.id, rider.name)
+                          }
+                          disabled={clearingId === rider.id}
+                          className="shrink-0 text-[11px] text-rose-700 underline decoration-line underline-offset-4 disabled:opacity-50"
                         >
-                          Clear Path
+                          {clearingId === rider.id ? "Clearing…" : "Clear path"}
                         </button>
                       )}
                     </div>
@@ -334,36 +421,78 @@ export default function DeliveryMapPage() {
                 })}
 
                 {riders.length === 0 && !loading && (
-                  <p className="text-[12px] text-ink2 pt-2">No active riders found.</p>
+                  <p className="py-8 text-center text-[12px] text-ink2">
+                    No active riders found.
+                  </p>
                 )}
               </div>
-            </div>
+            </section>
 
-            <div className="rounded-card border border-line bg-paper p-5 space-y-3">
-              <h3 className="text-[14px] font-semibold text-ink">Active Customer Orders ({orders.length})</h3>
-              <p className="text-[12px] text-ink2">
-                Orders with delivery coordinates are plotted as dark 📦 markers.
+            <section>
+              <h2 className="text-[14px] font-semibold text-ink">
+                Active customer orders ({orders.length})
+              </h2>
+              <p className="mt-1 text-[12px] text-ink2">
+                Orders with saved coordinates appear as dark order markers.
               </p>
-              <div className="space-y-2 pt-1 max-h-60 overflow-y-auto">
-                {orders.map((o) => (
-                  <div key={o.id} className="border-b border-line pb-2 text-[12px]">
-                    <p className="font-medium text-ink">#{o.reference}</p>
-                    <p className="text-ink2">{o.address?.recipientName} • {o.address?.district}</p>
-                  </div>
-                ))}
+              <div className="mt-4 max-h-64 divide-y divide-line overflow-y-auto border-y border-line">
+                {orders.length > 0 ? (
+                  orders.map((order) => {
+                    const assignedRider = riders.find(
+                      (rider) => rider.id === order.assignedDeliveryPersonnelId,
+                    );
+                    return (
+                      <div key={order.id} className="py-3 text-[12px]">
+                        <div className="flex items-start justify-between gap-3">
+                          <p className="font-medium text-ink">
+                            #{order.reference}
+                          </p>
+                          <span className="rounded-full bg-surface px-2 py-0.5 text-[10px] text-ink2">
+                            {order.shipmentStatus
+                              .replaceAll("_", " ")
+                              .toLowerCase()}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-ink2">
+                          {order.address?.recipientName || "Customer"} ·{" "}
+                          {order.address?.district || "No district"}
+                        </p>
+                        <p className="mt-1 text-[11px] text-ink2">
+                          {assignedRider
+                            ? `Assigned to ${assignedRider.name}`
+                            : "Unassigned"}
+                        </p>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <p className="py-8 text-center text-[12px] text-ink2">
+                    No active delivery orders found.
+                  </p>
+                )}
               </div>
-            </div>
-          </div>
+            </section>
+          </aside>
 
-          {/* OpenStreetMap Render Container */}
-          <div className="rounded-card border border-line bg-paper overflow-hidden h-[640px] relative">
-            <div ref={mapRef} className="w-full h-full z-0" />
+          <section
+            aria-label="Delivery location map"
+            className="relative h-[640px] overflow-hidden rounded-card border border-line bg-surface"
+          >
+            <div ref={mapRef} className="z-0 h-full w-full" />
             {loading && (
               <div className="absolute inset-0 z-10 flex items-center justify-center bg-paper/80 text-[13px] text-ink2">
-                Loading OpenStreetMap data...
+                Loading delivery locations…
               </div>
             )}
-          </div>
+            {mapError && !loading && (
+              <div
+                role="alert"
+                className="absolute inset-0 z-10 flex items-center justify-center bg-paper p-8 text-center text-[13px] text-rose-700"
+              >
+                {mapError}
+              </div>
+            )}
+          </section>
         </div>
       </div>
     </>

@@ -1,6 +1,10 @@
-import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getBackendUrl } from "@/lib/backend";
+import {
+  bffErrorResponse,
+  forwardedHeaders,
+  proxyBackendResponse,
+} from "@/lib/bff-response";
 
 export async function DELETE(
   request: Request,
@@ -8,24 +12,31 @@ export async function DELETE(
 ) {
   try {
     const token = cookies().get("ferio_admin_access")?.value;
+    if (!token) {
+      return bffErrorResponse(
+        "Admin session is required.",
+        401,
+        "AUTHENTICATION_REQUIRED",
+      );
+    }
 
     const res = await fetch(
-      getBackendUrl(`/api/v1/product-requests/${params.id}`),
+      getBackendUrl(`/product-requests/${params.id}`),
       {
         method: "DELETE",
-        headers: {
+        headers: forwardedHeaders(request, {
           Authorization: `Bearer ${token}`,
-        },
+        }),
         cache: "no-store",
       }
     );
 
-    const json = await res.json();
-    return NextResponse.json(json, { status: res.status });
+    return proxyBackendResponse(res, "Failed to delete product request.");
   } catch {
-    return NextResponse.json(
-      { success: false, message: "Failed to delete product request" },
-      { status: 500 }
+    return bffErrorResponse(
+      "Failed to delete product request.",
+      503,
+      "SERVICE_UNAVAILABLE",
     );
   }
 }

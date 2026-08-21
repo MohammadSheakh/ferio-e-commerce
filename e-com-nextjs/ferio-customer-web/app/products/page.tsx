@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import ProductCard from "@/components/ProductCard";
 import { getCategories, getProducts } from "@/lib/catalog";
+import ProductListingAnalytics from "./ProductListingAnalytics";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +57,15 @@ export default async function ProductsPage({
       totalPages: 0,
     })),
   ]);
+  const analyticsFilters: Record<string, boolean | number | string> = {};
+  if (category) analyticsFilters.category = category;
+  if (Number.isFinite(minPrice)) analyticsFilters.minPrice = minPrice as number;
+  if (Number.isFinite(maxPrice)) analyticsFilters.maxPrice = maxPrice as number;
+  if (inStock) analyticsFilters.inStock = true;
+  if (condition) analyticsFilters.condition = condition;
+  if (sort !== "newest") analyticsFilters.sort = sort;
+  if (attributeKey) analyticsFilters.attributeKey = attributeKey;
+  if (attributeValue) analyticsFilters.attributeValue = attributeValue;
 
   function categoryHref(nextCategory?: string): string {
     const query = new URLSearchParams();
@@ -73,6 +83,7 @@ export default async function ProductsPage({
 
   return (
     <main className="mx-auto max-w-6xl px-6 py-14">
+      <ProductListingAnalytics search={search} filters={analyticsFilters} />
       <h1 className="text-[28px] font-semibold tracking-tight text-ink">Shop all</h1>
       <p className="mt-1.5 text-[13px] text-ink2">{products.total} products</p>
 

@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import type { ApiEnvelope } from "@/lib/backend";
 import type { CartState } from "@/lib/cart";
+import { withCorrelationId } from "@/lib/correlation";
 
 const backendApiUrl =
   process.env.FERIO_API_URL ??
@@ -12,6 +13,8 @@ export class CartApiError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    readonly code = "INTERNAL_ERROR",
+    readonly correlationId?: string,
   ) {
     super(message);
   }
@@ -26,22 +29,25 @@ export async function cartApi<T>(
     `${backendApiUrl}${path.startsWith("/") ? path : `/${path}`}`,
     {
       ...init,
-      headers: {
+      headers: withCorrelationId({
         Accept: "application/json",
         ...(token ? { "X-Cart-Token": token } : {}),
         ...init?.headers,
-      },
+      }),
       cache: "no-store",
     },
   );
-  const payload = (await response.json()) as ApiEnvelope<T> & {
-    message?: string | string[];
-  };
+  const payload = (await response.json()) as ApiEnvelope<T>;
   if (!response.ok || payload.data === undefined) {
     const message = Array.isArray(payload.message)
       ? payload.message.join(" ")
       : payload.message;
-    throw new CartApiError(message || "Unable to update the cart.", response.status);
+    throw new CartApiError(
+      message || "Unable to update the cart.",
+      response.status,
+      payload.code,
+      payload.correlationId,
+    );
   }
   return payload.data;
 }
@@ -68,7 +74,16 @@ export function cartErrorResponse(error: unknown) {
   const status = error instanceof CartApiError ? error.status : 503;
   const message =
     error instanceof Error ? error.message : "The cart service is unavailable.";
-  const response = NextResponse.json({ message }, { status });
+  const response = NextResponse.json(
+    {
+      message,
+      code:
+        error instanceof CartApiError ? error.code : "SERVICE_UNAVAILABLE",
+      correlationId:
+        error instanceof CartApiError ? error.correlationId : undefined,
+    },
+    { status },
+  );
   if (
     status === 404 ||
     status === 409 ||

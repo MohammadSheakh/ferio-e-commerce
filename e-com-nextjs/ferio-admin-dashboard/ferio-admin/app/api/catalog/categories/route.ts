@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { AdminApiError, adminApi } from "@/lib/admin-api";
+import { adminApi } from "@/lib/admin-api";
+import { adminApiErrorResponse } from "@/lib/bff-response";
 import type { CatalogCategory } from "@/lib/catalog";
 
 export async function GET() {
@@ -9,10 +10,7 @@ export async function GET() {
     );
     return NextResponse.json({ data: categories });
   } catch (error) {
-    const status = error instanceof AdminApiError ? error.status : 503;
-    const message =
-      error instanceof Error ? error.message : "Unable to load categories.";
-    return NextResponse.json({ message }, { status });
+    return adminApiErrorResponse(error, "Unable to load categories.");
   }
 }
 
@@ -29,9 +27,6 @@ export async function POST(request: Request) {
     );
     return NextResponse.json({ data: category }, { status: 201 });
   } catch (error) {
-    const status = error instanceof AdminApiError ? error.status : 503;
-    const message =
-      error instanceof Error ? error.message : "Unable to create category.";
-    return NextResponse.json({ message }, { status });
+    return adminApiErrorResponse(error, "Unable to create category.");
   }
 }

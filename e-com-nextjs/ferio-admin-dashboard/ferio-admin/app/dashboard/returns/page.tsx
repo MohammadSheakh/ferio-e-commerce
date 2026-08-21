@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import Topbar from "@/components/Topbar";
+import Pagination from "@/components/Pagination";
 import RefundPanel from "@/components/returns/RefundPanel";
 import type {
   ReturnCase,
@@ -10,6 +11,14 @@ import type {
   ReturnCaseStatus,
 } from "@/lib/returns";
 import { returnStatusClass } from "@/lib/returns";
+
+const fieldClass =
+  "rounded-card border border-line bg-paper px-3 py-2.5 text-[12px] text-ink focus-visible:border-ink focus-visible:outline-none";
+
+function formatEnum(value: string) {
+  const label = value.replaceAll("_", " ").toLowerCase();
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
 
 function ReviewForm({
   entry,
@@ -64,7 +73,8 @@ function ReviewForm({
         <select
           value={decision}
           onChange={(event) => setDecision(event.target.value)}
-          className="rounded-card border border-line px-3 py-2.5 text-[12px]"
+          aria-label="Review decision"
+          className={fieldClass}
         >
           <option value="APPROVE">Approve request</option>
           <option value="PARTIAL_APPROVE">Partially approve</option>
@@ -76,7 +86,8 @@ function ReviewForm({
           minLength={3}
           maxLength={1000}
           placeholder="Required review reason"
-          className="rounded-card border border-line px-3 py-2.5 text-[12px]"
+          aria-label="Review reason"
+          className={fieldClass}
         />
       </div>
       {decision === "PARTIAL_APPROVE" && (
@@ -91,7 +102,7 @@ function ReviewForm({
                 min="0"
                 max={item.requestedQuantity}
                 defaultValue="0"
-                className="mt-1 w-full rounded-card border border-line px-3 py-2 text-[12px]"
+                className={`mt-1 w-full ${fieldClass}`}
               />
             </label>
           ))}
@@ -195,7 +206,7 @@ function InspectionForm({
                 min="0"
                 max={item.approvedQuantity ?? 0}
                 defaultValue={item.approvedQuantity ?? 0}
-                className="mt-1 w-full rounded-card border border-line px-2.5 py-2 text-[12px]"
+                className={`mt-1 w-full ${fieldClass}`}
               />
             </label>
             <label className="text-[11px] text-ink2">
@@ -209,14 +220,14 @@ function InspectionForm({
                 defaultValue={
                   decision === "REJECT" ? 0 : (item.approvedQuantity ?? 0)
                 }
-                className="mt-1 w-full rounded-card border border-line px-2.5 py-2 text-[12px]"
+                className={`mt-1 w-full ${fieldClass}`}
               />
             </label>
             <label className="text-[11px] text-ink2">
               Condition
               <select
                 name={`condition-${item.id}`}
-                className="mt-1 w-full rounded-card border border-line px-2.5 py-2 text-[12px]"
+                className={`mt-1 w-full ${fieldClass}`}
               >
                 <option value="SEALED">Sealed</option>
                 <option value="UNUSED">Unused</option>
@@ -231,7 +242,7 @@ function InspectionForm({
               Disposition
               <select
                 name={`disposition-${item.id}`}
-                className="mt-1 w-full rounded-card border border-line px-2.5 py-2 text-[12px]"
+                className={`mt-1 w-full ${fieldClass}`}
               >
                 <option value="SELLABLE">Sellable</option>
                 <option value="DAMAGED">Damaged</option>
@@ -241,9 +252,10 @@ function InspectionForm({
             </label>
             <input
               name={`note-${item.id}`}
+              aria-label={`Optional inspection note for ${item.orderItem.productName}`}
               maxLength={500}
               placeholder="Optional item note"
-              className="rounded-card border border-line px-3 py-2 text-[12px] md:col-span-2 xl:col-span-5"
+              className={`${fieldClass} md:col-span-2 xl:col-span-5`}
             />
           </div>
         ))}
@@ -252,7 +264,8 @@ function InspectionForm({
         <select
           value={decision}
           onChange={(event) => setDecision(event.target.value)}
-          className="rounded-card border border-line px-3 py-2.5 text-[12px]"
+          aria-label="Inspection decision"
+          className={fieldClass}
         >
           <option value="ACCEPT">Accept received units</option>
           <option value="PARTIAL_ACCEPT">Partially accept</option>
@@ -260,7 +273,8 @@ function InspectionForm({
         </select>
         <select
           name="finalResolution"
-          className="rounded-card border border-line px-3 py-2.5 text-[12px]"
+          aria-label="Final resolution"
+          className={fieldClass}
         >
           {decision === "REJECT" ? (
             <option value="REJECTED">Rejected</option>
@@ -279,7 +293,8 @@ function InspectionForm({
           minLength={3}
           maxLength={1000}
           placeholder="Required inspection note"
-          className="rounded-card border border-line px-3 py-2.5 text-[12px]"
+          aria-label="Inspection note"
+          className={fieldClass}
         />
       </div>
       <button
@@ -300,14 +315,19 @@ function InspectionForm({
 export default function ReturnsPage() {
   const [page, setPage] = useState<ReturnCasePage | null>(null);
   const [status, setStatus] = useState<ReturnCaseStatus | "ALL">("REQUESTED");
+  const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const query = status === "ALL" ? "" : `?status=${status}`;
-      const response = await fetch(`/api/returns${query}`, {
+      const query = new URLSearchParams({
+        page: String(currentPage),
+        limit: "30",
+      });
+      if (status !== "ALL") query.set("status", status);
+      const response = await fetch(`/api/returns?${query}`, {
         cache: "no-store",
       });
       const payload = (await response.json()) as {
@@ -326,7 +346,7 @@ export default function ReturnsPage() {
     } finally {
       setLoading(false);
     }
-  }, [status]);
+  }, [currentPage, status]);
   useEffect(() => {
     void load();
   }, [load]);
@@ -337,14 +357,16 @@ export default function ReturnsPage() {
         title="Returns"
         subtitle={`${page?.total ?? 0} cases in this view`}
       />
-      <main className="p-8">
+      <main className="p-4 sm:p-8">
         <div className="mb-6 flex flex-wrap items-center gap-3">
           <select
             value={status}
-            onChange={(event) =>
-              setStatus(event.target.value as ReturnCaseStatus | "ALL")
-            }
-            className="rounded-full border border-line px-4 py-2 text-[13px] text-ink2"
+            onChange={(event) => {
+              setStatus(event.target.value as ReturnCaseStatus | "ALL");
+              setCurrentPage(1);
+            }}
+            aria-label="Return status"
+            className={`${fieldClass} text-[13px] text-ink2`}
           >
             <option value="REQUESTED">Needs review</option>
             <option value="APPROVED">Approved for receipt</option>
@@ -359,9 +381,19 @@ export default function ReturnsPage() {
           </p>
         </div>
         {error && (
-          <p role="alert" className="mb-4 text-[12px] text-rose-700">
-            {error}
-          </p>
+          <div
+            role="alert"
+            className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-card border border-rose-200 bg-rose-50 p-4 text-[12px] text-rose-700"
+          >
+            <span>{error}</span>
+            <button
+              type="button"
+              onClick={() => void load()}
+              className="rounded-full border border-rose-200 px-3 py-1.5 font-medium"
+            >
+              Retry return cases
+            </button>
+          </div>
         )}
         <div className="divide-y divide-line border-y border-line">
           {page?.items.map((entry) => (
@@ -383,18 +415,18 @@ export default function ReturnsPage() {
                   <span
                     className={`rounded-full px-2.5 py-1 text-[11px] ${entry.eligibilityStatus === "ELIGIBLE" ? "bg-emerald-50 text-emerald-700" : entry.eligibilityStatus === "INELIGIBLE" ? "bg-rose-50 text-rose-700" : "bg-amber-50 text-amber-700"}`}
                   >
-                    {entry.eligibilityStatus.replaceAll("_", " ").toLowerCase()}
+                    {formatEnum(entry.eligibilityStatus)}
                   </span>
                   <span
                     className={`rounded-full px-2.5 py-1 text-[11px] ${returnStatusClass(entry.status)}`}
                   >
-                    {entry.status.replaceAll("_", " ").toLowerCase()}
+                    {formatEnum(entry.status)}
                   </span>
                 </div>
               </div>
               <p className="mt-4 text-[13px] text-ink">
-                {entry.reason.replaceAll("_", " ").toLowerCase()} · requested{" "}
-                {entry.requestedResolution.toLowerCase()}
+                {formatEnum(entry.reason)} · requested{" "}
+                {formatEnum(entry.requestedResolution).toLowerCase()}
               </p>
               <p className="mt-1 text-[12px] leading-5 text-ink2">
                 {entry.description}
@@ -408,7 +440,7 @@ export default function ReturnsPage() {
                       ? ` · approved ${item.approvedQuantity}`
                       : ""}
                     {item.receivedQuantity !== null
-                      ? ` · received ${item.receivedQuantity} · ${item.inventoryDisposition?.toLowerCase()}`
+                      ? ` · received ${item.receivedQuantity} · ${item.inventoryDisposition ? formatEnum(item.inventoryDisposition).toLowerCase() : "not classified"}`
                       : ""}
                   </p>
                 ))}
@@ -442,7 +474,9 @@ export default function ReturnsPage() {
                   {entry.inspectionNote && (
                     <p className="mt-2 text-[12px] text-ink">
                       Inspection: {entry.inspectionNote} ·{" "}
-                      {entry.finalResolution?.toLowerCase()}
+                      {entry.finalResolution
+                        ? formatEnum(entry.finalResolution).toLowerCase()
+                        : "not classified"}
                     </p>
                   )}
                   {entry.status === "INSPECTED" &&
@@ -456,7 +490,7 @@ export default function ReturnsPage() {
               )}
             </article>
           ))}
-          {loading && (
+          {loading && !page?.items.length && (
             <p className="py-14 text-center text-[13px] text-ink2">
               Loading return cases…
             </p>
@@ -467,6 +501,16 @@ export default function ReturnsPage() {
             </p>
           )}
         </div>
+        {page && (
+          <Pagination
+            currentPage={currentPage}
+            totalPages={page.totalPages}
+            totalItems={page.total}
+            pageSize={page.limit}
+            onPageChange={setCurrentPage}
+            isLoading={loading}
+          />
+        )}
       </main>
     </>
   );

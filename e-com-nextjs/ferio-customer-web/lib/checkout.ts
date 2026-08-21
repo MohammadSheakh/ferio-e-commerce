@@ -22,6 +22,7 @@ export type CheckoutPreview = {
   pricing: {
     subtotal: number;
     discountTotal: number;
+    couponCode: string | null;
     deliveryFee: number;
     paymentCharge: number;
     total: number;

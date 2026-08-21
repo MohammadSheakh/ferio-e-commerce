@@ -1,10 +1,18 @@
-import { NextResponse } from "next/server";
+import {
+  bffErrorResponse,
+  forwardedHeaders,
+  proxyBackendResponse,
+} from "@/lib/bff-response";
 
 export async function POST(request: Request) {
   try {
     const authHeader = request.headers.get("authorization");
     if (!authHeader) {
-      return NextResponse.json({ message: "Unauthorized." }, { status: 401 });
+      return bffErrorResponse(
+        "Unauthorized.",
+        401,
+        "AUTHENTICATION_REQUIRED",
+      );
     }
 
     const body = await request.json();
@@ -12,19 +20,19 @@ export async function POST(request: Request) {
       process.env.NEXT_PUBLIC_FERIO_API_URL ?? "http://localhost:6733/api/v1";
     const res = await fetch(`${backendUrl}/delivery-personnel/location`, {
       method: "POST",
-      headers: {
+      headers: forwardedHeaders(request, {
         Authorization: authHeader,
         "Content-Type": "application/json",
-      },
+      }),
       body: JSON.stringify(body),
     });
 
-    const data = await res.json();
-    return NextResponse.json(data, { status: res.status });
+    return proxyBackendResponse(res, "Unable to send GPS location.");
   } catch {
-    return NextResponse.json(
-      { message: "Network error sending GPS." },
-      { status: 503 },
+    return bffErrorResponse(
+      "Network error sending GPS.",
+      503,
+      "SERVICE_UNAVAILABLE",
     );
   }
 }

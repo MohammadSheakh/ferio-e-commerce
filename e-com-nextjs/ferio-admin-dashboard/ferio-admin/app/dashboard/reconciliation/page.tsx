@@ -4,12 +4,25 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Topbar from "@/components/Topbar";
 import FindingsQueue from "@/components/reconciliation/FindingsQueue";
 import SettlementImportPanel from "@/components/reconciliation/SettlementImportPanel";
+import { createBrowserUuid } from "@/lib/browser-uuid";
 import { formatTaka } from "@/lib/catalog";
 import type { CourierCode } from "@/lib/shipping";
 import type {
   CourierSettlement,
   EligibleCodCollection,
 } from "@/lib/settlements";
+
+const fieldClass =
+  "rounded-card border border-line bg-paper px-3 py-2.5 text-[12px] text-ink focus-visible:border-ink focus-visible:outline-none";
+
+function formatEnum(value: string) {
+  const label = value.replaceAll("_", " ").toLowerCase();
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+function failureMessage(reason: unknown, fallback: string) {
+  return reason instanceof Error ? reason.message : fallback;
+}
 
 export default function ReconciliationPage() {
   const [eligible, setEligible] = useState<EligibleCodCollection[]>([]);
@@ -18,44 +31,62 @@ export default function ReconciliationPage() {
   const [selected, setSelected] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const [operationError, setOperationError] = useState("");
+  const [notice, setNotice] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
-    setError("");
-    try {
-      const [eligibleResponse, settlementsResponse] = await Promise.all([
-        fetch("/api/settlements/eligible-collections", { cache: "no-store" }),
-        fetch("/api/settlements", { cache: "no-store" }),
-      ]);
-      const eligiblePayload = (await eligibleResponse.json()) as {
-        data?: EligibleCodCollection[];
-        message?: string;
-      };
-      const settlementsPayload = (await settlementsResponse.json()) as {
-        data?: CourierSettlement[];
-        message?: string;
-      };
-      if (!eligibleResponse.ok || !eligiblePayload.data)
-        throw new Error(
-          eligiblePayload.message || "Unable to load eligible collections.",
-        );
-      if (!settlementsResponse.ok || !settlementsPayload.data)
-        throw new Error(
-          settlementsPayload.message || "Unable to load settlements.",
-        );
-      setEligible(eligiblePayload.data);
-      setSettlements(settlementsPayload.data);
+    setLoadError("");
+    const [eligibleResult, settlementsResult] = await Promise.allSettled([
+      (async () => {
+        const response = await fetch("/api/settlements/eligible-collections", {
+          cache: "no-store",
+        });
+        const payload = (await response.json()) as {
+          data?: EligibleCodCollection[];
+          message?: string;
+        };
+        if (!response.ok || !payload.data)
+          throw new Error(
+            payload.message || "Unable to load eligible collections.",
+          );
+        return payload.data;
+      })(),
+      (async () => {
+        const response = await fetch("/api/settlements", {
+          cache: "no-store",
+        });
+        const payload = (await response.json()) as {
+          data?: CourierSettlement[];
+          message?: string;
+        };
+        if (!response.ok || !payload.data)
+          throw new Error(payload.message || "Unable to load settlements.");
+        return payload.data;
+      })(),
+    ]);
+    const failures: string[] = [];
+    if (eligibleResult.status === "fulfilled") {
+      setEligible(eligibleResult.value);
       setSelected([]);
-    } catch (loadError) {
-      setError(
-        loadError instanceof Error
-          ? loadError.message
-          : "Unable to load reconciliation.",
+    } else {
+      failures.push(
+        failureMessage(
+          eligibleResult.reason,
+          "Unable to load eligible collections.",
+        ),
       );
-    } finally {
-      setLoading(false);
     }
+    if (settlementsResult.status === "fulfilled") {
+      setSettlements(settlementsResult.value);
+    } else {
+      failures.push(
+        failureMessage(settlementsResult.reason, "Unable to load settlements."),
+      );
+    }
+    setLoadError(failures.join(" "));
+    setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -70,12 +101,17 @@ export default function ReconciliationPage() {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     if (selected.length === 0)
-      return setError("Select at least one delivered COD shipment.");
+      return setOperationError("Select at least one delivered COD shipment.");
     setSaving(true);
-    setError("");
+    setOperationError("");
+    setNotice("");
     try {
       const items = selected.map((collectionId) => {
-        const collection = eligible.find((entry) => entry.id === collectionId)!;
+        const collection = eligible.find((entry) => entry.id === collectionId);
+        if (!collection)
+          throw new Error(
+            "A selected COD collection is no longer available. Reload and try again.",
+          );
         return {
           shipmentId: collection.shipment.id,
           collectedAmount: Math.round(
@@ -92,7 +128,7 @@ export default function ReconciliationPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Idempotency-Key": crypto.randomUUID(),
+          "Idempotency-Key": createBrowserUuid(),
         },
         body: JSON.stringify({
           provider,
@@ -110,9 +146,10 @@ export default function ReconciliationPage() {
       };
       if (!response.ok || !payload.data)
         throw new Error(payload.message || "Unable to record settlement.");
+      setNotice(`Settlement ${payload.data.reference} recorded.`);
       await load();
     } catch (recordError) {
-      setError(
+      setOperationError(
         recordError instanceof Error
           ? recordError.message
           : "Unable to record settlement.",
@@ -128,10 +165,30 @@ export default function ReconciliationPage() {
         title="Reconciliation"
         subtitle="COD expected, collected, fees, remittance, and variance"
       />
-      <main className="space-y-10 p-8">
-        {error && (
+      <main className="space-y-10 p-4 sm:p-8">
+        {loadError && (
+          <div
+            role="alert"
+            className="flex flex-wrap items-center justify-between gap-3 border-y border-rose-200 bg-rose-50 px-4 py-3 text-[12px] text-rose-700"
+          >
+            <p>{loadError}</p>
+            <button
+              type="button"
+              onClick={() => void load()}
+              className="rounded-full border border-rose-200 px-3 py-1.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-700"
+            >
+              Retry settlement data
+            </button>
+          </div>
+        )}
+        {operationError && (
           <p role="alert" className="text-[12px] text-rose-700">
-            {error}
+            {operationError}
+          </p>
+        )}
+        {notice && (
+          <p role="status" className="text-[12px] text-emerald-700">
+            {notice}
           </p>
         )}
         <FindingsQueue />
@@ -148,21 +205,24 @@ export default function ReconciliationPage() {
                 collected and remitted.
               </p>
             </div>
-            <select
-              value={provider}
-              onChange={(event) => {
-                setProvider(event.target.value as CourierCode);
-                setSelected([]);
-              }}
-              className="rounded-full border border-line px-4 py-2 text-[12px]"
-            >
-              <option value="STEADFAST">Steadfast</option>
-              <option value="PATHAO">Pathao</option>
-              <option value="REDX">REDX</option>
-              <option value="ECOURIER">eCourier</option>
-              <option value="PAPERFLY">Paperfly</option>
-              <option value="CARRYBEE">CarryBee</option>
-            </select>
+            <label className="text-[10px] text-ink2">
+              Courier provider
+              <select
+                value={provider}
+                onChange={(event) => {
+                  setProvider(event.target.value as CourierCode);
+                  setSelected([]);
+                }}
+                className={`mt-1 block rounded-full ${fieldClass}`}
+              >
+                <option value="STEADFAST">Steadfast</option>
+                <option value="PATHAO">Pathao</option>
+                <option value="REDX">REDX</option>
+                <option value="ECOURIER">eCourier</option>
+                <option value="PAPERFLY">Paperfly</option>
+                <option value="CARRYBEE">CarryBee</option>
+              </select>
+            </label>
           </div>
           <form onSubmit={record} className="mt-5">
             <div className="overflow-x-auto border-y border-line">
@@ -184,6 +244,7 @@ export default function ReconciliationPage() {
                       <td className="px-3 py-3">
                         <input
                           type="checkbox"
+                          aria-label={`Select ${entry.order.reference}`}
                           checked={selected.includes(entry.id)}
                           onChange={(event) =>
                             setSelected((current) =>
@@ -213,7 +274,8 @@ export default function ReconciliationPage() {
                           min="0"
                           step="0.01"
                           defaultValue={(entry.expectedAmount / 100).toFixed(2)}
-                          className="w-28 rounded-card border border-line px-2.5 py-2 disabled:opacity-40"
+                          aria-label={`Collected amount for ${entry.order.reference}`}
+                          className={`w-28 ${fieldClass} disabled:opacity-40`}
                         />
                       </td>
                       <td className="px-3 py-3">
@@ -227,7 +289,8 @@ export default function ReconciliationPage() {
                           defaultValue={(
                             (entry.shipment.shippingCharge ?? 0) / 100
                           ).toFixed(2)}
-                          className="w-24 rounded-card border border-line px-2.5 py-2 disabled:opacity-40"
+                          aria-label={`Courier fee for ${entry.order.reference}`}
+                          className={`w-24 ${fieldClass} disabled:opacity-40`}
                         />
                       </td>
                       <td className="px-3 py-3">
@@ -239,7 +302,8 @@ export default function ReconciliationPage() {
                           min="0"
                           step="0.01"
                           defaultValue="0.00"
-                          className="w-24 rounded-card border border-line px-2.5 py-2 disabled:opacity-40"
+                          aria-label={`Other deduction for ${entry.order.reference}`}
+                          className={`w-24 ${fieldClass} disabled:opacity-40`}
                         />
                       </td>
                       <td className="px-3 py-3">
@@ -247,7 +311,8 @@ export default function ReconciliationPage() {
                           disabled={!selected.includes(entry.id)}
                           name={`note-${entry.id}`}
                           maxLength={500}
-                          className="w-40 rounded-card border border-line px-2.5 py-2 disabled:opacity-40"
+                          aria-label={`Settlement note for ${entry.order.reference}`}
+                          className={`w-40 ${fieldClass} disabled:opacity-40`}
                         />
                       </td>
                     </tr>
@@ -266,22 +331,26 @@ export default function ReconciliationPage() {
               </table>
             </div>
             <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-              <input
-                required
-                name="providerSettlementReference"
-                minLength={2}
-                maxLength={200}
-                placeholder="Provider settlement reference"
-                className="rounded-card border border-line px-3 py-2.5 text-[12px]"
-              />
-              <input
-                required
-                name="bankReference"
-                minLength={2}
-                maxLength={200}
-                placeholder="Bank transaction reference"
-                className="rounded-card border border-line px-3 py-2.5 text-[12px]"
-              />
+              <label className="text-[10px] text-ink2">
+                Provider settlement reference
+                <input
+                  required
+                  name="providerSettlementReference"
+                  minLength={2}
+                  maxLength={200}
+                  className={`mt-1 w-full ${fieldClass}`}
+                />
+              </label>
+              <label className="text-[10px] text-ink2">
+                Bank transaction reference
+                <input
+                  required
+                  name="bankReference"
+                  minLength={2}
+                  maxLength={200}
+                  className={`mt-1 w-full ${fieldClass}`}
+                />
+              </label>
               <label className="text-[10px] text-ink2">
                 Remitted amount
                 <input
@@ -290,7 +359,7 @@ export default function ReconciliationPage() {
                   type="number"
                   min="0"
                   step="0.01"
-                  className="mt-1 w-full rounded-card border border-line px-3 py-2 text-[12px]"
+                  className={`mt-1 w-full ${fieldClass}`}
                 />
               </label>
               <label className="text-[10px] text-ink2">
@@ -299,19 +368,22 @@ export default function ReconciliationPage() {
                   required
                   name="settledAt"
                   type="datetime-local"
-                  className="mt-1 w-full rounded-card border border-line px-3 py-2 text-[12px]"
+                  className={`mt-1 w-full ${fieldClass}`}
                 />
               </label>
-              <input
-                name="note"
-                maxLength={1000}
-                placeholder="Optional batch note"
-                className="rounded-card border border-line px-3 py-2.5 text-[12px]"
-              />
+              <label className="text-[10px] text-ink2">
+                Batch note
+                <input
+                  name="note"
+                  maxLength={1000}
+                  placeholder="Optional"
+                  className={`mt-1 w-full ${fieldClass}`}
+                />
+              </label>
             </div>
             <button
               disabled={saving || selected.length === 0}
-              className="mt-4 rounded-full bg-ink px-5 py-2.5 text-[12px] text-white disabled:opacity-40"
+              className="mt-4 rounded-full bg-ink px-5 py-2.5 text-[12px] text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:opacity-40"
             >
               {saving ? "Recording…" : `Record settlement (${selected.length})`}
             </button>
@@ -350,11 +422,15 @@ export default function ReconciliationPage() {
                     <span
                       className={`rounded-full px-2.5 py-1 text-[10px] ${entry.status === "MATCHED" ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}
                     >
-                      {entry.status.toLowerCase()}
+                      {formatEnum(entry.status)}
                     </span>
                     <p className="mt-2 text-[11px] text-ink2">
                       Remitted {formatTaka(entry.remittedAmount)} · variance{" "}
                       {formatTaka(entry.variance)}
+                    </p>
+                    <p className="mt-1 text-[10px] text-ink2">
+                      Settled{" "}
+                      {new Date(entry.settledAt).toLocaleString("en-BD")}
                     </p>
                   </div>
                 </div>
@@ -366,7 +442,7 @@ export default function ReconciliationPage() {
                 </div>
               </article>
             ))}
-            {loading && (
+            {loading && settlements.length === 0 && (
               <p className="py-12 text-center text-[12px] text-ink2">
                 Loading reconciliation…
               </p>

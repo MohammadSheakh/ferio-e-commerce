@@ -67,7 +67,7 @@ export type ShipmentPollAttempt = {
     trackingNumber: string | null;
     status: string;
     provider: { code: CourierCode; name: string };
-    order: { reference: string };
+    order: { id: string; reference: string };
   };
 };
 
