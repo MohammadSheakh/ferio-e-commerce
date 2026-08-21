@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import CustomerLogoutButton from "@/components/CustomerLogoutButton";
+import LocationPickerModal from "@/components/LocationPickerModal";
+import MiniAddressMap from "@/components/MiniAddressMap";
 
 interface UserAccount {
   id: string;
@@ -22,6 +24,8 @@ export interface CustomerAddress {
   area: string;
   detailedAddress: string;
   landmark?: string;
+  latitude?: number | null;
+  longitude?: number | null;
   isDefault: boolean;
 }
 
@@ -45,8 +49,20 @@ export default function AccountPage() {
 
   // Address Modal / Form state
   const [showAddressForm, setShowAddressForm] = useState(false);
+  const [showPickerModal, setShowPickerModal] = useState(false);
   const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
-  const [addressForm, setAddressForm] = useState({
+  const [addressForm, setAddressForm] = useState<{
+    label: string;
+    recipientName: string;
+    phone: string;
+    district: string;
+    area: string;
+    detailedAddress: string;
+    landmark: string;
+    latitude: number | null;
+    longitude: number | null;
+    isDefault: boolean;
+  }>({
     label: "Home",
     recipientName: "",
     phone: "",
@@ -54,6 +70,8 @@ export default function AccountPage() {
     area: "",
     detailedAddress: "",
     landmark: "",
+    latitude: null,
+    longitude: null,
     isDefault: false,
   });
   const [savingAddress, setSavingAddress] = useState(false);
@@ -170,6 +188,8 @@ export default function AccountPage() {
       area: "",
       detailedAddress: "",
       landmark: "",
+      latitude: null,
+      longitude: null,
       isDefault: addresses.length === 0,
     });
     setAddressMessage(null);
@@ -186,6 +206,8 @@ export default function AccountPage() {
       area: addr.area,
       detailedAddress: addr.detailedAddress,
       landmark: addr.landmark || "",
+      latitude: addr.latitude ?? null,
+      longitude: addr.longitude ?? null,
       isDefault: addr.isDefault,
     });
     setAddressMessage(null);
@@ -536,6 +558,19 @@ export default function AccountPage() {
                     </p>
                   )}
 
+                  {addr.latitude && addr.longitude && (
+                    <div className="mt-3">
+                      <MiniAddressMap
+                        lat={addr.latitude}
+                        lng={addr.longitude}
+                        height="135px"
+                        label={`${addr.label || "Delivery"} Pinpoint`}
+                        customText={`${addr.detailedAddress}, ${addr.area}, ${addr.district}`}
+                        onChangePin={() => openEditAddressForm(addr)}
+                      />
+                    </div>
+                  )}
+
                   <div className="mt-4 flex items-center justify-end gap-3 border-t border-line/60 pt-3 text-xs">
                     <button
                       onClick={() => openEditAddressForm(addr)}
@@ -574,11 +609,10 @@ export default function AccountPage() {
 
               {addressMessage && (
                 <div
-                  role={addressMessage.type === "error" ? "alert" : "status"}
-                  className={`mb-4 rounded-card border p-3 text-xs ${
-                    addressMessage.type === "success"
-                      ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                      : "border-rose-200 bg-rose-50 text-rose-800"
+                  className={`rounded-card p-3 text-xs ${
+                    addressMessage.type === "error"
+                      ? "bg-rose-50 text-rose-700 border border-rose-200"
+                      : "bg-emerald-50 text-emerald-700 border border-emerald-200"
                   }`}
                 >
                   {addressMessage.text}
@@ -723,6 +757,49 @@ export default function AccountPage() {
                   </div>
 
                   <div className="sm:col-span-2">
+                    <label className="mb-1 block text-[11px] uppercase tracking-eyebrow text-ink2">
+                      Map Pinpoint Location
+                    </label>
+                    {addressForm.latitude && addressForm.longitude ? (
+                      <MiniAddressMap
+                        lat={addressForm.latitude}
+                        lng={addressForm.longitude}
+                        height="185px"
+                        label="Selected Delivery Pinpoint"
+                        customText={[addressForm.detailedAddress, addressForm.area, addressForm.district].filter(Boolean).join(", ") || undefined}
+                        onChangePin={() => setShowPickerModal(true)}
+                        onClearPin={() =>
+                          setAddressForm((prev) => ({
+                            ...prev,
+                            latitude: null,
+                            longitude: null,
+                          }))
+                        }
+                      />
+                    ) : (
+                      <div className="rounded-card border border-line bg-surface p-4">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                          <div>
+                            <p className="text-xs font-semibold text-ink flex items-center gap-1.5">
+                              <span>🗺️ Map Location Pinpoint</span>
+                            </p>
+                            <p className="text-[11px] text-ink2 mt-0.5">
+                              Pin your precise position on OpenStreetMap for delivery accuracy.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setShowPickerModal(true)}
+                            className="px-3.5 py-1.5 bg-white border border-line text-ink text-xs font-medium rounded-full shadow-sm hover:border-ink transition-colors whitespace-nowrap"
+                          >
+                            📍 Select Pin on Map
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="sm:col-span-2">
                     <label className="flex items-center gap-2 text-xs text-ink">
                       <input
                         type="checkbox"
@@ -762,6 +839,26 @@ export default function AccountPage() {
               </form>
             </div>
           )}
+
+          <LocationPickerModal
+            isOpen={showPickerModal}
+            onClose={() => setShowPickerModal(false)}
+            initialLat={addressForm.latitude}
+            initialLng={addressForm.longitude}
+            onSelectLocation={(lat, lng, geoInfo) => {
+              setAddressForm((prev) => ({
+                ...prev,
+                latitude: lat,
+                longitude: lng,
+                area: prev.area || geoInfo?.suburb || "",
+                detailedAddress:
+                  prev.detailedAddress ||
+                  (geoInfo?.road && geoInfo.road !== "N/A"
+                    ? geoInfo.road
+                    : ""),
+              }));
+            }}
+          />
         </section>
       </div>
     </main>

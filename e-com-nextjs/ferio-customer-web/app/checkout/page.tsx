@@ -13,6 +13,7 @@ import type {
 import { formatTaka } from "@/lib/catalog";
 import type { PublicStoreConfig } from "@/lib/store";
 import { createBrowserIdempotencyKey } from "@/lib/browser-identifiers";
+import LocationPickerModal from "@/components/LocationPickerModal";
 
 type CheckoutForm = {
   name: string;
@@ -22,6 +23,8 @@ type CheckoutForm = {
   area: string;
   detailedAddress: string;
   landmark: string;
+  latitude?: number | null;
+  longitude?: number | null;
   customerNote: string;
   marketingConsent: boolean;
   purchaseActivityConsent: boolean;
@@ -44,6 +47,8 @@ export interface SavedAddressItem {
   area: string;
   detailedAddress: string;
   landmark?: string;
+  latitude?: number | null;
+  longitude?: number | null;
   isDefault: boolean;
 }
 
@@ -55,6 +60,8 @@ const emptyForm: CheckoutForm = {
   area: "",
   detailedAddress: "",
   landmark: "",
+  latitude: null,
+  longitude: null,
   customerNote: "",
   marketingConsent: false,
   purchaseActivityConsent: false,
@@ -101,7 +108,7 @@ export default function CheckoutPage() {
   const [updatingVariant, setUpdatingVariant] = useState("");
   const [error, setError] = useState("");
 
-  // Customer Account & Saved Addresses state
+  const [showPickerModal, setShowPickerModal] = useState(false);
   const [savedAddresses, setSavedAddresses] = useState<SavedAddressItem[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState<string | null>(
     null,
@@ -206,6 +213,8 @@ export default function CheckoutPage() {
                 detailedAddress:
                   prev.detailedAddress || defaultAddr.detailedAddress,
                 landmark: prev.landmark || defaultAddr.landmark || "",
+                latitude: prev.latitude ?? defaultAddr.latitude ?? null,
+                longitude: prev.longitude ?? defaultAddr.longitude ?? null,
               }));
             }
           } else if (acc) {
@@ -253,6 +262,8 @@ export default function CheckoutPage() {
       area: addr.area,
       detailedAddress: addr.detailedAddress,
       landmark: addr.landmark || "",
+      latitude: addr.latitude ?? null,
+      longitude: addr.longitude ?? null,
     }));
     setPreview(null);
     setError("");
@@ -841,6 +852,30 @@ export default function CheckoutPage() {
                 />
               </label>
 
+              <div className="sm:col-span-2 rounded-card border border-line bg-surface p-4 mt-1">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[13px] font-medium text-ink flex items-center gap-1.5">
+                      <span>🗺️ Map Location Pinpoint</span>
+                    </p>
+                    <p className="text-[11px] text-ink2 mt-0.5 leading-relaxed">
+                      {form.latitude && form.longitude
+                        ? `Selected Pinpoint: Lat ${form.latitude.toFixed(4)}, Lng ${form.longitude.toFixed(4)}`
+                        : "Pinpoint your exact location on OpenStreetMap for instant rider navigation."}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowPickerModal(true)}
+                    className="px-4 py-2 bg-white border border-line text-ink text-xs font-medium rounded-full shadow-sm hover:border-ink transition-colors whitespace-nowrap"
+                  >
+                    {form.latitude && form.longitude
+                      ? "📍 Change Pin on Map"
+                      : "📍 Select Pin on Map"}
+                  </button>
+                </div>
+              </div>
+
               {userLoggedIn && selectedAddressId === null && (
                 <div className="sm:col-span-2 pt-1">
                   <label className="flex items-center gap-2.5 text-[12px] text-slate-700 cursor-pointer">
@@ -860,6 +895,28 @@ export default function CheckoutPage() {
               )}
             </div>
           </section>
+
+          <LocationPickerModal
+            isOpen={showPickerModal}
+            onClose={() => setShowPickerModal(false)}
+            initialLat={form.latitude}
+            initialLng={form.longitude}
+            onSelectLocation={(lat, lng, geoInfo) => {
+              setSelectedAddressId(null);
+              setForm((prev) => ({
+                ...prev,
+                latitude: lat,
+                longitude: lng,
+                area: prev.area || geoInfo?.suburb || "",
+                detailedAddress:
+                  prev.detailedAddress ||
+                  (geoInfo?.road && geoInfo.road !== "N/A"
+                    ? geoInfo.road
+                    : ""),
+              }));
+              setPreview(null);
+            }}
+          />
 
           <fieldset>
             <legend className="text-[12px] uppercase tracking-eyebrow text-ink2">

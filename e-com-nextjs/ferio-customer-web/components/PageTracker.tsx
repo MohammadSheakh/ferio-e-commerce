@@ -16,11 +16,13 @@ export default function PageTracker() {
       localStorage.setItem("ferio_chat_guest_id", savedGuestId);
     }
 
-    const socket = getCustomerSocket(undefined, savedGuestId);
+    const savedRiderToken = localStorage.getItem("ferio_rider_token") || undefined;
+    const socket = getCustomerSocket(savedRiderToken, savedGuestId);
     socketRef.current = socket;
 
     function handleConnect() {
-      const currentPath = typeof window !== "undefined" ? window.location.pathname : pathname;
+      const currentPath =
+        typeof window !== "undefined" ? window.location.pathname : pathname;
       socket.emit("page-view", { page: currentPath });
     }
 
@@ -39,6 +41,17 @@ export default function PageTracker() {
     if (socketRef.current && socketRef.current.connected) {
       socketRef.current.emit("page-view", { page: pathname });
     }
+
+    // Periodic heartbeat to maintain live visitor state for riders/customers
+    const interval = setInterval(() => {
+      if (socketRef.current && socketRef.current.connected) {
+        const currentPath =
+          typeof window !== "undefined" ? window.location.pathname : pathname;
+        socketRef.current.emit("page-view", { page: currentPath });
+      }
+    }, 12000);
+
+    return () => clearInterval(interval);
   }, [pathname]);
 
   return null;

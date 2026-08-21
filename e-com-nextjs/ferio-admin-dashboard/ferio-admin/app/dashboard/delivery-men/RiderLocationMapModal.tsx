@@ -32,6 +32,115 @@ function escapeHtml(value: unknown) {
     .replaceAll("'", "&#039;");
 }
 
+const geocodeCache = new Map<
+  string,
+  { road: string; suburb: string; city: string; full: string }
+>();
+
+async function getAddressFromCoords(
+  lat: number,
+  lng: number,
+): Promise<{ road: string; suburb: string; city: string; full: string }> {
+  const key = `${lat.toFixed(4)},${lng.toFixed(4)}`;
+  if (geocodeCache.has(key)) {
+    return geocodeCache.get(key)!;
+  }
+
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`,
+      { headers: { "Accept-Language": "en" } },
+    );
+    if (!res.ok) throw new Error("Failed to reverse geocode");
+    const data = await res.json();
+    const addr = data.address || {};
+
+    const road =
+      addr.road ||
+      addr.pedestrian ||
+      addr.highway ||
+      addr.path ||
+      addr.neighbourhood ||
+      addr.amenity ||
+      "N/A";
+    const suburb =
+      addr.suburb ||
+      addr.residential ||
+      addr.quarter ||
+      addr.village ||
+      addr.town ||
+      addr.county ||
+      "N/A";
+    const city =
+      addr.city ||
+      addr.state_district ||
+      addr.district ||
+      addr.state ||
+      "N/A";
+
+    const full = data.display_name || `${road}, ${suburb}, ${city}`;
+
+    const result = { road, suburb, city, full };
+    geocodeCache.set(key, result);
+    return result;
+  } catch {
+    return {
+      road: "Location details unavailable",
+      suburb: "N/A",
+      city: "N/A",
+      full: "Address unavailable",
+    };
+  }
+}
+
+function buildWaypointPopupHtml(
+  riderName: string,
+  sequence: number,
+  timeStr: string,
+  geo?: { road: string; suburb: string; city: string },
+  loading = false,
+) {
+  return `
+    <div style="font-size: 12px; font-family: system-ui, -apple-system, sans-serif; min-width: 210px; padding: 2px;">
+      <div style="font-weight: 700; color: #111827; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; margin-bottom: 6px; font-size: 13px;">
+        ${escapeHtml(riderName)} <span style="font-weight: 400; color: #6b7280;">(Waypoint #${sequence})</span>
+      </div>
+      <div style="font-size: 11.5px; color: #374151; line-height: 1.5; margin-bottom: 6px;">
+        <div>📍 <strong>Road:</strong> ${escapeHtml(geo?.road || (loading ? "Loading..." : "N/A"))}</div>
+        <div>🏡 <strong>Suburb:</strong> ${escapeHtml(geo?.suburb || (loading ? "Loading..." : "N/A"))}</div>
+        <div>🏙️ <strong>City:</strong> ${escapeHtml(geo?.city || (loading ? "Loading..." : "N/A"))}</div>
+      </div>
+      <div style="font-size: 10.5px; color: #9ca3af; border-top: 1px solid #f3f4f6; padding-top: 4px;">
+        Time: ${escapeHtml(timeStr)}
+      </div>
+    </div>
+  `;
+}
+
+function buildCurrentRiderPopupHtml(
+  riderName: string,
+  vehicleType: string,
+  timeStr: string,
+  geo?: { road: string; suburb: string; city: string },
+  loading = false,
+) {
+  return `
+    <div style="font-size: 12px; font-family: system-ui, -apple-system, sans-serif; min-width: 210px; padding: 2px;">
+      <div style="font-weight: 700; color: #111827; border-bottom: 1px solid #e5e7eb; padding-bottom: 4px; margin-bottom: 6px; font-size: 13px;">
+        ${escapeHtml(riderName)} <span style="font-weight: 600; color: #e11d48;">(Current Location)</span>
+      </div>
+      <div style="font-size: 11.5px; color: #374151; line-height: 1.5; margin-bottom: 6px;">
+        <div>📍 <strong>Road:</strong> ${escapeHtml(geo?.road || (loading ? "Loading..." : "N/A"))}</div>
+        <div>🏡 <strong>Suburb:</strong> ${escapeHtml(geo?.suburb || (loading ? "Loading..." : "N/A"))}</div>
+        <div>🏙️ <strong>City:</strong> ${escapeHtml(geo?.city || (loading ? "Loading..." : "N/A"))}</div>
+      </div>
+      <div style="font-size: 10.5px; color: #9ca3af; border-top: 1px solid #f3f4f6; padding-top: 4px;">
+        Last Ping: ${escapeHtml(timeStr)} · ${escapeHtml(vehicleType)}
+      </div>
+    </div>
+  `;
+}
+
 export default function RiderLocationMapModal({
   riderId,
   riderName,
@@ -135,6 +244,9 @@ export default function RiderLocationMapModal({
     }
 
     renderRiderMap();
+    setTimeout(() => {
+      leafletInstanceRef.current?.invalidateSize();
+    }, 150);
   }, [rider]);
 
   useEffect(() => {
@@ -168,14 +280,29 @@ export default function RiderLocationMapModal({
         iconAnchor: [12, 12],
       });
 
-      L.marker([loc.latitude, loc.longitude], { icon }).addTo(
+      const marker = L.marker([loc.latitude, loc.longitude], { icon }).addTo(
         layerGroupRef.current,
-      ).bindPopup(`
-          <div style="font-size: 12px; font-family: sans-serif;">
-            <strong>${escapeHtml(rider.name)}</strong> (Waypoint #${loc.sequence})<br/>
-            Time: ${new Date(loc.createdAt).toLocaleTimeString()}
-          </div>
-        `);
+      );
+
+      const timeStr = new Date(loc.createdAt).toLocaleTimeString();
+      const cacheKey = `${loc.latitude.toFixed(4)},${loc.longitude.toFixed(4)}`;
+      const cached = geocodeCache.get(cacheKey);
+
+      marker.bindPopup(
+        buildWaypointPopupHtml(rider.name, loc.sequence, timeStr, cached, !cached),
+      );
+      marker.bindTooltip(
+        cached ? `${cached.road}, ${cached.suburb}, ${cached.city}` : `Waypoint #${loc.sequence}`,
+        { direction: "top", offset: [0, -10] },
+      );
+
+      marker.on("popupopen", async () => {
+        const geo = await getAddressFromCoords(loc.latitude, loc.longitude);
+        marker.setPopupContent(
+          buildWaypointPopupHtml(rider.name, loc.sequence, timeStr, geo, false),
+        );
+        marker.setTooltipContent(`${geo.road}, ${geo.suburb}, ${geo.city}`);
+      });
     });
 
     // Draw route line between sequence points
@@ -201,19 +328,57 @@ export default function RiderLocationMapModal({
         iconAnchor: [80, 14],
       });
 
-      L.marker([rider.currentLat, rider.currentLng], { icon }).addTo(
+      const currentMarker = L.marker([rider.currentLat, rider.currentLng], { icon }).addTo(
         layerGroupRef.current,
-      ).bindPopup(`
-          <div style="font-size: 13px; font-family: sans-serif;">
-            <strong>${escapeHtml(rider.name)}</strong><br/>
-            Current location<br/>
-            Last ping: ${rider.lastLocationAt ? new Date(rider.lastLocationAt).toLocaleTimeString() : "N/A"}
-          </div>
-        `);
+      );
+
+      const timeStr = rider.lastLocationAt
+        ? new Date(rider.lastLocationAt).toLocaleTimeString()
+        : "N/A";
+      const cacheKey = `${rider.currentLat.toFixed(4)},${rider.currentLng.toFixed(4)}`;
+      const cachedCurrent = geocodeCache.get(cacheKey);
+
+      currentMarker.bindPopup(
+        buildCurrentRiderPopupHtml(
+          rider.name,
+          rider.vehicleType,
+          timeStr,
+          cachedCurrent,
+          !cachedCurrent,
+        ),
+      );
+      currentMarker.bindTooltip(
+        cachedCurrent
+          ? `📍 ${cachedCurrent.road}, ${cachedCurrent.suburb}, ${cachedCurrent.city}`
+          : `📍 ${rider.name} Current`,
+        { direction: "top", offset: [0, -14] },
+      );
+
+      currentMarker.on("popupopen", async () => {
+        const geo = await getAddressFromCoords(
+          rider.currentLat!,
+          rider.currentLng!,
+        );
+        currentMarker.setPopupContent(
+          buildCurrentRiderPopupHtml(
+            rider.name,
+            rider.vehicleType,
+            timeStr,
+            geo,
+            false,
+          ),
+        );
+        currentMarker.setTooltipContent(
+          `📍 ${geo.road}, ${geo.suburb}, ${geo.city}`,
+        );
+      });
     }
 
-    if (bounds.length > 0 && leafletInstanceRef.current) {
-      leafletInstanceRef.current.fitBounds(bounds, { padding: [50, 50] });
+    if (leafletInstanceRef.current) {
+      leafletInstanceRef.current.invalidateSize();
+      if (bounds.length > 0) {
+        leafletInstanceRef.current.fitBounds(bounds, { padding: [50, 50] });
+      }
     }
   };
 
@@ -246,12 +411,12 @@ export default function RiderLocationMapModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/60 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/60 p-2 sm:p-4 md:p-6">
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="rider-map-dialog-title"
-        className="flex max-h-[90vh] w-full max-w-4xl flex-col rounded-card border border-line bg-paper p-6"
+        className="flex h-[94vh] w-[96vw] max-w-[1600px] flex-col rounded-card border border-line bg-paper p-4 md:p-6 shadow-2xl overflow-hidden"
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-line pb-4">

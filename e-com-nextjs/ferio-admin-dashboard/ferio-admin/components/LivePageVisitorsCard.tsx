@@ -47,8 +47,7 @@ export default function LivePageVisitorsCard() {
   useEffect(() => {
     const socket = getAdminSocket();
 
-    function handleStatsUpdate(payload: LivePageStatsPayload) {
-      setStats(payload);
+    function updateTimestamp() {
       setLastUpdated(
         new Date().toLocaleTimeString([], {
           hour: "2-digit",
@@ -58,9 +57,15 @@ export default function LivePageVisitorsCard() {
       );
     }
 
+    function handleStatsUpdate(payload: LivePageStatsPayload) {
+      setStats(payload);
+      updateTimestamp();
+    }
+
     function handleConnect() {
       setIsConnected(true);
       socket.emit("request-live-page-stats");
+      updateTimestamp();
     }
 
     function handleDisconnect() {
@@ -76,12 +81,13 @@ export default function LivePageVisitorsCard() {
     socket.on("disconnect", handleDisconnect);
     socket.on("live-page-visitors-stats", handleStatsUpdate);
 
-    // Periodic poll for stats fallback
+    // Periodic poll for stats refresh
     const interval = setInterval(() => {
-      if (socket.connected) {
-        socket.emit("request-live-page-stats");
+      const currentSocket = getAdminSocket();
+      if (currentSocket.connected) {
+        currentSocket.emit("request-live-page-stats");
       }
-    }, 5000);
+    }, 4000);
 
     return () => {
       clearInterval(interval);
