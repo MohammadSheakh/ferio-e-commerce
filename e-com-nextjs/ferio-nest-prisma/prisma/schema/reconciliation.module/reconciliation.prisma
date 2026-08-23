@@ -1,0 +1,105 @@
+enum ReconciliationDomain {
+  INVENTORY
+  PAYMENT
+  SHIPPING
+  REFUND
+  SETTLEMENT
+}
+
+enum ReconciliationSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ReconciliationFindingStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+enum ReconciliationFindingType {
+  DELIVERED_COD_MISSING_COLLECTION
+  OVERDUE_COD_COLLECTION
+  RTO_WITH_COLLECTION
+  COD_COLLECTION_VARIANCE
+  COURIER_SETTLEMENT_VARIANCE
+  COD_PAYMENT_STATE_MISMATCH
+  PREPAID_PAYMENT_STATE_MISMATCH
+  PREPAID_UNVERIFIED_PAID_ORDER
+  PREPAID_AMOUNT_MISMATCH
+  TERMINAL_ORDER_ACTIVE_RESERVATION
+  INVALID_STOCK_BALANCE
+  AGED_PENDING_REFUND
+}
+
+enum ReconciliationRunStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum ReconciliationRunTrigger {
+  MANUAL
+  SCHEDULED
+  RETRY
+}
+
+model ReconciliationFinding {
+  id                 String                      @id @default(cuid())
+  fingerprint        String                      @unique
+  type               ReconciliationFindingType
+  domain             ReconciliationDomain
+  severity           ReconciliationSeverity
+  status             ReconciliationFindingStatus @default(OPEN)
+  title              String
+  description        String
+  entityType         String
+  entityId           String
+  context            Json
+  occurrenceCount    Int                         @default(1)
+  firstDetectedAt    DateTime                    @default(now())
+  lastSeenAt         DateTime                    @default(now())
+  ownerActorId       String?
+  acknowledgedByActorId String?
+  acknowledgedAt     DateTime?
+  acknowledgementNote String?
+  resolvedByActorId  String?
+  resolvedAt         DateTime?
+  resolutionNote     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, severity, lastSeenAt])
+  @@index([domain, status, lastSeenAt])
+  @@index([type, status])
+  @@index([ownerActorId, status])
+  @@index([entityType, entityId])
+}
+
+model ReconciliationRun {
+  id                 String                  @id @default(cuid())
+  reference          String                  @unique
+  idempotencyKeyHash String                  @unique
+  status             ReconciliationRunStatus @default(RUNNING)
+  trigger            ReconciliationRunTrigger @default(MANUAL)
+  overdueHours       Int
+  detectedCount      Int                     @default(0)
+  openedCount        Int                     @default(0)
+  autoResolvedCount  Int                     @default(0)
+  initiatedByActorId String?
+  queueJobId         String?
+  attemptCount       Int                     @default(0)
+  startedAt          DateTime                @default(now())
+  lastAttemptAt      DateTime?
+  completedAt        DateTime?
+  failureReason      String?
+
+  createdAt DateTime @default(now())
+
+  @@index([status, startedAt])
+  @@index([trigger, startedAt])
+  @@index([initiatedByActorId, startedAt])
+}

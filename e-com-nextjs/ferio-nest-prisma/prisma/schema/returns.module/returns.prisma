@@ -1,0 +1,166 @@
+enum ReturnCaseStatus {
+  REQUESTED
+  UNDER_REVIEW
+  APPROVED
+  PARTIALLY_APPROVED
+  REJECTED
+  CANCELLED
+  INSPECTED
+}
+
+enum ReturnEligibilityStatus {
+  ELIGIBLE
+  INELIGIBLE
+  REVIEW_REQUIRED
+}
+
+enum ReturnReason {
+  DAMAGED
+  DEFECTIVE
+  WRONG_ITEM
+  NOT_AS_DESCRIBED
+  SIZE_OR_FIT
+  CHANGED_MIND
+  OTHER
+}
+
+enum ReturnRequestedResolution {
+  REFUND
+  REPLACEMENT
+  EXCHANGE
+  OTHER
+}
+
+enum ReturnRequestChannel {
+  CUSTOMER
+  SUPPORT
+  ADMIN
+}
+
+enum ReturnReviewDecision {
+  APPROVE
+  PARTIAL_APPROVE
+  REJECT
+}
+
+enum ReturnItemCondition {
+  SEALED
+  UNUSED
+  OPENED
+  USED
+  DAMAGED
+  WRONG_ITEM
+  OTHER
+}
+
+enum ReturnInventoryDisposition {
+  SELLABLE
+  DAMAGED
+  QUARANTINED
+  LOST
+}
+
+enum ReturnInspectionDecision {
+  ACCEPT
+  PARTIAL_ACCEPT
+  REJECT
+}
+
+enum ReturnFinalResolution {
+  REFUND
+  REPLACEMENT
+  EXCHANGE
+  REJECTED
+  OTHER
+}
+
+model ReturnCase {
+  id                  String                    @id @default(cuid())
+  rmaReference        String                    @unique
+  status              ReturnCaseStatus          @default(REQUESTED)
+  eligibilityStatus   ReturnEligibilityStatus
+  eligibilityReasons  String[]
+  reason              ReturnReason
+  description         String
+  requestedResolution ReturnRequestedResolution
+  requestChannel      ReturnRequestChannel
+  reviewDecision      ReturnReviewDecision?
+  reviewReason        String?
+  createdByActorId    String
+  reviewedByActorId   String?
+  reviewedAt          DateTime?
+  inspectionDecision  ReturnInspectionDecision?
+  finalResolution     ReturnFinalResolution?
+  inspectionNote      String?
+  inspectedByActorId  String?
+  receivedAt          DateTime?
+  inspectedAt         DateTime?
+
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  items    ReturnItem[]
+  evidence ReturnEvidence[]
+  history  ReturnStatusHistory[]
+  refunds  CommerceRefund[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orderId, createdAt])
+  @@index([status, createdAt])
+  @@index([eligibilityStatus, createdAt])
+  @@index([createdByActorId, createdAt])
+  @@index([inspectedByActorId, inspectedAt])
+}
+
+model ReturnItem {
+  id               String @id @default(cuid())
+  requestedQuantity Int
+  approvedQuantity  Int?
+  receivedQuantity  Int?
+  acceptedQuantity  Int?
+  condition         ReturnItemCondition?
+  inventoryDisposition ReturnInventoryDisposition?
+  inspectionNote    String?
+
+  returnCaseId String
+  returnCase   ReturnCase @relation(fields: [returnCaseId], references: [id], onDelete: Cascade)
+
+  orderItemId String
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([returnCaseId, orderItemId])
+  @@index([orderItemId])
+}
+
+model ReturnEvidence {
+  id   String @id @default(cuid())
+  url  String
+
+  returnCaseId String
+  returnCase   ReturnCase @relation(fields: [returnCaseId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([returnCaseId, createdAt])
+}
+
+model ReturnStatusHistory {
+  id        String            @id @default(cuid())
+  oldStatus ReturnCaseStatus?
+  newStatus ReturnCaseStatus
+  actorId   String
+  note      String?
+
+  returnCaseId String
+  returnCase   ReturnCase @relation(fields: [returnCaseId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([returnCaseId, createdAt])
+  @@index([actorId, createdAt])
+}

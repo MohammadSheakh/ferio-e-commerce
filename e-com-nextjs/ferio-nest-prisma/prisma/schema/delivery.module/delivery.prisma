@@ -1,0 +1,61 @@
+enum DeliveryVehicleType {
+  BIKE
+  BICYCLE
+  E_BIKE
+  BUS
+  CUSTOM
+  WALK
+}
+
+enum DeliveryPersonnelStatus {
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+model DeliveryPersonnel {
+  id              String                  @id @default(cuid())
+  name            String
+  phoneOriginal   String
+  phoneNormalized String                  @unique
+  email           String?                 @unique
+  nidNumber       String?
+  vehicleType     DeliveryVehicleType     @default(BIKE)
+  operatingZone   String?
+  drivingLicense  String?
+  emergencyPhone  String?
+  notes           String?
+  status          DeliveryPersonnelStatus @default(PENDING_APPROVAL)
+
+  currentLat     Float?
+  currentLng     Float?
+  lastLocationAt DateTime?
+
+  userId String? @unique
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  assignedOrders Order[]
+  locationHistory DeliveryLocationHistory[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([operatingZone])
+  @@index([phoneNormalized])
+}
+
+model DeliveryLocationHistory {
+  id                  String            @id @default(cuid())
+  latitude            Float
+  longitude           Float
+  sequence            Int
+
+  deliveryPersonnelId String
+  deliveryPersonnel   DeliveryPersonnel @relation(fields: [deliveryPersonnelId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([deliveryPersonnelId, createdAt])
+}

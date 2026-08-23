@@ -1,0 +1,69 @@
+enum SubscriptionType {
+  individual
+  business_starter
+  business_level1
+  business_level2
+}
+
+enum InitialDuration {
+  month
+  year
+}
+
+enum RenewalFrequency {
+  monthly
+  yearly
+}
+
+enum PurchaseChannel {
+  stripe
+  revenuecat
+  both
+}
+
+enum Platform {
+  ios
+  android
+  web
+}
+
+enum SubscriptionCurrency {
+  usd
+  bdt
+  eur
+  gbp
+}
+
+model SubscriptionPlan {
+  id                          String               @id @default(cuid())
+
+  // Public plan details shown before purchase.
+  subscriptionName            String
+  subscriptionType            SubscriptionType
+  freeTrialEnabled            Boolean              @default(true)
+  freeTrialDurationDays       Int?
+  initialDuration             InitialDuration      @default(month)
+  renewalFrequncy             RenewalFrequency     @default(monthly)
+  amount                      String
+  currency                    SubscriptionCurrency @default(usd)
+  maxChildrenAccount          Int
+  // Stripe identifiers for web subscription checkout.
+  stripe_product_id           String?
+  stripe_price_id             String?
+  purchaseChannel             PurchaseChannel      @default(stripe)
+  // RevenueCat identifiers for iOS/Android subscription checkout.
+  revenueCatProductIdentifier String?
+  revenueCatPackageIdentifier String?
+  availablePlatforms          Platform[]
+  isActive                    Boolean              @default(true)
+  isDeleted                   Boolean              @default(false)
+  createdAt                   DateTime             @default(now())
+  updatedAt                   DateTime             @updatedAt
+
+  @@index([subscriptionType, isActive, isDeleted])
+  @@index([purchaseChannel, isActive])
+  @@index([stripe_product_id, isDeleted])
+  @@index([stripe_price_id, isDeleted])
+  @@index([revenueCatProductIdentifier, isDeleted])
+  @@index([isActive, isDeleted, createdAt])
+}

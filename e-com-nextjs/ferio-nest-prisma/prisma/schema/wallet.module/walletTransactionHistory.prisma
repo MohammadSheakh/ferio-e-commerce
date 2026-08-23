@@ -1,0 +1,66 @@
+
+enum TWalletTransactionStatus {
+    pending
+    completed
+    failed
+}
+
+enum TTransactionFor {
+    UserSubscription
+    Purchase
+    WalletTopUp
+    OrderPurchase
+    OrderRefund
+    AdminAdjustment
+}
+
+
+model WalletTransactionHistory{
+    
+    id        String    @id @default(cuid())
+
+    // for back reference .. 
+    userId String     //🔗  one user can have many txn history
+    user User @relation(fields: [userId], references: [id])
+
+
+    // actually we dont need wallet
+    walletId String  //🔗 
+    wallet Wallet @relation(fields: [walletId], references: [id])
+    
+    
+    // paymentTransactionId PaymentTransaction?
+    withdrawalRequestId String? // history may have withdrawalRequestId
+    withdrawalRequest   WithdrawalRequest? @relation(fields: [withdrawalRequestId], references: [id])
+
+    topUpId String?
+    topUp WalletTopUp? @relation(fields: [topUpId], references: [id], onDelete: SetNull)
+
+    orderId String?
+    order Order? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+    idempotencyKey String? @unique
+
+    type TWalletTransactionHistory
+    amount Int 
+    currency TCurrency? // default
+    balanceBefore Int
+    balanceAfter Int
+    description String
+
+    status TWalletTransactionStatus
+
+    referenceFor TTransactionFor
+
+    // polymorphic relations
+    userSubscriptionId String?
+    purchaseId String?
+    
+    isDeleted Boolean @default(false)
+    createdAt DateTime @default(now())
+
+    @@index([userId, createdAt])
+    @@index([walletId, createdAt])
+    @@index([orderId, createdAt])
+    @@index([topUpId, createdAt])
+}

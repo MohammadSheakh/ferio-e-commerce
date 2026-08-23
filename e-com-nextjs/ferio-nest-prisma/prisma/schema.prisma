@@ -1,0 +1,3248 @@
+// Source: base/datasource.prisma
+// Prisma datasource configuration.
+// This file only describes which database Prisma connects to.
+// All models are kept in module folders and combined into prisma/schema.prisma by the build script.
+datasource db {
+  provider = "postgresql" // Change to "mongodb" only if the schema is converted to Mongo ObjectId style.
+}
+
+
+// Source: base/generator.prisma
+// Prisma Client generator.
+// Run the schema builder first, then run prisma generate against prisma/schema.prisma.
+generator client {
+  provider = "prisma-client-js"
+  // output   = "../../generated/prisma"
+}
+
+
+// Source: shared/attachment.prisma
+enum AttachmentType {
+  document
+  image
+  video
+  unknown
+}
+
+model Attachment {
+  id             String         @id @default(cuid())
+  attachment     String
+  attachmentType AttachmentType
+  publicId       String?
+  originalName   String?
+  size           Int?
+  mimeType       String?
+
+  // 🔗 Many attachments can be uploaded by one user. // we dont need to track the user
+  // uploadedByUserId String?
+  // uploadedByUser   User?   @relation("AttachmentUploader", fields: [uploadedByUserId], references: [id])
+
+  // 🔗 Polymorphic target: one attachment can point to a task, user, message, etc.
+  attachedToType String?
+  attachedToId   String?
+
+  // 🔗 Many attachments can belong to one withdrawal request as proof of payment.
+  withdrawalRequest WithdrawalRequest? @relation(fields: [withdrawalRequestId], references: [id])
+  withdrawalRequestId String?
+
+  // 🔗 Many to One: one message can have many attachments
+  message Message? @relation(fields: [messageId], references: [id])
+  messageId String?
+
+  isDeleted Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // @@index([uploadedByUserId, isDeleted])
+  @@index([attachedToType, attachedToId, isDeleted])
+  @@index([attachmentType, isDeleted])
+  @@index([createdAt, isDeleted])
+}
+
+
+// Source: user/_enums.prisma
+// User module enums shared by User, UserProfile, UserDevices, OAuthAccount, and UserRoleData.
+
+enum UserRole {
+  admin
+  staff
+  user
+  delivery_man
+}
+
+enum StaffAccessStatus {
+  active
+  inactive
+}
+
+enum StaffAccessTokenPurpose {
+  INVITE
+  RESET
+}
+
+enum UserAuthProvider {
+  local
+  google
+  apple
+}
+
+enum UserApprovalStatus {
+  pending
+  approved
+  rejected
+}
+
+enum UserAdminStatus {
+  active
+  inactive
+}
+
+enum DeviceType {
+  web
+  ios
+  android
+  desktop
+}
+
+enum OAuthProvider {
+  google
+  apple
+}
+
+enum RoleDataAdminStatus {
+  active
+  inactive
+}
+
+enum ProviderApprovalStatus {
+  accept
+  reject
+  pending
+  requested
+}
+
+
+// Source: user/oauthAccount.prisma
+model OAuthAccount {
+  id           String        @id @default(cuid())
+
+  // 🔗 Many OAuth accounts can belong to one user.
+  userId       String
+  user         User          @relation(fields: [userId], references: [id])
+
+  // Provider identity, such as Google sub or Apple sub.
+  authProvider OAuthProvider
+  providerId   String
+  email        String
+
+  // Sensitive provider tokens. Keep these protected at application level.
+  accessToken  String?
+  refreshToken String?
+  idToken      String?
+
+  isVerified   Boolean       @default(true)
+  lastUsedAt   DateTime?
+  isDeleted    Boolean       @default(false)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  // One provider account should only be linked once globally.
+  @@unique([authProvider, providerId])
+  @@index([userId, isDeleted])
+  @@index([authProvider, providerId, isDeleted])
+  @@index([email, isDeleted])
+  @@index([providerId, isDeleted])
+}
+
+
+// Source: user/staffAccessToken.prisma
+model StaffAccessToken {
+  id             String                  @id @default(cuid())
+  email          String
+  name           String?
+  permissions    String[]                @default([])
+  purpose        StaffAccessTokenPurpose
+  tokenHash      String                  @unique
+  targetUserId   String?
+  issuedByUserId String
+  expiresAt      DateTime
+  consumedAt     DateTime?
+  createdAt      DateTime                @default(now())
+
+  @@index([email, purpose, consumedAt, expiresAt])
+  @@index([targetUserId, purpose, consumedAt])
+  @@index([issuedByUserId, createdAt])
+}
+
+
+// Source: user/user.prisma
+model User {
+  id                  String           @id @default(cuid())
+  name                String
+  email               String           @unique
+  password            String?
+  role                UserRole
+  profileImageUrl     String           @default("/uploads/users/user.png")
+  phoneNumber         String?
+  isEmailVerified     Boolean          @default(false)
+  authProvider        UserAuthProvider @default(local)
+  preferredTime       String           @default("07:00")
+  isResetPassword     Boolean          @default(false)
+  failedLoginAttempts Int              @default(0)
+  lockUntil           DateTime?
+  staffAccessStatus   StaffAccessStatus?
+  staffPermissions    String[]          @default([])
+  staffSessionVersion Int               @default(0)
+  twoFactorEnabled              Boolean  @default(false)
+  twoFactorSecretEncrypted      String?
+  twoFactorPendingEncrypted     String?
+  twoFactorRecoveryCodeHashes   String[] @default([])
+
+  // 🔗 One user can have one wallet.
+  walletId String? @unique
+  wallet   Wallet? @relation(fields: [walletId], references: [id])
+
+  // 🔗 One user can have one primary profile link.
+  profileId String?      @unique
+  profile   UserProfile? @relation("UserProfileLink", fields: [profileId], references: [id])
+
+  // 🔗 One parent/creator user can create many child accounts.
+  accountCreatorId String?
+  accountCreator   User?   @relation("UserAccountCreator", fields: [accountCreatorId], references: [id])
+  childAccounts    User[]  @relation("UserAccountCreator")
+
+  customerId String?   @unique
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  isDeleted Boolean   @default(false)
+  deletedAt  DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  // == Back-relations
+  // 🔗 One user can have many withdrawal requests.
+  withdrawalRequests WithdrawalRequest[]
+
+  // 🔗 One user can save many bank info records.
+  bankInfos BankInfo[]
+
+  // 🔗 One user can have many wallet transaction histories.
+  walletTransactionHistories WalletTransactionHistory[]
+  walletTopUps WalletTopUp[]
+
+  // 🔗 One user can own one profile record.
+  ownedProfile UserProfile? @relation("UserProfileOwner")
+
+  // 🔗 One user can have many registered devices.
+  devices UserDevices[]
+
+  // 🔗 One user can link many OAuth provider accounts.
+  oauthAccounts OAuthAccount[]
+  carts         Cart[]
+  savedCarts    SavedCart[]
+
+  // 🔗 One user can have many role-specific data records.
+  roleData UserRoleData[]
+
+  // 🔗 One user can create many conversations.
+  createdConversations Conversation[] @relation("ConversationCreator")
+
+  // 🔗 One user can request many products.
+  productRequests ProductRequest[] @relation("ProductRequestUser")
+
+  // 🔗 One user can participate in many conversations.
+  conversationParticipents ConversationParticipents[]
+
+  // 🔗 One user can send many chat messages.
+  sentMessages Message[] @relation("MessageSender")
+
+  // 🔗 One user can have many message read status rows.
+  messageReadStatuses MessageReadStatus[]
+
+  // 🔗 One user can send many notifications.
+  sentNotifications Notification[] @relation("NotificationSender")
+
+  // 🔗 One user can receive many notifications.
+  receivedNotifications Notification[] @relation("NotificationReceiver")
+
+  
+  // 🔗 One user can have many payment transactions.
+  paymentTransactions PaymentTransaction[]
+  submittedYoutubeReviews ProductYoutubeReview[] @relation("YoutubeReviewSubmitter")
+  moderatedYoutubeReviews ProductYoutubeReview[] @relation("YoutubeReviewModerator")
+  submittedWarrantyClaims WarrantyClaim[] @relation("WarrantyClaimSubmitter")
+  handledWarrantyClaims WarrantyClaim[] @relation("WarrantyClaimHandler")
+
+  // 🔗 One user can have many Stripe Connect accounts over time.
+  stripeAccounts StripeAccount[]
+
+  // 🔗 One user can have one delivery personnel profile.
+  deliveryPersonnel DeliveryPersonnel?
+
+  @@index([email, isDeleted])
+  @@index([role, isDeleted])
+  @@index([role, staffAccessStatus, isDeleted])
+  @@index([role, isEmailVerified, isDeleted])
+  @@index([accountCreatorId, isDeleted])
+  @@index([createdAt, isDeleted])
+}
+
+
+// Source: user/userDevices.prisma
+model UserDevices {
+  id              String     @id @default(cuid())
+
+  // 🔗 Many devices can belong to one user.
+  userId          String
+  user            User       @relation(fields: [userId], references: [id])
+
+  fcmToken        String
+  deviceType      DeviceType @default(web)
+  deviceName      String?
+  deviceOsVersion String?
+  appVersion      String?
+  lastActive      DateTime   @default(now())
+  pushEnabled     Boolean    @default(true)
+  isDeleted       Boolean    @default(false)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  @@index([userId, isDeleted])
+  @@index([fcmToken, isDeleted])
+  @@index([deviceType, isDeleted])
+  @@index([lastActive, isDeleted])
+}
+
+
+// Source: user/userProfile.prisma
+model UserProfile {
+  id                        String             @id @default(cuid())
+
+  // 🔗 One user profile belongs to one user.
+  userId                    String             @unique
+  user                      User               @relation("UserProfileOwner", fields: [userId], references: [id])
+
+  // 🔗 Optional reverse side for User.profileId primary profile relation.
+  linkedUser                User?              @relation("UserProfileLink")
+
+  location                  String?
+  dob                       DateTime?
+  gender                    String?
+  acceptTOC                 Boolean            @default(false)
+  supportMode               String             @default("calm")
+  notificationStyle         String             @default("gentle")
+  providerApprovalStatus    UserApprovalStatus @default(pending)
+  adminStatus               UserAdminStatus    @default(active)
+
+  // Attachment IDs for provider verification images.
+  frontSideCertificateImage String?
+  backSideCertificateImage  String?
+  faceImageFromFrontCam     String?
+
+  isDeleted                 Boolean            @default(false)
+  createdAt                 DateTime           @default(now())
+  updatedAt                 DateTime           @updatedAt
+
+  @@index([userId, isDeleted])
+  @@index([providerApprovalStatus, isDeleted])
+  @@index([adminStatus, isDeleted])
+}
+
+
+// Source: user/userRoleData.prisma
+model UserRoleData {
+  id                     String                  @id @default(cuid())
+
+  // 🔗 Many role-data records can belong to one user.
+  userId                 String
+  user                   User                    @relation(fields: [userId], references: [id])
+
+  adminStatus            RoleDataAdminStatus?
+  providerApprovalStatus ProviderApprovalStatus?
+  approvedAt             DateTime?
+  isDeleted              Boolean                 @default(false)
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+
+  @@index([userId])
+}
+
+
+// Source: analytics.module/storefrontAnalytics.prisma
+enum StorefrontAnalyticsEventType {
+  PRODUCT_VIEW
+  SEARCH
+  FILTER
+  ADD_TO_CART
+}
+
+model StorefrontAnalyticsEvent {
+  id          String                       @id @default(cuid())
+  eventId     String                       @unique
+  type        StorefrontAnalyticsEventType
+  eventVersion Int                         @default(1)
+  source      String                       @default("CUSTOMER_WEB")
+  visitorHash String
+  productId   String?
+  variantId   String?
+  searchTerm  String?
+  filters     Json?
+  quantity    Int?
+  path        String?
+  createdAt   DateTime                     @default(now())
+
+  @@index([type, createdAt])
+  @@index([productId, type, createdAt])
+  @@index([visitorHash, createdAt])
+}
+
+
+// Source: audit.module/audit.prisma
+enum AuditSource {
+  ADMIN_API
+  SYSTEM
+  JOB
+  PROVIDER
+}
+
+model AuditLog {
+  id            String      @id @default(cuid())
+  action        String
+  entityType    String
+  entityId      String
+  actorId       String?
+  actorRole     String?
+  source        AuditSource @default(ADMIN_API)
+  previousValue Json?
+  newValue      Json?
+  metadata      Json?
+  createdAt     DateTime    @default(now())
+
+  @@index([entityType, entityId, createdAt])
+  @@index([actorId, createdAt])
+  @@index([action, createdAt])
+  @@index([source, createdAt])
+  @@index([createdAt])
+}
+
+
+// Source: cart.module/cart.prisma
+enum CartStatus {
+  ACTIVE
+  CONVERTED
+  ABANDONED
+  EXPIRED
+}
+
+model Cart {
+  id        String     @id @default(cuid())
+  tokenHash String     @unique
+  status    CartStatus @default(ACTIVE)
+  expiresAt DateTime
+
+  items         CartItem[]
+  checkoutDraft CheckoutDraft?
+  userId        String?
+  user          User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, expiresAt])
+  @@index([updatedAt])
+  @@index([userId, status, updatedAt])
+}
+
+model CartItem {
+  id             String @id @default(cuid())
+  quantity       Int
+  addedUnitPrice Int
+
+  cartId String
+  cart   Cart @relation(fields: [cartId], references: [id], onDelete: Cascade)
+
+  variantId String
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([cartId, variantId])
+  @@index([variantId])
+}
+
+model SavedCart {
+  id          String   @id @default(cuid())
+  name        String
+  shareToken  String   @unique
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items       SavedCartItem[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([shareToken])
+}
+
+model SavedCartItem {
+  id          String         @id @default(cuid())
+  quantity    Int            @default(1)
+  savedCartId String
+  savedCart   SavedCart      @relation(fields: [savedCartId], references: [id], onDelete: Cascade)
+  variantId   String
+  variant     ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([savedCartId, variantId])
+  @@index([variantId])
+}
+
+
+// Source: catalog.module/catalog.prisma
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum ProductMediaType {
+  IMAGE
+  VIDEO
+}
+
+enum ProductCondition {
+  NEW
+  SECOND_HAND
+}
+
+enum ProductConditionGrade {
+  LIKE_NEW
+  GOOD
+  FAIR
+}
+
+model Category {
+  id          String  @id @default(cuid())
+  name        String
+  slug        String  @unique
+  description String?
+  isActive    Boolean @default(true)
+  sortOrder   Int     @default(0)
+
+  parentId String?
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children Category[] @relation("CategoryTree")
+  products Product[]
+  services ServiceOffering[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([parentId, isActive, sortOrder])
+  @@index([isActive, sortOrder, name])
+}
+
+model Brand {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  slug        String    @unique
+  description String?
+  logoUrl     String?
+  isActive    Boolean   @default(true)
+
+  products    Product[]
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([isActive, name])
+}
+
+model Product {
+  id             String        @id @default(cuid())
+  name           String
+  slug           String        @unique
+  description    String
+  brand          String?
+  brandId        String?
+  brandRel       Brand?        @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  status         ProductStatus @default(DRAFT)
+  isFeatured     Boolean       @default(false)
+  codAvailable   Boolean       @default(true)
+  deliveryNote   String?
+  returnNote     String?
+  condition      ProductCondition      @default(NEW)
+  conditionGrade ProductConditionGrade?
+  conditionNote  String?
+  seoTitle       String?
+  seoDescription String?
+  publishedAt    DateTime?
+
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  variants   ProductVariant[]
+  media      ProductMedia[]
+  reviewBanners ProductReviewBanner[]
+  youtubeReviews ProductYoutubeReview[]
+  features   ProductFeature[]
+  specifications ProductSpecification[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([categoryId, status, createdAt])
+  @@index([brandId])
+  @@index([status, isFeatured, publishedAt])
+  @@index([name])
+}
+
+model ProductSpecification {
+  id        String   @id @default(cuid())
+  group     String   @default("General")
+  key       String
+  value     String
+  sortOrder Int      @default(0)
+
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([productId, sortOrder])
+}
+
+model ProductFeature {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  image       String?
+  tag         String?
+  sortOrder   Int      @default(0)
+
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([productId, sortOrder])
+}
+
+enum ProductYoutubeReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model ProductReviewBanner {
+  id        String  @id @default(cuid())
+  imageUrl  String
+  altText   String?
+  sortOrder Int     @default(0)
+  isActive  Boolean @default(true)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([productId, isActive, sortOrder])
+}
+
+model ProductYoutubeReview {
+  id             String                     @id @default(cuid())
+  youtubeUrl     String
+  youtubeVideoId String
+  title          String?
+  reviewerName   String?
+  status         ProductYoutubeReviewStatus @default(PENDING)
+  isFeatured     Boolean                    @default(false)
+  rejectionReason String?
+  submittedById  String
+  moderatedById  String?
+  moderatedAt    DateTime?
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  submittedBy User @relation("YoutubeReviewSubmitter", fields: [submittedById], references: [id], onDelete: Restrict)
+  moderatedBy User? @relation("YoutubeReviewModerator", fields: [moderatedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([productId, youtubeVideoId])
+  @@index([productId, status, isFeatured, createdAt])
+  @@index([submittedById, createdAt])
+}
+
+model ProductVariant {
+  id             String  @id @default(cuid())
+  name           String
+  sku            String  @unique
+  attributes     Json?
+  price          Int
+  compareAtPrice Int?
+  isActive       Boolean @default(true)
+  sortOrder      Int     @default(0)
+  weightGrams    Int?
+
+  productId String
+  product   Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
+  media     ProductMedia[]
+  inventory InventoryStock[]
+  cartItems CartItem[]
+  orderItems OrderItem[]
+  savedCartItems SavedCartItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([productId, isActive, sortOrder])
+  @@index([price])
+}
+
+model ProductMedia {
+  id        String           @id @default(cuid())
+  url       String
+  altText   String?
+  type      ProductMediaType @default(IMAGE)
+  sortOrder Int              @default(0)
+
+  productId String
+  product   Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([productId, sortOrder])
+  @@index([variantId, sortOrder])
+}
+
+enum ProductRequestStatus {
+  PENDING
+  COLLECTED
+  CONTACTED
+  DONE
+}
+
+model ProductRequest {
+  id          String               @id @default(cuid())
+  productName String
+  name        String?
+  phone       String?
+  status      ProductRequestStatus @default(PENDING)
+  notes       String?
+
+  userId String?
+  user   User?   @relation("ProductRequestUser", fields: [userId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([userId, createdAt])
+}
+
+
+
+// Source: chatting.module/conversation.prisma
+enum ConversationType {
+  direct
+  group
+}
+
+enum ParticipantRole {
+  admin
+  member
+}
+
+model Conversation {
+  id                   String   @id @default(cuid())
+
+  // 🔗 Many conversations can be created by one user.
+  creatorId            String
+  creator              User     @relation("ConversationCreator", fields: [creatorId], references: [id])
+
+  type                 ConversationType
+  groupName            String?
+  groupProfilePicture  String?
+
+  // Last message snapshot for faster conversation list loading.
+  lastMessageId        String?
+  lastMessageText      String?
+  lastMessageCreatedAt DateTime?
+  isDeleted            Boolean  @default(false)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  // 🔗 One conversation can have many participants.
+  participants ConversationParticipents[]
+
+  // 🔗 One conversation can have many messages.
+  messages     Message[]
+
+  // 🔗 One conversation can have many read-status rows.
+  readStatuses MessageReadStatus[]
+
+
+  @@index([creatorId, isDeleted])
+  @@index([type, isDeleted])
+  @@index([lastMessageCreatedAt, isDeleted])
+}
+
+
+// Source: chatting.module/conversationParticipents.prisma
+model ConversationParticipents {
+  id                         String          @id @default(cuid())
+
+  // 🔗 Many participant rows can belong to one user.
+  userId                     String
+  user                       User            @relation(fields: [userId], references: [id])
+  userName                   String
+
+  // 🔗 Many participant rows can belong to one conversation.
+  conversationId             String
+  conversation               Conversation    @relation(fields: [conversationId], references: [id])
+  joinedAt                   DateTime        @default(now())
+  role                       ParticipantRole
+  lastMessageReadAt          DateTime?
+  lastMessageReadId          String?
+  unreadCount                Int             @default(0)
+  isThisConversationUnseen   Int             @default(0)
+  isDeleted                  Boolean         @default(false)
+  createdAt                  DateTime        @default(now())
+  updatedAt                  DateTime        @updatedAt
+
+  @@index([userId, conversationId, isDeleted])
+  @@index([conversationId, isDeleted])
+  @@index([userId, isDeleted])
+}
+
+
+// Source: chatting.module/message.prisma
+model Message {
+  id             String       @id @default(cuid())
+  text           String
+
+  // 🔗 Many messages can be sent by one user.
+  senderId       String
+  sender         User         @relation("MessageSender", fields: [senderId], references: [id])
+
+  // 🔗 Many messages can belong to one conversation.
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  isDeleted      Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  // 🔗 One-to-many: one message can include many attachments.
+  attachments  Attachment[]
+
+  // 🔗 One message can have many read-status rows, one per reader.
+  readStatuses MessageReadStatus[]
+
+  @@index([conversationId, createdAt, isDeleted])
+  @@index([senderId, isDeleted])
+  @@index([createdAt, isDeleted])
+}
+
+
+// Source: chatting.module/messageReadStatus.prisma
+model MessageReadStatus {
+  id             String       @id @default(cuid())
+
+  // 🔗 Many read-status rows can belong to one message.
+  messageId      String
+  message        Message      @relation(fields: [messageId], references: [id])
+
+  // 🔗 Many read-status rows can belong to one user.
+  userId         String
+  user           User         @relation(fields: [userId], references: [id])
+
+  // 🔗 Many read-status rows can belong to one conversation.
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  isRead         Boolean      @default(false)
+  readAt         DateTime?
+  isDeleted      Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([messageId, userId])
+  @@index([messageId, userId, isDeleted])
+  @@index([conversationId, userId, isRead])
+  @@index([userId, isRead])
+}
+
+
+// Source: checkout.module/checkout.prisma
+enum DeliveryMethod {
+  HOME_DELIVERY
+  STORE_PICKUP
+}
+
+enum StorePickupStatus {
+  NOT_APPLICABLE
+  CHECKING_AVAILABILITY
+  AVAILABLE_IN_STORE
+  TRANSFER_REQUIRED
+  IN_TRANSFER
+  READY_FOR_PICKUP
+  SCHEDULED_BY_CUSTOMER
+  COMPLETED
+  CANCELLED
+}
+
+enum CheckoutPaymentMethod {
+  COD
+  PREPAID
+  PAY_AT_STORE
+  WALLET
+}
+
+enum CommercePaymentProvider {
+  SSLCOMMERZ
+  AAMARPAY
+}
+
+model DeliveryZone {
+  id                    String  @id @default(cuid())
+  name                  String
+  deliveryFee           Int
+  freeDeliveryThreshold Int?
+  isActive              Boolean @default(true)
+  sortOrder             Int     @default(0)
+
+  districts     DeliveryZoneDistrict[]
+  checkoutDrafts CheckoutDraft[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, sortOrder, name])
+}
+
+model DeliveryZoneDistrict {
+  id             String @id @default(cuid())
+  name           String
+  normalizedName String @unique
+
+  zoneId String
+  zone   DeliveryZone @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([zoneId, name])
+}
+
+model CheckoutDraft {
+  id              String @id @default(cuid())
+  name            String
+  phoneOriginal   String
+  phoneNormalized String
+  email           String?
+
+  district        String
+  area            String
+  detailedAddress String
+  landmark        String?
+  latitude        Float?
+  longitude       Float?
+  customerNote    String?
+
+  marketingConsent   Boolean   @default(false)
+  marketingConsentAt DateTime?
+  purchaseActivityConsent   Boolean   @default(false)
+  purchaseActivityConsentAt DateTime?
+  termsAccepted      Boolean   @default(false)
+
+  source   String?
+  medium   String?
+  campaign String?
+
+  deliveryMethod      DeliveryMethod        @default(HOME_DELIVERY)
+  pickupStoreId       String?
+  pickupStore         Warehouse?            @relation(fields: [pickupStoreId], references: [id], onDelete: SetNull)
+  preferredPickupDate DateTime?
+  preferredPickupSlot String?
+  storePickupStatus   StorePickupStatus     @default(NOT_APPLICABLE)
+
+  paymentMethod CheckoutPaymentMethod @default(COD)
+  paymentProvider CommercePaymentProvider?
+  subtotal        Int
+  discountTotal   Int                   @default(0)
+  couponCode      String?
+  deliveryFee     Int
+  paymentCharge   Int                   @default(0)
+  total           Int
+
+  cartId String @unique
+  cart   Cart   @relation(fields: [cartId], references: [id], onDelete: Cascade)
+
+  deliveryZoneId String
+  deliveryZone   DeliveryZone @relation(fields: [deliveryZoneId], references: [id], onDelete: Restrict)
+
+  order Order?
+
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([phoneNormalized, updatedAt])
+  @@index([expiresAt])
+  @@index([deliveryZoneId])
+  @@index([pickupStoreId])
+}
+
+
+// Source: customer.module/customer.prisma
+model Customer {
+  id              String  @id @default(cuid())
+  name            String
+  phoneOriginal   String
+  phoneNormalized String
+  email           String?
+
+  addresses CustomerAddress[]
+  orders    Order[]
+  user      User?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([phoneNormalized])
+  @@index([email])
+}
+
+model CustomerAddress {
+  id              String  @id @default(cuid())
+  label           String?
+  recipientName   String
+  phoneOriginal   String
+  phoneNormalized String
+  district        String
+  area            String
+  detailedAddress String
+  landmark        String?
+  latitude        Float?
+  longitude       Float?
+  isDefault       Boolean @default(false)
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([customerId, isDefault])
+  @@index([district, area])
+}
+
+
+// Source: delivery.module/delivery.prisma
+enum DeliveryVehicleType {
+  BIKE
+  BICYCLE
+  E_BIKE
+  BUS
+  CUSTOM
+  WALK
+}
+
+enum DeliveryPersonnelStatus {
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+model DeliveryPersonnel {
+  id              String                  @id @default(cuid())
+  name            String
+  phoneOriginal   String
+  phoneNormalized String                  @unique
+  email           String?                 @unique
+  nidNumber       String?
+  vehicleType     DeliveryVehicleType     @default(BIKE)
+  operatingZone   String?
+  drivingLicense  String?
+  emergencyPhone  String?
+  notes           String?
+  status          DeliveryPersonnelStatus @default(PENDING_APPROVAL)
+
+  currentLat     Float?
+  currentLng     Float?
+  lastLocationAt DateTime?
+
+  userId String? @unique
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  assignedOrders Order[]
+  locationHistory DeliveryLocationHistory[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([operatingZone])
+  @@index([phoneNormalized])
+}
+
+model DeliveryLocationHistory {
+  id                  String            @id @default(cuid())
+  latitude            Float
+  longitude           Float
+  sequence            Int
+
+  deliveryPersonnelId String
+  deliveryPersonnel   DeliveryPersonnel @relation(fields: [deliveryPersonnelId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([deliveryPersonnelId, createdAt])
+}
+
+
+// Source: inventory.module/inventory.prisma
+enum InventoryMovementType {
+  INITIAL_STOCK
+  RECEIVE
+  MANUAL_ADJUSTMENT
+  RESERVE
+  RELEASE
+  SALE
+  RETURN
+  DAMAGE
+  CORRECTION
+}
+
+enum InventoryAdjustmentReason {
+  STOCK_COUNT_CORRECTION
+  PURCHASE_RECEIPT
+  CUSTOMER_RETURN
+  DAMAGE_WRITE_OFF
+  OTHER
+}
+
+model Warehouse {
+  id                 String  @id @default(cuid())
+  code               String  @unique
+  name               String
+  isActive           Boolean @default(true)
+  isStore            Boolean @default(false)
+  phone              String?
+  email              String?
+  district           String?
+  area               String?
+  address            String?
+  latitude           Float?
+  longitude          Float?
+  operatingHours     String?
+  operatingDays      String?
+  pickupInstructions String?
+
+  inventory      InventoryStock[]
+  checkoutDrafts CheckoutDraft[]
+  orders         Order[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, isStore, name])
+}
+
+model InventoryStock {
+  id                String @id @default(cuid())
+  onHand            Int    @default(0)
+  reserved          Int    @default(0)
+  damaged           Int    @default(0)
+  incoming          Int    @default(0)
+  lowStockThreshold Int    @default(5)
+
+  warehouseId String
+  warehouse   Warehouse      @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  variantId   String
+  variant     ProductVariant @relation(fields: [variantId], references: [id], onDelete: Restrict)
+  movements   InventoryMovement[]
+  reservations InventoryReservation[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([warehouseId, variantId])
+  @@index([variantId])
+  @@index([warehouseId, onHand, reserved])
+}
+
+model InventoryMovement {
+  id            String                @id @default(cuid())
+  type          InventoryMovementType
+  quantityDelta Int
+  reason        String
+  referenceType String?
+  referenceId   String?
+  adjustmentReason InventoryAdjustmentReason?
+  unitCost      Int?
+  evidenceUrl   String?
+  effectiveAt   DateTime?
+  actorId       String?
+
+  inventoryId String
+  inventory   InventoryStock @relation(fields: [inventoryId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+
+  @@index([inventoryId, createdAt])
+  @@index([referenceType, referenceId])
+  @@index([actorId, createdAt])
+}
+
+
+// Source: notification.module/notification.prisma
+enum NotificationType {
+  task
+  group
+  system
+  reminder
+  mention
+  assignment
+  deadline
+  custom
+  commerce
+  order
+  payment
+  wallet
+  warranty
+  service
+}
+
+enum NotificationPriority {
+  low
+  normal
+  high
+  urgent
+}
+
+enum NotificationStatus {
+  pending
+  sent
+  delivered
+  read
+  failed
+}
+
+model Notification {
+  id           String               @id @default(cuid())
+  deduplicationKey String?          @unique
+
+  // 🔗 Many notifications can be sent by one user.
+  senderId     String?
+  sender       User?                @relation("NotificationSender", fields: [senderId], references: [id])
+
+  // 🔗 Many notifications can be received by one user.
+  receiverId   String?
+  receiver     User?                @relation("NotificationReceiver", fields: [receiverId], references: [id])
+
+  // Role broadcast target when receiverId is empty.
+  receiverRole String?
+  type         NotificationType
+  priority     NotificationPriority @default(normal)
+  status       NotificationStatus   @default(pending)
+  title        String
+  message      String?
+  // 🔗 Polymorphic target: notification can point to a task, group, message, etc.
+  entityType   String?
+  entityId     String?
+  linkFor      String?
+  linkId       String?
+  data         Json?
+  isRead       Boolean              @default(false)
+  readAt       DateTime?
+  deliveredAt  DateTime?
+  isDeleted    Boolean              @default(false)
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  @@index([receiverId, isRead, isDeleted, createdAt])
+  @@index([receiverId, status, isDeleted])
+  @@index([senderId, isDeleted])
+  @@index([type, isDeleted])
+  @@index([entityType, entityId, isDeleted])
+  @@index([receiverRole, isDeleted])
+}
+
+enum CommerceMessagePurpose {
+  TRANSACTIONAL
+  PROMOTIONAL
+}
+
+enum CommerceMessageChannel {
+  SMS
+  WHATSAPP
+  EMAIL
+}
+
+enum CommerceMessageStatus {
+  QUEUED
+  PROCESSING
+  SENT
+  DELIVERED
+  FAILED
+  CANCELLED
+  BLOCKED
+}
+
+enum CommerceMessageAttemptStatus {
+  STARTED
+  ACCEPTED
+  DELIVERED
+  FAILED
+  UNKNOWN
+}
+
+model CommerceMessage {
+  id               String                 @id @default(cuid())
+  deduplicationKey String                 @unique
+  eventType        String
+  purpose          CommerceMessagePurpose @default(TRANSACTIONAL)
+  templateKey      String
+  templateVersion  Int
+  renderedSubject  String?
+  renderedBody     String
+  recipient        String
+  selectedChannel  CommerceMessageChannel?
+  channelPlan      CommerceMessageChannel[]
+  routingPolicyVersion Int?
+  fallbackReason   String?
+  terminalReason   String?
+  status           CommerceMessageStatus  @default(QUEUED)
+  referenceType    String
+  referenceId      String
+  payload           Json?
+  availableAt      DateTime               @default(now())
+  lockedAt         DateTime?
+  sentAt           DateTime?
+  deliveredAt      DateTime?
+  failedAt         DateTime?
+  completedAt      DateTime?
+  lastError        String?
+  attempts         CommerceMessageAttempt[]
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
+  @@index([status, availableAt])
+  @@index([referenceType, referenceId, createdAt])
+  @@index([recipient, createdAt])
+  @@index([eventType, createdAt])
+}
+
+model CommerceMessageTemplate {
+  key             String   @id
+  eventType       String   @unique
+  enabled         Boolean  @default(true)
+  subjectTemplate String?
+  bodyTemplate    String
+  version         Int      @default(1)
+  updatedById     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([enabled, eventType])
+}
+
+model CommerceMessagingPolicy {
+  id                          String                   @id @default("transactional-default")
+  enabled                     Boolean                  @default(false)
+  version                     Int                      @default(1)
+  channelPriority             CommerceMessageChannel[]
+  fallbackOnDefinitiveFailure Boolean                  @default(true)
+  updatedById                 String?
+  createdAt                   DateTime                 @default(now())
+  updatedAt                   DateTime                 @updatedAt
+}
+
+model CommerceMessageAttempt {
+  id                String                       @id @default(cuid())
+  attemptNumber     Int
+  channel           CommerceMessageChannel
+  provider          String
+  status            CommerceMessageAttemptStatus @default(STARTED)
+  providerMessageId String?
+  requestPayload    Json?
+  responsePayload   Json?
+  errorCode         String?
+  errorMessage      String?
+  startedAt         DateTime                     @default(now())
+  completedAt       DateTime?
+  messageId         String
+  message           CommerceMessage              @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  createdAt         DateTime                     @default(now())
+
+  @@unique([messageId, attemptNumber])
+  @@index([status, createdAt])
+  @@index([provider, providerMessageId])
+}
+
+
+// Source: order.module/order.prisma
+enum OrderStatus {
+  PENDING_CONFIRMATION
+  CONFIRMED
+  CANCELLED
+  DELIVERED
+  COMPLETED
+}
+
+enum OrderPaymentStatus {
+  UNPAID
+  PAID
+  FAILED
+  PARTIALLY_REFUNDED
+  REFUNDED
+}
+
+enum OrderFulfillmentStatus {
+  UNFULFILLED
+  READY_FOR_FULFILLMENT
+  PICKING
+  PACKED
+  QUALITY_CHECKED
+  READY_FOR_HANDOVER
+  HANDED_OVER
+  CANCELLED
+  FULFILLED
+}
+
+enum FulfillmentExceptionType {
+  SHORTAGE
+  SUBSTITUTION
+  OTHER
+}
+
+enum FulfillmentExceptionStatus {
+  OPEN
+  RESOLVED
+}
+
+enum OrderShipmentStatus {
+  NOT_CREATED
+  READY
+  CREATED
+  PICKED_UP
+  IN_TRANSIT
+  AT_HUB
+  OUT_FOR_DELIVERY
+  DELIVERED
+  DELIVERY_FAILED
+  RETURN_IN_PROGRESS
+  RETURNED
+  CANCELLED
+  FAILED
+  RTO
+  UNKNOWN
+}
+
+enum OrderReturnStatus {
+  NONE
+  REQUESTED
+  APPROVED
+  REJECTED
+  RECEIVED
+}
+
+enum OrderRefundStatus {
+  NONE
+  PENDING
+  PARTIAL
+  REFUNDED
+  FAILED
+}
+
+enum CodVerificationStatus {
+  REQUIRED
+  NOT_REQUIRED
+  VERIFIED
+  FAILED
+}
+
+enum OrderHistorySource {
+  CUSTOMER
+  ADMIN
+  SYSTEM
+}
+
+enum InventoryReservationStatus {
+  ACTIVE
+  RELEASED
+  CONSUMED
+  EXPIRED
+}
+
+enum CodVerificationMode {
+  ALWAYS
+  ABOVE_AMOUNT
+  NEVER
+}
+
+model CodVerificationPolicy {
+  id              String              @id @default("default")
+  mode            CodVerificationMode @default(ALWAYS)
+  amountThreshold Int?
+  updatedAt       DateTime            @updatedAt
+  createdAt       DateTime            @default(now())
+}
+
+model Order {
+  id                 String                 @id @default(cuid())
+  reference          String                 @unique
+  idempotencyKeyHash String                 @unique
+  status             OrderStatus            @default(PENDING_CONFIRMATION)
+  paymentStatus      OrderPaymentStatus     @default(UNPAID)
+  fulfillmentStatus  OrderFulfillmentStatus @default(UNFULFILLED)
+  shipmentStatus     OrderShipmentStatus    @default(NOT_CREATED)
+  returnStatus       OrderReturnStatus      @default(NONE)
+  refundStatus       OrderRefundStatus      @default(NONE)
+  codVerification    CodVerificationStatus  @default(REQUIRED)
+
+  deliveryMethod      DeliveryMethod        @default(HOME_DELIVERY)
+  pickupStoreId       String?
+  pickupStore         Warehouse?            @relation(fields: [pickupStoreId], references: [id], onDelete: SetNull)
+  preferredPickupDate DateTime?
+  preferredPickupSlot String?
+  storePickupStatus   StorePickupStatus     @default(NOT_APPLICABLE)
+  storePickupOtp      String?
+  customerPickupNotes String?
+  pickupScheduledAt   DateTime?
+
+  paymentMethod      CheckoutPaymentMethod  @default(COD)
+  currency           String                 @default("BDT")
+
+  subtotal      Int
+  discountTotal Int @default(0)
+  couponCode    String?
+  deliveryFee   Int
+  paymentCharge Int @default(0)
+  total          Int
+
+  source   String?
+  medium   String?
+  campaign String?
+  customerNote String?
+  purchaseActivityConsent Boolean @default(false)
+
+  cancellationReason String?
+  confirmedAt        DateTime?
+  cancelledAt        DateTime?
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+
+  assignedDeliveryPersonnelId String?
+  assignedDeliveryPersonnel   DeliveryPersonnel? @relation(fields: [assignedDeliveryPersonnelId], references: [id], onDelete: SetNull)
+
+  checkoutDraftId String        @unique
+  checkoutDraft   CheckoutDraft @relation(fields: [checkoutDraftId], references: [id], onDelete: Restrict)
+
+  address      OrderAddress?
+  items        OrderItem[]
+  statusHistory OrderStatusHistory[]
+  fulfillmentHistory FulfillmentHistory[]
+  fulfillmentExceptions FulfillmentException[]
+  shipment    Shipment?
+  returnCases ReturnCase[]
+  refunds     CommerceRefund[]
+  rtoCases    RtoCase[]
+  codCollection CodCollection?
+  paymentAttempts CommercePaymentAttempt[]
+  walletTransactions WalletTransactionHistory[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([paymentStatus, createdAt])
+  @@index([purchaseActivityConsent, status, createdAt])
+  @@index([customerId, createdAt])
+  @@index([assignedDeliveryPersonnelId, status])
+  @@index([pickupStoreId])
+  @@index([deliveryMethod, storePickupStatus])
+  @@index([createdAt])
+}
+
+model OrderAddress {
+  id              String @id @default(cuid())
+  recipientName   String
+  phoneOriginal   String
+  phoneNormalized String
+  email           String?
+  district        String
+  area            String
+  detailedAddress String
+  landmark        String?
+  latitude        Float?
+  longitude       Float?
+
+  orderId String @unique
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([phoneNormalized])
+  @@index([district, area])
+}
+
+model OrderItem {
+  id               String  @id @default(cuid())
+  productIdSnapshot String
+  productName       String
+  variantName       String
+  sku               String
+  attributes        Json?
+  imageUrl           String?
+  productCondition   ProductCondition      @default(NEW)
+  conditionGrade     ProductConditionGrade?
+  conditionNote      String?
+  unitPrice          Int
+  discountTotal      Int     @default(0)
+  taxTotal           Int     @default(0)
+  weightGrams        Int
+  quantity           Int
+  lineTotal          Int
+
+  orderId String
+  order   Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  variantId String
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Restrict)
+
+  reservations InventoryReservation[]
+  fulfillmentExceptions FulfillmentException[]
+  returnItems ReturnItem[]
+  rtoItems    RtoItem[]
+  warrantyClaims WarrantyClaim[]
+
+  createdAt DateTime @default(now())
+
+  @@index([orderId])
+  @@index([variantId])
+  @@index([sku])
+}
+
+model OrderStatusHistory {
+  id        String             @id @default(cuid())
+  oldStatus OrderStatus?
+  newStatus OrderStatus
+  source    OrderHistorySource
+  actorId   String?
+  note      String?
+
+  orderId String
+  order   Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([orderId, createdAt])
+  @@index([actorId, createdAt])
+}
+
+model FulfillmentHistory {
+  id        String                 @id @default(cuid())
+  oldStatus OrderFulfillmentStatus?
+  newStatus OrderFulfillmentStatus
+  source    OrderHistorySource
+  actorId   String?
+  note      String?
+
+  orderId String
+  order   Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([orderId, createdAt])
+  @@index([actorId, createdAt])
+}
+
+model FulfillmentException {
+  id          String                     @id @default(cuid())
+  type        FulfillmentExceptionType
+  status      FulfillmentExceptionStatus @default(OPEN)
+  quantity    Int?
+  description String
+  resolution  String?
+  actorId     String
+  resolvedByActorId String?
+  resolvedAt  DateTime?
+
+  orderId String
+  order   Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  orderItemId String?
+  orderItem   OrderItem? @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orderId, status, createdAt])
+  @@index([orderItemId])
+  @@index([actorId, createdAt])
+}
+
+model InventoryReservation {
+  id       String                     @id @default(cuid())
+  quantity Int
+  status   InventoryReservationStatus @default(ACTIVE)
+  expiresAt DateTime?
+  releasedAt DateTime?
+  consumedAt DateTime?
+
+  inventoryId String
+  inventory   InventoryStock @relation(fields: [inventoryId], references: [id], onDelete: Restrict)
+
+  orderItemId String
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
+  rtoItem     RtoItem?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([inventoryId, orderItemId])
+  @@index([status, expiresAt])
+  @@index([orderItemId])
+}
+
+
+// Source: payment.module/paymentTransaction.prisma
+enum PaymentGateway {
+  stripe
+  paypal
+  sslcommerz
+  revenuecat
+  none
+}
+
+enum PaymentStatus {
+  pending
+  processing
+  completed
+  failed
+  refunded
+  cancelled
+  partially_refunded
+  disputed
+}
+
+enum PaymentCurrency {
+  usd
+  bdt
+  eur
+  gbp
+}
+
+enum TransactionType {
+  userSubscription
+  purchasedJourney
+  purchasedAdminCapsule
+}
+
+enum PaymentEnvironment {
+  production
+  sandbox
+}
+
+enum PaymentPlatform {
+  ios
+  android
+  web
+}
+
+model PaymentTransaction {
+  id                    String              @id @default(cuid())
+
+  // 🔗 One user can have many payment transactions.
+  userId                String
+  user                  User                @relation(fields: [userId], references: [id])
+
+  // 🔗 Polymorphic payment target, such as userSubscription or purchase.
+  referenceFor          TransactionType
+  referenceId           String
+  paymentGateway        PaymentGateway
+  transactionId         String?
+  paymentIntent         String?
+  amount                Int
+  currency              PaymentCurrency
+  paymentStatus         PaymentStatus       @default(pending)
+  gatewayResponse       Json?
+  revenueCatOrderId     String?
+  revenueCatEnvironment PaymentEnvironment?
+  platform              PaymentPlatform?
+  isDeleted             Boolean             @default(false)
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  @@index([userId, paymentStatus, isDeleted])
+  @@index([referenceFor, referenceId, isDeleted])
+  @@index([paymentGateway, transactionId])
+  @@index([revenueCatOrderId, isDeleted])
+  @@index([createdAt, isDeleted])
+  @@index([paymentStatus, createdAt, isDeleted])
+}
+
+enum CommercePaymentAttemptStatus {
+  CREATED
+  INITIATING
+  PENDING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+  EXPIRED
+  UNKNOWN
+}
+
+enum CommercePaymentCallbackStatus {
+  RECEIVED
+  VALIDATED
+  REJECTED
+  DUPLICATE
+  FAILED
+}
+
+model CommercePaymentAttempt {
+  id                    String                       @id @default(cuid())
+  merchantTransactionId String                       @unique
+  provider              CommercePaymentProvider
+  status                CommercePaymentAttemptStatus @default(CREATED)
+  amount                Int
+  currency              String                       @default("BDT")
+  providerSessionId     String?
+  providerTransactionId String?
+  providerValidationId  String?
+  redirectUrl           String?
+  initiationRequest     Json?
+  initiationResponse    Json?
+  validatedResponse     Json?
+  failureCode           String?
+  failureMessage        String?
+  expiresAt             DateTime?
+  initiatedAt           DateTime?
+  completedAt           DateTime?
+  orderId               String
+  order                 Order                        @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  callbacks             CommercePaymentCallback[]
+  createdAt             DateTime                     @default(now())
+  updatedAt             DateTime                     @updatedAt
+
+  @@index([orderId, createdAt])
+  @@index([provider, status, createdAt])
+  @@index([providerTransactionId])
+}
+
+model CommercePaymentCallback {
+  id              String                        @id @default(cuid())
+  deduplicationKey String                        @unique
+  provider        CommercePaymentProvider
+  status          CommercePaymentCallbackStatus @default(RECEIVED)
+  eventType       String
+  payload         Json
+  errorMessage    String?
+  processedAt     DateTime?
+  attemptId       String?
+  attempt         CommercePaymentAttempt?       @relation(fields: [attemptId], references: [id], onDelete: SetNull)
+  createdAt       DateTime                      @default(now())
+
+  @@index([provider, createdAt])
+  @@index([attemptId, createdAt])
+  @@index([status, createdAt])
+}
+
+
+// Source: payment.module/revenueCatWebhookEvent.prisma
+model RevenueCatWebhookEvent {
+  id               String                  @id @default(cuid())
+  eventId          String                  @unique
+  eventType        String
+  appId            String?
+  userId           String?
+  productId        String?
+  environment      PaymentEnvironment?
+  eventData        Json
+  processingStatus WebhookProcessingStatus @default(pending)
+  errorMessage     String?
+  attempts         Int                     @default(0)
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+
+  @@index([eventType, createdAt])
+  @@index([userId, createdAt])
+  @@index([processingStatus, attempts])
+}
+
+
+// Source: payment.module/stripeAccount.prisma
+model StripeAccount {
+  id          String   @id @default(cuid())
+
+  // 🔗 One user can have many Stripe account records over time.
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  accountId   String
+  isCompleted Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId, isCompleted])
+  @@index([accountId])
+}
+
+
+// Source: payment.module/stripeWebhookEvent.prisma
+enum WebhookProcessingStatus {
+  pending
+  processing
+  completed
+  failed
+}
+
+model StripeWebhookEvent {
+  id               String                  @id @default(cuid())
+  eventId          String                  @unique
+  eventType        String
+  accountId        String?
+  paymentIntentId  String?
+  customerId       String?
+  amount           Int?
+  currency         String?
+  eventData        Json
+  processingStatus WebhookProcessingStatus @default(pending)
+  errorMessage     String?
+  attempts         Int                     @default(0)
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+
+  @@index([eventType, createdAt])
+  @@index([paymentIntentId, createdAt])
+  @@index([processingStatus, attempts])
+}
+
+
+// Source: reconciliation.module/reconciliation.prisma
+enum ReconciliationDomain {
+  INVENTORY
+  PAYMENT
+  SHIPPING
+  REFUND
+  SETTLEMENT
+}
+
+enum ReconciliationSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ReconciliationFindingStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+enum ReconciliationFindingType {
+  DELIVERED_COD_MISSING_COLLECTION
+  OVERDUE_COD_COLLECTION
+  RTO_WITH_COLLECTION
+  COD_COLLECTION_VARIANCE
+  COURIER_SETTLEMENT_VARIANCE
+  COD_PAYMENT_STATE_MISMATCH
+  PREPAID_PAYMENT_STATE_MISMATCH
+  PREPAID_UNVERIFIED_PAID_ORDER
+  PREPAID_AMOUNT_MISMATCH
+  TERMINAL_ORDER_ACTIVE_RESERVATION
+  INVALID_STOCK_BALANCE
+  AGED_PENDING_REFUND
+}
+
+enum ReconciliationRunStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum ReconciliationRunTrigger {
+  MANUAL
+  SCHEDULED
+  RETRY
+}
+
+model ReconciliationFinding {
+  id                 String                      @id @default(cuid())
+  fingerprint        String                      @unique
+  type               ReconciliationFindingType
+  domain             ReconciliationDomain
+  severity           ReconciliationSeverity
+  status             ReconciliationFindingStatus @default(OPEN)
+  title              String
+  description        String
+  entityType         String
+  entityId           String
+  context            Json
+  occurrenceCount    Int                         @default(1)
+  firstDetectedAt    DateTime                    @default(now())
+  lastSeenAt         DateTime                    @default(now())
+  ownerActorId       String?
+  acknowledgedByActorId String?
+  acknowledgedAt     DateTime?
+  acknowledgementNote String?
+  resolvedByActorId  String?
+  resolvedAt         DateTime?
+  resolutionNote     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, severity, lastSeenAt])
+  @@index([domain, status, lastSeenAt])
+  @@index([type, status])
+  @@index([ownerActorId, status])
+  @@index([entityType, entityId])
+}
+
+model ReconciliationRun {
+  id                 String                  @id @default(cuid())
+  reference          String                  @unique
+  idempotencyKeyHash String                  @unique
+  status             ReconciliationRunStatus @default(RUNNING)
+  trigger            ReconciliationRunTrigger @default(MANUAL)
+  overdueHours       Int
+  detectedCount      Int                     @default(0)
+  openedCount        Int                     @default(0)
+  autoResolvedCount  Int                     @default(0)
+  initiatedByActorId String?
+  queueJobId         String?
+  attemptCount       Int                     @default(0)
+  startedAt          DateTime                @default(now())
+  lastAttemptAt      DateTime?
+  completedAt        DateTime?
+  failureReason      String?
+
+  createdAt DateTime @default(now())
+
+  @@index([status, startedAt])
+  @@index([trigger, startedAt])
+  @@index([initiatedByActorId, startedAt])
+}
+
+
+// Source: refund.module/refund.prisma
+enum CommerceRefundStatus {
+  PENDING
+  PROCESSING
+  REQUIRES_ACTION
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+enum CommerceRefundMethod {
+  ORIGINAL_PAYMENT
+  BANK_TRANSFER
+  BKASH
+  NAGAD
+  ROCKET
+  CASH
+  OTHER
+}
+
+enum RefundExecutionMode {
+  MANUAL
+  PROVIDER
+}
+
+enum RefundAttemptOutcome {
+  SUCCEEDED
+  FAILED
+}
+
+model CommerceRefund {
+  id                     String               @id @default(cuid())
+  reference              String               @unique
+  idempotencyKeyHash     String               @unique
+  status                 CommerceRefundStatus @default(PENDING)
+  method                 CommerceRefundMethod
+  amount                 Int
+  currency               String               @default("BDT")
+  reason                 String
+  sourcePaymentReference String?
+  provider               String?
+  providerRefundId       String?
+  providerResult         Json?
+  failureReason          String?
+  createdByActorId       String
+  completedByActorId     String?
+  processedAt            DateTime?
+  completedAt            DateTime?
+
+  orderId String
+  order   Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  returnCaseId String
+  returnCase   ReturnCase @relation(fields: [returnCaseId], references: [id], onDelete: Restrict)
+
+  attempts RefundAttempt[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orderId, status, createdAt])
+  @@index([returnCaseId, status, createdAt])
+  @@index([status, createdAt])
+  @@index([createdByActorId, createdAt])
+}
+
+model RefundAttempt {
+  id                String               @id @default(cuid())
+  attemptNumber     Int
+  deduplicationHash String               @unique
+  executionMode     RefundExecutionMode
+  outcome           RefundAttemptOutcome
+  provider          String?
+  externalReference String?
+  result            Json?
+  failureReason     String?
+  actorId           String
+
+  refundId String
+  refund   CommerceRefund @relation(fields: [refundId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+
+  @@unique([refundId, attemptNumber])
+  @@index([refundId, createdAt])
+  @@index([outcome, createdAt])
+  @@index([actorId, createdAt])
+}
+
+
+// Source: returns.module/returns.prisma
+enum ReturnCaseStatus {
+  REQUESTED
+  UNDER_REVIEW
+  APPROVED
+  PARTIALLY_APPROVED
+  REJECTED
+  CANCELLED
+  INSPECTED
+}
+
+enum ReturnEligibilityStatus {
+  ELIGIBLE
+  INELIGIBLE
+  REVIEW_REQUIRED
+}
+
+enum ReturnReason {
+  DAMAGED
+  DEFECTIVE
+  WRONG_ITEM
+  NOT_AS_DESCRIBED
+  SIZE_OR_FIT
+  CHANGED_MIND
+  OTHER
+}
+
+enum ReturnRequestedResolution {
+  REFUND
+  REPLACEMENT
+  EXCHANGE
+  OTHER
+}
+
+enum ReturnRequestChannel {
+  CUSTOMER
+  SUPPORT
+  ADMIN
+}
+
+enum ReturnReviewDecision {
+  APPROVE
+  PARTIAL_APPROVE
+  REJECT
+}
+
+enum ReturnItemCondition {
+  SEALED
+  UNUSED
+  OPENED
+  USED
+  DAMAGED
+  WRONG_ITEM
+  OTHER
+}
+
+enum ReturnInventoryDisposition {
+  SELLABLE
+  DAMAGED
+  QUARANTINED
+  LOST
+}
+
+enum ReturnInspectionDecision {
+  ACCEPT
+  PARTIAL_ACCEPT
+  REJECT
+}
+
+enum ReturnFinalResolution {
+  REFUND
+  REPLACEMENT
+  EXCHANGE
+  REJECTED
+  OTHER
+}
+
+model ReturnCase {
+  id                  String                    @id @default(cuid())
+  rmaReference        String                    @unique
+  status              ReturnCaseStatus          @default(REQUESTED)
+  eligibilityStatus   ReturnEligibilityStatus
+  eligibilityReasons  String[]
+  reason              ReturnReason
+  description         String
+  requestedResolution ReturnRequestedResolution
+  requestChannel      ReturnRequestChannel
+  reviewDecision      ReturnReviewDecision?
+  reviewReason        String?
+  createdByActorId    String
+  reviewedByActorId   String?
+  reviewedAt          DateTime?
+  inspectionDecision  ReturnInspectionDecision?
+  finalResolution     ReturnFinalResolution?
+  inspectionNote      String?
+  inspectedByActorId  String?
+  receivedAt          DateTime?
+  inspectedAt         DateTime?
+
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  items    ReturnItem[]
+  evidence ReturnEvidence[]
+  history  ReturnStatusHistory[]
+  refunds  CommerceRefund[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orderId, createdAt])
+  @@index([status, createdAt])
+  @@index([eligibilityStatus, createdAt])
+  @@index([createdByActorId, createdAt])
+  @@index([inspectedByActorId, inspectedAt])
+}
+
+model ReturnItem {
+  id               String @id @default(cuid())
+  requestedQuantity Int
+  approvedQuantity  Int?
+  receivedQuantity  Int?
+  acceptedQuantity  Int?
+  condition         ReturnItemCondition?
+  inventoryDisposition ReturnInventoryDisposition?
+  inspectionNote    String?
+
+  returnCaseId String
+  returnCase   ReturnCase @relation(fields: [returnCaseId], references: [id], onDelete: Cascade)
+
+  orderItemId String
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([returnCaseId, orderItemId])
+  @@index([orderItemId])
+}
+
+model ReturnEvidence {
+  id   String @id @default(cuid())
+  url  String
+
+  returnCaseId String
+  returnCase   ReturnCase @relation(fields: [returnCaseId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([returnCaseId, createdAt])
+}
+
+model ReturnStatusHistory {
+  id        String            @id @default(cuid())
+  oldStatus ReturnCaseStatus?
+  newStatus ReturnCaseStatus
+  actorId   String
+  note      String?
+
+  returnCaseId String
+  returnCase   ReturnCase @relation(fields: [returnCaseId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([returnCaseId, createdAt])
+  @@index([actorId, createdAt])
+}
+
+
+// Source: rto.module/rto.prisma
+enum RtoCaseStatus {
+  AWAITING_RECEIPT
+  INSPECTED
+}
+
+enum RtoReason {
+  CUSTOMER_UNREACHABLE
+  CUSTOMER_REFUSED
+  ADDRESS_ISSUE
+  DELIVERY_ATTEMPTS_EXHAUSTED
+  COURIER_ISSUE
+  DAMAGED_IN_TRANSIT
+  OTHER
+}
+
+model RtoCase {
+  id                   String        @id @default(cuid())
+  reference            String        @unique
+  status               RtoCaseStatus @default(AWAITING_RECEIPT)
+  reason               RtoReason?
+  reasonNote           String?
+  courierReason        String?
+  outboundCourierCost  Int           @default(0)
+  returnCourierCost    Int           @default(0)
+  otherCost            Int           @default(0)
+  totalCost            Int           @default(0)
+  courierReturnedAt    DateTime
+  inspectedAt          DateTime?
+  inspectedByActorId   String?
+
+  shipmentId String   @unique
+  shipment   Shipment @relation(fields: [shipmentId], references: [id], onDelete: Restrict)
+
+  orderId String
+  order   Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  items RtoItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, courierReturnedAt])
+  @@index([reason, createdAt])
+  @@index([orderId])
+}
+
+model RtoItem {
+  id                String @id @default(cuid())
+  expectedQuantity  Int
+  receivedQuantity  Int?
+  sellableQuantity  Int?
+  damagedQuantity   Int?
+  lostQuantity      Int?
+  note              String?
+
+  rtoCaseId String
+  rtoCase   RtoCase @relation(fields: [rtoCaseId], references: [id], onDelete: Cascade)
+
+  orderItemId String
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
+
+  reservationId String               @unique
+  reservation   InventoryReservation @relation(fields: [reservationId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([rtoCaseId])
+  @@index([orderItemId])
+}
+
+
+// Source: service-booking.module/serviceBooking.prisma
+enum ServiceOfferingStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum ServiceBookingStatus {
+  REQUESTED
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  REJECTED
+}
+
+model ServiceOffering {
+  id          String                @id @default(cuid())
+  name        String
+  slug        String                @unique
+  description String
+  status      ServiceOfferingStatus @default(DRAFT)
+  price       Int
+  durationMinutes Int
+  leadTimeHours   Int               @default(24)
+  serviceAreaNote String?
+  requirements    String?
+  imageUrl        String?
+
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  bookings   ServiceBooking[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([categoryId, status, createdAt])
+}
+
+model ServiceBooking {
+  id        String               @id @default(cuid())
+  reference String               @unique
+  status    ServiceBookingStatus @default(REQUESTED)
+
+  customerName  String
+  phoneOriginal String
+  phoneNormalized String
+  email         String?
+  preferredAt   DateTime
+  address       String?
+  customerNote  String?
+
+  serviceNameSnapshot String
+  priceSnapshot       Int
+  durationMinutesSnapshot Int
+
+  adminNote   String?
+  handledById String?
+  confirmedAt DateTime?
+  completedAt DateTime?
+  cancelledAt DateTime?
+
+  serviceId String
+  service   ServiceOffering @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  history   ServiceBookingHistory[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, preferredAt])
+  @@index([phoneNormalized, createdAt])
+  @@index([serviceId, createdAt])
+}
+
+model ServiceBookingHistory {
+  id        String               @id @default(cuid())
+  oldStatus ServiceBookingStatus?
+  newStatus ServiceBookingStatus
+  actorId   String?
+  source    OrderHistorySource
+  note      String?
+
+  bookingId String
+  booking   ServiceBooking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([bookingId, createdAt])
+}
+
+
+// Source: settings.module/settings.prisma
+enum SettingsType {
+  aboutUs
+  contactUs
+  privacyPolicy
+  termsAndConditions
+  introductionVideo
+  heroShowcase
+}
+
+model Settings {
+  id                String       @id @default(cuid())
+
+  // One settings row per static-content type, such as privacy policy or about us.
+  type              SettingsType @unique
+  details           String       @default("")
+  introductionVideo Json?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  @@index([type])
+}
+
+model CommerceSettings {
+  id                      String   @id @default("default")
+  storeName               String   @default("Ferio")
+  legalName               String?
+  supportPhone            String?
+  supportEmail            String?
+  currency                String   @default("BDT")
+  timezone                String   @default("Asia/Dhaka")
+  orderPrefix             String   @default("FER")
+  defaultReturnWindowDays Int?
+  codEnabled              Boolean  @default(true)
+  prepaidEnabled          Boolean  @default(false)
+  serviceBookingEnabled   Boolean  @default(true)
+  warrantyClaimsEnabled   Boolean  @default(true)
+  storefrontAnalyticsEnabled Boolean @default(true)
+  purchaseActivityEnabled Boolean  @default(false)
+  purchaseHistoryEnabled  Boolean  @default(false)
+  purchaseActivityShowDistrict Boolean @default(false)
+  purchaseActivityShowArea Boolean @default(false)
+  purchaseActivityDurationMs Int @default(4000)
+  purchaseActivityIntervalSeconds Int @default(12)
+  purchaseActivityMaxAgeDays Int @default(30)
+  purchaseActivityExcludedProductIds String[] @default([])
+  categoryTopNavEnabled   Boolean  @default(true)
+  categorySideNavEnabled  Boolean  @default(true)
+  termsUrl                String?
+  privacyUrl              String?
+  returnPolicyUrl         String?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+}
+
+
+// Source: settlement.module/codSettlement.prisma
+enum CodCollectionStatus {
+  EXPECTED
+  SETTLED
+  VARIANCE
+  DISPUTED
+}
+
+enum CourierSettlementStatus {
+  MATCHED
+  VARIANCE
+  DISPUTED
+}
+
+enum CourierSettlementItemStatus {
+  MATCHED
+  VARIANCE
+  DISPUTED
+}
+
+enum CourierSettlementImportSource {
+  API
+  CSV
+  MANUAL_JSON
+}
+
+enum CourierSettlementImportStatus {
+  APPLIED
+  NEEDS_REVIEW
+  SUPERSEDED
+}
+
+enum CourierSettlementImportRowStatus {
+  APPLIED
+  UNMATCHED
+  INELIGIBLE
+  ALREADY_SETTLED
+  DUPLICATE
+}
+
+model CodCollection {
+  id                 String              @id @default(cuid())
+  status             CodCollectionStatus @default(EXPECTED)
+  currency           String              @default("BDT")
+  expectedAmount     Int
+  collectedAmount    Int?
+  collectionVariance Int?
+  expectedAt         DateTime
+  settledAt          DateTime?
+
+  shipmentId String   @unique
+  shipment   Shipment @relation(fields: [shipmentId], references: [id], onDelete: Restrict)
+
+  orderId String @unique
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  settlementItem CourierSettlementItem?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, expectedAt])
+  @@index([settledAt])
+}
+
+model CourierSettlement {
+  id                          String                  @id @default(cuid())
+  reference                   String                  @unique
+  idempotencyKeyHash          String                  @unique
+  providerSettlementReference String
+  bankReference               String
+  status                      CourierSettlementStatus
+  currency                    String                  @default("BDT")
+  grossCollected              Int
+  courierFees                 Int
+  otherDeductions             Int
+  expectedRemittance          Int
+  remittedAmount              Int
+  variance                    Int
+  settledAt                   DateTime
+  recordedByActorId           String
+  note                        String?
+
+  providerId String
+  provider   ShipmentProvider @relation(fields: [providerId], references: [id], onDelete: Restrict)
+
+  items CourierSettlementItem[]
+  import CourierSettlementImport?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([providerId, providerSettlementReference])
+  @@index([status, settledAt])
+  @@index([providerId, settledAt])
+  @@index([bankReference])
+}
+
+model CourierSettlementImport {
+  id                 String                        @id @default(cuid())
+  reference          String                        @unique
+  idempotencyKeyHash String                        @unique
+  providerReportReference String
+  sourceHash         String
+  source             CourierSettlementImportSource
+  status             CourierSettlementImportStatus
+  rowCount           Int
+  appliedCount       Int
+  exceptionCount     Int
+  rawPayload         Json
+  recordedByActorId  String
+  sourceFileName     String?
+  sourceFileChecksum String?
+  parserVersion      String?
+  normalizedRowsChecksum String?
+
+  providerId String
+  provider   ShipmentProvider @relation(fields: [providerId], references: [id], onDelete: Restrict)
+
+  settlementId String? @unique
+  settlement   CourierSettlement? @relation(fields: [settlementId], references: [id], onDelete: Restrict)
+
+  supersedesImportId String? @unique
+  supersedesImport   CourierSettlementImport? @relation("CourierSettlementImportSupersession", fields: [supersedesImportId], references: [id], onDelete: Restrict)
+  supersededBy       CourierSettlementImport? @relation("CourierSettlementImportSupersession")
+  resolvedAt         DateTime?
+  correctionClaimHash String?
+  correctionClaimedAt DateTime?
+
+  rows CourierSettlementImportRow[]
+
+  createdAt DateTime @default(now())
+
+  @@unique([providerId, providerReportReference])
+  @@unique([providerId, sourceHash])
+  @@index([status, createdAt])
+  @@index([providerId, createdAt])
+  @@index([providerId, sourceFileChecksum])
+}
+
+model CourierSettlementImportRow {
+  id                   String                           @id @default(cuid())
+  providerRowReference String
+  deduplicationKey     String?                          @unique
+  rowHash              String
+  trackingNumber       String
+  status               CourierSettlementImportRowStatus
+  reason               String?
+  collectedAmount      Int
+  courierFee           Int
+  otherDeduction       Int
+  matchedShipmentId    String?
+  matchedCollectionId  String?
+  duplicateOfRowId     String?
+  rawPayload           Json
+
+  importId String
+  import   CourierSettlementImport @relation(fields: [importId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([importId, providerRowReference])
+  @@index([status, createdAt])
+  @@index([trackingNumber])
+  @@index([matchedShipmentId])
+}
+
+model CourierSettlementItem {
+  id                    String                      @id @default(cuid())
+  status                CourierSettlementItemStatus
+  expectedCodAmount     Int
+  collectedAmount       Int
+  courierFee            Int
+  otherDeduction        Int
+  expectedRemittance    Int
+  collectionVariance    Int
+  note                  String?
+
+  settlementId String
+  settlement   CourierSettlement @relation(fields: [settlementId], references: [id], onDelete: Restrict)
+
+  shipmentId String   @unique
+  shipment   Shipment @relation(fields: [shipmentId], references: [id], onDelete: Restrict)
+
+  codCollectionId String        @unique
+  codCollection   CodCollection @relation(fields: [codCollectionId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+
+  @@index([settlementId])
+  @@index([status, createdAt])
+}
+
+
+// Source: shipping.module/shipping.prisma
+enum ShipmentProviderCode {
+  PATHAO
+  STEADFAST
+  REDX
+  ECOURIER
+  PAPERFLY
+  CARRYBEE
+}
+
+enum ShipmentProviderEvidenceSource {
+  WEBHOOK
+  POLL
+}
+
+enum ShipmentPollAttemptStatus {
+  QUEUED
+  PROCESSING
+  SUCCEEDED
+  FAILED
+  SKIPPED
+}
+
+model ShipmentProvider {
+  id       String               @id @default(cuid())
+  code     ShipmentProviderCode @unique
+  name     String
+  baseUrl  String
+  isActive Boolean              @default(false)
+
+  shipments Shipment[]
+  settlements CourierSettlement[]
+  settlementImports CourierSettlementImport[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, name])
+}
+
+model Shipment {
+  id                 String              @id @default(cuid())
+  status             OrderShipmentStatus @default(READY)
+  externalShipmentId String?
+  trackingNumber     String?
+  trackingUrl        String?
+  labelUrl           String?
+  weightGrams        Int
+  codAmount          Int
+  shippingCharge     Int?
+  requestPayload     Json
+  responsePayload    Json?
+  lastRawStatus      String?
+  exceptionReason    String?
+  createdByActorId   String
+  pickedUpAt         DateTime?
+  deliveredAt        DateTime?
+  returnedAt         DateTime?
+  cancelledAt        DateTime?
+  lastPolledAt       DateTime?
+  nextPollAt         DateTime?
+  pollingFailureCount Int                 @default(0)
+  pollingError       String?
+
+  orderId String @unique
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  providerId String
+  provider   ShipmentProvider @relation(fields: [providerId], references: [id], onDelete: Restrict)
+
+  events ShipmentEvent[]
+  rtoCase RtoCase?
+  codCollection CodCollection?
+  settlementItem CourierSettlementItem?
+  pollAttempts ShipmentPollAttempt[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([providerId, status, createdAt])
+  @@index([nextPollAt, status])
+  @@index([trackingNumber])
+  @@index([externalShipmentId])
+}
+
+model ShipmentEvent {
+  id               String              @id @default(cuid())
+  deduplicationKey String              @unique
+  providerEventId  String?
+  rawStatus        String
+  normalizedStatus OrderShipmentStatus
+  payload          Json
+  occurredAt       DateTime
+  isOutOfOrder     Boolean             @default(false)
+  ignoredReason    String?
+
+  shipmentId String
+  shipment   Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([shipmentId, occurredAt])
+  @@index([normalizedStatus, occurredAt])
+}
+
+model ShipmentWebhookLog {
+  id               String               @id @default(cuid())
+  providerCode     ShipmentProviderCode
+  source           ShipmentProviderEvidenceSource @default(WEBHOOK)
+  deduplicationKey String               @unique
+  headers          Json
+  body             Json
+  authValid        Boolean
+  processed        Boolean              @default(false)
+  attemptCount     Int                  @default(0)
+  processingStartedAt DateTime?
+  lastAttemptAt    DateTime?
+  processingError  String?
+  receivedAt       DateTime             @default(now())
+  processedAt      DateTime?
+
+  @@index([providerCode, receivedAt])
+  @@index([processed, receivedAt])
+  @@index([processingStartedAt])
+  @@index([source, receivedAt])
+}
+
+model ShipmentPollAttempt {
+  id                 String                    @id @default(cuid())
+  correlationId      String                    @unique
+  status             ShipmentPollAttemptStatus @default(QUEUED)
+  requestedByActorId String?
+  queueJobId         String?
+  rawResponse         Json?
+  normalizedStatus   OrderShipmentStatus?
+  errorCode           String?
+  errorMessage        String?
+  startedAt           DateTime?
+  finishedAt          DateTime?
+
+  shipmentId String
+  shipment   Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  evidenceLogId String? @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([shipmentId, createdAt])
+}
+
+
+// Source: subscription.module/subscriptionPlan.prisma
+enum SubscriptionType {
+  individual
+  business_starter
+  business_level1
+  business_level2
+}
+
+enum InitialDuration {
+  month
+  year
+}
+
+enum RenewalFrequency {
+  monthly
+  yearly
+}
+
+enum PurchaseChannel {
+  stripe
+  revenuecat
+  both
+}
+
+enum Platform {
+  ios
+  android
+  web
+}
+
+enum SubscriptionCurrency {
+  usd
+  bdt
+  eur
+  gbp
+}
+
+model SubscriptionPlan {
+  id                          String               @id @default(cuid())
+
+  // Public plan details shown before purchase.
+  subscriptionName            String
+  subscriptionType            SubscriptionType
+  freeTrialEnabled            Boolean              @default(true)
+  freeTrialDurationDays       Int?
+  initialDuration             InitialDuration      @default(month)
+  renewalFrequncy             RenewalFrequency     @default(monthly)
+  amount                      String
+  currency                    SubscriptionCurrency @default(usd)
+  maxChildrenAccount          Int
+  // Stripe identifiers for web subscription checkout.
+  stripe_product_id           String?
+  stripe_price_id             String?
+  purchaseChannel             PurchaseChannel      @default(stripe)
+  // RevenueCat identifiers for iOS/Android subscription checkout.
+  revenueCatProductIdentifier String?
+  revenueCatPackageIdentifier String?
+  availablePlatforms          Platform[]
+  isActive                    Boolean              @default(true)
+  isDeleted                   Boolean              @default(false)
+  createdAt                   DateTime             @default(now())
+  updatedAt                   DateTime             @updatedAt
+
+  @@index([subscriptionType, isActive, isDeleted])
+  @@index([purchaseChannel, isActive])
+  @@index([stripe_product_id, isDeleted])
+  @@index([stripe_price_id, isDeleted])
+  @@index([revenueCatProductIdentifier, isDeleted])
+  @@index([isActive, isDeleted, createdAt])
+}
+
+
+// Source: wallet.module/bankInfo.prisma
+
+
+model BankInfo{
+    id        String    @id @default(cuid())
+    
+    // for back reference .. 
+    userId String     //🔗  one user can have many bank Info
+    user User @relation(fields: [userId], references: [id])
+    
+    bankAccountNumber String
+    bankRoutingNumber String
+    bankAccountHolderName String
+    bankAccountType TBankAccount
+    bankBranch String
+    bankName String
+
+    isActive Boolean
+    isDeleted Boolean
+}
+
+
+// Source: wallet.module/wallet.prisma
+enum TWalletStatus {
+    active 
+    frozen 
+    suspended
+}
+
+enum TCurrency {
+    bdt
+}
+
+
+model Wallet{
+
+    id String @id @default(cuid())
+
+    // for back reference .. 
+    // userId String   @unique
+    user User? //@relation(fields:[userId], references: [id])
+
+    amount Int @default(0)
+    totalBalance Int @default(0)
+    currency TCurrency @default(bdt)
+    status TWalletStatus @default(active)
+    
+    isDeleted Boolean @default(false)
+    createdAt     DateTime @default(now())
+    updatedAt     DateTime @updatedAt
+
+
+    //== back-relation
+    withdrawalRequests WithdrawalRequest[]
+    walletTransactionHistories WalletTransactionHistory[]
+    topUps WalletTopUp[]
+
+}
+
+
+// Source: wallet.module/walletTopUp.prisma
+enum WalletTopUpProvider {
+  BKASH
+  NAGAD
+  ROCKET
+  BANK_TRANSFER
+}
+
+enum WalletTopUpStatus {
+  PENDING_REVIEW
+  COMPLETED
+  REJECTED
+  CANCELLED
+}
+
+model WalletTopUp {
+  id                String            @id @default(cuid())
+  provider          WalletTopUpProvider
+  amount            Int
+  currency          TCurrency         @default(bdt)
+  status            WalletTopUpStatus @default(PENDING_REVIEW)
+  customerReference String
+  customerNote      String?
+  reviewNote        String?
+  reviewedById      String?
+  idempotencyKey    String            @unique
+  completedAt       DateTime?
+  reviewedAt        DateTime?
+
+  userId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  walletId String
+  wallet   Wallet @relation(fields: [walletId], references: [id], onDelete: Restrict)
+
+  transactions WalletTransactionHistory[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([walletId, createdAt])
+  @@index([status, createdAt])
+  @@index([provider, customerReference])
+}
+
+
+// Source: wallet.module/walletTransactionHistory.prisma
+
+enum TWalletTransactionStatus {
+    pending
+    completed
+    failed
+}
+
+enum TTransactionFor {
+    UserSubscription
+    Purchase
+    WalletTopUp
+    OrderPurchase
+    OrderRefund
+    AdminAdjustment
+}
+
+
+model WalletTransactionHistory{
+    
+    id        String    @id @default(cuid())
+
+    // for back reference .. 
+    userId String     //🔗  one user can have many txn history
+    user User @relation(fields: [userId], references: [id])
+
+
+    // actually we dont need wallet
+    walletId String  //🔗 
+    wallet Wallet @relation(fields: [walletId], references: [id])
+    
+    
+    // paymentTransactionId PaymentTransaction?
+    withdrawalRequestId String? // history may have withdrawalRequestId
+    withdrawalRequest   WithdrawalRequest? @relation(fields: [withdrawalRequestId], references: [id])
+
+    topUpId String?
+    topUp WalletTopUp? @relation(fields: [topUpId], references: [id], onDelete: SetNull)
+
+    orderId String?
+    order Order? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+    idempotencyKey String? @unique
+
+    type TWalletTransactionHistory
+    amount Int 
+    currency TCurrency? // default
+    balanceBefore Int
+    balanceAfter Int
+    description String
+
+    status TWalletTransactionStatus
+
+    referenceFor TTransactionFor
+
+    // polymorphic relations
+    userSubscriptionId String?
+    purchaseId String?
+    
+    isDeleted Boolean @default(false)
+    createdAt DateTime @default(now())
+
+    @@index([userId, createdAt])
+    @@index([walletId, createdAt])
+    @@index([orderId, createdAt])
+    @@index([topUpId, createdAt])
+}
+
+
+// Source: wallet.module/withdrawalRequest.prisma
+enum TWalletTransactionHistory {
+    debit 
+    credit 
+    withdrawal
+}
+
+enum TWithdrawalRequest {
+    completed
+    failed
+    processing
+    requested
+    rejected
+}
+
+enum TBankAccount {
+    savings
+    current
+}
+
+
+model WithdrawalRequest{
+
+    id String @id @default(cuid())
+
+    // for back reference .. 
+    userId String     //🔗  one user can have many txn history
+    user User @relation(fields:[userId], references: [id])
+
+    walletId String  //🔗
+    wallet Wallet @relation(fields:[walletId], references: [id])
+
+    
+    requestedAmount Int
+    
+    // Snapshot of bank details at time of request — intentional denormalization
+    bankAccountNumber String
+    bankRoutingNumber String
+    bankAccountHolderName String
+    bankAccountType TBankAccount
+    bankBranch String
+    bankName String
+    status TWithdrawalRequest
+
+    // 1 withdrawal can have many attachments
+    proofOfPayment Attachment[]
+
+    requestedAt DateTime
+    processedAt DateTime
+
+
+    isDeleted Boolean
+
+    transactionHistory WalletTransactionHistory[]
+}
+
+
+// Source: warranty.module/warranty.prisma
+enum WarrantyClaimStatus {
+  SUBMITTED
+  PRODUCT_RECEIVED
+  UNDER_DIAGNOSIS
+  SENT_TO_BRAND
+  RECEIVED_FROM_BRAND
+  REPAIRED
+  RESOLVED
+  REJECTED
+}
+
+model WarrantyClaim {
+  id        String              @id @default(cuid())
+  reference String              @unique
+  status    WarrantyClaimStatus @default(SUBMITTED)
+  issueDescription String
+  rejectionReason String?
+  adminNote String?
+
+  orderReferenceSnapshot String
+  productNameSnapshot String
+  variantNameSnapshot String
+  skuSnapshot String
+
+  submittedById String
+  submittedBy User @relation("WarrantyClaimSubmitter", fields: [submittedById], references: [id], onDelete: Restrict)
+  handledById String?
+  handledBy User? @relation("WarrantyClaimHandler", fields: [handledById], references: [id], onDelete: SetNull)
+
+  orderItemId String
+  orderItem OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
+
+  evidence WarrantyEvidence[]
+  history WarrantyClaimHistory[]
+
+  resolvedAt DateTime?
+  rejectedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([submittedById, createdAt])
+  @@index([orderItemId, createdAt])
+}
+
+model WarrantyEvidence {
+  id       String @id @default(cuid())
+  imageUrl String
+  publicId String?
+
+  claimId String
+  claim WarrantyClaim @relation(fields: [claimId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  @@index([claimId, createdAt])
+}
+
+model WarrantyClaimHistory {
+  id        String              @id @default(cuid())
+  oldStatus WarrantyClaimStatus?
+  newStatus WarrantyClaimStatus
+  actorId   String
+  source    OrderHistorySource
+  note      String?
+
+  claimId String
+  claim WarrantyClaim @relation(fields: [claimId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  @@index([claimId, createdAt])
+  @@index([actorId, createdAt])
+}

@@ -1,0 +1,54 @@
+enum TWalletTransactionHistory {
+    debit 
+    credit 
+    withdrawal
+}
+
+enum TWithdrawalRequest {
+    completed
+    failed
+    processing
+    requested
+    rejected
+}
+
+enum TBankAccount {
+    savings
+    current
+}
+
+
+model WithdrawalRequest{
+
+    id String @id @default(cuid())
+
+    // for back reference .. 
+    userId String     //🔗  one user can have many txn history
+    user User @relation(fields:[userId], references: [id])
+
+    walletId String  //🔗
+    wallet Wallet @relation(fields:[walletId], references: [id])
+
+    
+    requestedAmount Int
+    
+    // Snapshot of bank details at time of request — intentional denormalization
+    bankAccountNumber String
+    bankRoutingNumber String
+    bankAccountHolderName String
+    bankAccountType TBankAccount
+    bankBranch String
+    bankName String
+    status TWithdrawalRequest
+
+    // 1 withdrawal can have many attachments
+    proofOfPayment Attachment[]
+
+    requestedAt DateTime
+    processedAt DateTime
+
+
+    isDeleted Boolean
+
+    transactionHistory WalletTransactionHistory[]
+}

@@ -1,0 +1,41 @@
+model Customer {
+  id              String  @id @default(cuid())
+  name            String
+  phoneOriginal   String
+  phoneNormalized String
+  email           String?
+
+  addresses CustomerAddress[]
+  orders    Order[]
+  user      User?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([phoneNormalized])
+  @@index([email])
+}
+
+model CustomerAddress {
+  id              String  @id @default(cuid())
+  label           String?
+  recipientName   String
+  phoneOriginal   String
+  phoneNormalized String
+  district        String
+  area            String
+  detailedAddress String
+  landmark        String?
+  latitude        Float?
+  longitude       Float?
+  isDefault       Boolean @default(false)
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([customerId, isDefault])
+  @@index([district, area])
+}

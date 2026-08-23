@@ -1,0 +1,70 @@
+enum RtoCaseStatus {
+  AWAITING_RECEIPT
+  INSPECTED
+}
+
+enum RtoReason {
+  CUSTOMER_UNREACHABLE
+  CUSTOMER_REFUSED
+  ADDRESS_ISSUE
+  DELIVERY_ATTEMPTS_EXHAUSTED
+  COURIER_ISSUE
+  DAMAGED_IN_TRANSIT
+  OTHER
+}
+
+model RtoCase {
+  id                   String        @id @default(cuid())
+  reference            String        @unique
+  status               RtoCaseStatus @default(AWAITING_RECEIPT)
+  reason               RtoReason?
+  reasonNote           String?
+  courierReason        String?
+  outboundCourierCost  Int           @default(0)
+  returnCourierCost    Int           @default(0)
+  otherCost            Int           @default(0)
+  totalCost            Int           @default(0)
+  courierReturnedAt    DateTime
+  inspectedAt          DateTime?
+  inspectedByActorId   String?
+
+  shipmentId String   @unique
+  shipment   Shipment @relation(fields: [shipmentId], references: [id], onDelete: Restrict)
+
+  orderId String
+  order   Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  items RtoItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, courierReturnedAt])
+  @@index([reason, createdAt])
+  @@index([orderId])
+}
+
+model RtoItem {
+  id                String @id @default(cuid())
+  expectedQuantity  Int
+  receivedQuantity  Int?
+  sellableQuantity  Int?
+  damagedQuantity   Int?
+  lostQuantity      Int?
+  note              String?
+
+  rtoCaseId String
+  rtoCase   RtoCase @relation(fields: [rtoCaseId], references: [id], onDelete: Cascade)
+
+  orderItemId String
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
+
+  reservationId String               @unique
+  reservation   InventoryReservation @relation(fields: [reservationId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([rtoCaseId])
+  @@index([orderItemId])
+}

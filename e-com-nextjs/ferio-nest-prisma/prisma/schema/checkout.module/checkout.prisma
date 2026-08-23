@@ -1,0 +1,118 @@
+enum DeliveryMethod {
+  HOME_DELIVERY
+  STORE_PICKUP
+}
+
+enum StorePickupStatus {
+  NOT_APPLICABLE
+  CHECKING_AVAILABILITY
+  AVAILABLE_IN_STORE
+  TRANSFER_REQUIRED
+  IN_TRANSFER
+  READY_FOR_PICKUP
+  SCHEDULED_BY_CUSTOMER
+  COMPLETED
+  CANCELLED
+}
+
+enum CheckoutPaymentMethod {
+  COD
+  PREPAID
+  PAY_AT_STORE
+  WALLET
+}
+
+enum CommercePaymentProvider {
+  SSLCOMMERZ
+  AAMARPAY
+}
+
+model DeliveryZone {
+  id                    String  @id @default(cuid())
+  name                  String
+  deliveryFee           Int
+  freeDeliveryThreshold Int?
+  isActive              Boolean @default(true)
+  sortOrder             Int     @default(0)
+
+  districts     DeliveryZoneDistrict[]
+  checkoutDrafts CheckoutDraft[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, sortOrder, name])
+}
+
+model DeliveryZoneDistrict {
+  id             String @id @default(cuid())
+  name           String
+  normalizedName String @unique
+
+  zoneId String
+  zone   DeliveryZone @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([zoneId, name])
+}
+
+model CheckoutDraft {
+  id              String @id @default(cuid())
+  name            String
+  phoneOriginal   String
+  phoneNormalized String
+  email           String?
+
+  district        String
+  area            String
+  detailedAddress String
+  landmark        String?
+  latitude        Float?
+  longitude       Float?
+  customerNote    String?
+
+  marketingConsent   Boolean   @default(false)
+  marketingConsentAt DateTime?
+  purchaseActivityConsent   Boolean   @default(false)
+  purchaseActivityConsentAt DateTime?
+  termsAccepted      Boolean   @default(false)
+
+  source   String?
+  medium   String?
+  campaign String?
+
+  deliveryMethod      DeliveryMethod        @default(HOME_DELIVERY)
+  pickupStoreId       String?
+  pickupStore         Warehouse?            @relation(fields: [pickupStoreId], references: [id], onDelete: SetNull)
+  preferredPickupDate DateTime?
+  preferredPickupSlot String?
+  storePickupStatus   StorePickupStatus     @default(NOT_APPLICABLE)
+
+  paymentMethod CheckoutPaymentMethod @default(COD)
+  paymentProvider CommercePaymentProvider?
+  subtotal        Int
+  discountTotal   Int                   @default(0)
+  couponCode      String?
+  deliveryFee     Int
+  paymentCharge   Int                   @default(0)
+  total           Int
+
+  cartId String @unique
+  cart   Cart   @relation(fields: [cartId], references: [id], onDelete: Cascade)
+
+  deliveryZoneId String
+  deliveryZone   DeliveryZone @relation(fields: [deliveryZoneId], references: [id], onDelete: Restrict)
+
+  order Order?
+
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([phoneNormalized, updatedAt])
+  @@index([expiresAt])
+  @@index([deliveryZoneId])
+  @@index([pickupStoreId])
+}

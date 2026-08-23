@@ -1,0 +1,2 @@
+import { Module } from '@nestjs/common'; import { PrismaModule } from '@app/database'; import { AuthModule } from '../authentication/auth.module'; import { AuditModule } from '../audit/audit.module'; import { ProductContentController, AdminProductContentController } from './product-content.controller'; import { ProductContentService } from './product-content.service';
+@Module({imports:[PrismaModule,AuthModule,AuditModule],controllers:[ProductContentController,AdminProductContentController],providers:[ProductContentService]}) export class ProductContentModule {}

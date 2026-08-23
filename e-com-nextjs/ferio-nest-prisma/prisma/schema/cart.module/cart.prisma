@@ -1,0 +1,73 @@
+enum CartStatus {
+  ACTIVE
+  CONVERTED
+  ABANDONED
+  EXPIRED
+}
+
+model Cart {
+  id        String     @id @default(cuid())
+  tokenHash String     @unique
+  status    CartStatus @default(ACTIVE)
+  expiresAt DateTime
+
+  items         CartItem[]
+  checkoutDraft CheckoutDraft?
+  userId        String?
+  user          User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, expiresAt])
+  @@index([updatedAt])
+  @@index([userId, status, updatedAt])
+}
+
+model CartItem {
+  id             String @id @default(cuid())
+  quantity       Int
+  addedUnitPrice Int
+
+  cartId String
+  cart   Cart @relation(fields: [cartId], references: [id], onDelete: Cascade)
+
+  variantId String
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([cartId, variantId])
+  @@index([variantId])
+}
+
+model SavedCart {
+  id          String   @id @default(cuid())
+  name        String
+  shareToken  String   @unique
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items       SavedCartItem[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([shareToken])
+}
+
+model SavedCartItem {
+  id          String         @id @default(cuid())
+  quantity    Int            @default(1)
+  savedCartId String
+  savedCart   SavedCart      @relation(fields: [savedCartId], references: [id], onDelete: Cascade)
+  variantId   String
+  variant     ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([savedCartId, variantId])
+  @@index([variantId])
+}

@@ -1,0 +1,191 @@
+enum CodCollectionStatus {
+  EXPECTED
+  SETTLED
+  VARIANCE
+  DISPUTED
+}
+
+enum CourierSettlementStatus {
+  MATCHED
+  VARIANCE
+  DISPUTED
+}
+
+enum CourierSettlementItemStatus {
+  MATCHED
+  VARIANCE
+  DISPUTED
+}
+
+enum CourierSettlementImportSource {
+  API
+  CSV
+  MANUAL_JSON
+}
+
+enum CourierSettlementImportStatus {
+  APPLIED
+  NEEDS_REVIEW
+  SUPERSEDED
+}
+
+enum CourierSettlementImportRowStatus {
+  APPLIED
+  UNMATCHED
+  INELIGIBLE
+  ALREADY_SETTLED
+  DUPLICATE
+}
+
+model CodCollection {
+  id                 String              @id @default(cuid())
+  status             CodCollectionStatus @default(EXPECTED)
+  currency           String              @default("BDT")
+  expectedAmount     Int
+  collectedAmount    Int?
+  collectionVariance Int?
+  expectedAt         DateTime
+  settledAt          DateTime?
+
+  shipmentId String   @unique
+  shipment   Shipment @relation(fields: [shipmentId], references: [id], onDelete: Restrict)
+
+  orderId String @unique
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  settlementItem CourierSettlementItem?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, expectedAt])
+  @@index([settledAt])
+}
+
+model CourierSettlement {
+  id                          String                  @id @default(cuid())
+  reference                   String                  @unique
+  idempotencyKeyHash          String                  @unique
+  providerSettlementReference String
+  bankReference               String
+  status                      CourierSettlementStatus
+  currency                    String                  @default("BDT")
+  grossCollected              Int
+  courierFees                 Int
+  otherDeductions             Int
+  expectedRemittance          Int
+  remittedAmount              Int
+  variance                    Int
+  settledAt                   DateTime
+  recordedByActorId           String
+  note                        String?
+
+  providerId String
+  provider   ShipmentProvider @relation(fields: [providerId], references: [id], onDelete: Restrict)
+
+  items CourierSettlementItem[]
+  import CourierSettlementImport?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([providerId, providerSettlementReference])
+  @@index([status, settledAt])
+  @@index([providerId, settledAt])
+  @@index([bankReference])
+}
+
+model CourierSettlementImport {
+  id                 String                        @id @default(cuid())
+  reference          String                        @unique
+  idempotencyKeyHash String                        @unique
+  providerReportReference String
+  sourceHash         String
+  source             CourierSettlementImportSource
+  status             CourierSettlementImportStatus
+  rowCount           Int
+  appliedCount       Int
+  exceptionCount     Int
+  rawPayload         Json
+  recordedByActorId  String
+  sourceFileName     String?
+  sourceFileChecksum String?
+  parserVersion      String?
+  normalizedRowsChecksum String?
+
+  providerId String
+  provider   ShipmentProvider @relation(fields: [providerId], references: [id], onDelete: Restrict)
+
+  settlementId String? @unique
+  settlement   CourierSettlement? @relation(fields: [settlementId], references: [id], onDelete: Restrict)
+
+  supersedesImportId String? @unique
+  supersedesImport   CourierSettlementImport? @relation("CourierSettlementImportSupersession", fields: [supersedesImportId], references: [id], onDelete: Restrict)
+  supersededBy       CourierSettlementImport? @relation("CourierSettlementImportSupersession")
+  resolvedAt         DateTime?
+  correctionClaimHash String?
+  correctionClaimedAt DateTime?
+
+  rows CourierSettlementImportRow[]
+
+  createdAt DateTime @default(now())
+
+  @@unique([providerId, providerReportReference])
+  @@unique([providerId, sourceHash])
+  @@index([status, createdAt])
+  @@index([providerId, createdAt])
+  @@index([providerId, sourceFileChecksum])
+}
+
+model CourierSettlementImportRow {
+  id                   String                           @id @default(cuid())
+  providerRowReference String
+  deduplicationKey     String?                          @unique
+  rowHash              String
+  trackingNumber       String
+  status               CourierSettlementImportRowStatus
+  reason               String?
+  collectedAmount      Int
+  courierFee           Int
+  otherDeduction       Int
+  matchedShipmentId    String?
+  matchedCollectionId  String?
+  duplicateOfRowId     String?
+  rawPayload           Json
+
+  importId String
+  import   CourierSettlementImport @relation(fields: [importId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([importId, providerRowReference])
+  @@index([status, createdAt])
+  @@index([trackingNumber])
+  @@index([matchedShipmentId])
+}
+
+model CourierSettlementItem {
+  id                    String                      @id @default(cuid())
+  status                CourierSettlementItemStatus
+  expectedCodAmount     Int
+  collectedAmount       Int
+  courierFee            Int
+  otherDeduction        Int
+  expectedRemittance    Int
+  collectionVariance    Int
+  note                  String?
+
+  settlementId String
+  settlement   CourierSettlement @relation(fields: [settlementId], references: [id], onDelete: Restrict)
+
+  shipmentId String   @unique
+  shipment   Shipment @relation(fields: [shipmentId], references: [id], onDelete: Restrict)
+
+  codCollectionId String        @unique
+  codCollection   CodCollection @relation(fields: [codCollectionId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+
+  @@index([settlementId])
+  @@index([status, createdAt])
+}
