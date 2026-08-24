@@ -28,7 +28,9 @@ describe('TenantFanoutService (MT-8 §11.2)', () => {
     process.env.TENANCY_ENABLED = 'false';
     const { service } = build([registry('org-1')]);
     const calls: string[] = [];
-    await service.forEachTenant(async () => calls.push('run'), { label: 'test' });
+    await service.forEachTenant(async () => {
+      calls.push('run');
+    }, { label: 'test' });
     expect(calls).toEqual(['run']); // exactly one legacy run
   });
 

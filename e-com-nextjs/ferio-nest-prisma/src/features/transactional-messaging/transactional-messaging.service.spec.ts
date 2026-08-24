@@ -2,7 +2,11 @@ import { BadRequestException } from '@nestjs/common';
 import { TransactionalMessagingService } from './transactional-messaging.service';
 
 describe('TransactionalMessagingService templates', () => {
-  const actor = { userId: 'admin-1', role: 'admin' } as never;
+  const actor = {
+      userId: 'admin-1',
+      email: 'admin@ferio.com',
+      role: 'admin',
+    } as unknown as import('@app/common').UserPayload;
 
   function setup() {
     const current = {

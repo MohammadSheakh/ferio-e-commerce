@@ -2,7 +2,6 @@ import { Injectable, Logger, Inject, NotFoundException, BadRequestException, For
 import { Queue } from 'bullmq';
 
 import { PrismaService } from '@app/database';
-import { RedisService } from '@app/redis';
 import { SocketGateway } from '../../socket.gateway/socket.gateway';
 import {
   BULLMQ_CONVERSATION_LAST_MESSAGE_QUEUE,
@@ -16,7 +15,6 @@ export class MessageService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly redisService: RedisService,
     private readonly socketGateway: SocketGateway,
     @Inject(BULLMQ_CONVERSATION_LAST_MESSAGE_QUEUE) private conversationLastMessageQueue: Queue,
     @Inject(BULLMQ_NOTIFY_PARTICIPANTS_QUEUE) private notifyParticipantsQueue: Queue,

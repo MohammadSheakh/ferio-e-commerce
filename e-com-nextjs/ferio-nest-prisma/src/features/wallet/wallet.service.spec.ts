@@ -91,7 +91,7 @@ describe('WalletService', () => {
       isDeleted: false,
     });
     transaction.wallet.updateMany.mockResolvedValueOnce({ count: 1 });
-    transaction.wallet.findUniqueOrThrow = jest.fn().mockResolvedValueOnce({
+    (transaction.wallet as any).findUniqueOrThrow = jest.fn().mockResolvedValueOnce({
       amount: 5_000,
     });
     transaction.walletTransactionHistory.create.mockResolvedValueOnce({

@@ -1024,10 +1024,10 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 
 ## 16.4 Dependency/security hygiene
 
-- [ ] CI dependency audit.
+- [ ] **PARTIAL:** CI dependency audit. (strict typecheck incl. specs now a CI gate; dependency-audit job pending)
 - [ ] Secret scan.
-- [ ] SAST/lint/typecheck.
-- [ ] Production builds for all web apps/backend.
+- [x] SAST/lint/typecheck.
+- [x] Production builds for all web apps/backend. (CI matrix: backend, Customer Web, Admin Web, Platform Admin)
 - [ ] Prisma migration validation.
 - [ ] Tenant-isolation integration suite mandatory in CI.
 - [ ] Prevent merge if critical isolation tests fail.

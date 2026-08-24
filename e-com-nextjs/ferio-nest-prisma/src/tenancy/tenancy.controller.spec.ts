@@ -1,3 +1,4 @@
+import type { Request } from 'express';
 import { TenancyController } from './tenancy.controller';
 
 describe('TenancyController.status (MT-5)', () => {
@@ -14,8 +15,8 @@ describe('TenancyController.status (MT-5)', () => {
     return new TenancyController(resolver as never, platform as never);
   };
 
-  const request = (headers: Record<string, string>, hostname = 'proxy.local') =>
-    ({ headers, hostname }) as never as Request;
+  const request = (headers: Record<string, string>, hostname = 'proxy.local'): Request =>
+    ({ headers, hostname } as unknown as Request);
 
   it('returns LEGACY when tenancy is disabled — no resolution attempted', async () => {
     process.env.TENANCY_ENABLED = 'false';

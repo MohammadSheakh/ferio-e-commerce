@@ -8,7 +8,6 @@ import {
 import { Queue } from 'bullmq';
 
 import { PrismaService } from '@app/database';
-import { RedisService } from '@app/redis';
 import { SocketGateway } from '../../socket.gateway/socket.gateway';
 import { SocketRoomService } from '../../socket.gateway/services/socket-room.service';
 import {
@@ -24,7 +23,6 @@ export class ConversationService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly redisService: RedisService,
     private readonly socketGateway: SocketGateway,
     private readonly socketRoomService: SocketRoomService,
     @Inject(BULLMQ_CONVERSATION_LAST_MESSAGE_QUEUE)

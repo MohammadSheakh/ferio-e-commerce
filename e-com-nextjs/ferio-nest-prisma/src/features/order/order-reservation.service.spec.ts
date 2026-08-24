@@ -14,6 +14,8 @@ function createService() {
     {} as TransactionalMessagingService,
     {} as AuditService,
     { get: jest.fn() } as unknown as ConfigService,
+    {} as never, // wallet
+    {} as never, // customer notifications
   );
 }
 
