@@ -3,11 +3,14 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHash, randomBytes, randomInt, timingSafeEqual } from 'crypto';
+import type { PrismaClient } from '@prisma/client';
 import { CodVerificationMode, OrderStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '@app/database';
+import { TenantDbService } from '../../tenancy/tenant-db.service';
 import type { UserPayload } from '@app/common';
 import { CartService } from '../cart/cart.service';
 import { TransactionalMessagingService } from '../transactional-messaging/transactional-messaging.service';
@@ -69,8 +72,18 @@ export class OrderService {
     private readonly config: ConfigService,
     private readonly wallet: WalletService,
     private readonly customerNotifications: CustomerNotificationsService,
-  ) {}
+  
+    @Optional() private readonly tenantDb?: TenantDbService,) {}
 
+  /**
+   * MT-7: inside a tenant-resolved request this returns the resolved tenant
+   * database client; outside one (legacy mode, platform workers pre-MT-8) it
+   * explicitly falls back to the legacy single-tenant DB. Never guesses.
+   */
+  private async db(): Promise<PrismaClient> {
+    const tenant = await this.tenantDb?.tryGet();
+    return tenant ?? (this.prisma as PrismaClient);
+  }
   private hashIdempotencyKey(value: string): string {
     return createHash('sha256').update(value).digest('hex');
   }
@@ -165,7 +178,8 @@ export class OrderService {
   }
 
   private async loadDetailedOrder(id: string) {
-    const order = await this.prisma.order.findUnique({
+    const db = await this.db();
+    const order = await db.order.findUnique({
       where: { id },
       include: orderDetailInclude,
     });
@@ -605,15 +619,17 @@ export class OrderService {
   }
 
   async getCodPolicy() {
-    return this.prisma.codVerificationPolicy.upsert({
+    const db = await this.db();
+    return db.codVerificationPolicy.upsert({
       where: { id: 'default' },
       update: {},
       create: { id: 'default', mode: 'ALWAYS' },
     });
   }
 
-  updateCodPolicy(dto: UpdateCodPolicyDto, actor: UserPayload) {
-    return this.prisma.$transaction(async (transaction) => {
+  async updateCodPolicy(dto: UpdateCodPolicyDto, actor: UserPayload) {
+    const db = await this.db();
+    return db.$transaction(async (transaction) => {
       const previous = await transaction.codVerificationPolicy.findUnique({
         where: { id: 'default' },
       });
@@ -652,12 +668,13 @@ export class OrderService {
     rawIdempotencyKey?: string,
     actor?: UserPayload,
   ) {
+    const db = await this.db();
     if (paymentMethod === 'WALLET' && !actor) {
       throw new BadRequestException('Sign in to pay with your wallet');
     }
     const idempotencyKey = this.cleanIdempotencyKey(rawIdempotencyKey);
     const idempotencyKeyHash = this.hashIdempotencyKey(idempotencyKey);
-    const existing = await this.prisma.order.findUnique({
+    const existing = await db.order.findUnique({
       where: { idempotencyKeyHash },
       include: orderDetailInclude,
     });
@@ -680,7 +697,7 @@ export class OrderService {
     }
 
     try {
-      const orderId = await this.prisma.$transaction(
+      const orderId = await db.$transaction(
         async (transaction) => {
           const cart = await transaction.cart.findUnique({
             where: { id: validatedCart.id! },
@@ -960,7 +977,7 @@ export class OrderService {
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2002'
       ) {
-        const duplicate = await this.prisma.order.findUnique({
+        const duplicate = await db.order.findUnique({
           where: { idempotencyKeyHash },
           include: orderDetailInclude,
         });
@@ -970,7 +987,7 @@ export class OrderService {
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2034'
       ) {
-        const duplicate = await this.prisma.order.findUnique({
+        const duplicate = await db.order.findUnique({
           where: { idempotencyKeyHash },
           include: orderDetailInclude,
         });
@@ -982,6 +999,7 @@ export class OrderService {
   }
 
   async getOrders(query: OrderQueryDto) {
+    const db = await this.db();
     const search = query.search?.normalize('NFKC').trim();
     const where: Prisma.OrderWhereInput = {
       status: query.status,
@@ -1019,7 +1037,7 @@ export class OrderService {
         : undefined,
     };
     const [items, total] = await Promise.all([
-      this.prisma.order.findMany({
+      db.order.findMany({
         where,
         skip: (query.page - 1) * query.limit,
         take: query.limit,
@@ -1044,7 +1062,7 @@ export class OrderService {
           },
         },
       }),
-      this.prisma.order.count({ where }),
+      db.order.count({ where }),
     ]);
     const totalPages = Math.ceil(total / query.limit) || 1;
     return {
@@ -1067,8 +1085,9 @@ export class OrderService {
   }
 
   async getOrder(id: string) {
+    const db = await this.db();
     const order = await this.loadDetailedOrder(id);
-    const shipment = await this.prisma.shipment.findUnique({
+    const shipment = await db.shipment.findUnique({
       where: { orderId: id },
       select: {
         id: true,
@@ -1095,7 +1114,7 @@ export class OrderService {
         : []),
     ];
     const [payments, returnCases, refunds, messages] = await Promise.all([
-      this.prisma.commercePaymentAttempt.findMany({
+      db.commercePaymentAttempt.findMany({
         where: { orderId: id },
         orderBy: { createdAt: 'asc' },
         select: {
@@ -1117,7 +1136,7 @@ export class OrderService {
           },
         },
       }),
-      this.prisma.returnCase.findMany({
+      db.returnCase.findMany({
         where: { orderId: id },
         orderBy: { createdAt: 'asc' },
         select: {
@@ -1136,7 +1155,7 @@ export class OrderService {
           },
         },
       }),
-      this.prisma.commerceRefund.findMany({
+      db.commerceRefund.findMany({
         where: { orderId: id },
         orderBy: { createdAt: 'asc' },
         select: {
@@ -1161,7 +1180,7 @@ export class OrderService {
           },
         },
       }),
-      this.prisma.commerceMessage.findMany({
+      db.commerceMessage.findMany({
         where: { OR: messageReferences },
         orderBy: { createdAt: 'asc' },
         take: 100,
@@ -1189,8 +1208,9 @@ export class OrderService {
   }
 
   async confirmOrder(id: string, dto: ConfirmOrderDto, actor: UserPayload) {
+    const db = await this.db();
     try {
-      await this.prisma.$transaction(
+      await db.$transaction(
         async (transaction) => {
           const order = await transaction.order.findUnique({
             where: { id },
@@ -1275,8 +1295,9 @@ export class OrderService {
   }
 
   async cancelOrder(id: string, dto: CancelOrderDto, actor: UserPayload) {
+    const db = await this.db();
     try {
-      await this.prisma.$transaction(
+      await db.$transaction(
         async (transaction) => {
           const order = await transaction.order.findUnique({ where: { id } });
           if (!order) throw new NotFoundException('Order not found');
@@ -1377,7 +1398,8 @@ export class OrderService {
     dto: UpdateFulfillmentDto,
     actor: UserPayload,
   ) {
-    await this.prisma.$transaction(
+    const db = await this.db();
+    await db.$transaction(
       async (transaction) => {
         const order = await transaction.order.findUnique({
           where: { id },
@@ -1467,7 +1489,8 @@ export class OrderService {
     dto: CreateFulfillmentExceptionDto,
     actor: UserPayload,
   ) {
-    const order = await this.prisma.order.findUnique({
+    const db = await this.db();
+    const order = await db.order.findUnique({
       where: { id },
       include: { items: { select: { id: true } } },
     });
@@ -1488,7 +1511,7 @@ export class OrderService {
         'Shortages require an order item and affected quantity',
       );
     }
-    await this.prisma.$transaction(async (transaction) => {
+    await db.$transaction(async (transaction) => {
       const exception = await transaction.fulfillmentException.create({
         data: {
           orderId: id,
@@ -1520,7 +1543,8 @@ export class OrderService {
     dto: ResolveFulfillmentExceptionDto,
     actor: UserPayload,
   ) {
-    const exception = await this.prisma.fulfillmentException.findFirst({
+    const db = await this.db();
+    const exception = await db.fulfillmentException.findFirst({
       where: { id: exceptionId, orderId: id },
     });
     if (!exception)
@@ -1528,7 +1552,7 @@ export class OrderService {
     if (exception.status !== 'OPEN') {
       throw new ConflictException('Fulfillment exception is already resolved');
     }
-    await this.prisma.$transaction(async (transaction) => {
+    await db.$transaction(async (transaction) => {
       const resolved = await transaction.fulfillmentException.update({
         where: { id: exceptionId },
         data: {
@@ -1555,9 +1579,10 @@ export class OrderService {
   }
 
   async trackOrder(dto: TrackOrderDto) {
+    const db = await this.db();
     const reference = dto.reference.normalize('NFKC').trim().toUpperCase();
     const phone = normalizeBangladeshPhone(dto.phone);
-    const order = await this.prisma.order.findUnique({
+    const order = await db.order.findUnique({
       where: { reference },
       include: {
         address: { select: { phoneNormalized: true } },
@@ -1630,7 +1655,8 @@ export class OrderService {
     },
     actor?: UserPayload,
   ) {
-    const order = await this.prisma.order.findUnique({
+    const db = await this.db();
+    const order = await db.order.findUnique({
       where: { id: orderId },
       include: { pickupStore: true },
     });
@@ -1642,7 +1668,7 @@ export class OrderService {
     // Only the owning customer (or an admin caller) may schedule a pickup.
     if (actor?.role !== 'admin') {
       const viewer = actor?.userId
-        ? await this.prisma.user.findUnique({
+        ? await db.user.findUnique({
             where: { id: actor.userId },
             select: { customerId: true },
           })
@@ -1655,7 +1681,7 @@ export class OrderService {
     const scheduledDate = dto.pickupScheduledAt
       ? new Date(dto.pickupScheduledAt)
       : order.pickupScheduledAt;
-    const updated = await this.prisma.order.update({
+    const updated = await db.order.update({
       where: { id: orderId },
       data: {
         pickupScheduledAt: scheduledDate,
@@ -1701,7 +1727,8 @@ export class OrderService {
       | 'CANCELLED',
     actor: UserPayload,
   ) {
-    const order = await this.prisma.order.findUnique({
+    const db = await this.db();
+    const order = await db.order.findUnique({
       where: { id: orderId },
     });
     if (!order) throw new NotFoundException('Order not found');
@@ -1709,7 +1736,7 @@ export class OrderService {
       throw new BadRequestException('Order is not configured for store pickup');
     }
 
-    const updated = await this.prisma.order.update({
+    const updated = await db.order.update({
       where: { id: orderId },
       data: { storePickupStatus },
     });
@@ -1729,7 +1756,8 @@ export class OrderService {
   }
 
   async verifyStoreHandover(orderId: string, otp: string, actor: UserPayload) {
-    const order = await this.prisma.order.findUnique({
+    const db = await this.db();
+    const order = await db.order.findUnique({
       where: { id: orderId },
       include: { items: true, pickupStore: true },
     });
@@ -1749,7 +1777,7 @@ export class OrderService {
       );
     }
 
-    const updated = await this.prisma.order.update({
+    const updated = await db.order.update({
       where: { id: orderId },
       data: {
         storePickupStatus: 'COMPLETED',
@@ -1766,7 +1794,7 @@ export class OrderService {
     // Handover is a delivery event: record it in the order history like the
     // courier path does, so completion/return windows and reporting stay
     // consistent.
-    await this.prisma.orderStatusHistory.create({
+    await db.orderStatusHistory.create({
       data: {
         orderId,
         oldStatus: order.status,
@@ -1777,7 +1805,7 @@ export class OrderService {
       },
     });
     if (order.fulfillmentStatus !== 'FULFILLED') {
-      await this.prisma.fulfillmentHistory.create({
+      await db.fulfillmentHistory.create({
         data: {
           orderId,
           oldStatus: order.fulfillmentStatus,
@@ -1788,7 +1816,7 @@ export class OrderService {
         },
       });
     }
-    await this.prisma.$transaction(async (tx) => {
+    await db.$transaction(async (tx) => {
       await this.consumeDeliveredReservations(tx, orderId);
     });
 

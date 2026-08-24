@@ -3,10 +3,13 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
+import type { PrismaClient } from '@prisma/client';
 import { CommerceMessageChannel, Prisma } from '@prisma/client';
 import { StructuredLogger, type UserPayload } from '@app/common';
 import { PrismaService } from '@app/database';
+import { TenantDbService } from '../../tenancy/tenant-db.service';
 import { AuditService } from '../audit/audit.service';
 import {
   TransactionalMessageQueryDto,
@@ -43,16 +46,27 @@ export class TransactionalMessagingService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly adapters: MessageAdapterRegistry,
-  ) {}
+  
+    @Optional() private readonly tenantDb?: TenantDbService,) {}
 
+  /**
+   * MT-7: inside a tenant-resolved request this returns the resolved tenant
+   * database client; outside one (legacy mode, platform workers pre-MT-8) it
+   * explicitly falls back to the legacy single-tenant DB. Never guesses.
+   */
+  private async db(): Promise<PrismaClient> {
+    const tenant = await this.tenantDb?.tryGet();
+    return tenant ?? (this.prisma as PrismaClient);
+  }
   async enqueueAfterCommit(input: EnqueueCommerceMessageInput): Promise<void> {
+    const db = await this.db();
     if (!input.recipient) return;
     const templateKey = templateForCommerceEvent(input.eventType);
     if (!templateKey) return;
     try {
       const definition = definitionForTemplateKey(templateKey);
       if (!definition) return;
-      const template = await this.prisma.commerceMessageTemplate.upsert({
+      const template = await db.commerceMessageTemplate.upsert({
         where: { key: templateKey },
         update: {},
         create: {
@@ -64,7 +78,7 @@ export class TransactionalMessagingService {
       });
       if (!template.enabled) return;
       const payload = this.templatePayload(input.payload);
-      await this.prisma.commerceMessage.upsert({
+      await db.commerceMessage.upsert({
         where: {
           deduplicationKey: buildMessageDeduplicationKey(
             input.eventType,
@@ -104,9 +118,10 @@ export class TransactionalMessagingService {
   }
 
   async getTemplates() {
-    const templates = await this.prisma.$transaction(
+    const db = await this.db();
+    const templates = await db.$transaction(
       commerceTemplateDefinitions.map((definition) =>
-        this.prisma.commerceMessageTemplate.upsert({
+        db.commerceMessageTemplate.upsert({
           where: { key: definition.key },
           update: {},
           create: {
@@ -130,6 +145,7 @@ export class TransactionalMessagingService {
     dto: UpdateMessageTemplateDto,
     actor: UserPayload,
   ) {
+    const db = await this.db();
     const normalizedKey = key.normalize('NFKC').trim();
     const definition = definitionForTemplateKey(normalizedKey);
     if (!definition) throw new NotFoundException('Message template not found');
@@ -140,7 +156,7 @@ export class TransactionalMessagingService {
     ) {
       throw new BadRequestException('Provide at least one template change');
     }
-    const current = await this.prisma.commerceMessageTemplate.upsert({
+    const current = await db.commerceMessageTemplate.upsert({
       where: { key: definition.key },
       update: {},
       create: {
@@ -170,7 +186,7 @@ export class TransactionalMessagingService {
       if (validationError) throw new BadRequestException(validationError);
     }
 
-    return this.prisma.$transaction(async (transaction) => {
+    return db.$transaction(async (transaction) => {
       const updated = await transaction.commerceMessageTemplate.update({
         where: { key: definition.key },
         data: {
@@ -197,6 +213,7 @@ export class TransactionalMessagingService {
   }
 
   async getMessages(query: TransactionalMessageQueryDto) {
+    const db = await this.db();
     const search = query.search?.normalize('NFKC').trim();
     const where: Prisma.CommerceMessageWhereInput = {
       status: query.status,
@@ -214,16 +231,16 @@ export class TransactionalMessagingService {
           ]
         : undefined,
     };
-    const [messages, total, grouped] = await this.prisma.$transaction([
-      this.prisma.commerceMessage.findMany({
+    const [messages, total, grouped] = await db.$transaction([
+      db.commerceMessage.findMany({
         where,
         skip: (query.page - 1) * query.limit,
         take: query.limit,
         orderBy: { createdAt: 'desc' },
         include: { attempts: { orderBy: { attemptNumber: 'asc' } } },
       }),
-      this.prisma.commerceMessage.count({ where }),
-      this.prisma.commerceMessage.groupBy({
+      db.commerceMessage.count({ where }),
+      db.commerceMessage.groupBy({
         by: ['status'],
         orderBy: { status: 'asc' },
         _count: { status: true },
@@ -255,7 +272,8 @@ export class TransactionalMessagingService {
   }
 
   async getPolicy() {
-    const policy = await this.prisma.commerceMessagingPolicy.upsert({
+    const db = await this.db();
+    const policy = await db.commerceMessagingPolicy.upsert({
       where: { id: 'transactional-default' },
       update: {},
       create: { id: 'transactional-default' },
@@ -269,6 +287,7 @@ export class TransactionalMessagingService {
   }
 
   async updatePolicy(dto: UpdateMessagingPolicyDto, actor: UserPayload) {
+    const db = await this.db();
     const current = await this.getPolicy();
     const priority = dto.channelPriority ?? current.channelPriority;
     const enabled = dto.enabled ?? current.enabled;
@@ -286,7 +305,7 @@ export class TransactionalMessagingService {
       );
     }
 
-    return this.prisma.$transaction(async (transaction) => {
+    return db.$transaction(async (transaction) => {
       const updated = await transaction.commerceMessagingPolicy.update({
         where: { id: 'transactional-default' },
         data: {
@@ -314,8 +333,9 @@ export class TransactionalMessagingService {
     });
   }
 
-  eligibleMessages(limit: number) {
-    return this.prisma.commerceMessage.findMany({
+  async eligibleMessages(limit: number) {
+    const db = await this.db();
+    return db.commerceMessage.findMany({
       where: {
         status: 'QUEUED',
         availableAt: { lte: new Date() },
@@ -328,7 +348,8 @@ export class TransactionalMessagingService {
   }
 
   async prepareRetry(messageId: string) {
-    const message = await this.prisma.commerceMessage.findUniqueOrThrow({
+    const db = await this.db();
+    const message = await db.commerceMessage.findUniqueOrThrow({
       where: { id: messageId },
     });
     if (!['FAILED', 'BLOCKED'].includes(message.status)) {
@@ -336,7 +357,7 @@ export class TransactionalMessagingService {
         'Only failed or blocked messages can be retried',
       );
     }
-    return this.prisma.commerceMessage.update({
+    return db.commerceMessage.update({
       where: { id: messageId },
       data: {
         status: 'QUEUED',

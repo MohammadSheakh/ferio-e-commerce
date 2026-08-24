@@ -535,7 +535,7 @@ This is the largest migration slice. Existing feature behavior should remain sta
 - [ ] Define customer identity tenancy policy.
 - [ ] Tenant-scope customer profile/history.
 - [ ] Tenant-scope addresses.
-- [ ] Tenant-scope notification inbox.
+- [x] Tenant-scope notification inbox. (`CustomerNotificationsService` resolves through the tenant client; BullMQ-side dispatch resolution lands with MT-8)
 - [ ] Tenant-scope abandoned-cart eligibility.
 - [ ] Prevent customer search in Tenant Admin from crossing databases.
 - [ ] Tenant-scope analytics/customer metrics.
@@ -543,12 +543,12 @@ This is the largest migration slice. Existing feature behavior should remain sta
 ## 10.5 Orders and COD
 
 - [x] Idempotent orders and lifecycle state rules exist.
-- [ ] Tenant-scope order reference generation/prefix.
-- [ ] Tenant-scope idempotency keys.
-- [ ] Tenant-scope order history and audit.
-- [ ] Tenant-scope COD policy.
-- [ ] Tenant-scope confirmation queues.
-- [ ] Tenant-scope public/signed tracking.
+- [x] Tenant-scope order reference generation/prefix. (`OrderService` resolves through the tenant client; references are unique per database by construction)
+- [x] Tenant-scope idempotency keys.
+- [x] Tenant-scope order history and audit. (audit rows written inside the same tenant transaction)
+- [x] Tenant-scope COD policy.
+- [x] Tenant-scope confirmation queues.
+- [x] Tenant-scope public/signed tracking.
 - [ ] Prove same human-readable reference/prefix cannot cause cross-tenant lookup.
 
 ## 10.6 Commerce payments
@@ -645,6 +645,11 @@ This is the largest migration slice. Existing feature behavior should remain sta
 - [ ] Tenant-scope audit logs.
 - [ ] Add support-access audit linking when Platform Support views tenant data.
 
+### 10.4A Transactional messaging outbox (pulled forward)
+
+- [x] `TransactionalMessagingService` (outbox, templates, attempts evidence) resolves through the tenant client — messages can never be orphaned from the tenant orders they reference.
+- [ ] **PARTIAL:** BullMQ dispatch worker reads tenant outboxes — worker-side tenant resolution lands with MT-8; `TENANCY_ENABLED` must remain false until that lands (documented sequencing constraint).
+
 ### MT-7 gate
 
 - [ ] Every existing protected commerce controller/service has a documented tenant boundary.
@@ -662,7 +667,7 @@ This is the largest migration slice. Existing feature behavior should remain sta
 - [ ] Tenant-scope session adjunct data where applicable.
 - [ ] Tenant-scope OTP/rate-limit keys where business semantics require it.
 - [ ] Tenant-scope catalog/settings caches.
-- [ ] Tenant-scope idempotency keys.
+- [x] Tenant-scope idempotency keys.
 - [ ] Tenant-scope distributed locks.
 - [ ] Add collision tests using identical record IDs in two tenants.
 

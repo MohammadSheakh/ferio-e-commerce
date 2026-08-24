@@ -1,11 +1,13 @@
-import {
-  BadRequestException,
+import { BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '@app/database';
+import type { PrismaClient } from '@prisma/client';
+import { TenantDbService } from '../../tenancy/tenant-db.service';
 import { ConfigService } from '@nestjs/config';
 import type { UserPayload } from '@app/common';
 import { CartService } from '../cart/cart.service';
@@ -35,10 +37,21 @@ export class CheckoutService {
     private readonly cartService: CartService,
     private readonly audit: AuditService,
     private readonly config: ConfigService,
+    @Optional() private readonly tenantDb?: TenantDbService,
   ) {}
 
+  /**
+   * MT-7: inside a tenant-resolved request this returns the resolved tenant
+   * database client; outside one it explicitly falls back to the legacy DB.
+   */
+  private async db(): Promise<PrismaClient> {
+    const tenant = await this.tenantDb?.tryGet();
+    return tenant ?? (this.prisma as PrismaClient);
+  }
+
   async getPaymentOptions() {
-    const settings = await this.prisma.commerceSettings.upsert({
+    const db = await this.db();
+    const settings = await db.commerceSettings.upsert({
       where: { id: 'default' },
       update: {},
       create: {
@@ -116,8 +129,9 @@ export class CheckoutService {
     throw error;
   }
 
-  getDeliveryOptions() {
-    return this.prisma.deliveryZone.findMany({
+  async getDeliveryOptions() {
+    const db = await this.db();
+    return db.deliveryZone.findMany({
       where: { isActive: true },
       orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
       select: {
@@ -133,16 +147,18 @@ export class CheckoutService {
     });
   }
 
-  getDeliveryZones() {
-    return this.prisma.deliveryZone.findMany({
+  async getDeliveryZones() {
+    const db = await this.db();
+    return db.deliveryZone.findMany({
       orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
       include: deliveryZoneInclude,
     });
   }
 
   async createDeliveryZone(dto: CreateDeliveryZoneDto, actor: UserPayload) {
+    const db = await this.db();
     try {
-      return await this.prisma.$transaction(async (transaction) => {
+      return await db.$transaction(async (transaction) => {
         const zone = await transaction.deliveryZone.create({
           data: {
             name: dto.name.normalize('NFKC').trim(),
@@ -176,14 +192,15 @@ export class CheckoutService {
     dto: UpdateDeliveryZoneDto,
     actor: UserPayload,
   ) {
-    const existing = await this.prisma.deliveryZone.findUnique({
+    const db = await this.db();
+    const existing = await db.deliveryZone.findUnique({
       where: { id },
       include: deliveryZoneInclude,
     });
     if (!existing) throw new NotFoundException('Delivery zone not found');
 
     try {
-      return await this.prisma.$transaction(async (transaction) => {
+      return await db.$transaction(async (transaction) => {
         if (dto.districts) {
           await transaction.deliveryZoneDistrict.deleteMany({
             where: { zoneId: id },
@@ -222,7 +239,8 @@ export class CheckoutService {
   }
 
   async preview(dto: CheckoutPreviewDto, cartToken?: string) {
-    const commerceSettings = await this.prisma.commerceSettings.upsert({
+    const db = await this.db();
+    const commerceSettings = await db.commerceSettings.upsert({
       where: { id: 'default' },
       update: {},
       create: {
@@ -265,7 +283,7 @@ export class CheckoutService {
       );
     }
 
-    const deliveryDistrict = await this.prisma.deliveryZoneDistrict.findUnique({
+    const deliveryDistrict = await db.deliveryZoneDistrict.findUnique({
       where: { normalizedName: normalizeDistrict(dto.district) },
       include: { zone: true },
     });
@@ -288,7 +306,7 @@ export class CheckoutService {
           'Please select a store location for pickup.',
         );
       }
-      pickupStore = await this.prisma.warehouse.findUnique({
+      pickupStore = await db.warehouse.findUnique({
         where: { id: dto.pickupStoreId },
         include: { inventory: true },
       });
@@ -377,7 +395,7 @@ export class CheckoutService {
       deliveryZoneId: deliveryDistrict.zoneId,
       expiresAt,
     };
-    const draft = await this.prisma.checkoutDraft.upsert({
+    const draft = await db.checkoutDraft.upsert({
       where: { cartId: cart.id },
       update: draftData,
       create: { ...draftData, cartId: cart.id },

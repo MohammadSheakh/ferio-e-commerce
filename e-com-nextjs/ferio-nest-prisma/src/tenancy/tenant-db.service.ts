@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { PrismaClient } from '@prisma/client';
 import { getTenantContext, tryGetTenantContext } from './tenant-context';
-import { TenantDatabaseManager } from './tenant-database.manager';
+import type { TenantDatabaseManager } from './tenant-database.manager';
 
 /**
  * Request-scoped access to the resolved tenant database (MT-3 §6.2).
