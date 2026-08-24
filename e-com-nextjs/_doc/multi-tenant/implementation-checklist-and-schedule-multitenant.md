@@ -228,13 +228,13 @@ Create a separate control-plane schema/database for platform metadata.
 ## 5.3 Identity + tenant membership
 
 - [ ] Define global identity vs tenant membership behavior.
-- [ ] Verify an authenticated account is a member/customer/rider of the resolved tenant before protected tenant actions.
+- [ ] **PARTIAL:** Verify an authenticated account is a member/customer/rider of the resolved tenant before protected tenant actions. (staff membership gate live behind flag; rider binding remains enforced tenant-locally via approved personnel records; customer accounts tenant-local by database separation)
 - [ ] Define same-email behavior across independent tenant businesses.
 - [ ] Define whether customer identity is tenant-local initially.
 - [ ] Prevent a valid session from tenant A being replayed against tenant B.
-- [ ] Bind Tenant Admin session authorization to resolved tenant membership.
+- [ ] **PARTIAL:** Bind Tenant Admin session authorization to resolved tenant membership. (`TenantMembershipGuard` shipped: legacy passthrough, cross-tenant replay denial, OWNER/STAFF roster lookup with 60s cache + invalidation; applied to `admin/catalog` as the proof point — remaining controllers sweep at MT-10 cutover)
 - [ ] Bind rider authorization to tenant + approved personnel record.
-- [ ] Add negative tests for forged hosts and cross-tenant cookies/tokens.
+- [ ] **PARTIAL:** Add negative tests for forged hosts and cross-tenant cookies/tokens. (unit suites cover forged/malformed hosts, unknown-domain fail-closed, cross-org session replay denial; full multi-client E2E remains MT-14)
 
 ### MT-2 gate
 
@@ -518,15 +518,15 @@ This is the largest migration slice. Existing feature behavior should remain sta
 - [x] Persistent guest cart exists.
 - [x] Saved/shareable cart and reorder capabilities are approved/developed baseline.
 - [x] Checkout quantity/variant editing and order note exist.
-- [ ] Bind guest-cart identity to resolved tenant.
-- [ ] Namespace cart cookies/storage where required.
-- [ ] Bind saved-cart share tokens to one tenant.
-- [ ] Prevent shared token from directly resolving private records in another tenant.
-- [ ] Tenant-scope cart merge.
+- [x] Bind guest-cart identity to resolved tenant. (`CartService` resolves through the tenant client; opaque tokens are unique per database by construction)
+- [x] Namespace cart cookies/storage where required. (cookies are set without a Domain attribute — host-only by browser semantics, so each storefront subdomain holds its own cart cookie automatically)
+- [x] Bind saved-cart share tokens to one tenant.
+- [x] Prevent shared token from directly resolving private records in another tenant. (SavedCart rows live inside each tenant database)
+- [x] Tenant-scope cart merge.
 - [ ] Tenant-scope coupon validation.
 - [ ] Tenant-scope delivery zones/fees.
 - [ ] Tenant-scope checkout settings/support contacts.
-- [ ] Prove order history reorder ownership + tenant checks.
+- [ ] **PARTIAL:** Prove order history reorder ownership + tenant checks. (ownership enforced against the caller's linked customer profile; reorder resolves through the tenant client — cross-database integration case lands with the orders-module slice)
 
 ## 10.4 Customers, addresses, identity, notifications
 

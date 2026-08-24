@@ -5,6 +5,10 @@ import { TenantResolverService, TenantContextMiddleware } from './tenant-resolve
 import { TenantDatabaseManager } from './tenant-database.manager';
 import { TenantDbService } from './tenant-db.service';
 import { TenantSchemaBootstrapper } from './tenant-schema.bootstrapper';
+import {
+  TenantMembershipGuard,
+  TenantMembershipService,
+} from './tenant-membership.guard';
 
 /**
  * Tenant plane (MT-2/MT-3): trusted resolution, immutable request context,
@@ -16,11 +20,13 @@ import { TenantSchemaBootstrapper } from './tenant-schema.bootstrapper';
   controllers: [TenancyController],
   providers: [
     TenantResolverService,
+    TenantMembershipService,
+    TenantMembershipGuard,
     TenantContextMiddleware,
     TenantDatabaseManager,
     TenantDbService,
     TenantSchemaBootstrapper,
   ],
-  exports: [TenantResolverService, TenantDatabaseManager, TenantDbService, TenantSchemaBootstrapper],
+  exports: [TenantResolverService, TenantDatabaseManager, TenantDbService, TenantSchemaBootstrapper, TenantMembershipGuard],
 })
 export class TenancyModule {}

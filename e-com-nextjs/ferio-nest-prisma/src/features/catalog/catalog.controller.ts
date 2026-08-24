@@ -21,6 +21,7 @@ import {
 } from '@app/common';
 import type { UserPayload } from '@app/common';
 import { CatalogService } from './catalog.service';
+import { TenantMembershipGuard } from '../../tenancy/tenant-membership.guard';
 import {
   AdjustInventoryDto,
   AdminProductQueryDto,
@@ -69,7 +70,7 @@ export class PublicCatalogController {
 @ApiTags('Admin Catalog')
 @ApiBearerAuth()
 @Controller('admin/catalog')
-@UseGuards(AuthGuard, RolesGuard, PermissionsGuard)
+@UseGuards(AuthGuard, RolesGuard, PermissionsGuard, TenantMembershipGuard)
 @Roles('admin')
 @Permissions(PERMISSIONS.CATALOG_READ)
 export class AdminCatalogController {
