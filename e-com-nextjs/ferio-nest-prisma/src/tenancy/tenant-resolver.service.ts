@@ -33,6 +33,17 @@ export class TenantResolverService {
     private readonly redis: RedisService,
   ) {}
 
+  /** Effective host for proxied requests: x-forwarded-host wins over Host. */
+  effectiveHostFrom(headersOrRequest: {
+    headers?: Record<string, string | string[] | undefined>;
+    hostname?: string;
+  }): string | undefined {
+    const headers = headersOrRequest.headers;
+    const forwarded = headers?.['x-forwarded-host'];
+    if (forwarded) return Array.isArray(forwarded) ? forwarded[0] : forwarded;
+    return headersOrRequest.hostname;
+  }
+
   async resolveFromHost(rawHost: string | undefined): Promise<ResolvedTenant> {
     const hostname = normalizeTenantHost(rawHost);
 
@@ -174,8 +185,12 @@ export class TenantContextMiddleware implements NestMiddleware {
       next();
       return;
     }
+    // Storefront traffic is proxied through the Next.js BFF: trust the
+    // forwarding layer's original host above the proxy-local hostname.
+    const forwarded = request.headers?.['x-forwarded-host'];
+    const effectiveHost = Array.isArray(forwarded) ? forwarded[0] : forwarded || request.hostname;
     this.resolver
-      .resolveFromHost(request.hostname)
+      .resolveFromHost(effectiveHost)
       .then((resolved) => {
         runWithTenantContext(
           {

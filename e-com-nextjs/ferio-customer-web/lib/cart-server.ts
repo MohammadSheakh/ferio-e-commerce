@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import type { ApiEnvelope } from "@/lib/backend";
 import type { CartState } from "@/lib/cart";
 import { withCorrelationId } from "@/lib/correlation";
+import { hostForwardHeaders } from "@/lib/host-forward";
 
 const backendApiUrl =
   process.env.FERIO_API_URL ??
@@ -31,6 +32,7 @@ export async function cartApi<T>(
       ...init,
       headers: withCorrelationId({
         Accept: "application/json",
+        ...(await hostForwardHeaders()),
         ...(token ? { "X-Cart-Token": token } : {}),
         ...init?.headers,
       }),

@@ -99,6 +99,8 @@ export class AppModule implements NestModule {
       .exclude(
         'api/v1/platform/(.*)',
         'platform/(.*)',
+        'api/v1/tenancy/(.*)',
+        'tenancy/(.*)',
         'health',
         'api/v1/health',
         'socket.io/(.*)',

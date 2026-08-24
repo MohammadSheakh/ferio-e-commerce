@@ -368,15 +368,15 @@ Provisioning should behave as an idempotent state machine, not a controller scri
 
 ## 8.1 Default tenant subdomains
 
-- [ ] Define canonical hostname format, e.g. `{tenant}.ferio...`.
+- [x] Define canonical hostname format, e.g. `{tenant}.ferio...`. (`PLATFORM_PUBLIC_DOMAIN` + slug; enforced in DomainsService)
 - [ ] Configure wildcard DNS.
 - [ ] Configure wildcard TLS/certificate strategy.
-- [ ] Add local-development tenant-domain strategy.
+- [ ] **PARTIAL:** Add local-development tenant-domain strategy. (LEGACY passthrough mode keeps localhost working; per-host dev mapping table pending)
 - [ ] Add canonical redirect rules.
-- [ ] Add reserved subdomain list (`www`, `admin`, `api`, `app`, etc.).
+- [x] Add reserved subdomain list (`www`, `admin`, `api`, `app`, etc.). (`RESERVED_SUBDOMAINS`)
 - [ ] Prevent organization slugs from colliding with reserved/system routes.
-- [ ] Ensure storefront SSR/server requests resolve tenant before fetching tenant data.
-- [ ] Make metadata/SEO tenant-aware.
+- [x] Ensure storefront SSR/server requests resolve tenant before fetching tenant data. (Customer Web root layout gates rendering on backend `/tenancy/status`; all server-side BFF fetches forward `x-forwarded-host` via the instrumentation-registered provider)
+- [ ] **PARTIAL:** Make metadata/SEO tenant-aware. (layout metadata falls back neutrally on non-active states; per-tenant SEO titles/descriptions arrive with MT-7 settings reads)
 - [ ] Make sitemap/robots tenant-aware.
 - [ ] Make tenant branding cache-aware.
 
@@ -396,9 +396,9 @@ Provisioning should behave as an idempotent state machine, not a controller scri
 
 ## 8.3 Tenant-aware frontend state
 
-- [ ] Unknown store page.
-- [ ] Provisioning/not-ready page.
-- [ ] Suspended store page according to approved business policy.
+- [x] Unknown store page.
+- [x] Provisioning/not-ready page.
+- [x] Suspended store page according to approved business policy.
 - [ ] Domain verification pending state.
 - [ ] Tenant branding load failure fallback that does not display another tenant's branding.
 - [ ] Tenant-specific support contacts/policies.
