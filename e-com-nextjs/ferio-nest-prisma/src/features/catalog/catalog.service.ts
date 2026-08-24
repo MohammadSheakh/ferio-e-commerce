@@ -274,8 +274,9 @@ export class CatalogService {
   }
 
   async createCategory(dto: CreateCategoryDto, actor: UserPayload) {
+    const db = await this.db();
     if (dto.parentId) {
-      const parent = await this.prisma.category.findUnique({
+      const parent = await db.category.findUnique({
         where: { id: dto.parentId },
         select: { id: true },
       });
@@ -283,7 +284,7 @@ export class CatalogService {
     }
 
     try {
-      return await this.prisma.$transaction(async (transaction) => {
+      return await db.$transaction(async (transaction) => {
         const category = await transaction.category.create({
           data: {
             name: dto.name.trim(),
@@ -312,7 +313,8 @@ export class CatalogService {
   }
 
   async updateCategory(id: string, dto: UpdateCategoryDto, actor: UserPayload) {
-    const category = await this.prisma.category.findUnique({
+    const db = await this.db();
+    const category = await db.category.findUnique({
       where: { id },
       select: { id: true, name: true },
     });
@@ -321,7 +323,7 @@ export class CatalogService {
       throw new BadRequestException('A category cannot be its own parent');
     }
     if (dto.parentId) {
-      const parent = await this.prisma.category.findUnique({
+      const parent = await db.category.findUnique({
         where: { id: dto.parentId },
         select: { id: true, parentId: true },
       });
@@ -333,7 +335,7 @@ export class CatalogService {
       }
     }
     if (dto.isActive === false) {
-      const publishedProducts = await this.prisma.product.count({
+      const publishedProducts = await db.product.count({
         where: { categoryId: id, status: 'ACTIVE' },
       });
       if (publishedProducts > 0) {
@@ -344,7 +346,7 @@ export class CatalogService {
     }
 
     try {
-      return await this.prisma.$transaction(async (transaction) => {
+      return await db.$transaction(async (transaction) => {
         const updated = await transaction.category.update({
           where: { id },
           data: {
@@ -378,7 +380,8 @@ export class CatalogService {
   }
 
   async deleteCategory(id: string, actor: UserPayload) {
-    const category = await this.prisma.category.findUnique({
+    const db = await this.db();
+    const category = await db.category.findUnique({
       where: { id },
       include: { _count: { select: { products: true, children: true } } },
     });
@@ -394,7 +397,7 @@ export class CatalogService {
       );
     }
 
-    return this.prisma.$transaction(async (transaction) => {
+    return db.$transaction(async (transaction) => {
       const deleted = await transaction.category.delete({ where: { id } });
       await this.audit.record(
         {
@@ -435,8 +438,9 @@ export class CatalogService {
   }
 
   async createBrand(dto: CreateBrandDto, actor: UserPayload) {
+    const db = await this.db();
     try {
-      return await this.prisma.$transaction(async (transaction) => {
+      return await db.$transaction(async (transaction) => {
         const brand = await transaction.brand.create({
           data: {
             name: dto.name.trim(),
@@ -464,11 +468,12 @@ export class CatalogService {
   }
 
   async updateBrand(id: string, dto: UpdateBrandDto, actor: UserPayload) {
-    const brand = await this.prisma.brand.findUnique({ where: { id } });
+    const db = await this.db();
+    const brand = await db.brand.findUnique({ where: { id } });
     if (!brand) throw new NotFoundException('Brand not found');
 
     try {
-      return await this.prisma.$transaction(async (transaction) => {
+      return await db.$transaction(async (transaction) => {
         const updated = await transaction.brand.update({
           where: { id },
           data: {
@@ -501,13 +506,14 @@ export class CatalogService {
   }
 
   async deleteBrand(id: string, actor: UserPayload) {
-    const brand = await this.prisma.brand.findUnique({
+    const db = await this.db();
+    const brand = await db.brand.findUnique({
       where: { id },
       include: { _count: { select: { products: true } } },
     });
     if (!brand) throw new NotFoundException('Brand not found');
 
-    return this.prisma.$transaction(async (transaction) => {
+    return db.$transaction(async (transaction) => {
       const deleted = await transaction.brand.delete({ where: { id } });
       await this.audit.record(
         {
@@ -524,10 +530,10 @@ export class CatalogService {
   }
 
   async getBrands(query?: BrandQueryDto, publicOnly = false) {
+    const db = await this.db();
     const search = query?.search?.trim();
     const categoryId = query?.categoryId?.trim();
 
-    const db = await this.db();
     return db.brand.findMany({
       where: {
         ...(publicOnly ? { isActive: true } : {}),
@@ -557,6 +563,7 @@ export class CatalogService {
   }
 
   async createProduct(dto: CreateProductDto, actor: UserPayload) {
+    const db = await this.db();
     dto.variants.forEach((variant) =>
       this.ensureValidPrice(variant.price, variant.compareAtPrice),
     );
@@ -567,14 +574,14 @@ export class CatalogService {
       dto.conditionNote,
     );
 
-    const category = await this.prisma.category.findFirst({
+    const category = await db.category.findFirst({
       where: { id: dto.categoryId, isActive: true },
       select: { id: true },
     });
     if (!category) throw new NotFoundException('Active category not found');
 
     try {
-      const productId = await this.prisma.$transaction(async (transaction) => {
+      const productId = await db.$transaction(async (transaction) => {
         const warehouse = await transaction.warehouse.upsert({
           where: { code: 'MAIN' },
           update: { isActive: true },
@@ -752,7 +759,8 @@ export class CatalogService {
   }
 
   async updateProduct(id: string, dto: UpdateProductDto, actor: UserPayload) {
-    const existing = await this.prisma.product.findUnique({
+    const db = await this.db();
+    const existing = await db.product.findUnique({
       where: { id },
       include: { variants: { select: { id: true } } },
     });
@@ -770,7 +778,7 @@ export class CatalogService {
     this.ensureConditionDetails(condition, conditionGrade, conditionNote);
 
     if (dto.categoryId) {
-      const category = await this.prisma.category.findFirst({
+      const category = await db.category.findFirst({
         where: { id: dto.categoryId, isActive: true },
         select: { id: true },
       });
@@ -790,7 +798,7 @@ export class CatalogService {
     }
 
     try {
-      await this.prisma.$transaction(async (transaction) => {
+      await db.$transaction(async (transaction) => {
         let resolvedBrandId: string | null | undefined = dto.brandId;
         let resolvedBrandName: string | null | undefined = dto.brand?.trim();
 
@@ -1153,7 +1161,8 @@ export class CatalogService {
   }
 
   async getAdminProductById(id: string) {
-    const product = await this.prisma.product.findUnique({
+    const db = await this.db();
+    const product = await db.product.findUnique({
       where: { id },
       include: productInclude,
     });
@@ -1166,7 +1175,8 @@ export class CatalogService {
     dto: UpdateProductStatusDto,
     actor: UserPayload,
   ) {
-    const existing = await this.prisma.product.findUnique({
+    const db = await this.db();
+    const existing = await db.product.findUnique({
       where: { id },
       select: {
         id: true,
@@ -1188,7 +1198,7 @@ export class CatalogService {
         'A published product requires an active category and variant',
       );
     }
-    const product = await this.prisma.$transaction(async (transaction) => {
+    const product = await db.$transaction(async (transaction) => {
       const updated = await transaction.product.update({
         where: { id },
         data: {
@@ -1217,8 +1227,9 @@ export class CatalogService {
   }
 
   async getInventory(query: InventoryQueryDto) {
+    const db = await this.db();
     const search = query.search?.trim();
-    const stocks = await this.prisma.inventoryStock.findMany({
+    const stocks = await db.inventoryStock.findMany({
       where: {
         warehouse: { code: 'MAIN' },
         variant: {
@@ -1315,13 +1326,14 @@ export class CatalogService {
   }
 
   async getInventoryMovements(variantId: string, limit = 30) {
-    const inventory = await this.prisma.inventoryStock.findFirst({
+    const db = await this.db();
+    const inventory = await db.inventoryStock.findFirst({
       where: { variantId, warehouse: { code: 'MAIN' } },
       select: { id: true },
     });
     if (!inventory) throw new NotFoundException('Inventory record not found');
 
-    return this.prisma.inventoryMovement.findMany({
+    return db.inventoryMovement.findMany({
       where: { inventoryId: inventory.id },
       orderBy: { createdAt: 'desc' },
       take: Math.min(Math.max(limit, 1), 100),
@@ -1333,13 +1345,14 @@ export class CatalogService {
     dto: AdjustInventoryDto,
     actor: UserPayload,
   ) {
+    const db = await this.db();
     if (dto.quantityDelta === 0) {
       throw new BadRequestException('Inventory adjustment cannot be zero');
     }
     const effectiveAt = this.validateInventoryAdjustment(dto);
 
     try {
-      return await this.prisma.$transaction(
+      return await db.$transaction(
         async (transaction) => {
           const inventory = await transaction.inventoryStock.findFirst({
             where: { variantId, warehouse: { code: 'MAIN' } },

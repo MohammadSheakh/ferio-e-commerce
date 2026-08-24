@@ -2,11 +2,14 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Optional,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import type { UserPayload } from '@app/common';
 import { PrismaService } from '@app/database';
+import { TenantDbService } from '../../../tenancy/tenant-db.service';
 import { AuditService } from '../../audit/audit.service';
 import { normalizeBangladeshPhone } from '../../checkout/utils/checkout.util';
 import { UpdateCommerceSettingsDto } from '../dto/commerce-settings.dto';
@@ -25,10 +28,18 @@ export class CommerceSettingsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly config: ConfigService,
+    @Optional() private readonly tenantDb?: TenantDbService,
   ) {}
 
-  get() {
-    return this.prisma.commerceSettings.upsert({
+  /** Tenant client inside resolved storefront requests; legacy otherwise. */
+  private async db(): Promise<PrismaClient> {
+    const tenant = await this.tenantDb?.tryGet();
+    return tenant ?? (this.prisma as PrismaClient);
+  }
+
+  async get() {
+    const db = await this.db();
+    return db.commerceSettings.upsert({
       where: { id: 'default' },
       update: {},
       create: defaultCommerceSettings,
@@ -106,7 +117,8 @@ export class CommerceSettingsService {
       returnPolicyUrl: this.cleanNullable(dto.returnPolicyUrl),
     };
 
-    return this.prisma.$transaction(async (transaction) => {
+    const db = await this.db();
+    return db.$transaction(async (transaction) => {
       const previous = await transaction.commerceSettings.upsert({
         where: { id: 'default' },
         update: {},

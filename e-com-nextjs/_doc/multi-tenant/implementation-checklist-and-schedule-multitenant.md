@@ -495,7 +495,7 @@ This is the largest migration slice. Existing feature behavior should remain sta
 - [x] Existing `NEW` / `SECOND_HAND` condition support exists.
 - [x] Existing managed brands exist.
 - [x] Existing Hero Showcase capability exists.
-- [ ] **PARTIAL:** Route every catalog read/write through tenant DB context. (storefront reads — listing/search/detail/categories/brands — now resolve via `TenantDbService` inside `CatalogService.db()`; admin writes remain legacy until the next MT-7 pass)
+- [x] Route every catalog read/write through tenant DB context. (entire `CatalogService` — all 17 prisma-touching methods including admin writes, inventory views and adjustments — resolves via the tenant-aware `db()` helper; explicit legacy fallback outside resolved requests)
 - [x] Make brand slug uniqueness tenant-local. (automatic under database-per-tenant; identical slugs proven coexisting across two bootstrapped databases)
 - [ ] Make Hero content tenant-local.
 - [ ] Make catalog search/filter cache tenant-aware.
@@ -601,6 +601,12 @@ This is the largest migration slice. Existing feature behavior should remain sta
 - [ ] Tenant-scope BullMQ job IDs.
 - [ ] Tenant-scope manual retry actions.
 - [ ] Prove failure in tenant A reconciliation does not block tenant B jobs.
+
+### 10.1A Settings and storefront branding (pulled forward from §10.12 scope)
+
+- [x] Tenant-scope public settings reads (`getSettingsByType` → Hero Showcase etc.).
+- [x] Tenant-scope store configuration branding (`CommerceSettingsService.get/getPublic`) — store name, contacts, feature flags, policy URLs now resolve per tenant.
+- [x] Settings Redis cache keys carry the resolved organization identity (`settings:{orgId}:{type}`), eliminating the cross-tenant cache-collision hazard flagged in §11.1 before it could ship.
 
 ## 10.10 Services, warranty, reviews, product requests, pickup
 

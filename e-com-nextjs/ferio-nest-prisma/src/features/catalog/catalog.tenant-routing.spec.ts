@@ -1,6 +1,7 @@
 import { PrismaService } from '@app/database';
 import { TenantDbService } from '../../tenancy/tenant-db.service';
 import { CatalogService } from './catalog.service';
+import { CommerceSettingsService } from '../settings/services/commerce-settings.service';
 
 describe('CatalogService tenant routing (MT-7 slice 1)', () => {
   const legacyPrisma = {
@@ -82,5 +83,52 @@ describe('CatalogService tenant routing (MT-7 slice 1)', () => {
       }),
     );
     expect(legacyPrisma.product.findFirst).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('CommerceSettingsService tenant routing (MT-7 slice 2 - branding)', () => {
+  const legacyPrisma = {
+    commerceSettings: {
+      upsert: jest.fn().mockResolvedValue({ id: 'default', storeName: 'Legacy Store' }),
+    },
+  };
+  const tenantClient = {
+    commerceSettings: {
+      upsert: jest.fn().mockResolvedValue({ id: 'default', storeName: 'Tenant A Store' }),
+    },
+  };
+  const audit = { record: jest.fn() };
+  const config = {} as never;
+
+  beforeEach(() => jest.clearAllMocks());
+
+  it('serves store branding from the resolved TENANT database inside a storefront request', async () => {
+    const service = new CommerceSettingsService(
+      legacyPrisma as unknown as PrismaService,
+      audit as never,
+      config,
+      { tryGet: jest.fn().mockResolvedValue(tenantClient) } as unknown as TenantDbService,
+    );
+
+    const result = await service.get();
+
+    expect(result.storeName).toBe('Tenant A Store');
+    expect(tenantClient.commerceSettings.upsert).toHaveBeenCalledTimes(1);
+    expect(legacyPrisma.commerceSettings.upsert).not.toHaveBeenCalled();
+  });
+
+  it('keeps legacy branding behavior outside tenant requests', async () => {
+    const service = new CommerceSettingsService(
+      legacyPrisma as unknown as PrismaService,
+      audit as never,
+      config,
+      { tryGet: jest.fn().mockResolvedValue(undefined) } as unknown as TenantDbService,
+    );
+
+    const result = await service.get();
+
+    expect(result.storeName).toBe('Legacy Store');
+    expect(legacyPrisma.commerceSettings.upsert).toHaveBeenCalledTimes(1);
   });
 });

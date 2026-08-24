@@ -16,6 +16,10 @@ import { CreateOrUpdateSettingsDto } from '../dto/settings.dto';
 import { SETTINGS_CACHE_CONFIG } from '../constants/settings.cache.constants';
 import type { UserPayload } from '@app/common';
 import { AuditService } from '../../audit/audit.service';
+import { Optional } from '@nestjs/common';
+import { TenantDbService } from '../../../tenancy/tenant-db.service';
+import { tryGetTenantContext } from '../../../tenancy/tenant-context';
+import type { PrismaClient } from '@prisma/client';
 @Injectable()
 export class SettingsService {
   private readonly logger = new Logger(SettingsService.name);
@@ -24,12 +28,25 @@ export class SettingsService {
     private readonly prisma: PrismaService,
     private readonly redisService: RedisService,
     private readonly audit: AuditService,
+    @Optional() private readonly tenantDb?: TenantDbService,
   ) {
     this.logger.log('✅ Settings Service (Prisma + Cache) initialized');
   }
 
+  /**
+   * MT-7/MT-8: cache keys carry the resolved tenant identity. Identical
+   * settings types across tenants can never share a cache entry, and
+   * invalidation inside the same request context always matches.
+   */
   private getCacheKey(type: string): string {
-    return `${SETTINGS_CACHE_CONFIG.PREFIX}:${type}`;
+    const orgId = tryGetTenantContext()?.organizationId ?? 'legacy';
+    return `${SETTINGS_CACHE_CONFIG.PREFIX}:${orgId}:${type}`;
+  }
+
+  /** Tenant client inside resolved requests; legacy DB otherwise (MT-7). */
+  private async db(): Promise<PrismaClient> {
+    const tenant = await this.tenantDb?.tryGet();
+    return tenant ?? (this.prisma as PrismaClient);
   }
 
   async createOrUpdateSettings(
@@ -48,7 +65,8 @@ export class SettingsService {
         dto.introductionVideo as Prisma.InputJsonValue;
     }
 
-    const result: Settings = await this.prisma.$transaction(
+    const db = await this.db();
+    const result: Settings = await db.$transaction(
       async (transaction) => {
         const previous = await transaction.settings.findUnique({
           where: { type },
@@ -90,7 +108,8 @@ export class SettingsService {
   }
 
   private async fetchSettings(type: SettingsType) {
-    const settings = await this.prisma.settings.findUnique({ where: { type } });
+    const db = await this.db();
+    const settings = await db.settings.findUnique({ where: { type } });
     if (!settings) return [];
     return [settings];
   }
