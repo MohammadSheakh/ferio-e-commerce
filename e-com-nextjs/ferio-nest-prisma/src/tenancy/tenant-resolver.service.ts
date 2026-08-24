@@ -1,0 +1,194 @@
+import { Injectable, type NestMiddleware } from '@nestjs/common';
+import type { NextFunction, Request, Response } from 'express';
+import { RedisService } from '@app/redis';
+import { PlatformPrismaService } from '../platform/platform-prisma.service';
+import {
+  normalizeTenantHost,
+  TenantResolutionException,
+} from './tenant-errors';
+import { runWithTenantContext, type TenantDatabaseMaterial } from './tenant-context';
+
+const POSITIVE_CACHE_TTL_SECONDS = 60;
+const NEGATIVE_CACHE_TTL_SECONDS = 15;
+
+export interface ResolvedTenant {
+  organizationId: string;
+  tenantDatabaseId: string;
+  database: TenantDatabaseMaterial;
+  domainId: string;
+  hostname: string;
+  subscriptionStatus: 'TRIALING' | 'ACTIVE' | 'PAST_DUE' | 'SUSPENDED' | 'CANCELLED';
+}
+
+/**
+ * Trusted tenant resolution (ADR-0002). The request host is the ONLY routing
+ * input; the control-plane registry is the ONLY source of truth. Every
+ * failure mode fails closed — resolution failures never fall back to the
+ * legacy single-tenant database.
+ */
+@Injectable()
+export class TenantResolverService {
+  constructor(
+    private readonly platform: PlatformPrismaService,
+    private readonly redis: RedisService,
+  ) {}
+
+  async resolveFromHost(rawHost: string | undefined): Promise<ResolvedTenant> {
+    const hostname = normalizeTenantHost(rawHost);
+
+    const cached = await this.readCache(hostname);
+    if (cached === null) {
+      // Negative cache hit: recently-proven-unknown host.
+      throw new TenantResolutionException('TENANT_RESOLUTION_FAILED');
+    }
+    if (cached) return cached;
+
+    const resolved = await this.resolveFromControlPlane(hostname);
+    await this.writeCache(hostname, resolved);
+    return resolved;
+  }
+
+  private async resolveFromControlPlane(hostname: string): Promise<ResolvedTenant> {
+    const domain = await this.platform.client.tenantDomain.findUnique({
+      where: { hostname },
+      include: {
+        organization: {
+          include: { subscription: true },
+        },
+      },
+    });
+
+    if (!domain || domain.status !== 'ACTIVE') {
+      throw new TenantResolutionException('TENANT_RESOLUTION_FAILED');
+    }
+
+    const organization = domain.organization;
+    if (['SUSPENDED', 'CLOSURE_PENDING', 'CLOSED', 'ARCHIVED'].includes(organization.status)) {
+      throw new TenantResolutionException('TENANT_SUSPENDED', HttpStatus_SERVICE_UNAVAILABLE);
+    }
+
+    const registry = await this.platform.client.tenantDatabase.findUnique({
+      where: { organizationId: organization.id },
+    });
+    if (!registry || registry.status === 'RETIRED') {
+      throw new TenantResolutionException('TENANT_UNAVAILABLE', HttpStatus_SERVICE_UNAVAILABLE);
+    }
+    if (registry.status === 'MIGRATION_REQUIRED') {
+      throw new TenantResolutionException(
+        'TENANT_MIGRATION_REQUIRED',
+        HttpStatus_SERVICE_UNAVAILABLE,
+      );
+    }
+    if (registry.status !== 'READY') {
+      throw new TenantResolutionException('TENANT_UNAVAILABLE', HttpStatus_SERVICE_UNAVAILABLE);
+    }
+
+    return {
+      organizationId: organization.id,
+      tenantDatabaseId: registry.id,
+      database: {
+        id: registry.id,
+        host: registry.host,
+        port: registry.port,
+        databaseName: registry.databaseName,
+        username: registry.username,
+        credentialCipher: registry.credentialCipher,
+      },
+      domainId: domain.id,
+      hostname,
+      subscriptionStatus:
+        (organization.subscription?.status as ResolvedTenant['subscriptionStatus']) ?? 'TRIALING',
+    };
+  }
+
+  /** Invalidate cached mapping when domains/organizations change. */
+  async invalidate(hostname: string): Promise<void> {
+    try {
+      const client = await this.redis.getClient();
+      if (!client) return;
+      await Promise.all([
+        client.del(this.positiveKey(hostname)),
+        client.del(this.negativeKey(hostname)),
+      ]);
+    } catch {
+      // Best-effort; TTL bounds staleness regardless.
+    }
+  }
+
+  private async readCache(hostname: string): Promise<ResolvedTenant | null | undefined> {
+    try {
+      const client = await this.redis.getClient();
+      if (!client) return undefined;
+      const [positiveRaw, negativeRaw] = await Promise.all([
+        client.get(this.positiveKey(hostname)),
+        client.get(this.negativeKey(hostname)),
+      ]);
+      if (negativeRaw) return null;
+      return positiveRaw ? (JSON.parse(positiveRaw) as ResolvedTenant) : undefined;
+    } catch {
+      return undefined; // Redis unavailable → resolve straight from control plane.
+    }
+  }
+
+  private async writeCache(hostname: string, value: ResolvedTenant): Promise<void> {
+    try {
+      const client = await this.redis.getClient();
+      if (!client) return;
+      await client.set(
+        this.positiveKey(hostname),
+        JSON.stringify(value),
+        'EX',
+        POSITIVE_CACHE_TTL_SECONDS,
+      );
+    } catch {
+      // Best-effort caching only.
+    }
+  }
+
+  // Cache keys ARE the trusted hostname — identical hosts across tenants are
+  // impossible by definition, so no cross-tenant cache collision can occur.
+  private positiveKey(hostname: string) {
+    return `tenant:host:${hostname}`;
+  }
+
+  private negativeKey(hostname: string) {
+    return `tenant:host:neg:${hostname}`;
+  }
+}
+
+const HttpStatus_SERVICE_UNAVAILABLE = 503;
+
+/**
+ * Middleware that resolves the tenant before any route executes and wraps the
+ * downstream chain in the immutable TenantContext.
+ */
+@Injectable()
+export class TenantContextMiddleware implements NestMiddleware {
+  constructor(private readonly resolver: TenantResolverService) {}
+
+  use(request: Request, response: Response, next: NextFunction) {
+    // Staged rollout (MT-2): until TENANCY_ENABLED=true, requests pass through
+    // without tenant context and commerce keeps using its current database.
+    // When enabled, resolution is strict — unknown/suspended hosts fail closed.
+    if ((process.env.TENANCY_ENABLED || 'false') !== 'true') {
+      next();
+      return;
+    }
+    this.resolver
+      .resolveFromHost(request.hostname)
+      .then((resolved) => {
+        runWithTenantContext(
+          {
+            organizationId: resolved.organizationId,
+            tenantDatabaseId: resolved.tenantDatabaseId,
+            database: resolved.database,
+            domainId: resolved.domainId,
+            hostname: resolved.hostname,
+            subscriptionStatus: resolved.subscriptionStatus,
+          },
+          next,
+        );
+      })
+      .catch(next);
+  }
+}

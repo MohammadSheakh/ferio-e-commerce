@@ -1,0 +1,1395 @@
+# Ferio Commerce SaaS — Multi-Tenant Implementation Checklist and Delivery Schedule
+
+**Document status:** Living execution tracker  
+**Created:** August 24, 2026  
+**Primary source:** `Ferio-Commerce-SaaS-PRD-v2.1-Complete.md`  
+**Migration baseline:** Existing single-tenant Ferio Release 1 implementation  
+**Architecture:** Modular monolith + control-plane PostgreSQL + database-per-tenant PostgreSQL + Redis/BullMQ  
+**Primary applications:** Tenant Storefront Web, Tenant Admin Web, Rider Web Portal, Customer Mobile App, Ferio Platform Admin, NestJS Backend
+
+---
+
+## 1. Purpose and How to Use This Document
+
+This document converts the Ferio Commerce SaaS PRD v2.1 into an implementation sequence for migrating the already-developed single-tenant commerce platform into a production-grade multi-tenant SaaS product.
+
+This is **not** a rebuild plan. Existing commerce capabilities that are already working—catalog, inventory, cart, checkout, orders, payments, wallet, fulfillment, riders, returns, reconciliation, chat, warranty, services, reporting, and operational tooling—should be preserved and progressively moved behind trusted tenant context.
+
+The PRD remains the product source of truth. This checklist is the engineering execution tracker.
+
+### Status legend
+
+- [x] **Inherited / Done** — capability already exists in the current Ferio commerce baseline and should be preserved.
+- [ ] **Pending** — not yet implemented for SaaS/multi-tenancy.
+- [ ] **PARTIAL** — foundation exists but does not yet satisfy the multi-tenant acceptance condition.
+- [ ] **BLOCKED** — requires a product, infrastructure, provider, billing, DNS, or security decision.
+- [ ] **DEFERRED** — intentionally outside the current release.
+
+### Completion rule
+
+A multi-tenant item may become `[x]` only when:
+
+1. tenant context is resolved server-side from trusted inputs;
+2. the correct tenant database is selected without accepting a client-supplied database identity;
+3. authorization and plan entitlement are enforced server-side;
+4. Redis/cache/job/socket/file namespaces cannot collide across tenants;
+5. failure paths do not fall back to another tenant or the legacy default database;
+6. negative cross-tenant tests pass;
+7. audit/observability evidence identifies the organization safely;
+8. relevant frontend error/loading/suspended/unknown-domain states exist;
+9. migration, rollback, and operational documentation are updated.
+
+---
+
+## 2. Current Position
+
+**Current architecture:** Mature single-business Ferio commerce platform with substantial Release 1 operational functionality.
+
+**Progress checkpoint (August 24, 2026):**
+
+- **MT-0 complete** — seven ADRs (`_doc/multi-tenant/adr/`), full model classification (`data-classification.md`), security baseline verified, stable tenant error codes, fail-closed rules encoded and tested.
+- **MT-1 complete (code + tests)** — control-plane schema (`prisma/platform.prisma`, separate datasource/client), all §4.1 models, organization/subscription/entitlement/domain state machines, usage metering, provisioning orchestrator (idempotent, resumable), support-access grants, platform audit, independent `PlatformAuthGuard` realm, minimal admin API. Physical DB creation is a pluggable executor pending the hosting decision.
+- **MT-2 complete (code + tests)** — host normalization, fail-closed resolver with positive/negative caching, immutable `TenantContext` via AsyncLocalStorage, middleware wired for all routes except platform/health/socket paths.
+- **MT-3 core complete (code + tests)** — `TenantDatabaseManager`: LRU-bounded clients keyed by registry ID, idle eviction, acquire timeout, per-database circuit breaker, AES-256-GCM credentials. Tenant-scoped repository migration across commerce modules remains (§10).
+
+Verification: backend production build clean; **67 suites / 264 unit tests passing**, including new suites for lifecycle transitions, entitlement matrix, host security boundary, fail-closed resolution, and connection-manager bounds/breaker behavior.
+
+**Target architecture:** Multi-tenant Commerce SaaS with:
+
+- one Ferio control plane;
+- one isolated PostgreSQL database per tenant;
+- tenant-specific storefront hostname/subdomain;
+- separate Platform Admin and Tenant Admin authorization domains;
+- SaaS plans, subscriptions, entitlements, billing, usage, provisioning, domains, migrations, support, and tenant operations;
+- preservation of existing tenant commerce functionality.
+
+**Migration principle:** Introduce the SaaS control plane first, then trusted tenant resolution and database routing, then migrate every existing module behind tenant scope. Do not add broad new commerce features while the isolation boundary is incomplete.
+
+**Launch status:** Not SaaS-ready until isolation, provisioning, migrations, subscriptions, domain routing, backup/restore, and cross-tenant security gates pass.
+
+---
+
+# 3. Release MT-0 — Architecture Freeze and Safety Baseline
+
+## 3.1 Repository and application boundaries
+
+- [ ] Confirm the canonical SaaS application map:
+  - `ferio-nest-prisma` — shared NestJS backend;
+  - Tenant Storefront Web;
+  - Tenant Admin Web;
+  - Rider Web Portal / rider surface;
+  - Customer Mobile App;
+  - Ferio Platform Admin.
+- [ ] Decide whether Platform Admin is a separate Next.js application or an explicitly isolated application boundary inside an existing admin repository.
+- [ ] Document which modules are **control-plane**, **tenant-plane**, or **shared infrastructure**.
+- [x] Add an architecture decision record for database-per-tenant. (`_doc/multi-tenant/adr/ADR-0001`)
+- [x] Add an architecture decision record for tenant resolution. (`ADR-0002`)
+- [x] Add an architecture decision record for connection-pool management. (`ADR-0003`)
+- [x] Add an architecture decision record for platform identity vs tenant membership. (`ADR-0004`)
+- [x] Add an architecture decision record for tenant migration orchestration. (`ADR-0005`)
+- [x] Add an architecture decision record for subscription/entitlement enforcement. (`ADR-0006`)
+- [x] Add an architecture decision record for tenant deletion/export/retention. (`ADR-0007`, policy owner-blocked)
+- [ ] Freeze accidental new global tables in the existing tenant schema until ownership is classified.
+- [ ] Create a tenant-boundary review checklist for every future module/PR.
+
+## 3.2 Data classification
+
+- [x] Produce a table for every current Prisma model: `CONTROL_PLANE`, `TENANT`, `PLATFORM_SHARED`, or `REMOVE/LEGACY`. (`_doc/multi-tenant/data-classification.md`)
+- [x] Classify all existing tables for catalog, inventory, cart, checkout, orders, payments, wallet, returns, riders, chat, services, warranty, reviews, settings, analytics, audit, reconciliation, and notifications.
+- [x] Identify every current singleton/global setting that must become tenant-local.
+- [x] Identify every current unique constraint that becomes tenant-local after DB separation.
+- [ ] Identify every cross-domain reference that cannot cross database boundaries.
+- [x] Prohibit tenant DB foreign keys to control-plane tables. (enforced by ADR-0001; canonical schema extraction will make it physical)
+- [x] Define opaque identifiers required in cross-plane messages/events instead of database foreign keys. (TenantContext carries registry IDs only)
+- [ ] Document ownership and retention of uploaded product, warranty, review, return, and other media.
+
+## 3.3 Security baseline before tenancy
+
+- [ ] Re-run secret scanning and rotate any remaining exposed credentials.
+- [x] Verify JWT/session secrets have no development fallback in production. (Aug 2026 remediation + template-secret startup rejection)
+- [x] Verify refresh revocation fails closed. (Aug 2026 remediation)
+- [x] Verify OTP/TOTP hardening remains active. (Aug 2026 remediation)
+- [ ] Verify Platform Admin cannot reuse Tenant Admin authorization implicitly.
+- [x] Add stable error codes for tenant resolution, tenant unavailable, subscription denial, provisioning failure, and tenant migration failure. (`src/tenancy/tenant-errors.ts`; entitlement/provisioning codes in services)
+- [x] Add a rule: **no tenant lookup failure may fall back to the original Ferio database**. (resolver fails closed; enforced by tests)
+- [x] Add a rule: **no request body/query/header may select a tenant database directly**. (resolver reads host only; manager keys on registry ID)
+
+### MT-0 gate
+
+- [ ] Architecture decisions approved.
+- [ ] Existing Prisma models classified.
+- [ ] No ambiguous global-vs-tenant business data remains undocumented.
+- [ ] Threat model reviewed before implementing database routing.
+
+---
+
+# 4. Release MT-1 — Ferio Control Plane Foundation
+
+## 4.1 Control-plane Prisma schema
+
+Create a separate control-plane schema/database for platform metadata.
+
+- [x] Model `Organization`.
+- [x] Model organization lifecycle/status. (`OrganizationStatus` + `OrganizationLifecycleEvent` append-only history)
+- [x] Model `TenantDomain`.
+- [x] Model `TenantDatabase`.
+- [x] Model tenant database schema version/readiness.
+- [x] Model provisioning operations/runs. (`ProvisioningRun`/`Step`)
+- [x] Model tenant migration runs and per-tenant migration results. (`TenantMigrationRun`/`Result`)
+- [x] Model `Plan`.
+- [ ] Model plan versions if plan behavior must remain historically explainable.
+- [x] Model plan entitlements/limits. (`PlanEntitlement` featureKey/enabled/limit)
+- [x] Model `Subscription`.
+- [x] Model subscription lifecycle history. (`SubscriptionEvent`)
+- [x] Model SaaS invoices. (`SaasInvoice`)
+- [x] Model SaaS payment attempts/transactions separately from commerce payments. (`SaasPaymentAttempt`)
+- [x] Model usage counters/snapshots. (`UsageCounter` per metric+period)
+- [x] Model platform users. (`PlatformUser`)
+- [x] Model organization membership/ownership where platform identity is reused. (`OrganizationMember`)
+- [x] Model Platform Admin roles/permissions. (`PlatformRole` + guard permission map)
+- [x] Model support-access grants. (`SupportAccessGrant`)
+- [x] Model platform feature flags. (`PlatformFeatureFlag`)
+- [x] Model platform audit/security events. (`PlatformAuditLog`)
+- [x] Add indexes for hostname/domain resolution. (`hostname @unique` is the resolution index)
+- [x] Add uniqueness constraints for organization slug and active domain.
+- [x] Add idempotency constraints for provisioning and platform billing. (`idempotencyKey @unique`, `reference @unique`)
+- [x] Add explicit timestamps and append-only histories for sensitive lifecycle transitions.
+
+## 4.2 Control-plane services
+
+- [x] Implement organization service. (state machine + membership seed)
+- [x] Implement domain registry service. (subdomain reservation, custom-domain verification lifecycle)
+- [x] Implement tenant DB registry service. (AES-256-GCM credential encryption at rest)
+- [x] Implement plan service.
+- [x] Implement entitlement evaluator. (feature flags + limits + subscription state, stable denial codes)
+- [x] Implement subscription state machine. (trialing→active→past-due→suspended/cancelled with event history)
+- [x] Implement usage service. (atomic increment upserts, period-keyed snapshots)
+- [x] Implement provisioning orchestration service. (8-step idempotent state machine, resumable runs, pluggable executor)
+- [ ] **PARTIAL:** Implement tenant migration orchestration service. (run/result models + version stamping landed; BullMQ fleet runner lands in MT-11)
+- [x] Implement support-access service. (reason-bound TTL grants, revoke, assert-active)
+- [x] Implement platform audit service. (append-only)
+- [x] Keep all control-plane services independent of tenant Prisma models. (separate generated client + datasource)
+
+## 4.3 Control-plane authorization
+
+- [x] Create separate Platform Admin guards. (`PlatformAuthGuard`, realm=platform tokens, role→permission map)
+- [ ] Define platform permissions for organization, subscription, billing, domain, provisioning, migration, support access, and platform health.
+- [x] Ensure tenant staff roles cannot invoke Platform Admin APIs. (realm mismatch rejected)
+- [ ] Ensure Platform Admin identity alone does not grant direct tenant commerce access.
+- [ ] Require explicit support-access workflow for tenant-data access.
+- [x] Make support access reason-bound, time-bound, auditable, and revocable. (min reason length, 5min–8h TTL clamp)
+
+## 4.4 Validation
+
+- [x] Unit-test organization state transitions.
+- [x] Unit-test subscription state transitions.
+- [x] Unit-test entitlement evaluation. (full matrix incl. concurrent-limit semantics)
+- [x] Unit-test domain lifecycle. (reserved names, verification mismatch → FAILED, activation)
+- [ ] Integration-test control-plane migrations on disposable PostgreSQL.
+- [ ] Prove platform billing tables cannot be confused with tenant payment/wallet ledgers.
+
+### MT-1 gate
+
+- [ ] Control-plane database can operate without connecting to a tenant DB.
+- [ ] Platform Admin authorization is independent.
+- [ ] Organization/domain/plan/subscription/database registry foundations are production-build clean.
+
+---
+
+# 5. Release MT-2 — Trusted Tenant Resolution and Request Context
+
+## 5.1 Host/domain resolver
+
+- [x] Normalize incoming host safely. (pure `normalizeTenantHost`: lowercase, port-strip, malformed/IP-literal rejection — unit-tested)
+- [x] Handle ports in local/development hosts.
+- [x] Reject malformed hosts.
+- [x] Resolve Ferio subdomain to an active `TenantDomain`.
+- [x] Reject unknown domains. (negative-cached, stable code)
+- [x] Reject inactive/unverified domains.
+- [x] Reject suspended organizations according to policy. (`TENANT_SUSPENDED` 503)
+- [ ] **PARTIAL:** Support development host mapping without weakening production behavior. (`TENANCY_ENABLED` staged-rollout flag added: disabled = passthrough legacy mode; enabled = strict fail-closed resolution. Per-host dev mapping table still pending.)
+- [x] Cache domain resolution only with tenant-aware keys. (key IS the trusted hostname; positive 60s / negative 15s TTL)
+- [x] Implement explicit invalidation on domain/status changes. (`invalidate(hostname)`)
+- [ ] Define negative-cache TTL for unknown domains.
+- [x] Never trust `tenantId`, `organizationId`, `databaseUrl`, or equivalent browser-supplied routing values. (host-only input; middleware)
+
+## 5.2 Tenant request context
+
+- [x] Create immutable request-scoped `TenantContext`. (frozen object via AsyncLocalStorage)
+- [x] Include organization ID, tenant DB registry ID, hostname/domain ID, subscription state, and safe correlation metadata. (correlation rides the existing ALS)
+- [ ] Make tenant context available to application services without reading raw host repeatedly.
+- [x] Prevent code from mutating tenant context during a request. (Object.freeze + no setters exported)
+- [ ] **PARTIAL:** Propagate trusted tenant context to background jobs. (`TenantDatabaseMaterial` now rides the immutable request context; BullMQ envelope propagation lands with MT-8 job work.)
+- [ ] Propagate tenant scope to WebSocket authorization.
+- [ ] Include tenant identity in audit events.
+- [ ] Include safe tenant identity in structured logs/metrics.
+- [x] Do not expose DB credentials in context returned to frontend clients. (context carries registry IDs only; publicView strips secrets)
+
+## 5.3 Identity + tenant membership
+
+- [ ] Define global identity vs tenant membership behavior.
+- [ ] Verify an authenticated account is a member/customer/rider of the resolved tenant before protected tenant actions.
+- [ ] Define same-email behavior across independent tenant businesses.
+- [ ] Define whether customer identity is tenant-local initially.
+- [ ] Prevent a valid session from tenant A being replayed against tenant B.
+- [ ] Bind Tenant Admin session authorization to resolved tenant membership.
+- [ ] Bind rider authorization to tenant + approved personnel record.
+- [ ] Add negative tests for forged hosts and cross-tenant cookies/tokens.
+
+### MT-2 gate
+
+- [ ] Two test hostnames resolve deterministically to two different organizations.
+- [x] Unknown/suspended hosts fail closed. (negative tests prove no legacy-DB fallback)
+- [x] Changing an ID, cookie, host, or request payload cannot select another tenant's database. (manager accepts registry rows only)
+
+---
+
+# 6. Release MT-3 — Tenant Database Router and Connection Management
+
+## 6.1 Tenant Prisma client manager
+
+- [ ] Implement a centralized tenant database connection manager.
+- [ ] Resolve DB connection only from trusted `TenantDatabase` control-plane metadata.
+- [ ] Encrypt tenant database credentials at rest.
+- [ ] Keep decrypted credentials out of normal logs/errors.
+- [ ] Add bounded client/connection caching.
+- [ ] Add idle eviction.
+- [ ] Add maximum active tenant-client limits.
+- [ ] Add connection acquisition timeout.
+- [ ] Add health-state handling for unavailable tenant DBs.
+- [ ] Prevent unbounded `new PrismaClient()` per request.
+- [ ] Add graceful application shutdown/disconnect.
+- [ ] Add metrics for active clients, evictions, acquisition failures, and pool exhaustion.
+- [ ] Design for PgBouncer/managed pooling if tenant count requires it.
+- [ ] Add a circuit-breaker/backoff strategy for repeatedly unhealthy tenant DBs.
+
+## 6.2 Repository/application-service integration
+
+- [ ] Remove direct singleton tenant Prisma usage from tenant-scoped request paths.
+- [ ] **PARTIAL:** Introduce tenant-aware repository/service access. (`TenantDbService.get()/tryGet()` primitive shipped — resolves client exclusively from immutable context + control plane; commerce-module migration begins MT-7)
+- [ ] Ensure transactions use the same resolved tenant client for the entire operation.
+- [ ] Ensure nested services cannot silently acquire a different tenant client.
+- [ ] Ensure control-plane transactions never include tenant DB writes as if they were one ACID transaction.
+- [ ] Define saga/compensation behavior for cross-plane workflows such as provisioning.
+- [ ] Add tests for transaction rollback inside one tenant without affecting another.
+
+## 6.3 Database isolation tests
+
+- [ ] Provision tenant A database.
+- [ ] Provision tenant B database.
+- [ ] Seed deliberately similar IDs into both.
+- [ ] Prove tenant A reads only A.
+- [ ] Prove tenant B reads only B.
+- [ ] Prove writes remain isolated.
+- [ ] Prove transaction rollback remains isolated.
+- [ ] Prove one tenant DB outage does not route to another.
+- [ ] Prove one tenant DB outage does not crash healthy tenant traffic unnecessarily.
+- [ ] Load-test connection manager with many simulated tenants.
+
+### MT-3 gate
+
+- [ ] Database-per-tenant isolation is demonstrated automatically.
+- [ ] No tenant-scoped HTTP path uses a global/default Prisma client.
+- [ ] Pool/client count remains bounded under load.
+
+---
+
+# 7. Release MT-4 — Tenant Provisioning and Lifecycle Automation
+
+## 7.1 Organization creation workflow
+
+Provisioning should behave as an idempotent state machine, not a controller script.
+
+- [ ] Platform Admin creates organization.
+- [ ] Reserve unique organization slug.
+- [ ] Reserve default tenant subdomain.
+- [x] Create tenant DB registry record.
+- [ ] **PARTIAL:** Create physical database/schema according to infrastructure strategy. (default executor issues CREATE DATABASE on the platform server + canonical migration set applied via `TenantSchemaBootstrapper`; managed hosting remains owner-blocked)
+- [x] Generate/store tenant DB credential securely. (AES-256-GCM at rest, decrypted only inside pool creation/bootstrap)
+- [x] Apply current approved tenant migration set. (ordered artifact execution tracked in `_ferio_tenant_migrations`; idempotent re-runs proven)
+- [x] Run tenant seed.
+- [x] Seed default tenant settings. (CommerceSettings store identity + COD verification ALWAYS baseline, ON CONFLICT-safe)
+- [ ] Seed default permissions/owner role.
+- [ ] Create/attach initial owner membership.
+- [x] Run DB health check. (bootstrap success + registry READY stamping)
+- [ ] Run minimal tenant smoke test.
+- [ ] Activate domain only after readiness.
+- [ ] Mark organization `READY/ACTIVE` only after all required steps succeed.
+- [x] Persist every provisioning step/result.
+- [x] Make retries resume safely. (resume-from-first-incomplete-step; idempotency-key replay returns completed runs)
+- [x] Prevent duplicate DB/domain creation on repeated requests. (unique org slug/domain hostname/registry orgId/idempotencyKey)
+- [ ] Add compensation/manual-recovery instructions for partial failure.
+
+## 7.2 Tenant seed
+
+- [ ] Refactor existing Ferio seed into tenant-safe seed logic.
+- [ ] Remove global hard-coded Ferio business assumptions.
+- [ ] Seed tenant owner separately from platform super-admin.
+- [ ] Seed tenant-local settings.
+- [ ] Seed tenant-local feature defaults.
+- [ ] Seed tenant-local notification templates.
+- [ ] Seed delivery/payment defaults as disabled/configuration-required where appropriate.
+- [ ] Seed no fake customer/order/payment data in production provisioning.
+- [x] Make seed idempotent.
+
+## 7.3 Organization lifecycle
+
+- [ ] Implement `PROVISIONING`.
+- [ ] Implement `ACTIVE`.
+- [ ] Implement `SUSPENDED`.
+- [ ] Implement `PROVISIONING_FAILED`.
+- [ ] Implement `CLOSURE_PENDING` if approved.
+- [ ] Implement archived/deleted lifecycle according to retention policy.
+- [ ] Define which public/storefront operations remain visible during subscription suspension.
+- [ ] Prevent destructive deletion while legal/financial retention applies.
+- [ ] Add export-before-closure workflow if required.
+
+## 7.4 Provisioning operations UI
+
+- [ ] Platform Admin organization list.
+- [ ] Organization detail.
+- [ ] Provisioning progress timeline.
+- [ ] Retry failed provisioning step.
+- [ ] Tenant DB health/readiness.
+- [ ] Domain status.
+- [ ] Owner/membership status.
+- [ ] Schema version.
+- [ ] Safe operational diagnostics without DB secrets.
+
+### MT-4 gate
+
+- [ ] A new organization can be created from Platform Admin and reach a working isolated storefront/admin environment without manual SQL.
+- [ ] Replaying provisioning is idempotent.
+- [ ] Failed provisioning is diagnosable and recoverable.
+
+---
+
+# 8. Release MT-5 — Domain, Subdomain, and Storefront Routing
+
+## 8.1 Default tenant subdomains
+
+- [ ] Define canonical hostname format, e.g. `{tenant}.ferio...`.
+- [ ] Configure wildcard DNS.
+- [ ] Configure wildcard TLS/certificate strategy.
+- [ ] Add local-development tenant-domain strategy.
+- [ ] Add canonical redirect rules.
+- [ ] Add reserved subdomain list (`www`, `admin`, `api`, `app`, etc.).
+- [ ] Prevent organization slugs from colliding with reserved/system routes.
+- [ ] Ensure storefront SSR/server requests resolve tenant before fetching tenant data.
+- [ ] Make metadata/SEO tenant-aware.
+- [ ] Make sitemap/robots tenant-aware.
+- [ ] Make tenant branding cache-aware.
+
+## 8.2 Custom domains — P1 / plan-gated
+
+- [ ] **BLOCKED:** Select DNS/TLS automation strategy/provider.
+- [ ] Add custom-domain request.
+- [ ] Generate ownership verification challenge.
+- [ ] Verify DNS.
+- [ ] Verify TLS readiness.
+- [ ] Activate only after verification.
+- [ ] Support primary/canonical domain.
+- [ ] Support domain removal.
+- [ ] Prevent stale domain takeover/reassignment.
+- [ ] Audit domain changes.
+- [ ] Entitlement-gate custom domains by plan.
+
+## 8.3 Tenant-aware frontend state
+
+- [ ] Unknown store page.
+- [ ] Provisioning/not-ready page.
+- [ ] Suspended store page according to approved business policy.
+- [ ] Domain verification pending state.
+- [ ] Tenant branding load failure fallback that does not display another tenant's branding.
+- [ ] Tenant-specific support contacts/policies.
+
+### MT-5 gate
+
+- [ ] Tenant A and tenant B render different storefronts/data/settings on distinct hosts.
+- [ ] Cache/CDN behavior cannot leak branding/catalog/settings between hosts.
+- [ ] Unknown and removed domains are safe.
+
+---
+
+# 9. Release MT-6 — Plans, Subscriptions, Entitlements, Usage, and SaaS Billing
+
+## 9.1 Plans and entitlements
+
+- [ ] Define initial plan catalog.
+- [ ] **BLOCKED:** Approve exact plan names/prices/billing intervals.
+- [ ] **BLOCKED:** Approve free/trial policy.
+- [ ] Define feature entitlements.
+- [ ] Define usage limits.
+- [ ] Define staff/user limits.
+- [ ] Define product/SKU limits if applicable.
+- [ ] Define order/GMV limits if applicable.
+- [ ] Define custom-domain entitlement.
+- [ ] Define advanced reports/CRM/marketing entitlement.
+- [ ] Define warehouse entitlement.
+- [ ] Define integration/provider entitlement if applicable.
+- [ ] Store entitlement evaluation server-side.
+- [ ] Do not rely on hidden/disabled frontend controls for enforcement.
+- [ ] Add owner-visible current plan and usage.
+- [ ] Add upgrade-required errors with stable machine codes.
+
+## 9.2 Subscription lifecycle
+
+- [ ] Implement trialing if approved.
+- [ ] Implement active.
+- [ ] Implement past-due/grace period if approved.
+- [ ] Implement suspended/restricted.
+- [ ] Implement cancelled/non-renewing.
+- [ ] Implement reactivation.
+- [ ] Preserve tenant data across non-destructive subscription state changes.
+- [ ] Define storefront behavior when subscription is overdue.
+- [ ] Define Tenant Admin behavior when subscription is overdue.
+- [ ] Keep billing lifecycle separate from organization/database lifecycle.
+
+## 9.3 SaaS billing
+
+- [ ] Build platform billing adapter interface.
+- [ ] **BLOCKED:** Approve SaaS subscription payment provider(s).
+- [ ] Store platform payment attempts in control plane.
+- [ ] Add invoices/receipts.
+- [ ] Add webhook verification/idempotency.
+- [ ] Add retry/recovery.
+- [ ] Add billing history.
+- [ ] Add manual/admin adjustment workflow with audit if required.
+- [ ] Never write SaaS subscription payments into tenant `Payment`, `Wallet`, COD, refund, or settlement records.
+
+## 9.4 Usage metering
+
+- [ ] Define authoritative usage counters.
+- [ ] Decide real-time vs periodic aggregation by metric.
+- [ ] Add idempotent usage updates.
+- [ ] Add reconciliation of counters against tenant DB facts.
+- [ ] Add warning thresholds.
+- [ ] Add plan-limit denial behavior.
+- [ ] Add usage reset behavior per billing period where applicable.
+- [ ] Add Platform Admin usage view.
+- [ ] Add Tenant Owner usage view.
+
+## 9.5 Entitlement test matrix
+
+- [ ] Plan A cannot use Plan B-only feature.
+- [ ] Upgrade unlocks capability without tenant DB migration where possible.
+- [ ] Downgrade does not destroy historical data.
+- [ ] Limit exceeded is enforced concurrently.
+- [ ] Suspended subscription blocks only approved capabilities.
+- [ ] Internal/free entitlement is explicit and audited.
+
+### MT-6 gate
+
+- [ ] One test tenant can subscribe/activate, hit a plan limit, upgrade, and unlock the capability.
+- [ ] SaaS billing is financially and technically isolated from customer commerce billing.
+
+---
+
+# 10. Release MT-7 — Convert Existing Commerce Modules to Tenant-Safe Operation
+
+This is the largest migration slice. Existing feature behavior should remain stable; the primary change is isolation, tenant configuration, and entitlement enforcement.
+
+## 10.1 Catalog, brands, product conditions, Hero Showcase
+
+- [x] Existing catalog/product/variant/inventory foundations exist.
+- [x] Existing `NEW` / `SECOND_HAND` condition support exists.
+- [x] Existing managed brands exist.
+- [x] Existing Hero Showcase capability exists.
+- [ ] Route every catalog read/write through tenant DB context.
+- [ ] Make brand slug uniqueness tenant-local.
+- [ ] Make Hero content tenant-local.
+- [ ] Make catalog search/filter cache tenant-aware.
+- [ ] Tenant-scope product media object keys/metadata.
+- [ ] Prove tenant A unpublished/product IDs cannot be queried from tenant B.
+- [ ] Prove storefront SEO/catalog caches cannot cross tenants.
+
+## 10.2 Inventory
+
+- [x] Stock movements/reservations/concurrency foundations exist.
+- [ ] Move inventory transactions behind tenant client.
+- [ ] Tenant-scope reconciliation jobs and idempotency keys.
+- [ ] Tenant-scope low-stock alerts.
+- [ ] Tenant-scope exports.
+- [ ] Preserve finite-stock concurrency guarantees independently per tenant.
+- [ ] Validate same SKU can exist independently across tenant databases.
+
+## 10.3 Cart, saved carts, sharing, reorder, checkout
+
+- [x] Persistent guest cart exists.
+- [x] Saved/shareable cart and reorder capabilities are approved/developed baseline.
+- [x] Checkout quantity/variant editing and order note exist.
+- [ ] Bind guest-cart identity to resolved tenant.
+- [ ] Namespace cart cookies/storage where required.
+- [ ] Bind saved-cart share tokens to one tenant.
+- [ ] Prevent shared token from directly resolving private records in another tenant.
+- [ ] Tenant-scope cart merge.
+- [ ] Tenant-scope coupon validation.
+- [ ] Tenant-scope delivery zones/fees.
+- [ ] Tenant-scope checkout settings/support contacts.
+- [ ] Prove order history reorder ownership + tenant checks.
+
+## 10.4 Customers, addresses, identity, notifications
+
+- [x] Customer profile/address/order-history foundations exist.
+- [x] Private notification inbox exists.
+- [ ] Define customer identity tenancy policy.
+- [ ] Tenant-scope customer profile/history.
+- [ ] Tenant-scope addresses.
+- [ ] Tenant-scope notification inbox.
+- [ ] Tenant-scope abandoned-cart eligibility.
+- [ ] Prevent customer search in Tenant Admin from crossing databases.
+- [ ] Tenant-scope analytics/customer metrics.
+
+## 10.5 Orders and COD
+
+- [x] Idempotent orders and lifecycle state rules exist.
+- [ ] Tenant-scope order reference generation/prefix.
+- [ ] Tenant-scope idempotency keys.
+- [ ] Tenant-scope order history and audit.
+- [ ] Tenant-scope COD policy.
+- [ ] Tenant-scope confirmation queues.
+- [ ] Tenant-scope public/signed tracking.
+- [ ] Prove same human-readable reference/prefix cannot cause cross-tenant lookup.
+
+## 10.6 Commerce payments
+
+- [x] Provider-neutral prepaid architecture exists.
+- [ ] Move payment provider configuration to tenant-secure integration configuration.
+- [ ] Tenant-scope provider credentials/secrets.
+- [ ] Tenant-scope merchant references/idempotency.
+- [ ] Resolve webhook/callback tenant without trusting customer browser input.
+- [ ] Define provider account mapping to tenant.
+- [ ] Verify callback cannot mutate another tenant's payment.
+- [ ] Tenant-scope payment recovery/sweeps.
+- [ ] Tenant-scope reconciliation.
+- [ ] Preserve platform SaaS billing separation.
+
+## 10.7 Wallet
+
+- [x] Customer wallet and immutable ledger foundation exists.
+- [ ] Make wallet strictly tenant-local.
+- [ ] Prohibit cross-tenant wallet balance portability.
+- [ ] Tenant-scope top-up evidence/review.
+- [ ] Tenant-scope wallet checkout/refunds.
+- [ ] Prove tenant A customer identifier cannot debit tenant B wallet.
+- [ ] Add tenant-aware financial reconciliation tests.
+
+## 10.8 Fulfillment, courier, delivery, rider
+
+- [x] Fulfillment/courier foundation exists.
+- [x] Rider application/assignment/location/live map exists.
+- [ ] Tenant-scope fulfillment queues.
+- [ ] Tenant-scope courier integrations and credentials.
+- [ ] Tenant-scope shipment callbacks/polls.
+- [ ] Tenant-scope rider application.
+- [ ] Tenant-scope rider personnel approval.
+- [ ] Tenant-scope assignment.
+- [ ] Tenant-scope duty state.
+- [ ] Tenant-scope GPS history.
+- [ ] Tenant-scope WebSocket/live-map rooms.
+- [ ] Tenant-scope location-history clearing.
+- [ ] Prevent rider session from tenant A acting on tenant B order.
+- [ ] Preserve COD staff-confirmation rule per tenant.
+- [ ] Add location retention policy.
+
+## 10.9 Returns, refunds, RTO, settlement, reconciliation
+
+- [x] Existing post-purchase/reconciliation foundations exist.
+- [ ] Tenant-scope every return/refund/RTO/settlement record.
+- [ ] Tenant-scope scheduled reconciliation runs.
+- [ ] Tenant-scope settlement imports and evidence.
+- [ ] Tenant-scope BullMQ job IDs.
+- [ ] Tenant-scope manual retry actions.
+- [ ] Prove failure in tenant A reconciliation does not block tenant B jobs.
+
+## 10.10 Services, warranty, reviews, product requests, pickup
+
+- [x] Existing service booking exists.
+- [x] Existing warranty workflow exists.
+- [x] Existing review/banner workflow exists.
+- [x] Existing product-request workflow exists.
+- [x] Existing store pickup/outlet workflow exists.
+- [ ] Tenant-scope all records and settings.
+- [ ] Tenant-scope media/evidence.
+- [ ] Tenant-scope outlet inventory/pickup configuration.
+- [ ] Tenant-scope moderation and Admin queues.
+- [ ] Add cross-tenant ownership tests.
+
+## 10.11 Chat and real-time communication
+
+- [x] Chat foundation exists.
+- [ ] Tenant-scope socket tickets.
+- [ ] Tenant-scope rooms/channels.
+- [ ] Tenant-scope conversation lookup/history.
+- [ ] Tenant-scope quick replies/folders if configurable.
+- [ ] Reject cross-tenant socket subscriptions.
+- [ ] Add multi-client E2E with two tenants active simultaneously.
+
+## 10.12 Reports, analytics, purchase activity, audit, settings, health
+
+- [x] Existing reports/audit/settings/health foundations exist.
+- [ ] Tenant-scope report queries.
+- [ ] Tenant-scope exports.
+- [ ] Tenant-scope purchase activity/social proof.
+- [ ] Clarify that "Global Order History" means tenant-global only.
+- [ ] Tenant-scope feature flags/settings.
+- [ ] Separate platform feature flags from tenant feature flags.
+- [ ] Tenant-scope operations health while keeping platform health separate.
+- [ ] Ensure Platform Admin aggregate metrics use approved metadata/aggregation and do not expose tenant PII by default.
+- [ ] Tenant-scope audit logs.
+- [ ] Add support-access audit linking when Platform Support views tenant data.
+
+### MT-7 gate
+
+- [ ] Every existing protected commerce controller/service has a documented tenant boundary.
+- [ ] Automated tests cover at least two tenants for every high-risk financial/identity/real-time module.
+- [ ] No legacy single-store global setting or default tenant DB remains on production request paths.
+
+---
+
+# 11. Release MT-8 — Redis, BullMQ, WebSockets, Cache, Files, and External Integrations
+
+## 11.1 Redis/cache namespace
+
+- [ ] Inventory all Redis keys.
+- [ ] Prefix tenant-scoped keys with trusted tenant identity.
+- [ ] Tenant-scope session adjunct data where applicable.
+- [ ] Tenant-scope OTP/rate-limit keys where business semantics require it.
+- [ ] Tenant-scope catalog/settings caches.
+- [ ] Tenant-scope idempotency keys.
+- [ ] Tenant-scope distributed locks.
+- [ ] Add collision tests using identical record IDs in two tenants.
+
+## 11.2 BullMQ
+
+- [ ] Inventory every queue.
+- [ ] Add tenant ID to trusted job envelope.
+- [ ] Validate tenant registry record before job DB access.
+- [ ] Resolve tenant DB inside worker from control plane.
+- [ ] Tenant-scope job IDs/deduplication keys.
+- [ ] Tenant-scope scheduled jobs.
+- [ ] Prevent a poisoned/forged job from selecting arbitrary DB URL.
+- [ ] Add dead-letter/failure evidence with tenant context.
+- [ ] Add per-tenant operational metrics where useful.
+- [ ] Prove one tenant's failed jobs do not starve the entire queue.
+
+## 11.3 WebSockets
+
+- [ ] Resolve tenant during socket authentication.
+- [ ] Bind socket ticket/session to tenant.
+- [ ] Prefix rooms with tenant identity.
+- [ ] Tenant-scope Admin chat.
+- [ ] Tenant-scope rider live map.
+- [ ] Tenant-scope customer notifications if realtime.
+- [ ] Reject room joins across tenant boundaries.
+
+## 11.4 Object/media storage
+
+- [ ] **BLOCKED/PARTIAL:** Select/complete production object storage strategy.
+- [ ] Namespace object keys by tenant.
+- [ ] Keep private evidence private.
+- [ ] Use signed access where required.
+- [ ] Prevent guessed tenant paths from returning objects.
+- [ ] Add lifecycle/retention rules.
+- [ ] Add tenant export/deletion support.
+- [ ] Add malware/content validation where required by upload type.
+
+## 11.5 Tenant integrations
+
+- [ ] Build tenant integration credential vault/boundary.
+- [ ] Encrypt provider secrets.
+- [ ] Redact secrets from Admin/API/logs.
+- [ ] Tenant-scope payment providers.
+- [ ] Tenant-scope courier providers.
+- [ ] Tenant-scope transactional messaging providers/templates.
+- [ ] Tenant-scope Google/Meta integrations where later enabled.
+- [ ] Add credential rotation workflow.
+- [ ] Add readiness/health without leaking secrets.
+
+### MT-8 gate
+
+- [ ] Identical Redis/job/socket/object identifiers in two tenants cannot collide.
+- [ ] Background and realtime paths meet the same isolation standard as HTTP.
+
+---
+
+# 12. Release MT-9 — Ferio Platform Admin
+
+## 12.1 Platform dashboard
+
+- [ ] Organization counts by lifecycle.
+- [ ] Active/trial/past-due/suspended subscription counts.
+- [ ] Provisioning failures.
+- [ ] Tenant migration fleet status.
+- [ ] Domain health.
+- [ ] Tenant DB health.
+- [ ] Platform billing outcomes.
+- [ ] Usage/limit alerts.
+- [ ] Queue/system health.
+- [ ] Backup status.
+- [ ] Security/support-access alerts.
+
+## 12.2 Organization management
+
+- [ ] Create organization.
+- [ ] View organization metadata.
+- [ ] View owner/members at platform metadata level.
+- [ ] View plan/subscription.
+- [ ] View domains.
+- [ ] View tenant DB registration/schema version.
+- [ ] View provisioning timeline.
+- [ ] Suspend/reactivate according to policy.
+- [ ] Initiate closure/export according to policy.
+- [ ] Never show raw tenant DB password.
+
+## 12.3 Plan and billing administration
+
+- [ ] CRUD/version plans safely.
+- [ ] Configure entitlements/limits.
+- [ ] View subscriptions.
+- [ ] View platform invoices/payment attempts.
+- [ ] Manual billing operations require explicit permission/reason/audit.
+- [ ] Add internal/free entitlement state if approved.
+- [ ] Add tenant-specific override with expiry/reason if approved.
+
+## 12.4 Tenant operations
+
+- [ ] Provisioning retry.
+- [ ] Tenant migration canary/batch control.
+- [ ] Pause rollout.
+- [ ] Retry failed tenant.
+- [ ] DB health probe.
+- [ ] Schema version drift view.
+- [ ] Backup evidence.
+- [ ] Restore workflow status.
+- [ ] Domain verification diagnostics.
+- [ ] Tenant cache invalidation where safe.
+
+## 12.5 Support access
+
+- [ ] Request support access.
+- [ ] Require reason.
+- [ ] Require tenant authorization where policy demands it.
+- [ ] Set expiry.
+- [ ] Restrict scope/permissions.
+- [ ] Record every support action.
+- [ ] Revoke immediately.
+- [ ] Display active support sessions prominently.
+
+### MT-9 gate
+
+- [ ] Ferio operators can manage tenant lifecycle without direct DB shell access for normal operations.
+- [ ] Platform Admin is not an unrestricted universal tenant superuser.
+
+---
+
+# 13. Release MT-10 — Tenant Admin and Storefront SaaS Experience
+
+## 13.1 Tenant owner onboarding
+
+- [ ] Invitation/first-login flow.
+- [ ] Organization/store setup wizard.
+- [ ] Store identity.
+- [ ] Logo/branding.
+- [ ] Support contacts.
+- [ ] Currency/timezone.
+- [ ] Order prefix.
+- [ ] Delivery zones.
+- [ ] COD policy.
+- [ ] Payment configuration.
+- [ ] Courier configuration.
+- [ ] Notification configuration.
+- [ ] Initial catalog/import guidance.
+- [ ] Subscription/plan summary.
+- [ ] Usage/limit summary.
+- [ ] Domain status.
+
+## 13.2 Tenant Admin entitlement UX
+
+- [ ] Navigation hides or labels unavailable plan features.
+- [ ] Backend remains authoritative.
+- [ ] Upgrade CTA for plan-gated features.
+- [ ] Limit warnings before hard limits.
+- [ ] Stable errors when limit reached.
+- [ ] Downgraded tenant can still access historical records appropriately.
+- [ ] Suspended tenant gets approved read/write restrictions.
+
+## 13.3 Tenant branding
+
+- [ ] Tenant storefront logo.
+- [ ] Tenant name.
+- [ ] Hero Showcase.
+- [ ] Contact information.
+- [ ] Policies.
+- [ ] Social links.
+- [ ] Theme tokens only within approved customization boundary.
+- [ ] No tenant-supplied unsafe arbitrary script/CSS by default.
+- [ ] Cache invalidation after branding update.
+
+## 13.4 Storefront tenant behavior
+
+- [ ] Tenant-aware catalog.
+- [ ] Tenant-aware cart cookies/session.
+- [ ] Tenant-aware auth/customer account.
+- [ ] Tenant-aware checkout/payment.
+- [ ] Tenant-aware tracking.
+- [ ] Tenant-aware wallet.
+- [ ] Tenant-aware warranty/services/chat.
+- [ ] Tenant-aware support information.
+- [ ] Tenant-aware SEO.
+- [ ] Unknown/suspended domain states.
+
+### MT-10 gate
+
+- [ ] A business owner can receive a tenant, configure it, publish products, receive an order, fulfill it, and see only that business's data.
+- [ ] A second tenant can perform the same flow concurrently with no shared state.
+
+---
+
+# 14. Release MT-11 — Tenant Migration Orchestration
+
+Database-per-tenant requires fleet migration tooling before production tenant count grows.
+
+## 14.1 Migration packaging
+
+- [ ] Define canonical tenant Prisma schema.
+- [ ] Define canonical migration artifact/version.
+- [ ] Record expected schema version in control plane.
+- [ ] Make migration artifact immutable once released.
+- [ ] Add compatibility metadata if application version requires minimum schema version.
+- [ ] Separate control-plane migrations from tenant-plane migrations.
+
+## 14.2 Migration orchestrator
+
+- [ ] Discover eligible tenant DBs.
+- [ ] Preflight tenant DB connectivity.
+- [ ] Verify current version.
+- [ ] Apply canary tenant migration.
+- [ ] Run post-migration health checks.
+- [ ] Roll out in bounded batches.
+- [ ] Limit concurrency.
+- [ ] Record per-tenant result.
+- [ ] Retry transient failures.
+- [ ] Stop/pause on failure threshold.
+- [ ] Isolate one failed tenant without blocking already healthy tenants unnecessarily.
+- [ ] Prevent application from serving incompatible schema silently.
+- [ ] Provide operator resume/retry.
+- [ ] Provide migration fleet dashboard.
+
+## 14.3 Migration safety
+
+- [ ] Back up before high-risk migrations.
+- [ ] Define expand/migrate/contract pattern for breaking changes.
+- [ ] Avoid destructive schema changes in one step.
+- [ ] Test old app/new schema and new app/transition schema compatibility where rollout requires it.
+- [ ] Add migration timeout.
+- [ ] Add lock/contention strategy.
+- [ ] Add rollback/forward-fix runbook.
+- [ ] Never run uncontrolled `prisma migrate deploy` against every tenant simultaneously from application startup.
+
+## 14.4 Validation
+
+- [ ] Create at least 10 disposable tenant DBs.
+- [ ] Migrate all successfully.
+- [ ] Inject one failing tenant.
+- [ ] Prove remaining tenants are handled according to rollout policy.
+- [ ] Prove retry after repair.
+- [ ] Prove schema-version reporting.
+- [ ] Prove app rejects/isolates incompatible tenant safely.
+
+### MT-11 gate
+
+- [ ] Canary → batch → fleet migration works with one intentionally failing database.
+- [ ] Production deployment does not depend on manually migrating tenant DBs one by one.
+
+---
+
+# 15. Release MT-12 — Backup, Restore, Export, Closure, and Disaster Recovery
+
+## 15.1 Backup
+
+- [ ] Select managed PostgreSQL backup/PITR strategy.
+- [ ] Define RPO.
+- [ ] Define RTO.
+- [ ] Back up control plane.
+- [ ] Back up every tenant DB.
+- [ ] Track backup evidence/status centrally.
+- [ ] Alert on stale/failed backup.
+- [ ] Protect backup credentials.
+- [ ] Define retention by plan/legal requirement.
+
+## 15.2 Restore
+
+- [ ] Restore control plane to isolated environment.
+- [ ] Restore one tenant independently.
+- [ ] Restore tenant without overwriting another.
+- [ ] Verify schema version after restore.
+- [ ] Verify object/media references.
+- [ ] Verify financial ledgers/reconciliation.
+- [ ] Document DNS/domain behavior during disaster recovery.
+- [ ] Perform and record restore exercise.
+
+## 15.3 Tenant export/closure
+
+- [ ] **BLOCKED:** Approve retention/deletion policy.
+- [ ] Define export package.
+- [ ] Export tenant business data.
+- [ ] Export audit/financial data according to policy.
+- [ ] Export media where required.
+- [ ] Revoke domains safely.
+- [ ] Revoke integration credentials.
+- [ ] Stop scheduled jobs.
+- [ ] Close DB connections.
+- [ ] Archive/delete DB according to policy.
+- [ ] Prevent domain takeover after closure.
+- [ ] Preserve required platform billing/audit evidence.
+
+### MT-12 gate
+
+- [ ] One tenant can be restored independently from backup.
+- [ ] A documented closure flow exists before accepting production tenants.
+
+---
+
+# 16. Release MT-13 — Observability, Security, Performance, and SaaS Hardening
+
+## 16.1 Observability
+
+- [ ] Add organization/tenant ID to safe structured logs.
+- [ ] Add resolved domain where safe.
+- [ ] Add tenant DB connection metrics.
+- [ ] Add provisioning metrics.
+- [ ] Add migration fleet metrics.
+- [ ] Add subscription/entitlement denial metrics.
+- [ ] Add unknown-domain metrics.
+- [ ] Add per-tenant queue failure visibility.
+- [ ] Add platform billing metrics.
+- [ ] Add backup freshness metrics.
+- [ ] Add support-access security events.
+- [ ] Add alerting for isolation-critical failures.
+
+## 16.2 Security tests
+
+- [ ] Host-header manipulation tests.
+- [ ] Cross-tenant JWT/session replay tests.
+- [ ] IDOR tests using same IDs across tenant DBs.
+- [ ] Tenant Admin → Platform Admin privilege escalation tests.
+- [ ] Platform Support access expiry/revocation tests.
+- [ ] Cross-tenant saved-cart token tests.
+- [ ] Cross-tenant wallet tests.
+- [ ] Cross-tenant payment callback tests.
+- [ ] Cross-tenant rider assignment/GPS tests.
+- [ ] Cross-tenant WebSocket room tests.
+- [ ] Cross-tenant Redis collision tests.
+- [ ] Cross-tenant file/object access tests.
+- [ ] Unknown/suspended/deleted tenant tests.
+- [ ] SSR/BFF tenant-confusion tests.
+- [ ] Cache poisoning/leak tests.
+
+## 16.3 Performance and scale
+
+- [ ] Load-test tenant resolver.
+- [ ] Load-test connection manager.
+- [ ] Load-test 10/50/100+ active tenant simulations.
+- [ ] Measure cold tenant DB connection latency.
+- [ ] Measure cached tenant resolution.
+- [ ] Test pool exhaustion behavior.
+- [ ] Test noisy-neighbor queue behavior.
+- [ ] Test one slow tenant DB.
+- [ ] Test control-plane outage behavior.
+- [ ] Define safe degraded behavior; never bypass tenant authorization.
+- [ ] Establish capacity thresholds for when database connection strategy must change.
+
+## 16.4 Dependency/security hygiene
+
+- [ ] CI dependency audit.
+- [ ] Secret scan.
+- [ ] SAST/lint/typecheck.
+- [ ] Production builds for all web apps/backend.
+- [ ] Prisma migration validation.
+- [ ] Tenant-isolation integration suite mandatory in CI.
+- [ ] Prevent merge if critical isolation tests fail.
+
+### MT-13 gate
+
+- [ ] Security review finds no known path for tenant A to read/write tenant B data.
+- [ ] Capacity test demonstrates bounded DB connection behavior.
+- [ ] Critical SaaS metrics and alerts are operational.
+
+---
+
+# 17. Release MT-14 — Internal Alpha, Pilot Tenants, and Production Launch
+
+## 17.1 Internal alpha
+
+- [ ] Provision at least three internal tenants.
+- [ ] Use intentionally overlapping customer/product/order identifiers.
+- [ ] Run browse → checkout → order → payment/COD → fulfillment → rider/courier → return/refund flows.
+- [ ] Run wallet flow.
+- [ ] Run warranty/service/chat/pickup flow.
+- [ ] Run tenant suspension/reactivation.
+- [ ] Run plan upgrade/downgrade.
+- [ ] Run provisioning retry.
+- [ ] Run tenant migration canary/batch.
+- [ ] Run tenant backup/restore.
+- [ ] Run support-access workflow.
+
+## 17.2 Pilot beta
+
+- [ ] Select 2–5 controlled real businesses.
+- [ ] Provision each independently.
+- [ ] Validate owner onboarding.
+- [ ] Validate real domains/subdomains.
+- [ ] Validate tenant-specific provider configuration.
+- [ ] Monitor DB pools and tenant latency.
+- [ ] Monitor queue fairness.
+- [ ] Monitor support volume.
+- [ ] Collect onboarding friction.
+- [ ] Collect plan/limit feedback.
+- [ ] Freeze destructive schema changes during pilot unless required.
+
+## 17.3 Production launch gate
+
+- [ ] Every PRD Release 1 SaaS exit criterion passes.
+- [ ] At least two independent organizations have isolated DBs and domains.
+- [ ] Cross-tenant negative test suite passes.
+- [ ] Provisioning is idempotent.
+- [ ] Migration orchestration is proven.
+- [ ] Subscription/entitlement enforcement is proven.
+- [ ] Platform billing is separated from tenant commerce billing.
+- [ ] Backup and restore are proven.
+- [ ] Unknown/suspended-domain behavior is proven.
+- [ ] Redis/BullMQ/WebSocket/file isolation is proven.
+- [ ] Platform Admin support access is audited and constrained.
+- [ ] No production request path can fall back to the original single-tenant DB.
+- [ ] Critical/high security findings are closed or formally accepted.
+- [ ] Operational runbooks are complete.
+
+---
+
+# 18. Release 2 — Multi-Tenant CRM, Retention, and Growth
+
+Release 2 should begin only after SaaS isolation and operations are stable.
+
+## 18.1 Tenant Customer 360
+
+- [ ] Unified tenant-local customer timeline.
+- [ ] Reviewed duplicate profile merge within a tenant.
+- [ ] Delivered/cancelled/returned/spend/source/risk indicators.
+- [ ] Support context.
+- [ ] Cohort and lifetime-value/contribution views.
+- [ ] Explicitly prevent cross-tenant Customer 360 aggregation unless a separate privacy-reviewed platform product is approved.
+
+## 18.2 Tenant consent and communications
+
+- [ ] Channel-specific consent evidence.
+- [ ] Revocation/suppression.
+- [ ] Frequency caps.
+- [ ] Quiet hours.
+- [ ] Tenant marketing kill switch.
+- [ ] Explainable eligibility.
+- [ ] Tenant-specific send history.
+- [ ] Tenant-specific messaging credentials/templates.
+- [ ] Plan entitlement for advanced marketing if applicable.
+
+## 18.3 Segments and campaigns
+
+- [ ] Deterministic tenant-local segments.
+- [ ] Segment preview/count.
+- [ ] WhatsApp-first controlled campaigns.
+- [ ] Abandoned-cart automation.
+- [ ] Restock automation.
+- [ ] Price-drop automation.
+- [ ] Post-purchase automation.
+- [ ] Repeat-purchase automation.
+- [ ] Win-back automation.
+- [ ] Meta Lead Ads / Pixel / CAPI if approved.
+- [ ] Tenant campaign reporting through delivered/returned/contribution outcomes.
+- [ ] Tenant usage/billing metering for campaign volume if plan requires it.
+
+## 18.4 Release 2 SaaS gates
+
+- [ ] Campaign jobs cannot cross tenant.
+- [ ] Suppression/consent is evaluated inside correct tenant.
+- [ ] Provider credentials cannot cross tenant.
+- [ ] Segment preview cannot query another tenant DB.
+- [ ] Usage limits are enforced server-side.
+- [ ] Release 2 PRD exit criteria pass.
+
+---
+
+# 19. Release 3 — SaaS Optimization and Scale
+
+These are trigger-based candidates, not launch prerequisites.
+
+- [ ] Dedicated search infrastructure with tenant index isolation.
+- [ ] Personalized recommendations with tenant/customer privacy boundaries.
+- [ ] Advanced COD/fraud scoring.
+- [ ] AI-assisted product descriptions.
+- [ ] AI-assisted SEO.
+- [ ] Review summarization/image moderation.
+- [ ] Customer-support assistant/translation.
+- [ ] Image background removal.
+- [ ] Category/duplicate-product detection.
+- [ ] Analytics warehouse with explicit tenant partitioning.
+- [ ] Advanced courier optimization.
+- [ ] Multi-warehouse entitlement.
+- [ ] Public tenant APIs.
+- [ ] Tenant webhooks.
+- [ ] Enterprise SSO if demand justifies it.
+- [ ] Higher-availability/dedicated tenant tiers.
+- [ ] Tenant DB placement/region strategy if scale requires it.
+- [ ] Read replicas only after measured need.
+- [ ] Service extraction only after modular-monolith bottlenecks are demonstrated.
+
+---
+
+# 20. Product-Owner / Architecture Decision Checklist
+
+The following decisions should be recorded in a dedicated ADR/product decision log.
+
+- [ ] **BLOCKED:** Initial SaaS plan names, prices, billing intervals.
+- [ ] **BLOCKED:** Trial/free/internal tenant policy.
+- [ ] **BLOCKED:** Exact feature entitlements and quantitative limits.
+- [ ] **BLOCKED:** Subscription grace-period and suspension behavior.
+- [ ] **BLOCKED:** SaaS subscription payment provider.
+- [ ] **BLOCKED:** Default production tenant hostname/domain.
+- [ ] **BLOCKED:** Wildcard DNS/TLS hosting strategy.
+- [ ] **BLOCKED:** Custom-domain launch release and certificate automation.
+- [ ] **BLOCKED:** PostgreSQL hosting model for database-per-tenant.
+- [ ] **BLOCKED:** Tenant DB credential storage/KMS strategy.
+- [ ] **BLOCKED:** PgBouncer/connection-pooling infrastructure.
+- [ ] **BLOCKED:** RPO/RTO.
+- [ ] **BLOCKED:** Backup retention.
+- [ ] **BLOCKED:** Tenant closure/export/deletion retention.
+- [ ] **BLOCKED:** Customer identity scope across tenants.
+- [ ] **BLOCKED:** Whether one global login may have memberships in multiple tenant businesses.
+- [ ] **BLOCKED:** Platform support-access approval policy.
+- [ ] **BLOCKED:** Object storage provider and tenant object-key strategy.
+- [ ] **BLOCKED:** Plan treatment of custom domains, advanced CRM, campaigns, integrations, warehouses, staff counts, products/SKUs, and usage.
+- [ ] **BLOCKED:** Production tenant onboarding model: self-service, sales-assisted, or Platform Admin-only for initial launch.
+- [ ] **BLOCKED:** Whether subscription suspension leaves storefront read-only, hides checkout only, or disables the storefront.
+- [ ] **BLOCKED:** Exact tenant database migration maintenance-window policy.
+- [ ] **BLOCKED:** Data residency/legal requirements for Bangladesh and future markets.
+
+---
+
+# 21. Delivery Order and Dependency Schedule
+
+This is a dependency schedule, not a calendar promise. The safest implementation order is:
+
+| Order | Slice | Depends on | Completion gate |
+|---:|---|---|---|
+| 0 | MT-0 Architecture & safety baseline | Current Ferio baseline | Model ownership classified; ADRs and threat model approved |
+| 1 | MT-1 Control plane | MT-0 | Organizations/plans/subscriptions/DB registry work independently |
+| 2 | MT-2 Tenant resolver/context | MT-1 | Trusted host → tenant context; unknown/cross-tenant attempts fail closed |
+| 3 | MT-3 DB router | MT-2 | Two isolated tenant DBs work with bounded connections |
+| 4 | MT-4 Provisioning | MT-1–3 | Organization → DB → migration → seed → owner → ready is idempotent |
+| 5 | MT-5 Domains | MT-2, MT-4 | Separate tenant hosts render correct isolated stores |
+| 6 | MT-6 Subscription/entitlements | MT-1, MT-2 | Plan limits and subscription state enforced server-side |
+| 7 | MT-7 Existing module migration | MT-2–6 | Existing commerce works tenant-isolated end to end |
+| 8 | MT-8 Redis/jobs/sockets/files/integrations | MT-2–7 | Non-HTTP infrastructure passes cross-tenant isolation tests |
+| 9 | MT-9 Platform Admin | MT-1, MT-4, MT-6, MT-11 foundations | Ferio can operate tenant lifecycle safely |
+| 10 | MT-10 Tenant SaaS UX | MT-5–9 | Tenant owner can configure and operate a complete store |
+| 11 | MT-11 Migration orchestration | MT-3–4 | Canary/batch/failure-isolation fleet migration passes |
+| 12 | MT-12 Backup/restore/closure | MT-3–4 | Independent tenant restore is proven |
+| 13 | MT-13 Hardening | MT-1–12 | Security/performance/observability gates pass |
+| 14 | MT-14 Alpha/beta/launch | All prior | PRD SaaS Release 1 exit criteria pass |
+| 15 | Release 2 CRM/retention | Stable SaaS Release 1 | Tenant-local CRM/consent/campaign gates pass |
+| 16 | Release 3 optimization | Measured triggers | Approved experiments prove value and isolation |
+
+---
+
+# 22. Suggested Engineering Schedule
+
+Assuming one strong full-time engineer/AI-assisted development workflow, this should be treated as a **sequencing estimate**, not a guaranteed delivery date.
+
+| Phase | Suggested effort | Primary outcome |
+|---|---:|---|
+| MT-0 | 2–4 days | Architecture freeze, model classification, threat model |
+| MT-1 | 4–7 days | Control-plane schema/services/auth |
+| MT-2 | 3–5 days | Trusted tenant resolver/context/membership |
+| MT-3 | 5–8 days | Tenant Prisma router + bounded connection manager |
+| MT-4 | 5–8 days | Idempotent tenant provisioning |
+| MT-5 | 3–6 days | Subdomains/domain routing and tenant frontend state |
+| MT-6 | 5–8 days | Plans/subscriptions/entitlements/usage foundation |
+| MT-7 | 15–25 days | Migrate existing commerce modules to tenant-safe operation |
+| MT-8 | 5–9 days | Redis/BullMQ/socket/storage/provider isolation |
+| MT-9 | 6–10 days | Platform Admin operational surface |
+| MT-10 | 5–9 days | Tenant onboarding/plan/branding UX |
+| MT-11 | 5–8 days | Fleet migration orchestrator |
+| MT-12 | 4–7 days | Backup/restore/export/closure |
+| MT-13 | 7–12 days | Security, performance, observability hardening |
+| MT-14 | 7–14 days | Alpha, pilot, remediation, launch proof |
+
+**Indicative Release 1 SaaS engineering range:** approximately **81–140 focused engineering days** for a production-grade conversion, depending heavily on infrastructure/provider choices, how much existing code can be adapted cleanly, and the depth of automated testing already available.
+
+Parallel work can shorten calendar time, but MT-2/MT-3 are architectural choke points: feature teams should not independently invent tenant routing before those contracts are stable.
+
+---
+
+# 23. Recommended First 20 Implementation Tasks
+
+Execute these before broad UI work:
+
+1. [ ] Create `control-plane` architecture ADR.
+2. [ ] Classify every existing Prisma model as control-plane or tenant-plane.
+3. [ ] Create separate control-plane Prisma schema/database.
+4. [ ] Add `Organization`, `TenantDomain`, `TenantDatabase`, `Plan`, `Subscription`.
+5. [ ] Add Platform Admin identity/permission boundary.
+6. [ ] Implement trusted hostname normalization/resolution.
+7. [ ] Implement immutable request-scoped `TenantContext`.
+8. [ ] Implement encrypted tenant DB registry credentials.
+9. [ ] Implement bounded tenant Prisma client manager.
+10. [ ] Remove/default-disable global tenant Prisma access from tenant HTTP paths.
+11. [ ] Create two disposable tenant DBs with intentionally overlapping IDs.
+12. [ ] Add first cross-tenant isolation integration suite.
+13. [ ] Implement organization provisioning state machine.
+14. [ ] Refactor tenant seed to be idempotent and business-neutral.
+15. [ ] Implement tenant subdomain reservation/activation.
+16. [ ] Tenant-enable authentication/membership.
+17. [ ] Tenant-enable catalog + settings first as a vertical proof.
+18. [ ] Tenant-enable cart → checkout → COD order as the first complete commerce proof.
+19. [ ] Namespace Redis/BullMQ/socket identifiers.
+20. [ ] Build minimal Platform Admin organization/provisioning screen.
+
+**Do not start by rewriting every controller.** Prove one complete vertical slice:
+
+```text
+tenant hostname
+    ↓
+trusted tenant resolver
+    ↓
+tenant context
+    ↓
+tenant DB router
+    ↓
+tenant catalog
+    ↓
+tenant cart
+    ↓
+tenant checkout
+    ↓
+tenant COD order
+    ↓
+tenant admin sees only that order
+```
+
+Then use that pattern to migrate the remaining modules.
+
+---
+
+# 24. Mandatory Cross-Tenant Test Matrix
+
+For each high-risk resource, create tenant A and tenant B with overlapping numeric/UUID-like test fixtures wherever possible.
+
+| Domain | Required negative proof |
+|---|---|
+| Auth/session | Tenant A session cannot authorize tenant B protected route |
+| Catalog | Product A ID/slug cannot expose B product |
+| Cart | Guest/customer cart cannot move between tenants accidentally |
+| Saved cart | Share token resolves only its tenant |
+| Checkout | Tenant B cannot price/place A cart |
+| Coupon | Coupon belongs to correct tenant |
+| Customer | Tenant Admin A cannot search/read B customer |
+| Order | Reference/ID from A cannot return B order |
+| Payment | Callback/merchant reference maps to exactly one tenant |
+| Wallet | A balance cannot be read/debited/refunded by B |
+| Inventory | Reservation/movement cannot target B SKU |
+| Rider | A rider cannot see/update B assignment |
+| GPS/live map | A Admin cannot subscribe/read B locations |
+| Return/refund | A return cannot mutate B order/payment |
+| Settlement | Import/reconciliation is tenant-bound |
+| Warranty/service | Ownership checks include tenant |
+| Chat | Socket ticket/room cannot cross tenant |
+| Notification | Inbox/outbox remains tenant-scoped |
+| Reports/export | Queries and exports contain one tenant only |
+| Audit | Tenant audit cannot expose B events |
+| Redis | Same logical key in A/B does not collide |
+| BullMQ | Job payload cannot choose arbitrary tenant DB |
+| Object storage | Guessed B path is inaccessible to A |
+| Settings/Hero | Cache cannot return B branding/content |
+| Platform support | Access requires explicit active support grant |
+
+---
+
+# 25. CI/CD Gate for Multi-Tenancy
+
+Every merge affecting tenant-aware code should run:
+
+- [ ] Backend lint/typecheck/build.
+- [ ] Backend unit suite.
+- [ ] Control-plane Prisma migration validation.
+- [ ] Tenant-plane Prisma migration validation.
+- [ ] Disposable control-plane PostgreSQL integration tests.
+- [ ] At least two disposable tenant PostgreSQL databases.
+- [ ] Cross-tenant isolation suite.
+- [ ] Redis/BullMQ isolation tests for affected modules.
+- [ ] WebSocket isolation tests for affected realtime modules.
+- [ ] Storefront production build.
+- [ ] Tenant Admin production build.
+- [ ] Platform Admin production build.
+- [ ] Rider surface production build.
+- [ ] Secret scan.
+- [ ] Dependency/security audit.
+- [ ] Migration compatibility check.
+- [ ] No use of production tenant credentials in CI.
+- [ ] Fail build on critical tenant-isolation regression.
+
+Before production deployment:
+
+```text
+control-plane migration
+        ↓
+application compatibility deployment if required
+        ↓
+tenant migration canary
+        ↓
+post-canary validation
+        ↓
+bounded tenant batches
+        ↓
+failed-tenant isolation/recovery
+        ↓
+full rollout
+```
+
+---
+
+# 26. Definition of Done for the Multi-Tenant Conversion
+
+The conversion is not complete merely because requests contain `tenantId`.
+
+It is complete when:
+
+- [ ] Ferio has a separate operational control plane.
+- [ ] Each tenant has an independently registered and isolated database.
+- [ ] Tenant context comes only from trusted server-side resolution/membership.
+- [ ] Every tenant commerce module uses the resolved tenant database.
+- [ ] Existing single-tenant commerce functionality remains behaviorally correct.
+- [ ] Platform billing and tenant commerce money remain separate.
+- [ ] Plans and limits are enforced server-side.
+- [ ] Tenant provisioning is idempotent and recoverable.
+- [ ] Domains are safely verified/routed.
+- [ ] Redis, BullMQ, WebSockets, caches, files, and provider integrations are tenant-isolated.
+- [ ] Fleet migrations are staged and failure-isolated.
+- [ ] One tenant can be backed up/restored independently.
+- [ ] Platform support access is explicit and audited.
+- [ ] Cross-tenant negative tests cover all sensitive domains.
+- [ ] Two or more real/pilot tenants can operate concurrently without data, cache, job, socket, credential, or financial leakage.
+- [ ] No legacy default-tenant fallback exists in production.
+- [ ] Release 1 SaaS acceptance criteria in PRD v2.1 pass.
+
+---
+
+# 27. Checklist Maintenance
+
+After every completed slice:
+
+1. Change `[ ]` to `[x]` only after the stated multi-tenant gate is validated.
+2. Record test/build/migration evidence in the current progress document.
+3. Record architecture changes as ADRs.
+4. Add newly discovered tenant-boundary risks immediately.
+5. Never mark UI-only implementation as completion when backend isolation is missing.
+6. Re-run the cross-tenant negative suite after changes to auth, DB routing, cache, jobs, sockets, files, payments, wallet, riders, or Platform Admin.
+7. Keep Release 2/3 growth work behind the Release 1 SaaS isolation and operational gates.

@@ -24,7 +24,7 @@ jobs:
           cache-dependency-path: ferio-nest-prisma/pnpm-lock.yaml
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Generate Prisma client
+      - name: Generate Prisma clients (tenant + platform)
         run: pnpm prisma:generate
       - name: Production build
         run: pnpm build
