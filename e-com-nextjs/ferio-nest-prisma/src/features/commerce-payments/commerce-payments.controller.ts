@@ -34,12 +34,17 @@ import {
   RetryCommercePaymentDto,
 } from './dto/commerce-payment.dto';
 import { PaymentRecoveryQueue } from './payment-recovery.queue';
+import { verifyCallbackToken } from '../../tenancy/callback-tenant.util';
+import { TenantCallbackRunner } from '../../tenancy/tenant-callback.runner';
 import { PaymentLedgerQueryDto } from './dto/payment-ledger.dto';
 
 @ApiTags('Payments')
 @Controller('payments')
 export class PublicCommercePaymentsController {
-  constructor(private readonly payments: CommercePaymentsService) {}
+  constructor(
+    private readonly payments: CommercePaymentsService,
+    private readonly callbackRunner: TenantCallbackRunner,
+  ) {}
 
   @Get('providers')
   providers() {
@@ -80,11 +85,42 @@ export class PublicCommercePaymentsController {
     if (!['SSLCOMMERZ', 'AAMARPAY'].includes(provider))
       throw new BadRequestException('Unknown payment provider');
 
+    // MT-7 §10.6: route the callback to its tenant ONLY via the HMAC-signed
+    // token minted at initiation. Browser/provider-supplied values are never
+    // trusted to select a database.
+    const tenancyEnabled =
+      (process.env.TENANCY_ENABLED || 'false') === 'true' &&
+      !!this.callbackRunner;
+    if (tenancyEnabled) {
+      const secret = process.env.PLATFORM_CALLBACK_SECRET;
+      const organizationId = verifyCallbackToken(query.cbt, secret);
+      if (!organizationId) {
+        throw new BadRequestException('PAYMENT_CALLBACK_TENANT_INVALID');
+      }
+      const result = await this.callbackRunner.runForOrganization(
+        organizationId,
+        () =>
+          this.payments.processCallback(provider, eventType, {
+            ...query,
+            ...payload,
+          }),
+      );
+      return this.respond(eventType, result, response);
+    }
+
     // Process callback & validate with SSLCommerz server API
     const result = await this.payments.processCallback(provider, eventType, {
       ...query,
       ...payload,
     });
+    return this.respond(eventType, result, response);
+  }
+
+  private async respond(
+    eventType: string,
+    result: { paid: boolean; orderId?: string },
+    response: Response,
+  ) {
 
     // IPN background notifications do not redirect browser
     if (eventType === 'ipn') return response.status(200).json(result);

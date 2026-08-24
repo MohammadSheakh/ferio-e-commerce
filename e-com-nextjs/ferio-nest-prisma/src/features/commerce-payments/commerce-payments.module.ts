@@ -15,7 +15,7 @@ import { PaymentRecoveryProcessor } from './payment-recovery.processor';
 import { PaymentRecoveryQueue } from './payment-recovery.queue';
 
 @Module({
-  imports: [PrismaModule, AuthModule, OrderModule, AuditModule],
+  imports: [PrismaModule, AuthModule, OrderModule, AuditModule, TenancyModule],
   controllers: [
     PublicCommercePaymentsController,
     AdminCommercePaymentsController,

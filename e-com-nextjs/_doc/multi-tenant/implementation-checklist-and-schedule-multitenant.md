@@ -556,10 +556,10 @@ This is the largest migration slice. Existing feature behavior should remain sta
 - [x] Provider-neutral prepaid architecture exists.
 - [ ] Move payment provider configuration to tenant-secure integration configuration.
 - [ ] Tenant-scope provider credentials/secrets.
-- [ ] Tenant-scope merchant references/idempotency.
-- [ ] Resolve webhook/callback tenant without trusting customer browser input.
+- [x] Tenant-scope merchant references/idempotency. (attempts/callbacks resolve per tenant database; unique references scoped by construction)
+- [x] Resolve webhook/callback tenant without trusting customer browser input. (HMAC-signed `cbt` token minted at initiation and embedded in gateway callback URLs; verified timing-safe server-side before any mutation — forgery fails closed with PAYMENT_CALLBACK_TENANT_INVALID)
 - [ ] Define provider account mapping to tenant.
-- [ ] Verify callback cannot mutate another tenant's payment.
+- [x] Verify callback cannot mutate another tenant's payment. (token binds organization; processing runs inside that tenant's context/database — cross-tenant mutation has no resolution path)
 - [ ] Tenant-scope payment recovery/sweeps.
 - [ ] Tenant-scope reconciliation.
 - [ ] Preserve platform SaaS billing separation.

@@ -9,6 +9,7 @@ import {
   TenantMembershipGuard,
   TenantMembershipService,
 } from './tenant-membership.guard';
+import { TenantCallbackRunner } from './tenant-callback.runner';
 
 /**
  * Tenant plane (MT-2/MT-3): trusted resolution, immutable request context,
@@ -26,6 +27,7 @@ import {
     TenantDatabaseManager,
     TenantDbService,
     TenantSchemaBootstrapper,
+    TenantCallbackRunner,
   ],
   exports: [TenantResolverService, TenantDatabaseManager, TenantDbService, TenantSchemaBootstrapper, TenantMembershipGuard],
 })
