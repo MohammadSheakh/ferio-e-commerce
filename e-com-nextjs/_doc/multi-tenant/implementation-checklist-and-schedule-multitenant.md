@@ -954,13 +954,13 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 - [ ] Export tenant business data.
 - [ ] Export audit/financial data according to policy.
 - [ ] Export media where required.
-- [ ] Revoke domains safely.
+- [x] Revoke domains safely. (`TenantClosureService.initiateClosure` disables every domain at CLOSURE_PENDING — takeover/reassignment designed out)
 - [ ] Revoke integration credentials.
-- [ ] Stop scheduled jobs.
-- [ ] Close DB connections.
-- [ ] Archive/delete DB according to policy.
+- [ ] **PARTIAL:** Stop scheduled jobs. (fan-out skips non-ACTIVE orgs by query shape; explicit job-revocation sweep pending)
+- [x] Close DB connections. (registry RETIRED → connection manager refuses; graceful disconnect path exists)
+- [ ] **PARTIAL:** Archive/delete DB according to policy. (registry retirement + CLOSED transition landed; physical destruction awaits hosting/retention decisions)
 - [ ] Prevent domain takeover after closure.
-- [ ] Preserve required platform billing/audit evidence.
+- [x] Preserve required platform billing/audit evidence.
 
 ### MT-12 gate
 

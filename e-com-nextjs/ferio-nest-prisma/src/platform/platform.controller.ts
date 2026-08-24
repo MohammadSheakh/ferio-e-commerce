@@ -6,6 +6,7 @@ import type { CreatePlanInput } from './services/plans.service';
 import { SubscriptionsService } from './services/subscriptions.service';
 import { ProvisioningService } from './services/provisioning.service';
 import { MigrationOrchestratorService } from './services/migration-orchestrator.service';
+import { TenantClosureService } from './services/tenant-closure.service';
 import { SupportAccessService } from './services/support-access.service';
 import { PlatformAuthService } from './services/platform-auth.service';
 import { PlatformAuditService } from './services/platform-audit.service';
@@ -31,6 +32,7 @@ export class PlatformAdminController {
     private readonly provisioning: ProvisioningService,
     private readonly supportAccess: SupportAccessService,
     private readonly migrations: MigrationOrchestratorService,
+    private readonly closure: TenantClosureService,
     private readonly platformAuth: PlatformAuthService,
     private readonly jwt: JwtService,
     private readonly platformPrisma: import('./platform-prisma.service').PlatformPrismaService,
@@ -244,6 +246,32 @@ export class PlatformAdminController {
   @PlatformPermissions('migration:run')
   resumeMigration(@Param('runId') runId: string) {
     return this.migrations.resume(runId);
+  }
+
+  @Post('organizations/:id/closure/initiate')
+  @PlatformPermissions('organization:write')
+  initiateClosure(
+    @Param('id') id: string,
+    @Body() body: { reason?: string },
+    @Req() request: any,
+  ) {
+    return this.closure.initiateClosure(id, {
+      actorId: request.platformPrincipal?.platformUserId,
+      reason: body.reason,
+    });
+  }
+
+  @Post('organizations/:id/closure/finalize')
+  @PlatformPermissions('organization:write')
+  finalizeClosure(
+    @Param('id') id: string,
+    @Body() body: { retentionAcknowledged?: boolean },
+    @Req() request: any,
+  ) {
+    return this.closure.finalizeClosure(id, {
+      actorId: request.platformPrincipal?.platformUserId,
+      retentionAcknowledged: body.retentionAcknowledged === true,
+    });
   }
 
   @Get('support-access')

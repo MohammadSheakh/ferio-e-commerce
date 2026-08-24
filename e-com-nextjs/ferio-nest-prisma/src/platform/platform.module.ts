@@ -17,6 +17,8 @@ import { PlatformAdminController } from './platform.controller';
 import { PlatformAuthService } from './services/platform-auth.service';
 import { MigrationOrchestratorService } from './services/migration-orchestrator.service';
 import { TenantMigrationProcessor } from './migration-orchestrator.processor';
+import { TenantClosureService } from './services/tenant-closure.service';
+import { PlanGateService } from './services/plan-gate.service';
 
 /**
  * Ferio control plane (MT-1). Owns SaaS metadata exclusively and is fully
@@ -46,6 +48,22 @@ import { TenantMigrationProcessor } from './migration-orchestrator.processor';
     PlatformPrismaService,
     PlatformAuthService,
     MigrationOrchestratorService,
+    TenantClosureService,
+    PlanGateService,
+    {
+      provide: 'ORG_MEMBERS_COUNTER',
+      useFactory: (platform: PlatformPrismaService) => ({
+        countActiveMembers: (organizationId: string) =>
+          platform.client.organizationMember.count({
+            where: { organizationId, isActive: true },
+          }),
+      }),
+      inject: [PlatformPrismaService],
+    },
+    {
+      provide: 'PLAN_GATE',
+      useExisting: PlanGateService,
+    },
     TenantMigrationProcessor,
     OrganizationsService,
     DomainsService,
@@ -70,6 +88,22 @@ import { TenantMigrationProcessor } from './migration-orchestrator.processor';
     PlatformAuditService,
     SupportAccessService,
     ProvisioningService,
+    TenantClosureService,
+    PlanGateService,
+    {
+      provide: 'ORG_MEMBERS_COUNTER',
+      useFactory: (platform: PlatformPrismaService) => ({
+        countActiveMembers: (organizationId: string) =>
+          platform.client.organizationMember.count({
+            where: { organizationId, isActive: true },
+          }),
+      }),
+      inject: [PlatformPrismaService],
+    },
+    {
+      provide: 'PLAN_GATE',
+      useExisting: PlanGateService,
+    },
   ],
 })
 export class PlatformModule {}
