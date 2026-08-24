@@ -495,12 +495,12 @@ This is the largest migration slice. Existing feature behavior should remain sta
 - [x] Existing `NEW` / `SECOND_HAND` condition support exists.
 - [x] Existing managed brands exist.
 - [x] Existing Hero Showcase capability exists.
-- [ ] Route every catalog read/write through tenant DB context.
-- [ ] Make brand slug uniqueness tenant-local.
+- [ ] **PARTIAL:** Route every catalog read/write through tenant DB context. (storefront reads — listing/search/detail/categories/brands — now resolve via `TenantDbService` inside `CatalogService.db()`; admin writes remain legacy until the next MT-7 pass)
+- [x] Make brand slug uniqueness tenant-local. (automatic under database-per-tenant; identical slugs proven coexisting across two bootstrapped databases)
 - [ ] Make Hero content tenant-local.
 - [ ] Make catalog search/filter cache tenant-aware.
 - [ ] Tenant-scope product media object keys/metadata.
-- [ ] Prove tenant A unpublished/product IDs cannot be queried from tenant B.
+- [x] Prove tenant A unpublished/product IDs cannot be queried from tenant B. (`tenant-bootstrap.integration-spec.ts`: identical product IDs/slugs seeded into two real PostgreSQL databases; A publishes, B stays draft; publish-filtered read returns 1 in A, 0 in B)
 - [ ] Prove storefront SEO/catalog caches cannot cross tenants.
 
 ## 10.2 Inventory

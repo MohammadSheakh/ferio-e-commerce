@@ -6,6 +6,9 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '@app/database';
+import type { PrismaClient } from '@prisma/client';
+import { Optional } from '@nestjs/common';
+import { TenantDbService } from '../../tenancy/tenant-db.service';
 import type { UserPayload } from '@app/common';
 import { AuditService } from '../audit/audit.service';
 import {
@@ -51,7 +54,19 @@ export class CatalogService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    @Optional() private readonly tenantDb?: TenantDbService,
   ) {}
+
+  /**
+   * MT-7 storefront reads: inside a tenant-resolved request this returns the
+   * resolved tenant database client; outside one (legacy deployments, admin
+   * plane during migration) it falls back to the legacy single-tenant DB.
+   * The fallback is EXPLICIT here — TenantDbService.tryGet() never guesses.
+   */
+  private async db(): Promise<PrismaClient> {
+    const tenant = await this.tenantDb?.tryGet();
+    return tenant ?? (this.prisma as PrismaClient);
+  }
 
   private slugify(value: string): string {
     return value
@@ -396,7 +411,8 @@ export class CatalogService {
   }
 
   async getCategories(publicOnly = false) {
-    return this.prisma.category.findMany({
+    const db = await this.db();
+    return db.category.findMany({
       where: publicOnly ? { isActive: true } : undefined,
       select: {
         id: true,
@@ -511,7 +527,8 @@ export class CatalogService {
     const search = query?.search?.trim();
     const categoryId = query?.categoryId?.trim();
 
-    return this.prisma.brand.findMany({
+    const db = await this.db();
+    return db.brand.findMany({
       where: {
         ...(publicOnly ? { isActive: true } : {}),
         ...(search ? { name: { contains: search, mode: 'insensitive' } } : {}),
@@ -1056,6 +1073,7 @@ export class CatalogService {
     query: ProductQueryDto | AdminProductQueryDto,
     publicOnly: boolean,
   ) {
+    const db = await this.db();
     const page = query.page || 1;
     const limit = Math.min(query.limit || 24, 100);
     const where = this.buildProductWhere(query, publicOnly);
@@ -1067,7 +1085,7 @@ export class CatalogService {
     const APPLICATION_PAGINATION_WINDOW = 2000;
     const needsApplicationPagination = isPriceSort || query.inStock === 'true';
     const [products, databaseTotal] = await Promise.all([
-      this.prisma.product.findMany({
+      db.product.findMany({
         where,
         include: productInclude,
         orderBy:
@@ -1079,7 +1097,7 @@ export class CatalogService {
           ? APPLICATION_PAGINATION_WINDOW
           : limit,
       }),
-      this.prisma.product.count({ where }),
+      db.product.count({ where }),
     ]);
     let serialized = products.map((product) =>
       this.serializeProduct(product, publicOnly),
@@ -1120,7 +1138,8 @@ export class CatalogService {
   }
 
   async getPublicProductBySlug(slug: string) {
-    const product = await this.prisma.product.findFirst({
+    const db = await this.db();
+    const product = await db.product.findFirst({
       where: {
         slug,
         status: 'ACTIVE',

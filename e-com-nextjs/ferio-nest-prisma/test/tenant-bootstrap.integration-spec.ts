@@ -145,4 +145,50 @@ conditionalDescribe('TenantSchemaBootstrapper (real PostgreSQL)', () => {
 
     await Promise.all([poolA.end(), poolB.end()]);
   }, 240_000);
+
+  it('proves tenant B cannot query tenant A products by ID even with identical identifiers (MT-7 §10.1)', async () => {
+    const [dbA, dbB] = await Promise.all([
+      createScratchDatabase('ferio_test_prod_a'),
+      createScratchDatabase('ferio_test_prod_b'),
+    ]);
+    created.push(dbA, dbB);
+    const config = serverConfig();
+    await bootstrapper.bootstrap({ ...config, database: dbA });
+    await bootstrapper.bootstrap({ ...config, database: dbB });
+
+    // Both tenants create a category + product with IDENTICAL ids/slugs.
+    for (const dbName of [dbA, dbB]) {
+      const pool = new Pool({ ...config, database: dbName, max: 1 });
+      await pool.query(
+        `INSERT INTO "Category" ("id", "name", "slug") VALUES ('shared-cat-1', 'Shared', 'shared')`,
+      );
+      await pool.query(
+        `INSERT INTO "Product" ("id", "name", "slug", "description", "status", "categoryId")
+         VALUES ('shared-prod-1', 'Shared Product', 'shared-product', 'desc', 'DRAFT', 'shared-cat-1')`,
+      );
+      await pool.end();
+    }
+
+    // Tenant A publishes its product; B's stays DRAFT (unpublished).
+    const poolA = new Pool({ ...config, database: dbA, max: 1 });
+    await poolA.query(
+      `UPDATE "Product" SET "status" = 'ACTIVE', "publishedAt" = now() WHERE id = 'shared-prod-1'`,
+    );
+
+    // A public storefront read in each database applies publish filters.
+    const publicRead = async (dbName: string) => {
+      const pool = new Pool({ ...config, database: dbName, max: 1 });
+      const rows = await pool.query(
+        `SELECT "id", "status" FROM "Product"
+         WHERE id = 'shared-prod-1' AND "status" = 'ACTIVE' AND "publishedAt" <= now()`,
+      );
+      await pool.end();
+      return rows.rowCount ?? 0;
+    };
+
+    expect(await publicRead(dbA)).toBe(1); // A sees its own published product
+    expect(await publicRead(dbB)).toBe(0); // B sees nothing of A's — different DB AND unpublished there
+
+    await poolA.end();
+  }, 240_000);
 });
