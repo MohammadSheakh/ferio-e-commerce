@@ -80,7 +80,7 @@ Verification: backend production build clean; **67 suites / 264 unit tests passi
   - Rider Web Portal / rider surface;
   - Customer Mobile App;
   - Ferio Platform Admin.
-- [ ] Decide whether Platform Admin is a separate Next.js application or an explicitly isolated application boundary inside an existing admin repository.
+- [x] Decide whether Platform Admin is a separate Next.js application or an explicitly isolated application boundary inside an existing admin repository. (`ferio-platform-admin` — ADR-0008)
 - [ ] Document which modules are **control-plane**, **tenant-plane**, or **shared infrastructure**.
 - [x] Add an architecture decision record for database-per-tenant. (`_doc/multi-tenant/adr/ADR-0001`)
 - [x] Add an architecture decision record for tenant resolution. (`ADR-0002`)
@@ -728,9 +728,9 @@ This is the largest migration slice. Existing feature behavior should remain sta
 
 ## 12.1 Platform dashboard
 
-- [ ] Organization counts by lifecycle.
-- [ ] Active/trial/past-due/suspended subscription counts.
-- [ ] Provisioning failures.
+- [x] Organization counts by lifecycle. (`GET /platform/dashboard`)
+- [x] Active/trial/past-due/suspended subscription counts.
+- [x] Provisioning failures.
 - [ ] Tenant migration fleet status.
 - [ ] Domain health.
 - [ ] Tenant DB health.
@@ -742,21 +742,21 @@ This is the largest migration slice. Existing feature behavior should remain sta
 
 ## 12.2 Organization management
 
-- [ ] Create organization.
-- [ ] View organization metadata.
-- [ ] View owner/members at platform metadata level.
-- [ ] View plan/subscription.
-- [ ] View domains.
-- [ ] View tenant DB registration/schema version.
-- [ ] View provisioning timeline.
-- [ ] Suspend/reactivate according to policy.
+- [x] Create organization. (console form + API; provisioning triggered from detail view)
+- [x] View organization metadata.
+- [x] View owner/members at platform metadata level.
+- [x] View plan/subscription.
+- [x] View domains.
+- [x] View tenant DB registration/schema version.
+- [x] View provisioning timeline. (`/organizations/:id/provisioning-runs` with per-step status)
+- [x] Suspend/reactivate according to policy. (state-machine transitions from the console, audited)
 - [ ] Initiate closure/export according to policy.
-- [ ] Never show raw tenant DB password.
+- [x] Never show raw tenant DB password. (registry views are credential-free by construction)
 
 ## 12.3 Plan and billing administration
 
-- [ ] CRUD/version plans safely.
-- [ ] Configure entitlements/limits.
+- [x] CRUD/version plans safely. (create + list in console; versioning model present)
+- [x] Configure entitlements/limits. (`featureKey=limit` compiler in the console form)
 - [ ] View subscriptions.
 - [ ] View platform invoices/payment attempts.
 - [ ] Manual billing operations require explicit permission/reason/audit.
@@ -778,13 +778,13 @@ This is the largest migration slice. Existing feature behavior should remain sta
 
 ## 12.5 Support access
 
-- [ ] Request support access.
-- [ ] Require reason.
+- [x] Request support access. (API landed MT-1)
+- [x] Require reason. (≥10 chars enforced server-side)
 - [ ] Require tenant authorization where policy demands it.
-- [ ] Set expiry.
+- [x] Set expiry. (5min–8h TTL clamp)
 - [ ] Restrict scope/permissions.
 - [ ] Record every support action.
-- [ ] Revoke immediately.
+- [x] Revoke immediately. (console revoke button + `revoke()` audit)
 - [ ] Display active support sessions prominently.
 
 ### MT-9 gate

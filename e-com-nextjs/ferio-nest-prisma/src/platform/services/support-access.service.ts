@@ -84,6 +84,25 @@ export class SupportAccessService {
     return updated;
   }
 
+  countActive(): Promise<number> {
+    return this.platform.client.supportAccessGrant.count({
+      where: { revokedAt: null, expiresAt: { gt: new Date() } },
+    });
+  }
+
+  /** Platform-wide listing (optionally filtered) for the console. */
+  listActive(organizationId?: string) {
+    return this.platform.client.supportAccessGrant.findMany({
+      where: {
+        revokedAt: null,
+        expiresAt: { gt: new Date() },
+        ...(organizationId ? { organizationId } : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+  }
+
   listActiveForOrganization(organizationId: string) {
     return this.platform.client.supportAccessGrant.findMany({
       where: { organizationId, revokedAt: null, expiresAt: { gt: new Date() } },

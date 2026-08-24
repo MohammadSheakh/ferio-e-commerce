@@ -6,6 +6,9 @@ import type { CreatePlanInput } from './services/plans.service';
 import { SubscriptionsService } from './services/subscriptions.service';
 import { ProvisioningService } from './services/provisioning.service';
 import { SupportAccessService } from './services/support-access.service';
+import { PlatformAuthService } from './services/platform-auth.service';
+import { PlatformAuditService } from './services/platform-audit.service';
+import { JwtService } from '@nestjs/jwt';
 import {
   PlatformAuthGuard,
   PlatformPermissions,
@@ -26,6 +29,10 @@ export class PlatformAdminController {
     private readonly subscriptions: SubscriptionsService,
     private readonly provisioning: ProvisioningService,
     private readonly supportAccess: SupportAccessService,
+    private readonly platformAuth: PlatformAuthService,
+    private readonly jwt: JwtService,
+    private readonly platformPrisma: import('./platform-prisma.service').PlatformPrismaService,
+    private readonly audit: PlatformAuditService,
   ) {}
 
   @Post('organizations')
@@ -113,6 +120,103 @@ export class PlatformAdminController {
       actorId: request.platformPrincipal?.platformUserId,
       note: body.note,
     });
+  }
+
+  /**
+   * MT-9 §12.1 — platform dashboard aggregates. Metadata only; no tenant PII.
+   */
+  @Get('dashboard')
+  @PlatformPermissions('organization:read')
+  async dashboard() {
+    const [orgLifecycle, subsByStatus, dbsByStatus, provisioningFailed, activeGrants] =
+      await Promise.all([
+        this.platformPrisma.client.organization.groupBy({
+          by: ['status'],
+          _count: { _all: true },
+        }),
+        this.platformPrisma.client.subscription.groupBy({
+          by: ['status'],
+          _count: { _all: true },
+        }),
+        this.platformPrisma.client.tenantDatabase.groupBy({
+          by: ['status'],
+          _count: { _all: true },
+        }),
+        this.platformPrisma.client.provisioningRun.count({
+          where: { status: 'FAILED' },
+        }),
+        this.supportAccess.countActive(),
+      ]);
+    const toMap = (rows: Array<{ status: string; _count: { _all: number } }>) =>
+      Object.fromEntries(rows.map((row) => [row.status, row._count._all]));
+    return {
+      organizations: toMap(orgLifecycle),
+      subscriptions: toMap(subsByStatus),
+      tenantDatabases: toMap(dbsByStatus),
+      provisioningFailures: provisioningFailed,
+      activeSupportGrants: activeGrants,
+    };
+  }
+
+  @Get('organizations/:id/provisioning-runs')
+  @PlatformPermissions('provisioning:run', 'organization:read')
+  provisioningTimeline(@Param('id') id: string) {
+    return this.platformPrisma.client.provisioningRun.findMany({
+      where: { organizationId: id },
+      include: { steps: { orderBy: { id: 'asc' } } },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+    });
+  }
+
+  @Post('auth/login')
+  @PlatformPermissions() // public within the platform controller realm guard
+  async login(
+    @Body() body: { email?: string; password?: string },
+  ) {
+    if (!body.email || !body.password) {
+      throw new (require('@nestjs/common').UnauthorizedException)(
+        'PLATFORM_CREDENTIALS_INVALID',
+      );
+    }
+    const principal = await this.platformAuth.verifyCredentials(
+      body.email,
+      body.password,
+    );
+    const token = await this.jwt.signAsync(
+      {
+        sub: principal.platformUserId,
+        email: principal.email,
+        roles: principal.roles,
+        realm: 'platform',
+      },
+      { secret: process.env.PLATFORM_JWT_SECRET, expiresIn: '8h' },
+    );
+    await this.audit.record({
+      action: 'PLATFORM_LOGIN',
+      entityType: 'PlatformUser',
+      entityId: principal.platformUserId,
+      actorId: principal.platformUserId,
+    });
+    return { accessToken: token, roles: principal.roles };
+  }
+
+  @Get('support-access')
+  @PlatformPermissions('support_access:request')
+  listSupportAccess(@Query('organizationId') organizationId?: string) {
+    return this.supportAccess.listActive(organizationId);
+  }
+
+  @Post('support-access/:grantId/revoke')
+  @PlatformPermissions('support_access:request')
+  revokeSupportAccess(
+    @Param('grantId') grantId: string,
+    @Req() request: any,
+  ) {
+    return this.supportAccess.revoke(
+      grantId,
+      request.platformPrincipal?.platformUserId,
+    );
   }
 
   @Post('support-access')
