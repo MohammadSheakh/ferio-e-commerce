@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { RedisModule } from '@app/redis';
 import { TenancyController } from './tenancy.controller';
+import { TenancyPlanController } from './tenancy-plan.controller';
 import { TenantResolverService, TenantContextMiddleware } from './tenant-resolver.service';
 import { TenantDatabaseManager } from './tenant-database.manager';
 import { TenantDbService } from './tenant-db.service';
@@ -19,7 +20,7 @@ import { TenantFanoutService } from './tenant-fanout.service';
  */
 @Module({
   imports: [RedisModule],
-  controllers: [TenancyController],
+  controllers: [TenancyController, TenancyPlanController],
   providers: [
     TenantResolverService,
     TenantMembershipService,

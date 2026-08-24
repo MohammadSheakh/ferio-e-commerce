@@ -10,6 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { TenantMembershipGuard } from '../../tenancy/tenant-membership.guard';
 import {
   AuthGuard,
   GLOBAL_RATE_LIMITS,
@@ -110,7 +111,7 @@ export class PublicOrderTrackingController {
 @ApiTags('Admin Orders')
 @ApiBearerAuth()
 @Controller('admin/orders')
-@UseGuards(AuthGuard, RolesGuard, PermissionsGuard)
+@UseGuards(AuthGuard, RolesGuard, PermissionsGuard, TenantMembershipGuard)
 @Roles('admin')
 @Permissions(PERMISSIONS.ORDERS_READ)
 export class AdminOrderController {

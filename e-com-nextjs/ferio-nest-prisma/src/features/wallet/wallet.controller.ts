@@ -10,6 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { TenantMembershipGuard } from '../../tenancy/tenant-membership.guard';
 import {
   AuthGuard,
   PERMISSIONS,
@@ -56,7 +57,7 @@ export class CustomerWalletController {
 @ApiTags('Admin Wallets')
 @ApiBearerAuth()
 @Controller('admin/wallet')
-@UseGuards(AuthGuard, RolesGuard, PermissionsGuard)
+@UseGuards(AuthGuard, RolesGuard, PermissionsGuard, TenantMembershipGuard)
 @Roles('admin')
 @Permissions(PERMISSIONS.WALLETS_READ)
 export class AdminWalletController {

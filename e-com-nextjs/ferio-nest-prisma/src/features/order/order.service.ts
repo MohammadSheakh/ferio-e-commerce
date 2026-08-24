@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   Optional,
@@ -11,6 +12,7 @@ import type { PrismaClient } from '@prisma/client';
 import { CodVerificationMode, OrderStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '@app/database';
 import { TenantDbService } from '../../tenancy/tenant-db.service';
+import { tryGetTenantContext } from '../../tenancy/tenant-context';
 import type { UserPayload } from '@app/common';
 import { CartService } from '../cart/cart.service';
 import { TransactionalMessagingService } from '../transactional-messaging/transactional-messaging.service';
@@ -72,8 +74,10 @@ export class OrderService {
     private readonly config: ConfigService,
     private readonly wallet: WalletService,
     private readonly customerNotifications: CustomerNotificationsService,
-  
-    @Optional() private readonly tenantDb?: TenantDbService,) {}
+    @Optional() private readonly tenantDb?: TenantDbService,
+    @Optional() private readonly entitlements?: import('../../platform/services/entitlements.service').EntitlementsService,
+    @Optional() private readonly usage?: import('../../platform/services/usage.service').UsageService,
+  ) {}
 
   /**
    * MT-7: inside a tenant-resolved request this returns the resolved tenant
@@ -266,6 +270,17 @@ export class OrderService {
     });
   }
 
+  private async recordOrderUsage(): Promise<void> {
+    try {
+      const ctx = tryGetTenantContext();
+      if (ctx && this.usage) {
+        await this.usage.increment(ctx.organizationId, 'orders_per_month', 1);
+      }
+    } catch {
+      // Metering must never fail an order.
+    }
+  }
+
   private async confirmationAfterCommit(
     order: Prisma.OrderGetPayload<{ include: typeof orderDetailInclude }>,
   ) {
@@ -273,6 +288,8 @@ export class OrderService {
       'ORDER_PLACED',
       ...(order.status === 'CONFIRMED' ? ['ORDER_CONFIRMED'] : []),
     ]);
+    // Non-blocking SaaS usage metering (MT-10 §9.4): never fails an order.
+    void this.recordOrderUsage();
     return this.serializeConfirmation(order);
   }
 
@@ -671,6 +688,16 @@ export class OrderService {
     const db = await this.db();
     if (paymentMethod === 'WALLET' && !actor) {
       throw new BadRequestException('Sign in to pay with your wallet');
+    }
+    // MT-10 §13.2: plan limits enforced server-side at the monetizable event.
+    const tenantContext = tryGetTenantContext();
+    if (tenantContext && this.entitlements) {
+      const decision = await this.entitlements
+        .evaluate(tenantContext.organizationId, 'orders_per_month', { requestedCount: 1 })
+        .catch(() => null);
+      if (decision && !decision.allowed) {
+        throw new ForbiddenException(decision.code ?? 'PLAN_LIMIT_REACHED');
+      }
     }
     const idempotencyKey = this.cleanIdempotencyKey(rawIdempotencyKey);
     const idempotencyKeyHash = this.hashIdempotencyKey(idempotencyKey);

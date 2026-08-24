@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -9,6 +10,7 @@ import { PrismaService } from '@app/database';
 import type { PrismaClient } from '@prisma/client';
 import { Optional } from '@nestjs/common';
 import { TenantDbService } from '../../tenancy/tenant-db.service';
+import { tryGetTenantContext } from '../../tenancy/tenant-context';
 import type { UserPayload } from '@app/common';
 import { AuditService } from '../audit/audit.service';
 import {
@@ -55,6 +57,7 @@ export class CatalogService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     @Optional() private readonly tenantDb?: TenantDbService,
+    @Optional() private readonly entitlements?: import('../../platform/services/entitlements.service').EntitlementsService,
   ) {}
 
   /**
@@ -564,6 +567,22 @@ export class CatalogService {
 
   async createProduct(dto: CreateProductDto, actor: UserPayload) {
     const db = await this.db();
+    // MT-10 §13.2: SKU entitlement enforced server-side for tenants.
+    const ctx = tryGetTenantContext();
+    if (ctx && this.entitlements) {
+      const currentCount = await db.product.count({
+        where: { status: { not: 'ARCHIVED' } },
+      });
+      const decision = await this.entitlements
+        .evaluate(ctx.organizationId, 'products_max', {
+          requestedCount: currentCount + 1,
+          currentOverride: currentCount,
+        })
+        .catch(() => null);
+      if (decision && !decision.allowed) {
+        throw new ForbiddenException(decision.code ?? 'PLAN_LIMIT_REACHED');
+      }
+    }
     dto.variants.forEach((variant) =>
       this.ensureValidPrice(variant.price, variant.compareAtPrice),
     );

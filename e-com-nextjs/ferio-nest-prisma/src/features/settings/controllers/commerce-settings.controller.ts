@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Patch, UseGuards } from '@nestjs/common';
+import { TenantMembershipGuard } from '../../../tenancy/tenant-membership.guard';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import {
   AuthGuard,
@@ -27,7 +28,7 @@ export class PublicCommerceSettingsController {
 @ApiTags('Admin Commerce Settings')
 @ApiBearerAuth()
 @Controller('admin/commerce-settings')
-@UseGuards(AuthGuard, RolesGuard, PermissionsGuard)
+@UseGuards(AuthGuard, RolesGuard, PermissionsGuard, TenantMembershipGuard)
 @Roles('admin')
 @Permissions(PERMISSIONS.SETTINGS_READ)
 export class AdminCommerceSettingsController {

@@ -20,6 +20,7 @@ import {
   User,
 } from '@app/common';
 import type { UserPayload } from '@app/common';
+import { TenantMembershipGuard } from '../../tenancy/tenant-membership.guard';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CartService } from './cart.service';
 import {
@@ -154,7 +155,7 @@ export class CartController {
 
 @ApiTags('Admin Cart Eligibility')
 @Controller('admin/abandoned-carts')
-@UseGuards(AuthGuard, RolesGuard, PermissionsGuard)
+@UseGuards(AuthGuard, RolesGuard, PermissionsGuard, TenantMembershipGuard)
 @Roles('admin')
 @Permissions(PERMISSIONS.MESSAGING_READ)
 export class AdminCartEligibilityController {

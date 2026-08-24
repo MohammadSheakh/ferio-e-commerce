@@ -28,7 +28,7 @@ export class EntitlementsService {
   async evaluate(
     organizationId: string,
     featureKey: string,
-    options: { requestedCount?: number; periodKey?: string } = {},
+    options: { requestedCount?: number; periodKey?: string; currentOverride?: number } = {},
   ): Promise<EntitlementDecision> {
     const subscription = await this.platform.client.subscription.findUnique({
       where: { organizationId },
@@ -53,11 +53,10 @@ export class EntitlementsService {
     }
 
     const requested = options.requestedCount ?? 1;
-    const current = await this.usage.getValue(
-      organizationId,
-      featureKey,
-      options.periodKey,
-    );
+    const current =
+      options.currentOverride !== undefined
+        ? BigInt(options.currentOverride)
+        : await this.usage.getValue(organizationId, featureKey, options.periodKey);
     if (Number(current) + requested > entitlement.limit) {
       return {
         allowed: false,

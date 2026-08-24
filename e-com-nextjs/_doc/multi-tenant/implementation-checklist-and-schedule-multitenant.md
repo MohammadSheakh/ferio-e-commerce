@@ -800,7 +800,7 @@ This is the largest migration slice. Existing feature behavior should remain sta
 
 - [ ] Invitation/first-login flow.
 - [ ] Organization/store setup wizard.
-- [ ] Store identity.
+- [ ] **PARTIAL:** Store identity. (CommerceSettings store name is tenant-scoped; consolidated wizard deferred)
 - [ ] Logo/branding.
 - [ ] Support contacts.
 - [ ] Currency/timezone.
@@ -817,11 +817,11 @@ This is the largest migration slice. Existing feature behavior should remain sta
 
 ## 13.2 Tenant Admin entitlement UX
 
-- [ ] Navigation hides or labels unavailable plan features.
-- [ ] Backend remains authoritative.
+- [ ] **PARTIAL:** Navigation hides or labels unavailable plan features. (Plan & Usage card on the admin dashboard surfaces plan, usage vs limits and limit-reached labels; full nav gating pending)
+- [x] Backend remains authoritative.
 - [ ] Upgrade CTA for plan-gated features.
 - [ ] Limit warnings before hard limits.
-- [ ] Stable errors when limit reached.
+- [x] Stable errors when limit reached. (`PLAN_LIMIT_REACHED` / `FEATURE_DISABLED` / `SUBSCRIPTION_INACTIVE` from EntitlementsService)
 - [ ] Downgraded tenant can still access historical records appropriately.
 - [ ] Suspended tenant gets approved read/write restrictions.
 
@@ -849,6 +849,13 @@ This is the largest migration slice. Existing feature behavior should remain sta
 - [ ] Tenant-aware support information.
 - [ ] Tenant-aware SEO.
 - [ ] Unknown/suspended domain states.
+
+### 13.2A Server-side entitlement enforcement hooks (landed)
+
+- [x] Order placement evaluates `orders_per_month` before work begins and meters usage post-commit (non-blocking; metering can never fail an order).
+- [x] Product creation evaluates `products_max` against the tenant's own live catalog count.
+- [x] All gates activate only inside a resolved tenant context — legacy mode unaffected — and deny with stable machine codes.
+- [ ] Staff-seat hook on invitations (same pattern) — next pass.
 
 ### MT-10 gate
 

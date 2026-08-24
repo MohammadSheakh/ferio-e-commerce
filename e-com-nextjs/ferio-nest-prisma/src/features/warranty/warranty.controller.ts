@@ -13,6 +13,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
+import { TenantMembershipGuard } from '../../tenancy/tenant-membership.guard';
 import { memoryStorage } from 'multer';
 import {
   AuthGuard,
@@ -98,7 +99,7 @@ export class WarrantyController {
 }
 
 @Controller('admin/warranty')
-@UseGuards(AuthGuard, RolesGuard, PermissionsGuard)
+@UseGuards(AuthGuard, RolesGuard, PermissionsGuard, TenantMembershipGuard)
 @Roles('admin')
 @Permissions(PERMISSIONS.WARRANTY_READ)
 export class AdminWarrantyController {

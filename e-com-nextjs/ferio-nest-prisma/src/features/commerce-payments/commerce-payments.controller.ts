@@ -11,6 +11,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { TenantMembershipGuard } from '../../tenancy/tenant-membership.guard';
 import type { Response } from 'express';
 import { CommercePaymentProvider } from '@prisma/client';
 import {
@@ -160,7 +161,7 @@ export class PublicCommercePaymentsController {
 @ApiTags('Admin Payments')
 @ApiBearerAuth()
 @Controller('admin/payments')
-@UseGuards(AuthGuard, RolesGuard, PermissionsGuard)
+@UseGuards(AuthGuard, RolesGuard, PermissionsGuard, TenantMembershipGuard)
 @Roles('admin')
 @Permissions(PERMISSIONS.PAYMENTS_READ)
 export class AdminCommercePaymentsController {

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { OrganizationsService } from './services/organizations.service';
 import { DomainsService } from './services/domains.service';
 import { PlansService } from './services/plans.service';

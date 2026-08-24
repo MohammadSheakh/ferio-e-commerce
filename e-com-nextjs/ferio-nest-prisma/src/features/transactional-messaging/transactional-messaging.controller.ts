@@ -9,6 +9,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { TenantMembershipGuard } from '../../tenancy/tenant-membership.guard';
 import {
   AuthGuard,
   PERMISSIONS,
@@ -30,7 +31,7 @@ import { TransactionalMessageQueue } from './transactional-message.queue';
 @ApiTags('Admin Transactional Messages')
 @ApiBearerAuth()
 @Controller('admin/transactional-messages')
-@UseGuards(AuthGuard, RolesGuard, PermissionsGuard)
+@UseGuards(AuthGuard, RolesGuard, PermissionsGuard, TenantMembershipGuard)
 @Roles('admin')
 @Permissions(PERMISSIONS.MESSAGING_READ)
 export class TransactionalMessagingController {

@@ -9,6 +9,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { TenantMembershipGuard } from '../../tenancy/tenant-membership.guard';
 import {
   AuthGuard,
   PERMISSIONS,
@@ -30,7 +31,7 @@ import { ReconciliationQueue } from './reconciliation.queue';
 @ApiTags('Admin Reconciliation')
 @ApiBearerAuth()
 @Controller('admin/reconciliation')
-@UseGuards(AuthGuard, RolesGuard, PermissionsGuard)
+@UseGuards(AuthGuard, RolesGuard, PermissionsGuard, TenantMembershipGuard)
 @Roles('admin')
 @Permissions(PERMISSIONS.RECONCILIATION_READ)
 export class ReconciliationController {
