@@ -1,4 +1,4 @@
-import { Injectable, type NestMiddleware } from '@nestjs/common';
+import { Injectable, type NestMiddleware, type OnModuleInit } from '@nestjs/common';
 import type { NextFunction, Request, Response } from 'express';
 import { RedisService } from '@app/redis';
 import { PlatformPrismaService } from '../platform/platform-prisma.service';
@@ -27,11 +27,16 @@ export interface ResolvedTenant {
  * legacy single-tenant database.
  */
 @Injectable()
-export class TenantResolverService {
+export class TenantResolverService implements OnModuleInit {
   constructor(
     private readonly platform: PlatformPrismaService,
     private readonly redis: RedisService,
   ) {}
+
+  /** Control-plane domain mutations drop this resolver's cached entries. */
+  onModuleInit(): void {
+    setDomainCacheInvalidator((hostname) => this.invalidate(hostname));
+  }
 
   /** Effective host for proxied requests: x-forwarded-host wins over Host. */
   effectiveHostFrom(headersOrRequest: {

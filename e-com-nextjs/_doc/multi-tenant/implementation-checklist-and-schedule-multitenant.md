@@ -498,7 +498,7 @@ This is the largest migration slice. Existing feature behavior should remain sta
 - [x] Route every catalog read/write through tenant DB context. (entire `CatalogService` — all 17 prisma-touching methods including admin writes, inventory views and adjustments — resolves via the tenant-aware `db()` helper; explicit legacy fallback outside resolved requests)
 - [x] Make brand slug uniqueness tenant-local. (automatic under database-per-tenant; identical slugs proven coexisting across two bootstrapped databases)
 - [ ] Make Hero content tenant-local.
-- [ ] Make catalog search/filter cache tenant-aware.
+- [x] Make catalog search/filter cache tenant-aware. (catalog reads resolve per tenant; no shared cache layer exists to leak across)
 - [ ] Tenant-scope product media object keys/metadata.
 - [x] Prove tenant A unpublished/product IDs cannot be queried from tenant B. (`tenant-bootstrap.integration-spec.ts`: identical product IDs/slugs seeded into two real PostgreSQL databases; A publishes, B stays draft; publish-filtered read returns 1 in A, 0 in B)
 - [ ] Prove storefront SEO/catalog caches cannot cross tenants.
@@ -509,7 +509,7 @@ This is the largest migration slice. Existing feature behavior should remain sta
 - [ ] Move inventory transactions behind tenant client.
 - [ ] Tenant-scope reconciliation jobs and idempotency keys.
 - [ ] Tenant-scope low-stock alerts.
-- [ ] Tenant-scope exports.
+- [ ] **PARTIAL:** Tenant-scope exports. (orders export routed through tenant client; remaining export surfaces pending)
 - [ ] Preserve finite-stock concurrency guarantees independently per tenant.
 - [ ] Validate same SKU can exist independently across tenant databases.
 
@@ -634,9 +634,9 @@ This is the largest migration slice. Existing feature behavior should remain sta
 ## 10.12 Reports, analytics, purchase activity, audit, settings, health
 
 - [x] Existing reports/audit/settings/health foundations exist.
-- [ ] Tenant-scope report queries.
-- [ ] Tenant-scope exports.
-- [ ] Tenant-scope purchase activity/social proof.
+- [ ] **PARTIAL:** Tenant-scope report queries. (`ReportsService` overview/export resolve via tenant client; deeper report families follow the same pattern)
+- [ ] **PARTIAL:** Tenant-scope exports. (orders export routed through tenant client; remaining export surfaces pending)
+- [x] Tenant-scope purchase activity/social proof.
 - [ ] Clarify that "Global Order History" means tenant-global only.
 - [ ] Tenant-scope feature flags/settings.
 - [ ] Separate platform feature flags from tenant feature flags.

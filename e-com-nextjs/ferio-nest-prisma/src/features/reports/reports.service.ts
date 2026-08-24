@@ -1,7 +1,12 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException, Injectable,
+  Optional,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PERMISSIONS, roleHasPermission, type UserPayload } from '@app/common';
+import type { PrismaClient } from '@prisma/client';
 import { PrismaService } from '@app/database';
+import { TenantDbService } from '../../tenancy/tenant-db.service';
 import { randomUUID } from 'node:crypto';
 import { ReportQueryDto } from './dto/report-query.dto';
 import { csvCell, maskExportName, reportPeriod, sumMoney } from './report.util';
@@ -62,12 +67,22 @@ export class ReportsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
-  ) {}
+  
+    @Optional() private readonly tenantDb?: TenantDbService,) {}
 
+  /**
+   * MT-7/MT-8: tenant client inside resolved storefront/admin requests;
+   * explicit legacy fallback otherwise. Never guesses.
+   */
+  private async db(): Promise<PrismaClient> {
+    const tenant = await this.tenantDb?.tryGet();
+    return tenant ?? (this.prisma as PrismaClient);
+  }
   async overview(query: ReportQueryDto) {
+    const db = await this.db();
     const period = reportPeriod(query);
     const source = query.source?.normalize('NFKC').trim();
-    const orders = await this.prisma.order.findMany({
+    const orders = await db.order.findMany({
       where: {
         createdAt: { gte: period.from, lte: period.to },
         source:
@@ -87,6 +102,7 @@ export class ReportsService {
   }
 
   async ordersExport(query: ReportQueryDto, actor: UserPayload) {
+    const db = await this.db();
     const period = reportPeriod(query);
     const source = query.source?.normalize('NFKC').trim();
     const canViewCustomerDetails = roleHasPermission(
@@ -94,7 +110,7 @@ export class ReportsService {
       PERMISSIONS.CUSTOMERS_READ,
       actor.permissions ?? [],
     );
-    const orders = await this.prisma.order.findMany({
+    const orders = await db.order.findMany({
       where: {
         createdAt: { gte: period.from, lte: period.to },
         source:

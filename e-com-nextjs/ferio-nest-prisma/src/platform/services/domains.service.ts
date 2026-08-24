@@ -1,5 +1,6 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PlatformAuditService } from './platform-audit.service';
+import { invalidateDomainCache } from '../utils/domain-cache-invalidation';
 import type { PlatformPrismaService } from '../platform-prisma.service';
 
 /** Hosts that can never be tenant subdomains. */
@@ -60,6 +61,7 @@ export class DomainsService {
         entityId: domain.id,
         newValue: { hostname, organizationId },
       });
+      invalidateDomainCache(hostname);
       return domain;
     } catch (error: any) {
       if (error?.code === 'P2002') {
@@ -124,6 +126,7 @@ export class DomainsService {
       where: { id: domainId },
       data: { status: 'ACTIVE', verifiedAt: new Date() },
     });
+    invalidateDomainCache(updated.hostname);
     await this.audit.record({
       action: 'CUSTOM_DOMAIN_VERIFIED',
       entityType: 'TenantDomain',
@@ -157,6 +160,7 @@ export class DomainsService {
   async disable(domainId: string, actorId?: string) {
     const domain = await this.platform.client.tenantDomain.findUnique({ where: { id: domainId } });
     if (!domain) throw new NotFoundException('DOMAIN_NOT_FOUND');
+    invalidateDomainCache(domain.hostname);
     const updated = await this.platform.client.tenantDomain.update({
       where: { id: domainId },
       data: { status: 'DISABLED', isPrimary: false },

@@ -1,8 +1,13 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException, Injectable,
+  Optional,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma, StorefrontAnalyticsEventType } from '@prisma/client';
 import { createHmac } from 'node:crypto';
+import type { PrismaClient } from '@prisma/client';
 import { PrismaService } from '@app/database';
+import { TenantDbService } from '../../tenancy/tenant-db.service';
 import { CreateStorefrontAnalyticsEventDto } from './storefront-analytics.dto';
 import { CommerceSettingsService } from '../settings/services/commerce-settings.service';
 import {
@@ -17,9 +22,19 @@ export class StorefrontAnalyticsService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly settings: CommerceSettingsService,
-  ) {}
+  
+    @Optional() private readonly tenantDb?: TenantDbService,) {}
 
+  /**
+   * MT-7/MT-8: tenant client inside resolved storefront/admin requests;
+   * explicit legacy fallback otherwise. Never guesses.
+   */
+  private async db(): Promise<PrismaClient> {
+    const tenant = await this.tenantDb?.tryGet();
+    return tenant ?? (this.prisma as PrismaClient);
+  }
   async create(dto: CreateStorefrontAnalyticsEventDto) {
+    const db = await this.db();
     if (!(await this.settings.get()).storefrontAnalyticsEnabled) {
       return { accepted: false, duplicate: false, disabled: true };
     }
@@ -28,7 +43,7 @@ export class StorefrontAnalyticsService {
     await this.validateEvent(dto, searchTerm, filters);
 
     try {
-      await this.prisma.storefrontAnalyticsEvent.create({
+      await db.storefrontAnalyticsEvent.create({
         data: {
           eventId: dto.eventId,
           type: dto.type,
@@ -60,6 +75,7 @@ export class StorefrontAnalyticsService {
     searchTerm?: string,
     filters?: Record<string, boolean | number | string>,
   ) {
+    const db = await this.db();
     if (dto.type === StorefrontAnalyticsEventType.SEARCH && !searchTerm) {
       throw new BadRequestException('A search event requires a search term.');
     }
@@ -72,7 +88,7 @@ export class StorefrontAnalyticsService {
       if (!dto.productId) {
         throw new BadRequestException('A product view requires a product.');
       }
-      const product = await this.prisma.product.findFirst({
+      const product = await db.product.findFirst({
         where: { id: dto.productId, status: 'ACTIVE' },
         select: { id: true },
       });
@@ -84,7 +100,7 @@ export class StorefrontAnalyticsService {
           'An add-to-cart event requires product, variant, and quantity.',
         );
       }
-      const variant = await this.prisma.productVariant.findFirst({
+      const variant = await db.productVariant.findFirst({
         where: {
           id: dto.variantId,
           productId: dto.productId,
@@ -98,8 +114,9 @@ export class StorefrontAnalyticsService {
   }
 
   async getTopSearches(days = 30, limit = 20) {
+    const db = await this.db();
     const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-    const searches = await this.prisma.storefrontAnalyticsEvent.groupBy({
+    const searches = await db.storefrontAnalyticsEvent.groupBy({
       by: ['searchTerm'],
       where: {
         type: StorefrontAnalyticsEventType.SEARCH,
@@ -118,8 +135,9 @@ export class StorefrontAnalyticsService {
   }
 
   async getZeroResultSearches(days = 30, limit = 20) {
+    const db = await this.db();
     const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-    const zeroSearches = await this.prisma.storefrontAnalyticsEvent.groupBy({
+    const zeroSearches = await db.storefrontAnalyticsEvent.groupBy({
       by: ['searchTerm'],
       where: {
         type: StorefrontAnalyticsEventType.SEARCH,
@@ -145,8 +163,9 @@ export class StorefrontAnalyticsService {
   }
 
   async getViewedButNotPurchased(days = 30, limit = 20) {
+    const db = await this.db();
     const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-    const views = await this.prisma.storefrontAnalyticsEvent.groupBy({
+    const views = await db.storefrontAnalyticsEvent.groupBy({
       by: ['productId'],
       where: {
         type: StorefrontAnalyticsEventType.PRODUCT_VIEW,
@@ -164,7 +183,7 @@ export class StorefrontAnalyticsService {
 
     if (productIds.length === 0) return [];
 
-    const products = await this.prisma.product.findMany({
+    const products = await db.product.findMany({
       where: { id: { in: productIds } },
       select: {
         id: true,
@@ -179,7 +198,7 @@ export class StorefrontAnalyticsService {
 
     const productMap = new Map(products.map((p) => [p.id, p]));
 
-    const purchases = await this.prisma.orderItem.groupBy({
+    const purchases = await db.orderItem.groupBy({
       by: ['productIdSnapshot'],
       where: {
         productIdSnapshot: { in: productIds },
@@ -215,9 +234,10 @@ export class StorefrontAnalyticsService {
   }
 
   async getAnalyticsOverview(days = 30) {
+    const db = await this.db();
     const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
-    const eventCounts = await this.prisma.storefrontAnalyticsEvent.groupBy({
+    const eventCounts = await db.storefrontAnalyticsEvent.groupBy({
       by: ['type'],
       where: { createdAt: { gte: startDate } },
       _count: { type: true },
@@ -228,7 +248,7 @@ export class StorefrontAnalyticsService {
     const searchCount = countMap.get(StorefrontAnalyticsEventType.SEARCH) ?? 0;
     const addToCartCount = countMap.get(StorefrontAnalyticsEventType.ADD_TO_CART) ?? 0;
 
-    const orders = await this.prisma.order.findMany({
+    const orders = await db.order.findMany({
       where: {
         createdAt: { gte: startDate },
         status: { notIn: ['CANCELLED'] },
