@@ -12,11 +12,14 @@ import {
 } from '@nestjs/common';
 import {
   AuthGuard,
+  GLOBAL_RATE_LIMITS,
   PERMISSIONS,
   Permissions,
   PermissionsGuard,
   Roles,
   RolesGuard,
+  SlidingWindowRateLimitGuard,
+  RateLimit,
 } from '@app/common';
 import {
   ApplyDeliveryPersonnelDto,
@@ -38,6 +41,8 @@ export class DeliveryPersonnelController {
    * Public registration endpoint for prospective Bangladesh riders
    */
   @Post('apply')
+  @UseGuards(SlidingWindowRateLimitGuard)
+  @RateLimit(GLOBAL_RATE_LIMITS.auth)
   apply(@Body() dto: ApplyDeliveryPersonnelDto) {
     return this.service.apply(dto);
   }

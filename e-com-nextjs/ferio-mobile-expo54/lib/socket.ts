@@ -1,6 +1,14 @@
 import { io, Socket } from "socket.io-client";
 
-const rawApiUrl = process.env.EXPO_PUBLIC_FERIO_API_URL || "http://192.168.0.110:6733";
+// The backend URL must be provided via environment configuration. No
+// developer-LAN fallback: an unset variable should fail loudly in development,
+// not silently point at someone's machine.
+const rawApiUrl = process.env.EXPO_PUBLIC_FERIO_API_URL;
+if (!rawApiUrl) {
+  throw new Error(
+    "EXPO_PUBLIC_FERIO_API_URL is required (e.g. http://192.168.1.10:6733 for local development).",
+  );
+}
 const SOCKET_URL = rawApiUrl
   .replace(/\/api\/v1\/?$/, "")
   .replace(":6733", ":6734");

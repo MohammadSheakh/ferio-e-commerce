@@ -17,8 +17,6 @@ import { OAuthAccountController } from './oauthAccount/oauthAccount.controller';
 import { OAuthAccountService } from './oauthAccount/oauthAccount.service';
 // import { OAuthAccount, OAuthAccountSchema } from './oauthAccount/oauthAccount.schema';
 
-import { UserRoleDataController } from './userRoleData/userRoleData.controller';
-import { UserRoleDataService } from './userRoleData/userRoleData.service';
 // import { UserRoleData, UserRoleDataSchema } from './userRoleData/userRoleData.schema';
 
 import { RedisModule } from '@app/redis';
@@ -57,8 +55,8 @@ import { RedisModule } from '@app/redis';
     // Auth Module (required for AuthGuard / JwtService)
     AuthModule,
   ],
-  controllers: [UserController, UserProfileController, UserDevicesController, OAuthAccountController, UserRoleDataController],
-  providers: [UserService, UserProfileService, UserDevicesService, OAuthAccountService, UserRoleDataService],
-  exports: [UserService, UserProfileService, UserDevicesService, OAuthAccountService, UserRoleDataService],
+  controllers: [UserController, UserProfileController, UserDevicesController, OAuthAccountController],
+  providers: [UserService, UserProfileService, UserDevicesService, OAuthAccountService],
+  exports: [UserService, UserProfileService, UserDevicesService, OAuthAccountService],
 })
 export class UserModule {}

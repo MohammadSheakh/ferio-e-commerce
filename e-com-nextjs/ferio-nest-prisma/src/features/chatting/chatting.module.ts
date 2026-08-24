@@ -25,7 +25,7 @@ import {
 @Module({
   imports: [
     JwtModule.register({
-      secret: process.env.JWT_ACCESS_SECRET || 'fallback-secret',
+      secret: process.env.JWT_ACCESS_SECRET as string,
       signOptions: { expiresIn: '7d' },
     }),
 

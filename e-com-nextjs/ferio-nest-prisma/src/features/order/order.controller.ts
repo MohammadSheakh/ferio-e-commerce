@@ -92,14 +92,18 @@ export class PublicOrderTrackingController {
   }
 
   @Patch(':id/store-pickup/schedule')
+  @UseGuards(AuthGuard)
+  @UseGuards(SlidingWindowRateLimitGuard)
+  @RateLimit(GLOBAL_RATE_LIMITS.user)
   @ApiOperation({
-    summary: 'Schedule or update customer store pickup date and time',
+    summary: 'Schedule or update your own store pickup date and time',
   })
   scheduleStorePickup(
     @Param('id') id: string,
     @Body() dto: ScheduleStorePickupDto,
+    @User() actor: UserPayload,
   ) {
-    return this.orderService.scheduleStorePickup(id, dto);
+    return this.orderService.scheduleStorePickup(id, dto, actor);
   }
 }
 

@@ -3,10 +3,11 @@ import {
   forwardedHeaders,
   proxyBackendResponse,
 } from "@/lib/bff-response";
+import { riderTokenFromCookie } from "@/lib/rider-session";
 
 export async function GET(request: Request) {
   try {
-    const authHeader = request.headers.get("authorization");
+    const authHeader = await riderTokenFromCookie();
     if (!authHeader) {
       return bffErrorResponse(
         "Unauthorized.",

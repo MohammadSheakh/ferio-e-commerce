@@ -169,14 +169,14 @@ describe('CommercePaymentsService', () => {
   describe('initiate', () => {
     it('throws ConflictException if payment gateway is not configured', async () => {
       mockGateway.isConfigured.mockReturnValueOnce(false);
-      await expect(service.initiate('order-1', 'SSLCOMMERZ')).rejects.toThrow(
+      await expect(service.initiate('order-1', 'FER-1001', '+8801711111111', 'SSLCOMMERZ')).rejects.toThrow(
         ConflictException,
       );
     });
 
     it('throws NotFoundException if order does not exist', async () => {
       prisma.order.findUnique.mockResolvedValueOnce(null);
-      await expect(service.initiate('order-1', 'SSLCOMMERZ')).rejects.toThrow(
+      await expect(service.initiate('order-1', 'FER-1001', '+8801711111111', 'SSLCOMMERZ')).rejects.toThrow(
         NotFoundException,
       );
     });
@@ -184,12 +184,13 @@ describe('CommercePaymentsService', () => {
     it('throws ConflictException if order is not PREPAID or is already PAID', async () => {
       prisma.order.findUnique.mockResolvedValueOnce({
         id: 'order-1',
+        reference: 'FER-1001',
         paymentMethod: 'COD',
         paymentStatus: 'UNPAID',
         address: { recipientName: 'John', phoneNormalized: '+8801711111111' },
         paymentAttempts: [],
       });
-      await expect(service.initiate('order-1', 'SSLCOMMERZ')).rejects.toThrow(
+      await expect(service.initiate('order-1', 'FER-1001', '+8801711111111', 'SSLCOMMERZ')).rejects.toThrow(
         ConflictException,
       );
     });
@@ -226,7 +227,7 @@ describe('CommercePaymentsService', () => {
         redirectUrl: 'https://sandbox.sslcommerz.com/pay/session123',
       });
 
-      const result = await service.initiate('order-1', 'SSLCOMMERZ');
+      const result = await service.initiate('order-1', 'FER-1001', '+8801711111111', 'SSLCOMMERZ');
 
       expect(orders.preparePrepaidRetry).toHaveBeenCalled();
       expect(mockGateway.initiate).toHaveBeenCalledWith(

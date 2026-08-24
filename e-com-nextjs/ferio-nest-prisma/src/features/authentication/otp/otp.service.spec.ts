@@ -1,17 +1,22 @@
 import { BadRequestException } from '@nestjs/common';
+import { createHash } from 'crypto';
 import { OtpService } from './otp.service';
 import { OtpType } from './interfaces/otp-payload.interface';
 
 describe('OtpService security events', () => {
   it('logs invalid verification attempts without email or OTP data', async () => {
+    const otpHash = createHash('sha256').update('123456').digest('hex');
     const client = {
       get: jest
         .fn()
         .mockResolvedValue(
-          JSON.stringify({ otp: '123456', createdAt: Date.now(), attempts: 1 }),
+          JSON.stringify({ otpHash, createdAt: Date.now(), attempts: 1 }),
         ),
       set: jest.fn().mockResolvedValue('OK'),
       del: jest.fn(),
+      getdel: jest.fn().mockResolvedValue(
+        JSON.stringify({ otpHash, createdAt: Date.now(), attempts: 2 }),
+      ),
     };
     const service = new OtpService({
       getClient: jest.fn().mockResolvedValue(client),

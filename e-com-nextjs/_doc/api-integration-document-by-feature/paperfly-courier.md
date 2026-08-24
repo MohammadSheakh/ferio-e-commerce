@@ -4,7 +4,7 @@ Edited paperfly.adapter.ts
 Ran command: `pnpm test src/features/shipping`
 Ran command: `pnpm run build`
 
-I have logged into the **Paperfly Go** merchant portal (`go.paperfly.com.bd`), retrieved the official Developer Guide & API specs for account `c180028`, and updated the `PaperflyAdapter` in `ferio-nest-prisma`.
+I have logged into the **Paperfly Go** merchant portal (`go.paperfly.com.bd`), retrieved the official Developer Guide & API specs for the merchant account, and updated the `PaperflyAdapter` in `ferio-nest-prisma`.
 
 ---
 
@@ -13,7 +13,7 @@ I have logged into the **Paperfly Go** merchant portal (`go.paperfly.com.bd`), r
 #### 1. **Authentication & Headers**
 - **Base URL**: `https://api.paperfly.com.bd`
 - **Auth Strategy**: HTTP Basic Auth (`Basic base64(PAPERFLY_USERNAME:PAPERFLY_PASSWORD)`)
-- **Required Header**: `paperflykey: Paperfly_~La?Rj73FcLm`
+- **Required Header**: `paperflykey: <PAPERFLY_KEY — rotate via Paperfly merchant portal; value removed from repo>`
 - **Merchant ID**: `C-1-80028`
 
 #### 2. **API Endpoints & Payload Structure**
@@ -45,9 +45,9 @@ I have logged into the **Paperfly Go** merchant portal (`go.paperfly.com.bd`), r
    Add to `.env` file when enabling Paperfly:
    ```env
    PAPERFLY_BASE_URL="https://api.paperfly.com.bd"
-   PAPERFLY_USERNAME="c180028"
-   PAPERFLY_PASSWORD="1277"
-   PAPERFLY_KEY="Paperfly_~La?Rj73FcLm"
+   PAPERFLY_USERNAME="<PAPERFLY_USERNAME>"
+   PAPERFLY_PASSWORD="<PAPERFLY_PASSWORD>"
+   PAPERFLY_KEY="<PAPERFLY_KEY>"
    PAPERFLY_STORE_NAME="Ferio E-Commerce"
    ```
 

@@ -42,7 +42,7 @@ export class CommercePaymentsService {
     ) {
       throw new NotFoundException('Order is unavailable for payment retry');
     }
-    return this.initiate(order.id, provider);
+    return this.initiate(order.id, order.reference, phone, provider);
   }
 
   async returnContext(orderId?: string) {
@@ -53,7 +53,12 @@ export class CommercePaymentsService {
     });
   }
 
-  async initiate(orderId: string, provider: CommercePaymentProvider) {
+  async initiate(
+    orderId: string,
+    reference: string,
+    phone: string,
+    provider: CommercePaymentProvider,
+  ) {
     const adapter = this.gateways.get(provider);
     if (!adapter.isConfigured())
       throw new ConflictException(`${provider} is not configured`);
@@ -64,7 +69,17 @@ export class CommercePaymentsService {
         paymentAttempts: { orderBy: { createdAt: 'desc' }, take: 1 },
       },
     });
-    if (!order?.address) throw new NotFoundException('Order not found');
+    // Ownership proof: caller must know the order reference AND the phone
+    // used at placement. Prevents anonymous initiation against arbitrary
+    // order IDs (IDOR / gateway-session spam).
+    if (
+      !order?.address ||
+      !reference ||
+      order.reference !== reference.normalize('NFKC').trim().toUpperCase() ||
+      order.address.phoneNormalized !== normalizeBangladeshPhone(phone)
+    ) {
+      throw new NotFoundException('Order is unavailable for payment');
+    }
     if (order.paymentMethod !== 'PREPAID' || order.paymentStatus === 'PAID') {
       throw new ConflictException(
         'Order is not eligible for prepaid initiation',
@@ -306,6 +321,22 @@ export class CommercePaymentsService {
         );
         return { paid: true, orderId: attempt.orderId };
       }
+      // Browser-reported fail/cancel outcomes cannot be verified against the
+      // provider. Record them as evidence but never mutate attempt or order
+      // state — the payment-recovery expiry sweep is the authoritative path
+      // for abandoned/failed sessions.
+      if (validation.outcome === 'UNVERIFIED_REPORT') {
+        await this.prisma.commercePaymentCallback.update({
+          where: { id: log.id },
+          data: {
+            status: 'REJECTED',
+            processedAt: new Date(),
+            errorMessage: 'Unverified browser report ignored',
+          },
+        });
+        return { paid: false, unverified: true };
+      }
+
       const status =
         validation.outcome === 'CANCELLED'
           ? 'CANCELLED'
@@ -377,8 +408,9 @@ export class CommercePaymentsService {
           processedAt: new Date(),
         },
       });
+      // Do not reflect internal validation details to untrusted callers.
       throw new ConflictException(
-        error instanceof Error ? error.message : 'Callback rejected',
+        'Payment callback could not be validated. If you were completing a payment, check your order status or contact support.',
       );
     }
   }

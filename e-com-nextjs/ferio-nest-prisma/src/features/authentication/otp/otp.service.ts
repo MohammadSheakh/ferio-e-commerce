@@ -1,4 +1,5 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
+import { createHash, randomInt, timingSafeEqual } from 'crypto';
 import { RedisService } from '@app/redis';
 import { OtpType } from './interfaces/otp-payload.interface';
 import { StructuredLogger } from '@app/common';
@@ -11,8 +12,17 @@ export class OtpService {
 
   constructor(private readonly redisService: RedisService) {}
 
+  /**
+   * Cryptographically secure 6-digit code. Math.random() is predictable and
+   * must never back a security credential.
+   */
   private generateOtp(): string {
-    return Math.floor(100000 + Math.random() * 900000).toString();
+    return String(randomInt(0, 1_000_000)).padStart(6, '0');
+  }
+
+  /** OTPs are stored only as SHA-256 digests: a Redis read must not leak live codes. */
+  private hashOtp(otp: string): string {
+    return createHash('sha256').update(otp).digest('hex');
   }
 
   async createOtp(email: string, type: OtpType): Promise<string> {
@@ -24,7 +34,7 @@ export class OtpService {
       await client.set(
         key,
         JSON.stringify({
-          otp,
+          otpHash: this.hashOtp(otp),
           createdAt: Date.now(),
           attempts: 0,
         }),
@@ -59,7 +69,21 @@ export class OtpService {
       throw new BadRequestException('OTP expired or not found');
     }
 
-    const parsed = JSON.parse(data);
+    let parsed: { otpHash: string; createdAt: number; attempts: number };
+    try {
+      parsed = JSON.parse(data);
+    } catch {
+      await client.del(key);
+      throw new BadRequestException('OTP expired or not found');
+    }
+    if (
+      !parsed ||
+      typeof parsed.otpHash !== 'string' ||
+      typeof parsed.attempts !== 'number'
+    ) {
+      await client.del(key);
+      throw new BadRequestException('OTP expired or not found');
+    }
 
     if (parsed.attempts >= this.MAX_ATTEMPTS) {
       await client.del(key);
@@ -73,7 +97,7 @@ export class OtpService {
       );
     }
 
-    if (parsed.otp !== otp) {
+    if (!this.constantTimeEquals(parsed.otpHash, this.hashOtp(otp))) {
       parsed.attempts += 1;
       await client.set(key, JSON.stringify(parsed), 'EX', this.OTP_TTL);
       this.logger.warn('authentication_otp_rejected', {
@@ -84,7 +108,11 @@ export class OtpService {
       throw new BadRequestException('Invalid OTP');
     }
 
-    await client.del(key);
+    // Atomic consume: a concurrent verification of the same code fails.
+    const consumed = await (client as any).getdel?.(key);
+    if (!consumed) {
+      throw new BadRequestException('OTP already used');
+    }
     return true;
   }
 
@@ -97,6 +125,16 @@ export class OtpService {
     if (!client) return false;
     const data = await client.get(this.getOtpKey(email, type));
     return !!data;
+  }
+
+  private constantTimeEquals(a: string, b: string): boolean {
+    const bufA = Buffer.from(a);
+    const bufB = Buffer.from(b);
+    if (bufA.length !== bufB.length) {
+      timingSafeEqual(bufA, bufA);
+      return false;
+    }
+    return timingSafeEqual(bufA, bufB);
   }
 
   private getOtpKey(email: string, type: OtpType): string {

@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { createHash, randomBytes, timingSafeEqual } from 'crypto';
+import { createHash, randomBytes, randomInt, timingSafeEqual } from 'crypto';
 import { CodVerificationMode, OrderStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '@app/database';
 import type { UserPayload } from '@app/common';
@@ -73,6 +73,17 @@ export class OrderService {
 
   private hashIdempotencyKey(value: string): string {
     return createHash('sha256').update(value).digest('hex');
+  }
+
+  private timingSafeEqualStrings(a: string, b: string): boolean {
+    const bufA = Buffer.from(a);
+    const bufB = Buffer.from(b);
+    if (bufA.length !== bufB.length) {
+      // Compare against self to keep timing uniform, then fail.
+      timingSafeEqual(bufA, bufA);
+      return false;
+    }
+    return timingSafeEqual(bufA, bufB);
   }
 
   private orderReference(prefix = 'FER'): string {
@@ -514,8 +525,7 @@ export class OrderService {
     orderId: string,
     reason: string,
     actorId: string,
-  ) {
-    const reservations = await transaction.inventoryReservation.findMany({
+  ) {    const reservations = await transaction.inventoryReservation.findMany({
       where: { orderItem: { orderId }, status: 'ACTIVE' },
     });
     for (const reservation of reservations) {
@@ -542,6 +552,53 @@ export class OrderService {
           referenceType: 'Order',
           referenceId: orderId,
           actorId,
+        },
+      });
+    }
+  }
+
+  /**
+   * Consume ACTIVE reservations when a store-pickup handover completes.
+   * Mirrors the courier delivery accounting (ShippingService) so inventory
+   * stays consistent regardless of fulfilment channel.
+   */
+  private async consumeDeliveredReservations(
+    transaction: Prisma.TransactionClient,
+    orderId: string,
+  ) {
+    const reservations = await transaction.inventoryReservation.findMany({
+      where: { orderItem: { orderId }, status: 'ACTIVE' },
+    });
+    for (const reservation of reservations) {
+      const stock = await transaction.inventoryStock.findUnique({
+        where: { id: reservation.inventoryId },
+      });
+      if (
+        !stock ||
+        stock.reserved < reservation.quantity ||
+        stock.onHand < reservation.quantity
+      ) {
+        throw new ConflictException('Delivered reservation is inconsistent');
+      }
+      await transaction.inventoryStock.update({
+        where: { id: reservation.inventoryId },
+        data: {
+          reserved: { decrement: reservation.quantity },
+          onHand: { decrement: reservation.quantity },
+        },
+      });
+      await transaction.inventoryReservation.update({
+        where: { id: reservation.id },
+        data: { status: 'CONSUMED', consumedAt: new Date() },
+      });
+      await transaction.inventoryMovement.create({
+        data: {
+          inventoryId: reservation.inventoryId,
+          type: 'SALE',
+          quantityDelta: -reservation.quantity,
+          reason: 'Store pickup handover completed',
+          referenceType: 'Order',
+          referenceId: orderId,
         },
       });
     }
@@ -731,7 +788,7 @@ export class OrderService {
               : 'CONFIRMED';
           const isStorePickup = draft.deliveryMethod === 'STORE_PICKUP';
           const storePickupOtp = isStorePickup
-            ? Math.floor(100000 + Math.random() * 900000).toString()
+            ? String(randomInt(0, 1_000_000)).padStart(6, '0')
             : null;
 
           const order = await transaction.order.create({
@@ -1582,6 +1639,19 @@ export class OrderService {
       throw new BadRequestException('Order is not configured for store pickup');
     }
 
+    // Only the owning customer (or an admin caller) may schedule a pickup.
+    if (actor?.role !== 'admin') {
+      const viewer = actor?.userId
+        ? await this.prisma.user.findUnique({
+            where: { id: actor.userId },
+            select: { customerId: true },
+          })
+        : null;
+      if (!viewer?.customerId || viewer.customerId !== order.customerId) {
+        throw new NotFoundException('Order not found');
+      }
+    }
+
     const scheduledDate = dto.pickupScheduledAt
       ? new Date(dto.pickupScheduledAt)
       : order.pickupScheduledAt;
@@ -1594,6 +1664,17 @@ export class OrderService {
         customerPickupNotes:
           dto.customerPickupNotes ?? order.customerPickupNotes,
         storePickupStatus: 'SCHEDULED_BY_CUSTOMER',
+      },
+      // Payload-safe response: never echo handover secrets.
+      select: {
+        id: true,
+        reference: true,
+        status: true,
+        deliveryMethod: true,
+        storePickupStatus: true,
+        pickupScheduledAt: true,
+        preferredPickupSlot: true,
+        customerPickupNotes: true,
       },
     });
 
@@ -1659,7 +1740,10 @@ export class OrderService {
     if (order.storePickupStatus === 'COMPLETED') {
       throw new ConflictException('Order pickup has already been completed.');
     }
-    if (order.storePickupOtp !== otp.trim()) {
+    if (
+      !order.storePickupOtp ||
+      !this.timingSafeEqualStrings(order.storePickupOtp, otp.trim())
+    ) {
       throw new BadRequestException(
         'Invalid pickup OTP code. Verification failed.',
       );
@@ -1678,6 +1762,36 @@ export class OrderService {
             : order.paymentStatus,
       },
     });
+
+    // Handover is a delivery event: record it in the order history like the
+    // courier path does, so completion/return windows and reporting stay
+    // consistent.
+    await this.prisma.orderStatusHistory.create({
+      data: {
+        orderId,
+        oldStatus: order.status,
+        newStatus: 'DELIVERED',
+        source: 'ADMIN',
+        actorId: actor.userId || (actor as any).sub,
+        note: `Store pickup handover completed at ${order.pickupStore?.name ?? 'store'}`,
+      },
+    });
+    if (order.fulfillmentStatus !== 'FULFILLED') {
+      await this.prisma.fulfillmentHistory.create({
+        data: {
+          orderId,
+          oldStatus: order.fulfillmentStatus,
+          newStatus: 'FULFILLED',
+          source: 'ADMIN',
+          actorId: actor.userId || (actor as any).sub,
+          note: 'Store pickup handover completed',
+        },
+      });
+    }
+    await this.prisma.$transaction(async (tx) => {
+      await this.consumeDeliveredReservations(tx, orderId);
+    });
+
 
     await this.audit.record({
       action: 'STORE_PICKUP_HANDOVER_COMPLETED',

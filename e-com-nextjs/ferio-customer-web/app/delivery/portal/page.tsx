@@ -62,22 +62,28 @@ export default function RiderPortalPage() {
   const [geoStatus, setGeoStatus] = useState<string | null>(null);
 
   useEffect(() => {
-    const savedToken = localStorage.getItem("ferio_rider_token");
-    if (savedToken) {
-      setToken(savedToken);
+    // Session lives in an httpOnly cookie managed by the BFF routes.
+    let cancelled = false;
+    async function probe() {
+      try {
+        const res = await fetch("/api/delivery/me");
+        if (!cancelled && res.ok) {
+          setToken("cookie-session");
+        }
+      } catch {
+        // Not signed in
+      }
     }
-    const savedOnline = localStorage.getItem("ferio_rider_online");
-    if (savedOnline !== null) {
-      setIsOnline(savedOnline === "true");
-    }
+    void probe();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const loadProfile = useCallback(async () => {
     if (!token) return;
     try {
-      const res = await fetch("/api/delivery/me", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch("/api/delivery/me");
       if (res.ok) {
         const raw = await res.json();
         const prof = raw.data || raw;
@@ -101,10 +107,7 @@ export default function RiderPortalPage() {
     setLoadingOrders(true);
     try {
       const res = await fetch(`/api/delivery/my-orders`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/json",
-        },
+        headers: { Accept: "application/json" },
       });
       const data = await res.json();
       if (res.ok && Array.isArray(data)) {
@@ -137,11 +140,10 @@ export default function RiderPortalPage() {
         body: JSON.stringify({ email: loginEmail, password: loginPassword }),
       });
       const data = await res.json();
-      if (!res.ok || !data.accessToken) {
+      if (!res.ok) {
         throw new Error(data.message || "Rider login failed. Check credentials.");
       }
-      localStorage.setItem("ferio_rider_token", data.accessToken);
-      setToken(data.accessToken);
+      setToken("cookie-session");
       if (data.user) {
         setProfile(data.user);
       }
@@ -159,23 +161,16 @@ export default function RiderPortalPage() {
     try {
       const res = await fetch("/api/delivery/online-status", {
         method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isOnline: targetState }),
       });
       if (res.ok) {
         setIsOnline(targetState);
-        localStorage.setItem("ferio_rider_online", String(targetState));
       } else {
-        // Fallback local toggle
-        setIsOnline(targetState);
-        localStorage.setItem("ferio_rider_online", String(targetState));
+        setGeoStatus("Could not change duty status. Try again.");
       }
     } catch {
-      setIsOnline(targetState);
-      localStorage.setItem("ferio_rider_online", String(targetState));
+      setGeoStatus("Network error changing duty status.");
     } finally {
       setTogglingOnline(false);
     }
@@ -246,10 +241,7 @@ export default function RiderPortalPage() {
 
       const res = await fetch(`/api/delivery/my-orders/${orderId}/status`, {
         method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           status,
           latitude: coords.latitude,
@@ -276,10 +268,7 @@ export default function RiderPortalPage() {
     try {
       const res = await fetch(`/api/delivery/location`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ latitude: coords.latitude, longitude: coords.longitude }),
       });
       if (res.ok) {
@@ -292,8 +281,12 @@ export default function RiderPortalPage() {
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("ferio_rider_token");
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/delivery/logout", { method: "POST" });
+    } catch {
+      // Cookie clearing is best-effort client-side
+    }
     setToken(null);
     setProfile(null);
   };

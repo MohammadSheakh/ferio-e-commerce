@@ -50,7 +50,7 @@ export class PublicCommercePaymentsController {
   @UseGuards(SlidingWindowRateLimitGuard)
   @RateLimit(GLOBAL_RATE_LIMITS.strict)
   initiate(@Body() dto: InitiateCommercePaymentDto) {
-    return this.payments.initiate(dto.orderId, dto.provider);
+    return this.payments.initiate(dto.orderId, dto.reference, dto.phone, dto.provider);
   }
 
   @Post('retry')
@@ -68,6 +68,8 @@ export class PublicCommercePaymentsController {
    * For Browser Callbacks: Validates transaction and redirects user to /order-confirmation.
    */
   @All('callback/:provider/:eventType')
+  @UseGuards(SlidingWindowRateLimitGuard)
+  @RateLimit(GLOBAL_RATE_LIMITS.user)
   async callback(
     @Param('provider') provider: CommercePaymentProvider,
     @Param('eventType') eventType: string, // e.g. success, fail, cancel, ipn

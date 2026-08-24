@@ -91,6 +91,9 @@ describe('WalletService', () => {
       isDeleted: false,
     });
     transaction.wallet.updateMany.mockResolvedValueOnce({ count: 1 });
+    transaction.wallet.findUniqueOrThrow = jest.fn().mockResolvedValueOnce({
+      amount: 5_000,
+    });
     transaction.walletTransactionHistory.create.mockResolvedValueOnce({
       id: 'ledger-1',
     });
@@ -131,6 +134,10 @@ describe('WalletService', () => {
       amount: 25_000,
       status: 'COMPLETED',
       reviewNote: 'Verified against provider statement',
+    });
+    transaction.wallet.update.mockResolvedValueOnce({
+      id: 'wallet-1',
+      amount: 35_000,
     });
 
     await service.reviewTopUp(

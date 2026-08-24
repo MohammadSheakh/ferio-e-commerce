@@ -28,7 +28,13 @@ export type InitiatePaymentResult = {
 };
 
 export type ValidatePaymentResult = {
-  outcome: 'SUCCEEDED' | 'FAILED' | 'CANCELLED' | 'PENDING' | 'UNKNOWN';
+  outcome:
+    | 'SUCCEEDED'
+    | 'FAILED'
+    | 'CANCELLED'
+    | 'PENDING'
+    | 'UNKNOWN'
+    | 'UNVERIFIED_REPORT';
   merchantTransactionId: string;
   amount?: number;
   currency?: string;

@@ -22,13 +22,10 @@ export default function VerifyAccountPage() {
 
   useEffect(() => {
     setEmail(new URLSearchParams(window.location.search).get("email") || "");
-    const developmentCode = sessionStorage.getItem(
-      "ferio_development_verification_code",
-    );
-    if (developmentCode) {
-      setOtp(developmentCode);
-      sessionStorage.removeItem("ferio_development_verification_code");
-    }
+    // Verification codes are never delivered to the browser; the code must be
+    // retrieved from the customer's email inbox.
+    // Legacy dev-session keys are removed defensively.
+    sessionStorage.removeItem("ferio_development_verification_code");
   }, []);
 
   async function verify(event: FormEvent<HTMLFormElement>) {

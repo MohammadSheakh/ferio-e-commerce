@@ -33,6 +33,19 @@ export default function CategoriesScreen() {
     );
   }
 
+  if (tree.length === 0) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <FerioHeader />
+        <View style={{ marginTop: 60, paddingHorizontal: 24 }}>
+          <Text style={{ fontSize: 15, color: '#6e6e73', textAlign: 'center' }}>
+            No categories are available right now. Please try again later.
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safe}>
       <FerioHeader />

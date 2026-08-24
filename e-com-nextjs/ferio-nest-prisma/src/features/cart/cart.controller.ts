@@ -135,16 +135,19 @@ export class CartController {
   }
 
   @Post('reorder/:orderId')
-  @ApiOperation({ summary: 'Reorder available items from a past order into active cart' })
+  @UseGuards(AuthGuard)
+  @ApiOperation({ summary: 'Reorder available items from one of your past orders into active cart' })
   reorder(
     @Param('orderId') orderId: string,
     @Body() dto: ReorderDto,
+    @User() user: UserPayload,
     @Headers('x-cart-token') token?: string,
   ) {
     return this.cartService.reorderFromOrder(
       orderId,
       dto.orderItemIds,
       token,
+      user,
     );
   }
 }

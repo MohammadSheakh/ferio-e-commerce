@@ -1057,10 +1057,14 @@ export class CatalogService {
     publicOnly: boolean,
   ) {
     const page = query.page || 1;
-    const limit = query.limit || 24;
+    const limit = Math.min(query.limit || 24, 100);
     const where = this.buildProductWhere(query, publicOnly);
     const isPriceSort =
       query.sort === 'price-asc' || query.sort === 'price-desc';
+    // Application-side pagination (price sort / stock filter) must stay
+    // bounded: cap the candidate window so a large catalog cannot force a
+    // full-table scan into memory per request.
+    const APPLICATION_PAGINATION_WINDOW = 2000;
     const needsApplicationPagination = isPriceSort || query.inStock === 'true';
     const [products, databaseTotal] = await Promise.all([
       this.prisma.product.findMany({
@@ -1071,7 +1075,9 @@ export class CatalogService {
             ? { name: 'asc' }
             : [{ isFeatured: 'desc' }, { createdAt: 'desc' }],
         skip: needsApplicationPagination ? undefined : (page - 1) * limit,
-        take: needsApplicationPagination ? undefined : limit,
+        take: needsApplicationPagination
+          ? APPLICATION_PAGINATION_WINDOW
+          : limit,
       }),
       this.prisma.product.count({ where }),
     ]);
@@ -1224,6 +1230,8 @@ export class CatalogService {
         _count: { select: { movements: true } },
       },
       orderBy: [{ updatedAt: 'desc' }, { variant: { sku: 'asc' } }],
+      // Bounded scan: inventory views must not load an unbounded table.
+      take: 2000,
     });
     const rows = stocks
       .map((stock) => {

@@ -392,6 +392,7 @@ export default function CheckoutPage() {
           paymentMethod: form.paymentMethod,
           paymentProvider:
             form.paymentMethod === "PREPAID" ? form.paymentProvider : undefined,
+          phone: form.phone,
         }),
       });
       const payload = (await response.json()) as {

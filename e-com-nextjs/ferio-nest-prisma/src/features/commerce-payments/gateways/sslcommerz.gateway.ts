@@ -102,10 +102,13 @@ export class SslcommerzGateway extends PaymentGateway {
   ): Promise<ValidatePaymentResult> {
     const validationId = String(payload.val_id ?? '');
 
-    // If val_id is missing (e.g. cancel/fail callback before payment completed)
+    // Without a val_id there is nothing this server can verify with the
+    // provider. Browser-reported fail/cancel outcomes are recorded as an
+    // UNVERIFIED_REPORT and must never mutate attempt or order state — a
+    // forged callback would otherwise be able to kill in-flight payments.
     if (!validationId)
       return {
-        outcome: this.callbackOutcome(payload),
+        outcome: 'UNVERIFIED_REPORT' as const,
         merchantTransactionId: String(
           payload.tran_id ?? payload.merchantTransactionId ?? '',
         ),
@@ -145,13 +148,6 @@ export class SslcommerzGateway extends PaymentGateway {
 
   protected credentialKeys() {
     return ['SSLCOMMERZ_STORE_ID', 'SSLCOMMERZ_STORE_PASSWORD'];
-  }
-
-  private callbackOutcome(payload: Record<string, unknown>) {
-    const status = String(payload.status ?? '').toUpperCase();
-    if (status === 'CANCELLED') return 'CANCELLED' as const;
-    if (status === 'FAILED') return 'FAILED' as const;
-    return 'UNKNOWN' as const;
   }
 
   /**

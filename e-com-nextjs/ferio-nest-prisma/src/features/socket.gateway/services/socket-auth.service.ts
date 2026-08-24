@@ -65,7 +65,7 @@ export class SocketAuthService implements OnModuleInit {
       // Verify JWT token
       try {
         const payload = await this.jwtService.verifyAsync(token, {
-          secret: process.env.JWT_ACCESS_SECRET || 'fallback-secret',
+          secret: process.env.JWT_ACCESS_SECRET as string,
         });
 
         if (payload?.purpose === 'chat_socket' && payload.userId && payload.role === 'guest') {
@@ -107,20 +107,15 @@ export class SocketAuthService implements OnModuleInit {
             };
           }
 
-          // Generic token payload fallback
-          return {
-            userId: targetId,
-            role: payload.role || 'guest',
-            name: payload.name || 'Visitor',
-          };
+          // Valid token for an account that no longer resolves (deleted user,
+          // stale rider): reject instead of trusting claim-derived roles.
+          return null;
         }
       } catch {
-        // Fall back to guest session if token is expired or invalid
-        return {
-          userId: this.normalizeGuestId(guestId) || `guest_${socket.id.slice(0, 8)}`,
-          role: 'guest',
-          name: 'Guest Visitor',
-        };
+        // A supplied-but-invalid token must never silently downgrade into a
+        // guest session bound to a client-asserted ID. Reject the socket;
+        // genuine guests connect without a token.
+        return null;
       }
 
       return {

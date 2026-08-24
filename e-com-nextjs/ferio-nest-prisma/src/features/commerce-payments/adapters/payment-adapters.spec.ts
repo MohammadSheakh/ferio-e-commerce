@@ -66,8 +66,8 @@ describe('hosted payment adapters', () => {
     } as Response);
     const adapter = new SslcommerzGateway(
       config({
-        SSL_STORE_ID: 'betop6905e84dc8dd5',
-        SSL_STORE_PASSWORD: 'betop6905e84dc8dd5@ssl',
+        SSL_STORE_ID: 'test-store-id',
+        SSL_STORE_PASSWORD: 'test-store-password',
       }),
     );
     expect(adapter.isConfigured()).toBe(true);

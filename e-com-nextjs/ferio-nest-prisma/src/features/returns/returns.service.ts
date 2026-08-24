@@ -93,6 +93,13 @@ export class ReturnsService {
     return this.prisma.$transaction(
       async (transaction) => {
         const eligibility = await this.loadEligibility(orderId, transaction);
+        // Eligibility gates creation: INELIGIBLE requests are rejected here,
+        // not merely recorded. REVIEW_REQUIRED still proceeds to staff review.
+        if (eligibility.status === 'INELIGIBLE') {
+          throw new BadRequestException(
+            'This order is not eligible for a return request.',
+          );
+        }
         const requestedIds = new Set(dto.items.map((item) => item.orderItemId));
         if (requestedIds.size !== dto.items.length) {
           throw new BadRequestException('Each order item may appear only once');

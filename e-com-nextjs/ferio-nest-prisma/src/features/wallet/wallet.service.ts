@@ -221,9 +221,9 @@ export class WalletService {
           throw new ConflictException(`Top-up is already ${topUp.status.toLowerCase()}`);
         }
         if (dto.status === 'COMPLETED') {
-          const balanceBefore = topUp.wallet.amount;
-          const balanceAfter = balanceBefore + topUp.amount;
-          await transaction.wallet.update({
+          // Prisma returns the post-update row: derive an exact audit trail
+          // instead of trusting the pre-read balance under concurrency.
+          const updatedWallet = await transaction.wallet.update({
             where: { id: topUp.walletId },
             data: {
               amount: { increment: topUp.amount },
@@ -239,8 +239,8 @@ export class WalletService {
               type: 'credit',
               amount: topUp.amount,
               currency: 'bdt',
-              balanceBefore,
-              balanceAfter,
+              balanceBefore: updatedWallet.amount - topUp.amount,
+              balanceAfter: updatedWallet.amount,
               description: `${topUp.provider} wallet top-up approved`,
               status: 'completed',
               referenceFor: 'WalletTopUp',
@@ -312,6 +312,11 @@ export class WalletService {
       data: { amount: { decrement: amount } },
     });
     if (!changed.count) throw new ConflictException('Insufficient wallet balance');
+    // Re-read inside this transaction for the authoritative post-debit value.
+    const walletAfterDebit = await transaction.wallet.findUniqueOrThrow({
+      where: { id: wallet.id },
+      select: { amount: true },
+    });
     return transaction.walletTransactionHistory.create({
       data: {
         userId,
@@ -321,8 +326,8 @@ export class WalletService {
         type: 'debit',
         amount,
         currency: 'bdt',
-        balanceBefore: wallet.amount,
-        balanceAfter: wallet.amount - amount,
+        balanceBefore: walletAfterDebit.amount + amount,
+        balanceAfter: walletAfterDebit.amount,
         description: 'Ferio order paid from wallet',
         status: 'completed',
         referenceFor: 'OrderPurchase',
@@ -341,13 +346,27 @@ export class WalletService {
       where: { idempotencyKey: `order:${orderId}:refund` },
     });
     if (existing) return existing;
+    // Fail closed against over-crediting: a refund can never exceed the
+    // wallet debit recorded for this order.
+    const originalDebit = await transaction.walletTransactionHistory.findUnique({
+      where: { idempotencyKey: `order:${orderId}:debit` },
+    });
+    if (
+      !originalDebit ||
+      originalDebit.type !== 'debit' ||
+      amount > originalDebit.amount
+    ) {
+      throw new ConflictException(
+        'Refund amount exceeds the wallet-paid total for this order',
+      );
+    }
     const user = await transaction.user.findUnique({
       where: { customerId },
       select: { id: true },
     });
     if (!user) throw new ConflictException('Wallet owner could not be resolved');
     const wallet = await this.ensureWallet(transaction, user.id);
-    await transaction.wallet.update({
+    const updatedWallet = await transaction.wallet.update({
       where: { id: wallet.id },
       data: { amount: { increment: amount }, totalBalance: { increment: amount } },
     });
@@ -360,8 +379,8 @@ export class WalletService {
         type: 'credit',
         amount,
         currency: 'bdt',
-        balanceBefore: wallet.amount,
-        balanceAfter: wallet.amount + amount,
+        balanceBefore: updatedWallet.amount - amount,
+        balanceAfter: updatedWallet.amount,
         description: 'Cancelled order refunded to Ferio wallet',
         status: 'completed',
         referenceFor: 'OrderRefund',

@@ -795,9 +795,23 @@ export class CartService {
     orderId: string,
     orderItemIds?: string[],
     token?: string,
+    actor?: { userId: string },
   ) {
-    const order = await this.prisma.order.findUnique({
-      where: { id: orderId },
+    // Ownership: only the account linked to the order's customer profile may
+    // reorder it. Unauthenticated callers can no longer enumerate arbitrary
+    // order IDs and echo back their contents.
+    const viewer = actor?.userId
+      ? await this.prisma.user.findUnique({
+          where: { id: actor.userId },
+          select: { customerId: true },
+        })
+      : null;
+    if (!viewer?.customerId) {
+      throw new NotFoundException('Order not found');
+    }
+
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, customerId: viewer.customerId },
       include: {
         items: {
           include: {

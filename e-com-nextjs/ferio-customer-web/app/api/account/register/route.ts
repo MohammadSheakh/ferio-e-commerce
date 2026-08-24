@@ -58,7 +58,8 @@ export async function POST(request: Request) {
       data: {
         email: payload.user?.email || body.email,
         message: payload.message || "Check your email for a verification code.",
-        developmentOtp: payload.otp,
+        // Verification codes never reach the browser — even in development.
+        // Use the backend email inbox/logs to read the dev code instead.
       },
     });
   } catch {
