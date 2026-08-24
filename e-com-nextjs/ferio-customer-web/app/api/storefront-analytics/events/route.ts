@@ -1,22 +1,21 @@
-import { proxyBackendResponse, forwardedHeaders } from '@/lib/bff-response';
+import { NextResponse } from "next/server";
 
-const backendApiUrl =
-  process.env.NEXT_PUBLIC_FERIO_API_URL ?? 'http://localhost:6733/api/v1';
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3000";
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const response = await fetch(`${backendApiUrl}/storefront-analytics/events`, {
-      method: 'POST',
-      headers: forwardedHeaders(request, {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-      }),
+    const response = await fetch(`${BACKEND_URL}/storefront-analytics/events`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
-      cache: 'no-store',
     });
-    return proxyBackendResponse(response, 'Analytics event could not be accepted.');
+
+    if (response.ok) {
+      return NextResponse.json({ success: true }, { status: 202 });
+    }
+    return NextResponse.json({ success: false }, { status: response.status });
   } catch {
-    return new Response(null, { status: 204 });
+    return NextResponse.json({ success: false }, { status: 500 });
   }
 }

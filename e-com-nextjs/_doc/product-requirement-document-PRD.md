@@ -428,6 +428,7 @@ Scope:
 - storefront, search, product detail, cart, and checkout;
 - guest checkout with phone-first customer resolution;
 - COD and at least one configurable prepaid payment integration or a production-ready payment adapter;
+- authenticated customer wallets with reviewed recharge requests and wallet-funded checkout;
 - product, variant, category, price, media, and publication management;
 - one-warehouse stock management and reservation;
 - order lifecycle and status history;
@@ -706,6 +707,21 @@ Initial roles:
 | FR-PAY-009 | P1 | Reconciliation must compare internal payments against provider records or reports. |
 | FR-PAY-010 | P1 | Refunds must reference payment, return/order reason, amount, method, provider result, and actor. |
 
+### 12.9A Customer wallet
+
+| ID | Priority | Requirement |
+|---|---|---|
+| FR-WAL-001 | P0 | Every authenticated customer must have at most one active BDT wallet, created lazily or during account provisioning. |
+| FR-WAL-002 | P0 | Wallet balances and all wallet amounts must use integer minor units; clients must never submit or calculate an authoritative balance. |
+| FR-WAL-003 | P0 | Customers must be able to submit recharge requests for bKash, Nagad, Rocket, or bank transfer with a provider transaction/reference and an idempotency key. |
+| FR-WAL-004 | P0 | Recharge requests must remain pending until an authorized administrator verifies the external payment evidence and approves or rejects the request with a note. |
+| FR-WAL-005 | P0 | Approval must atomically credit the wallet and append one immutable ledger entry; replay or concurrent review must not credit twice. |
+| FR-WAL-006 | P0 | Authenticated customers may pay an eligible order from wallet balance, while COD, SSLCommerz, and aamarPay remain separate checkout choices. |
+| FR-WAL-007 | P0 | Wallet order placement must atomically verify sufficient balance, debit once, reserve stock, and create the order; insufficient balance must create no order or partial debit. |
+| FR-WAL-008 | P0 | Cancelling a wallet-paid order must credit the eligible refund exactly once and preserve order-linked debit and refund ledger entries. |
+| FR-WAL-009 | P0 | Customers must see current balance, recharge status, and paginated ledger history; authorized Admin users must see and review pending recharge requests. |
+| FR-WAL-010 | P1 | Direct provider-verified wallet recharge may replace manual review only through authenticated provider adapters, idempotent callbacks, amount/reference verification, and reconciliation evidence. |
+
 ### 12.10 Fulfillment, shipping, and courier
 
 | ID | Priority | Requirement |
@@ -733,6 +749,10 @@ Initial roles:
 | FR-NOT-006 | P0 | Retry policy must avoid duplicate customer messages when provider outcome is uncertain. |
 | FR-NOT-007 | P1 | Channel fallback must follow policy, not broadcast the same message to all channels. |
 | FR-NOT-008 | P1 | Customer-facing status language must be normalized and understandable, not expose provider codes. |
+| FR-NOT-009 | P0 | Authenticated customers must have a private in-app notification inbox with unread count, pagination, read state, and soft deletion scoped to the owning account. |
+| FR-NOT-010 | P0 | In-app notifications must use deterministic deduplication keys so retries cannot create duplicate customer events. |
+| FR-NOT-011 | P0 | CommerceMessage remains the outbound SMS/WhatsApp/email outbox and must not be treated as the customer in-app inbox. |
+| FR-NOT-012 | P1 | Order, payment, wallet, warranty, service, and other actionable customer lifecycle events should link to the relevant authenticated screen when available. |
 
 Required Release 1 transactional triggers:
 
@@ -1105,9 +1125,10 @@ Consent history must not be overwritten when current status changes.
 - orders, order items, status history, adjustments, and attribution;
 - warehouses, stock balances, reservations, and stock movements;
 - payment attempts, transactions, refunds, and reconciliation results;
+- customer wallets, recharge requests, and immutable wallet ledger entries;
 - fulfillments, pick lists, packages, shipments, courier events, and tracking history;
 - return requests, inspections, resolutions, and RMA references;
-- notification templates, messages, attempts, and provider events;
+- notification templates, outbound commerce messages, provider attempts/events, and private customer inbox notifications;
 - segments, campaigns, audience snapshots, workflow enrollments, and outcomes;
 - costs, campaign spend, contribution snapshots, and reporting dimensions;
 - settings, feature flags, integration connections, scheduled jobs, and audit logs.
@@ -1630,6 +1651,7 @@ Release 1 is launch-ready only when:
 - a customer can complete the full mobile storefront journey using production data;
 - COD order creation is idempotent and verification policy works;
 - configured prepaid flow safely handles success, failure, cancellation, callback replay, and retry;
+- wallet recharge approval, insufficient-balance rejection, wallet order debit, cancellation refund, and idempotent replay pass automated tests before wallet launch;
 - stock cannot oversell during tested concurrent checkout scenarios;
 - staff can move valid orders from confirmation through fulfillment and shipment;
 - one real courier integration passes create, callback/poll, delivery, failed-attempt, cancellation, and RTO tests where supported;

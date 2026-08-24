@@ -8,6 +8,7 @@ import Footer from "@/components/Footer";
 import PurchaseActivityToast from "@/components/PurchaseActivityToast";
 import LiveChatWidget from "@/components/LiveChatWidget";
 import PageTracker from "@/components/PageTracker";
+import { GoogleAnalytics } from "@next/third-parties/google";
 import { fallbackStoreConfig, getStoreConfig } from "@/lib/store";
 import { getCategories } from "@/lib/catalog";
 
@@ -53,6 +54,9 @@ export default async function RootLayout({
           <PurchaseActivityToast />
           <LiveChatWidget />
           <PageTracker />
+          {process.env.NEXT_PUBLIC_GA_ID && (
+            <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GA_ID} />
+          )}
         </CartProvider>
       </body>
     </html>

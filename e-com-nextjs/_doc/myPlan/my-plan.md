@@ -24,6 +24,34 @@ tar profile details edit option e giye .. facebook id er url add
 korte parbe .. and next feature hishebe facebook id er screen shot dite
 parbe .. 
 
+ilish ... 
+
+5:30
+gulistan 6:30
+sree nagar 7:30
+pacholdia 8:30
+
+johor (khabar)
+
+3:30 bibondi
+
+magrib .. bibondi
+
+noapara 
+
+chonbari .. 
+
+
+
+
+
+
+11. customer ra wallet recharge kore rakhte parbe .. shei taka diye jinish 
+    kinte parbe .. 
+
+12. ekjon user .. tar profile image, full name , phone number change korle egula tracked / 
+history saved thakbe .. admin dekhte parbe .. ager information gula saved thakbe 
+
 =================
 1. category delete korar feature thakte hobe
 2. category er under e service booking er feature thakte hobe
@@ -43,7 +71,7 @@ parbe ..
 8. ekta product er jonno .. public review section thakbe ..  shekhan e youtube er reviewer der public review thakbe... je keo review link share korte parbe .. jodi amader site e tar account thake .. taile link submit korbe .. admin sheta check kore approve korte parbe .. prottek ta product er jonno admin end theke cover photo / banner style er image upload kora jabe onek gula .. normal logged in customer youtuve review link add korte parbe jekono product er jonno ....
 jekono ekta youtube review jeta admin approve korse .. sheta product details page ei show hobe ..
 
-9.  Inventory er record adjustment niye kaj korte hobe admin dashboard e .. field baraite hobe .. ki ki field barano jay .. sheta niye chinta korte hobe
+1.  Inventory er record adjustment niye kaj korte hobe admin dashboard e .. field baraite hobe .. ki ki field barano jay .. sheta niye chinta korte hobe
 
 10.
 

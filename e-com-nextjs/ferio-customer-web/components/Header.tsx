@@ -40,15 +40,11 @@ export default function Header({
             <Link href="/track" className="transition hover:text-ink">
               Track order
             </Link>
-            <Link href="/support" className="transition hover:text-ink">
-              Support
-            </Link>
             {serviceBookingEnabled && (
               <Link href="/services" className="transition hover:text-ink">
                 Services
               </Link>
             )}
-            <HeaderAccountNav />
             {warrantyClaimsEnabled && (
               <Link
                 href="/account/warranty"
@@ -57,6 +53,7 @@ export default function Header({
                 Warranty
               </Link>
             )}
+            <HeaderAccountNav />
           </nav>
           <Link
             href="/cart"

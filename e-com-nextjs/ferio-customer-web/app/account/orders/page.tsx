@@ -1,17 +1,27 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import type { CommerceAccount } from "@/lib/account";
 import { formatTaka } from "@/lib/catalog";
 import CustomerLogoutButton from "@/components/CustomerLogoutButton";
+import { useCart } from "@/components/CartContext";
 
 export default function AccountOrdersPage() {
+  const router = useRouter();
+  const { revalidate } = useCart();
   const [account, setAccount] = useState<CommerceAccount | null>(null);
   const [loading, setLoading] = useState(true);
   const [linking, setLinking] = useState(false);
   const [message, setMessage] = useState("");
   const [unauthorized, setUnauthorized] = useState(false);
+  const [reorderingId, setReorderingId] = useState<string | null>(null);
+  const [reorderResult, setReorderResult] = useState<{
+    summary: string;
+    addedItems: any[];
+    unavailableItems: any[];
+  } | null>(null);
 
   async function load() {
     const response = await fetch("/api/account/commerce", { cache: "no-store" });
@@ -25,6 +35,33 @@ export default function AccountOrdersPage() {
   useEffect(() => {
     void load();
   }, []);
+
+  async function handleReorder(orderId: string, orderItemIds?: string[]) {
+    const targetKey = orderItemIds ? `${orderId}-${orderItemIds.join(",")}` : orderId;
+    setReorderingId(targetKey);
+    setReorderResult(null);
+    try {
+      const response = await fetch(`/api/cart/reorder/${orderId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderItemIds }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to reorder items.");
+      }
+      await revalidate();
+      setReorderResult({
+        summary: data.summary || "Items added to your cart!",
+        addedItems: data.addedItems || [],
+        unavailableItems: data.unavailableItems || [],
+      });
+    } catch (err: any) {
+      alert(err.message || "Could not reorder items.");
+    } finally {
+      setReorderingId(null);
+    }
+  }
 
   async function linkAccount(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -92,6 +129,37 @@ export default function AccountOrdersPage() {
         <CustomerLogoutButton />
       </div>
 
+      {reorderResult && (
+        <div className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 shadow-xs">
+          <div className="flex items-center justify-between">
+            <h3 className="text-[15px] font-semibold text-emerald-900">
+              🛒 {reorderResult.summary}
+            </h3>
+            <button
+              onClick={() => router.push("/cart")}
+              className="rounded-full bg-emerald-700 px-4 py-1.5 text-[12.5px] font-medium text-white hover:bg-emerald-800"
+            >
+              Go to Cart →
+            </button>
+          </div>
+
+          {reorderResult.unavailableItems.length > 0 && (
+            <div className="mt-3 border-t border-emerald-200/60 pt-3">
+              <p className="text-[12px] font-semibold text-amber-900">
+                Unavailable / Out of stock items skipped:
+              </p>
+              <ul className="mt-1 space-y-1 text-[11.5px] text-amber-800">
+                {reorderResult.unavailableItems.map((u, idx) => (
+                  <li key={idx}>
+                    • <span className="font-medium">{u.productName}</span> ({u.variantName}) — {u.reason}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
       {!account?.linked ? (
         <section className="mt-10 max-w-xl border-y border-line py-8">
           <h2 className="text-[18px] font-medium text-ink">
@@ -146,12 +214,20 @@ export default function AccountOrdersPage() {
                     : ""}
                 </p>
               </div>
-              <Link
-                href="/account/warranty"
-                className="text-[12px] text-ink2 underline underline-offset-4"
-              >
-                Warranty claims
-              </Link>
+              <div className="flex items-center gap-4">
+                <Link
+                  href="/account/saved-carts"
+                  className="text-[12px] text-ink2 underline underline-offset-4"
+                >
+                  Saved Carts
+                </Link>
+                <Link
+                  href="/account/warranty"
+                  className="text-[12px] text-ink2 underline underline-offset-4"
+                >
+                  Warranty claims
+                </Link>
+              </div>
             </div>
 
             <div className="divide-y divide-line">
@@ -167,53 +243,77 @@ export default function AccountOrdersPage() {
                         {order.paymentMethod}
                       </p>
                     </div>
-                    <span className="rounded-full bg-surface px-3 py-1 text-[11px] text-ink2">
-                      {order.status.replaceAll("_", " ").toLowerCase()}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleReorder(order.id)}
+                        disabled={reorderingId === order.id}
+                        className="inline-flex items-center gap-1 rounded-full bg-ink px-3.5 py-1 text-[11.5px] font-medium text-white hover:opacity-85 disabled:opacity-50 transition"
+                      >
+                        <span>🔄</span>
+                        <span>{reorderingId === order.id ? "Reordering…" : "Re-order"}</span>
+                      </button>
+                      <span className="rounded-full bg-surface px-3 py-1 text-[11px] text-ink2">
+                        {order.status.replaceAll("_", " ").toLowerCase()}
+                      </span>
+                    </div>
                   </div>
 
-                  {/* Order Items with Per-Item Warranty Claim Button */}
+                  {/* Order Items with Per-Item Warranty & Re-order Button */}
                   <div className="mt-5 space-y-3">
-                    {order.items.map((item) => (
-                      <div
-                        key={item.id}
-                        className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line/60 bg-paper p-3"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="h-14 w-14 shrink-0 overflow-hidden rounded-card bg-surface">
-                            {item.imageUrl ? (
-                              <img
-                                src={item.imageUrl}
-                                alt=""
-                                className="h-full w-full object-cover"
-                              />
-                            ) : null}
+                    {order.items.map((item) => {
+                      const itemKey = `${order.id}-${item.id}`;
+                      return (
+                        <div
+                          key={item.id}
+                          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line/60 bg-paper p-3"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="h-14 w-14 shrink-0 overflow-hidden rounded-card bg-surface">
+                              {item.imageUrl ? (
+                                <img
+                                  src={item.imageUrl}
+                                  alt=""
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : null}
+                            </div>
+                            <div>
+                              <p className="text-[13px] font-medium text-ink">
+                                {item.productName}
+                              </p>
+                              <p className="mt-1 text-[11px] text-ink2">
+                                {item.variantName} · Qty {item.quantity} ·{" "}
+                                {formatTaka(item.lineTotal)}
+                              </p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="text-[13px] font-medium text-ink">
-                              {item.productName}
-                            </p>
-                            <p className="mt-1 text-[11px] text-ink2">
-                              {item.variantName} · Qty {item.quantity} ·{" "}
-                              {formatTaka(item.lineTotal)}
-                            </p>
+
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleReorder(order.id, [item.id])}
+                              disabled={reorderingId === itemKey}
+                              className="inline-flex items-center gap-1 rounded-full border border-line bg-white px-3 py-1 text-[11px] font-medium text-ink hover:border-ink disabled:opacity-50"
+                            >
+                              <span>🛒</span>
+                              <span>{reorderingId === itemKey ? "Adding…" : "Buy Again"}</span>
+                            </button>
+
+                            {["DELIVERED", "COMPLETED"].includes(order.status) && (
+                              <Link
+                                href={`/account/warranty?reference=${encodeURIComponent(
+                                  order.reference,
+                                )}&phone=${encodeURIComponent(
+                                  account?.customer?.phoneNormalized || "",
+                                )}&itemId=${encodeURIComponent(item.id)}`}
+                                className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3.5 py-1.5 text-[11.5px] font-medium text-ink hover:border-ink hover:shadow-xs transition-all"
+                              >
+                                <span>🛡️ Claim Warranty</span>
+                              </Link>
+                            )}
                           </div>
                         </div>
-
-                        {["DELIVERED", "COMPLETED"].includes(order.status) && (
-                          <Link
-                            href={`/account/warranty?reference=${encodeURIComponent(
-                              order.reference,
-                            )}&phone=${encodeURIComponent(
-                              account?.customer?.phoneNormalized || "",
-                            )}&itemId=${encodeURIComponent(item.id)}`}
-                            className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3.5 py-1.5 text-[11.5px] font-medium text-ink hover:border-ink hover:shadow-xs transition-all"
-                          >
-                            <span>🛡️ Claim Warranty</span>
-                          </Link>
-                        )}
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
 
                   <div className="mt-5 grid grid-cols-2 gap-4 border-t border-line pt-4 text-[12px] sm:grid-cols-4">

@@ -25,8 +25,8 @@ An item may be changed to `[x]` only when its relevant backend behavior, fronten
 ## 2. Current Position
 
 **Current milestone:** Release 1 — Cross-surface reconciliation and launch hardening
-**Current completed scope:** Core commerce plus substantial support, pickup, delivery, and customer-engagement extensions
-**Next scheduled scope:** Run Mobile App, chat, payment, and courier end-to-end provider proof, then continue Release 1 hardening
+**Current completed scope:** Core commerce plus substantial support, pickup, delivery, customer-engagement, wallet, and private in-app notification foundations
+**Next scheduled scope:** Apply and concurrency-test the wallet migration, then continue Web/backend Release 1 provider proof and hardening; Mobile App follow-up remains paused by owner direction
 **Release 1 launch status:** Not ready
 
 ## 3. Release 0 — Foundation Checklist
@@ -207,6 +207,24 @@ Release 1 has broad implementation coverage, but launch completion still depends
 - [x] Show paid, unpaid, failed, expired, partially refunded, and refunded states in Admin Web with provider, attempt, payment, refund, and reference filters plus payload-safe callback/refund drill-down.
 - [x] Restrict and audit manual payment-state changes; the active Admin payment API exposes no generic state mutation, privileged operations are limited to recovery orchestration, and provider, expiry, settlement, and refund transitions retain append-only evidence.
 - [ ] Add sandbox tests for success, failure, cancellation, replay, expiry, and retry.
+
+### Slice 5A — Customer wallet and in-app notifications
+
+**Purpose:** Let authenticated customers retain verified funds, pay safely from wallet balance, and receive private lifecycle updates without confusing outbound commerce messages with an inbox.  
+**PRD coverage:** `FR-WAL-001`–`FR-WAL-010`, `FR-NOT-009`–`FR-NOT-012`
+
+- [x] Add one BDT wallet per customer with integer minor-unit balances and an immutable, order/top-up-linked transaction ledger.
+- [x] Add idempotent customer recharge requests for bKash, Nagad, Rocket, and bank transfer references.
+- [x] Add permission-protected Admin recharge search, evidence review, approval/rejection notes, audit evidence, and exactly-once crediting.
+- [x] Add authenticated wallet checkout beside COD, SSLCommerz, and aamarPay with atomic sufficient-balance debit, stock/order transaction participation, and idempotent order placement.
+- [x] Add idempotent wallet refund crediting when an eligible wallet-paid order is cancelled.
+- [x] Add Customer Web wallet balance, recharge form, recharge history, paginated ledger, checkout balance visibility, and insufficient-balance recovery guidance.
+- [x] Add a private owner-scoped Customer Web notification inbox with pagination, unread count, read/read-all actions, and soft deletion.
+- [x] Add deduplicated order and wallet lifecycle notifications while retaining `CommerceMessage` as the independent outbound SMS/WhatsApp/email outbox.
+- [x] Keep the inherited generic notification send/broadcast controller outside the active application; customer routes cannot send or broadcast arbitrary notifications.
+- [ ] **PARTIAL:** Connect warranty, service-booking, shipment, return, refund, and payment lifecycle events to the in-app inbox; order placement/confirmation/cancellation and wallet recharge review are connected first.
+- [ ] **PARTIAL:** Replace manual recharge evidence review with direct bKash/Nagad/Rocket/bank provider verification only after approved credentials, callback contracts, reconciliation rules, and sandbox proof are available.
+- [ ] Apply the wallet/notification migration to a disposable PostgreSQL database and prove concurrent top-up approval, wallet debit, cancellation refund, and insufficient-balance rollback.
 
 ### Slice 6 — Fulfillment, courier, tracking, and notifications
 

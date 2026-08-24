@@ -38,7 +38,7 @@ export type CheckoutPreview = {
   storePickupStatus?: "NOT_APPLICABLE" | "AVAILABLE_IN_STORE" | "TRANSFER_REQUIRED";
   preferredPickupDate?: string | null;
   preferredPickupSlot?: string | null;
-  paymentMethod: "COD" | "PREPAID" | "PAY_AT_STORE";
+  paymentMethod: "COD" | "PREPAID" | "PAY_AT_STORE" | "WALLET";
   paymentProvider: "SSLCOMMERZ" | "AAMARPAY" | null;
   marketingConsent: boolean;
   purchaseActivityConsent: boolean;
@@ -52,13 +52,13 @@ export type OrderConfirmation = {
   reference: string;
   status: "PENDING_CONFIRMATION" | "CONFIRMED";
   codVerification: "REQUIRED" | "NOT_REQUIRED";
-  paymentMethod: "COD" | "PREPAID";
+  paymentMethod: "COD" | "PREPAID" | "PAY_AT_STORE" | "WALLET";
   total: number;
   createdAt: string;
 };
 
 export type PaymentOptions = {
-  methods: { cod: boolean; prepaid: boolean };
+  methods: { cod: boolean; prepaid: boolean; wallet: boolean };
   providers: Array<{ code: "SSLCOMMERZ" | "AAMARPAY"; name: string; configured: boolean }>;
 };
 

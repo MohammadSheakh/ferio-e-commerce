@@ -1,7 +1,18 @@
 import { withCorrelationId } from "@/lib/correlation";
 
-const backendApiUrl =
-  process.env.NEXT_PUBLIC_FERIO_API_URL ?? "http://localhost:6733/api/v1";
+function getBackendApiUrl(): string {
+  if (process.env.NEXT_PUBLIC_FERIO_API_URL) {
+    return process.env.NEXT_PUBLIC_FERIO_API_URL;
+  }
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname;
+    if (host !== "localhost" && host !== "127.0.0.1") {
+      const protocol = window.location.protocol === "https:" ? "https:" : "http:";
+      return `${protocol}//${window.location.host}/api/v1`;
+    }
+  }
+  return "http://localhost:6733/api/v1";
+}
 
 export type ApiEnvelope<T> = {
   success: boolean;
@@ -27,7 +38,7 @@ export async function getPublicApi<T>(
   init?: RequestInit,
 ): Promise<T> {
   const response = await fetch(
-    `${backendApiUrl}${path.startsWith("/") ? path : `/${path}`}`,
+    `${getBackendApiUrl()}${path.startsWith("/") ? path : `/${path}`}`,
     {
       ...init,
       headers: withCorrelationId({

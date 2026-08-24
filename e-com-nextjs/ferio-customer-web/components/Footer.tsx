@@ -23,6 +23,11 @@ export default function Footer({ store }: { store: PublicStoreConfig }) {
           </p>
           <ul className="mt-4 space-y-2.5 text-[13px] text-ink/80">
             <li>
+              <Link href="/support" className="hover:text-ink">
+                Contact support
+              </Link>
+            </li>
+            <li>
               <Link href="/track" className="hover:text-ink">
                 Track an order
               </Link>
@@ -35,11 +40,6 @@ export default function Footer({ store }: { store: PublicStoreConfig }) {
             <li>
               <Link href="/account/register" className="hover:text-ink">
                 Create account
-              </Link>
-            </li>
-            <li>
-              <Link href="/support" className="hover:text-ink">
-                Contact support
               </Link>
             </li>
             <li>

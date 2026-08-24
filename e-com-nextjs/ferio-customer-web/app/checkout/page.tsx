@@ -29,7 +29,7 @@ type CheckoutForm = {
   marketingConsent: boolean;
   purchaseActivityConsent: boolean;
   termsAccepted: boolean;
-  paymentMethod: "COD" | "PREPAID" | "PAY_AT_STORE";
+  paymentMethod: "COD" | "PREPAID" | "PAY_AT_STORE" | "WALLET";
   paymentProvider: "SSLCOMMERZ" | "AAMARPAY";
   deliveryMethod: "HOME_DELIVERY" | "STORE_PICKUP";
   pickupStoreId: string;
@@ -115,6 +115,7 @@ export default function CheckoutPage() {
   );
   const [saveAddressToAccount, setSaveAddressToAccount] = useState(false);
   const [userLoggedIn, setUserLoggedIn] = useState(false);
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const [publicStores, setPublicStores] = useState<any[]>([]);
 
   useEffect(() => {
@@ -150,12 +151,14 @@ export default function CheckoutPage() {
           storeResponse,
           accountResponse,
           publicStoresResponse,
+          walletResponse,
         ] = await Promise.all([
           fetch("/api/checkout/delivery-options", { cache: "no-store" }),
           fetch("/api/checkout/payment-options", { cache: "no-store" }),
           fetch("/api/store/config", { cache: "no-store" }),
           fetch("/api/account/commerce", { cache: "no-store" }),
           fetch("/api/store-locations", { cache: "no-store" }),
+          fetch("/api/account/wallet", { cache: "no-store" }),
         ]);
         const payload = (await response.json()) as {
           data?: DeliveryOption[];
@@ -225,6 +228,10 @@ export default function CheckoutPage() {
               email: prev.email || acc.email || "",
             }));
           }
+        }
+        if (walletResponse.ok) {
+          const walletPayload = await walletResponse.json();
+          setWalletBalance(walletPayload.data?.wallet?.balance ?? 0);
         }
       } catch (loadError) {
         setError(
@@ -419,6 +426,14 @@ export default function CheckoutPage() {
 
   const inputClass =
     "mt-1.5 w-full rounded-card border border-line bg-white px-4 py-3 text-[14px] text-ink placeholder:text-ink2/70 focus:border-ink";
+  const walletShortfall =
+    form.paymentMethod === "WALLET" &&
+    preview !== null &&
+    walletBalance !== null &&
+    walletBalance < preview.pricing.total
+      ? preview.pricing.total - walletBalance
+      : 0;
+  const hasInsufficientWalletBalance = walletShortfall > 0;
 
   return (
     <main className="mx-auto max-w-6xl px-6 py-14">
@@ -956,6 +971,25 @@ export default function CheckoutPage() {
                   Cards, mobile banking, or internet banking.
                 </p>
               </label>
+              <label
+                className={`rounded-card border p-4 ${form.paymentMethod === "WALLET" ? "border-ink" : "border-line"} ${!userLoggedIn || walletBalance === null ? "opacity-50" : ""}`}
+              >
+                <input
+                  type="radio"
+                  name="paymentMethod"
+                  disabled={!userLoggedIn || walletBalance === null}
+                  checked={form.paymentMethod === "WALLET"}
+                  onChange={() => updateForm("paymentMethod", "WALLET")}
+                />
+                <span className="ml-3 text-[13px] font-medium text-ink">
+                  Ferio wallet
+                </span>
+                <p className="ml-6 mt-1 text-[11px] text-ink2">
+                  {userLoggedIn && walletBalance !== null
+                    ? `${formatTaka(walletBalance)} available`
+                    : "Sign in to use your wallet balance."}
+                </p>
+              </label>
             </div>
             {form.paymentMethod === "PREPAID" && (
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -1180,6 +1214,8 @@ export default function CheckoutPage() {
                   <span>
                     {preview.paymentMethod === "COD"
                       ? "Cash on delivery"
+                      : preview.paymentMethod === "WALLET"
+                        ? "Ferio wallet"
                       : preview.paymentProvider === "AAMARPAY"
                         ? "aamarPay"
                         : "SSLCommerz"}
@@ -1193,15 +1229,30 @@ export default function CheckoutPage() {
             )}
           </div>
           {preview ? (
-            <div className="mt-6 rounded-card bg-surface p-4">
-              <p className="text-[13px] font-medium text-ink">
-                Total confirmed
-              </p>
-              <p className="mt-1 text-[12px] leading-5 text-ink2">
-                This checkout draft is saved for recovery. Placing the order is
-                idempotent, so a safe retry cannot create a duplicate order.
-              </p>
-            </div>
+            <>
+              <div className="mt-6 rounded-card bg-surface p-4">
+                <p className="text-[13px] font-medium text-ink">
+                  Total confirmed
+                </p>
+                <p className="mt-1 text-[12px] leading-5 text-ink2">
+                  This checkout draft is saved for recovery. Placing the order is
+                  idempotent, so a safe retry cannot create a duplicate order.
+                </p>
+              </div>
+              {hasInsufficientWalletBalance && (
+                <div className="mt-3 border-l-2 border-amber-500 bg-amber-50 px-4 py-3 text-[12px] leading-5 text-amber-900">
+                  Your wallet needs {formatTaka(walletShortfall)}
+                  more for this order. Add money from your wallet page or choose
+                  another payment method.
+                  <Link
+                    href="/account/wallet"
+                    className="ml-2 font-medium underline underline-offset-4"
+                  >
+                    Add money
+                  </Link>
+                </div>
+              )}
+            </>
           ) : (
             <p className="mt-5 text-[12px] leading-5 text-ink2">
               Enter a covered district to receive a server-calculated final
@@ -1210,7 +1261,7 @@ export default function CheckoutPage() {
           )}
           <button
             type="button"
-            disabled={!preview || placing}
+            disabled={!preview || placing || hasInsufficientWalletBalance}
             onClick={() => void placeOrder()}
             className="mt-6 w-full rounded-full bg-ink px-6 py-3 text-[14px] font-medium text-white disabled:bg-ink/20"
           >
@@ -1218,6 +1269,8 @@ export default function CheckoutPage() {
               ? "Preparing payment safely…"
               : form.paymentMethod === "PREPAID"
                 ? "Continue to secure payment"
+                : form.paymentMethod === "WALLET"
+                  ? "Pay with Ferio wallet"
                 : "Place cash-on-delivery order"}
           </button>
           {(support?.supportPhone || support?.supportEmail) && (

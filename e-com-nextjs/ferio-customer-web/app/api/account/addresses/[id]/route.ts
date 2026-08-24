@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { customerSessionFetch } from "@/lib/customer-session";
+
+export const dynamic = "force-dynamic";
 import {
   backendErrorResponse,
   bffErrorResponse,

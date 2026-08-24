@@ -8,6 +8,7 @@ interface CopyableIdProps {
   prefix?: string;
   href?: string;
   displayValue?: string;
+  truncateLast5?: boolean;
   className?: string;
 }
 
@@ -16,12 +17,14 @@ export default function CopyableId({
   prefix = "",
   href,
   displayValue,
+  truncateLast5 = false,
   className = "",
 }: CopyableIdProps) {
   const [copied, setCopied] = useState(false);
 
   const textToCopy = id;
-  const textToShow = displayValue || id;
+  const defaultDisplay = truncateLast5 && id.length > 5 ? `...${id.slice(-5)}` : id;
+  const textToShow = displayValue || defaultDisplay;
 
   const handleCopy = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -45,7 +48,7 @@ export default function CopyableId({
   return (
     <div
       onClick={handleCopy}
-      title={copied ? "Copied to clipboard!" : "Click to copy ID"}
+      title={copied ? "Copied to clipboard!" : `Click to copy ID (${id})`}
       className={`group relative inline-block text-[11px] font-mono cursor-pointer transition select-all break-all whitespace-normal max-w-[110px] text-ink2 hover:text-ink leading-tight ${className}`}
     >
       {href ? (

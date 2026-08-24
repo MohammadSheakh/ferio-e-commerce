@@ -46,6 +46,31 @@ export function trackStorefrontEvent(
   if (storageKey && sessionStorage.getItem(storageKey)) return;
   if (storageKey) sessionStorage.setItem(storageKey, '1');
 
+  // Dispatch to Google Analytics 4 if present
+  if (typeof window.gtag === 'function') {
+    try {
+      if (event.type === 'PRODUCT_VIEW') {
+        window.gtag('event', 'view_item', {
+          item_id: event.productId,
+          page_path: event.path || window.location.pathname,
+        });
+      } else if (event.type === 'SEARCH') {
+        window.gtag('event', 'search', {
+          search_term: event.searchTerm,
+          page_path: event.path || window.location.pathname,
+        });
+      } else if (event.type === 'ADD_TO_CART') {
+        window.gtag('event', 'add_to_cart', {
+          item_id: event.productId,
+          quantity: event.quantity,
+          page_path: event.path || window.location.pathname,
+        });
+      }
+    } catch {
+      // Ignore GA errors
+    }
+  }
+
   void fetch('/api/storefront-analytics/events', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

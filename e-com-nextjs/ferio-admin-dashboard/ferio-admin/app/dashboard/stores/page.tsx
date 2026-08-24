@@ -37,6 +37,7 @@ export default function StoresPage() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [showModal, setShowModal] = useState(false);
+  const [editingStore, setEditingStore] = useState<StoreLocation | null>(null);
   const [saving, setSaving] = useState(false);
 
   const [form, setForm] = useState({
@@ -86,44 +87,97 @@ export default function StoresPage() {
     loadStores();
   }, [page, pageSize, search]);
 
-  const handleCreateStore = async (e: React.FormEvent) => {
+  const handleOpenCreate = () => {
+    setEditingStore(null);
+    setForm({
+      code: "",
+      name: "",
+      district: "Dhaka",
+      area: "Dhanmondi",
+      address: "",
+      phone: "",
+      email: "",
+      operatingHours: "10:00 AM - 08:30 PM",
+      operatingDays: "Sat - Thu",
+      pickupInstructions: "Show your 6-digit pickup OTP to the store desk manager.",
+    });
+    setShowModal(true);
+  };
+
+  const handleOpenEdit = (store: StoreLocation) => {
+    setEditingStore(store);
+    setForm({
+      code: store.code || "",
+      name: store.name || "",
+      district: store.district || "Dhaka",
+      area: store.area || "",
+      address: store.address || "",
+      phone: store.phone || "",
+      email: store.email || "",
+      operatingHours: store.operatingHours || "10:00 AM - 08:30 PM",
+      operatingDays: store.operatingDays || "Sat - Thu",
+      pickupInstructions: store.pickupInstructions || "",
+    });
+    setShowModal(true);
+  };
+
+  const handleSaveStore = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       setSaving(true);
       setError("");
       setMessage("");
 
-      const res = await fetch("/api/admin/store-locations", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("admin_access_token") || ""}`,
-        },
-        body: JSON.stringify({ ...form, isStore: true, isActive: true }),
-      });
+      if (editingStore) {
+        // Update existing store via PATCH
+        const res = await fetch(`/api/admin/store-locations/${editingStore.id}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("admin_access_token") || ""}`,
+          },
+          body: JSON.stringify({
+            name: form.name,
+            district: form.district,
+            area: form.area,
+            address: form.address,
+            phone: form.phone,
+            email: form.email,
+            operatingHours: form.operatingHours,
+            operatingDays: form.operatingDays,
+            pickupInstructions: form.pickupInstructions,
+          }),
+        });
 
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.message || "Failed to create store");
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.message || "Failed to update store location");
+        }
+
+        setMessage(`Store "${form.name}" updated successfully!`);
+      } else {
+        // Create new store via POST
+        const res = await fetch("/api/admin/store-locations", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${localStorage.getItem("admin_access_token") || ""}`,
+          },
+          body: JSON.stringify({ ...form, isStore: true, isActive: true }),
+        });
+
+        if (!res.ok) {
+          const data = await res.json();
+          throw new Error(data.message || "Failed to create store");
+        }
+
+        setMessage("Physical store outlet created successfully!");
       }
 
-      setMessage("Physical store outlet created successfully!");
       setShowModal(false);
-      setForm({
-        code: "",
-        name: "",
-        district: "Dhaka",
-        area: "",
-        address: "",
-        phone: "",
-        email: "",
-        operatingHours: "10:00 AM - 08:30 PM",
-        operatingDays: "Sat - Thu",
-        pickupInstructions: "",
-      });
       loadStores();
     } catch (err: any) {
-      setError(err.message || "Failed to create store");
+      setError(err.message || "Failed to save store location");
     } finally {
       setSaving(false);
     }
@@ -183,7 +237,7 @@ export default function StoresPage() {
               </button>
             </form>
             <button
-              onClick={() => setShowModal(true)}
+              onClick={handleOpenCreate}
               className="px-4 py-2 bg-ink text-white font-medium text-xs rounded-lg hover:bg-ink/90 transition shadow-xs flex items-center gap-2"
             >
               <span>➕ Add Physical Store</span>
@@ -267,6 +321,14 @@ export default function StoresPage() {
                               : "Inactive"
                             : "Central Hub"}
                         </span>
+                        
+                        <button
+                          onClick={() => handleOpenEdit(store)}
+                          className="px-3 py-1 rounded text-[11px] font-medium bg-slate-100 text-slate-700 hover:bg-slate-200 transition border border-slate-300"
+                        >
+                          ✏️ Edit
+                        </button>
+
                         {store.isStore && (
                           <button
                             onClick={() => toggleStatus(store)}
@@ -310,12 +372,14 @@ export default function StoresPage() {
           />
         </div>
 
-        {/* Modal for adding physical store */}
+        {/* Modal for adding or editing store outlet */}
         {showModal && (
           <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
             <div className="bg-paper border border-line rounded-2xl max-w-lg w-full p-6 shadow-xl space-y-5 animate-in fade-in zoom-in-95 duration-150">
               <div className="flex items-center justify-between border-b border-line pb-3">
-                <h3 className="text-lg font-bold text-ink">➕ Add Physical Store Outlet</h3>
+                <h3 className="text-lg font-bold text-ink flex items-center gap-2">
+                  <span>{editingStore ? "✏️ Edit Store Outlet" : "➕ Add Physical Store Outlet"}</span>
+                </h3>
                 <button
                   onClick={() => setShowModal(false)}
                   className="text-ink2 hover:text-ink text-xl font-bold"
@@ -324,17 +388,18 @@ export default function StoresPage() {
                 </button>
               </div>
 
-              <form onSubmit={handleCreateStore} className="space-y-4 text-xs">
+              <form onSubmit={handleSaveStore} className="space-y-4 text-xs">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-ink font-medium mb-1">Store Code *</label>
                     <input
                       type="text"
                       required
+                      disabled={!!editingStore}
                       placeholder="e.g. STORE-MIR"
                       value={form.code}
                       onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })}
-                      className="w-full px-3 py-2 border border-line rounded-lg bg-surface text-ink text-xs focus:ring-1 focus:ring-ink"
+                      className="w-full px-3 py-2 border border-line rounded-lg bg-surface text-ink text-xs focus:ring-1 focus:ring-ink disabled:opacity-60 disabled:bg-slate-100"
                     />
                   </div>
                   <div>
@@ -421,7 +486,13 @@ export default function StoresPage() {
                     disabled={saving}
                     className="px-4 py-2 bg-ink text-white font-medium rounded-lg hover:bg-ink/90 disabled:opacity-50"
                   >
-                    {saving ? "Creating..." : "Save Store Outlet"}
+                    {saving
+                      ? editingStore
+                        ? "Saving Changes..."
+                        : "Creating..."
+                      : editingStore
+                      ? "Update Store Outlet"
+                      : "Save Store Outlet"}
                   </button>
                 </div>
               </form>

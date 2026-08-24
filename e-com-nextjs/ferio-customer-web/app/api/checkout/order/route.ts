@@ -1,10 +1,46 @@
 import { NextResponse } from "next/server";
 import { cartApi, cartErrorResponse } from "@/lib/cart-server";
 import type { CheckoutOrderResult, OrderConfirmation } from "@/lib/checkout";
+import { cookies } from "next/headers";
+import { bffErrorResponse, proxyBackendResponse } from "@/lib/bff-response";
+import { customerSessionFetch } from "@/lib/customer-session";
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as { idempotencyKey?: string; paymentMethod?: "COD" | "PREPAID" | "PAY_AT_STORE"; paymentProvider?: "SSLCOMMERZ" | "AAMARPAY" };
+    const body = (await request.json()) as { idempotencyKey?: string; paymentMethod?: "COD" | "PREPAID" | "PAY_AT_STORE" | "WALLET"; paymentProvider?: "SSLCOMMERZ" | "AAMARPAY" };
+    if (body.paymentMethod === "WALLET") {
+      const cartToken = cookies().get("ferio_cart")?.value;
+      const result = await customerSessionFetch("/checkout/orders/wallet", {
+        method: "POST",
+        headers: {
+          ...(cartToken ? { "X-Cart-Token": cartToken } : {}),
+          ...(body.idempotencyKey
+            ? { "Idempotency-Key": body.idempotencyKey }
+            : {}),
+        },
+      });
+      if (!result) {
+        return bffErrorResponse(
+          "Sign in to pay with your wallet.",
+          401,
+          "AUTHENTICATION_REQUIRED",
+        );
+      }
+      const response = await proxyBackendResponse(
+        result.response,
+        "Unable to place the wallet order.",
+      );
+      if (result.response.ok) {
+        response.cookies.set("ferio_cart", "", {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          sameSite: "lax",
+          maxAge: 0,
+          path: "/",
+        });
+      }
+      return response;
+    }
     const order = await cartApi<OrderConfirmation>("/checkout/orders", {
       method: "POST",
       headers: {

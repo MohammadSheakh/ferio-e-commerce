@@ -419,10 +419,13 @@ export default function FeedbackClient({ initialItems, initialTotal }: Props) {
             <tbody className="divide-y divide-line">
               {filteredItems.map((item) => {
                 const conf = STATUS_CONFIG[item.status] || STATUS_CONFIG.PENDING;
-                const formattedDate = new Date(item.createdAt).toLocaleString("en-US", {
+                const dateObj = new Date(item.createdAt);
+                const formattedDateOnly = dateObj.toLocaleDateString("en-US", {
                   day: "2-digit",
                   month: "short",
                   year: "numeric",
+                });
+                const formattedTimeOnly = dateObj.toLocaleTimeString("en-US", {
                   hour: "2-digit",
                   minute: "2-digit",
                   hour12: true,
@@ -440,12 +443,15 @@ export default function FeedbackClient({ initialItems, initialTotal }: Props) {
                   <tr key={item.id} className="text-[13px] text-ink hover:bg-surface/50 transition">
                     {/* ID */}
                     <td className="px-4 py-4 align-top w-24">
-                      <CopyableId id={item.id} prefix="#" />
+                      <CopyableId id={item.id} prefix="#" truncateLast5 />
                     </td>
 
-                    {/* Date */}
-                    <td className="px-5 py-4 whitespace-nowrap text-ink2 text-[12px] align-top">
-                      {formattedDate}
+                    {/* Date & Time */}
+                    <td className="px-5 py-4 text-ink2 text-[12px] align-top">
+                      <div className="leading-tight">
+                        <p className="font-medium text-ink/90 whitespace-nowrap">{formattedDateOnly}</p>
+                        <p className="text-[11px] text-ink2 mt-0.5 whitespace-nowrap">{formattedTimeOnly}</p>
+                      </div>
                     </td>
 
                     {/* Category Pill */}
