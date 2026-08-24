@@ -1,8 +1,9 @@
-import { ConflictException, Injectable, OnModuleInit } from '@nestjs/common';
+import { ConflictException, Injectable, OnModuleInit, Optional } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { ConfigService } from '@nestjs/config';
 import type { Queue } from 'bullmq';
 import type { UserPayload } from '@app/common';
+import { TenantFanoutService } from '../../tenancy/tenant-fanout.service';
 import { QUEUE_NAMES } from '@app/queue';
 import { AuditService } from '../audit/audit.service';
 import { TransactionalMessagingService } from './transactional-messaging.service';
@@ -11,7 +12,7 @@ export const TRANSACTIONAL_MESSAGE_JOB = 'dispatch-transactional-message';
 export const TRANSACTIONAL_MESSAGE_SWEEP_JOB = 'sweep-transactional-messages';
 export const TRANSACTIONAL_MESSAGE_SCHEDULER_ID = 'ferio-transactional-message-dispatch';
 
-export type TransactionalMessageJobData = { messageId?: string };
+export type TransactionalMessageJobData = { messageId?: string  organizationId?: string };
 
 @Injectable()
 export class TransactionalMessageQueue implements OnModuleInit {
@@ -21,6 +22,7 @@ export class TransactionalMessageQueue implements OnModuleInit {
     private readonly config: ConfigService,
     private readonly messages: TransactionalMessagingService,
     private readonly audit: AuditService,
+    @Optional() private readonly fanout?: TenantFanoutService,
   ) {}
 
   async onModuleInit() {
@@ -63,15 +65,53 @@ export class TransactionalMessageQueue implements OnModuleInit {
   }
 
   async enqueueDue() {
-    const messages = await this.messages.eligibleMessages(this.batchSize());
-    const jobs = await this.queue.addBulk(
-      messages.map(({ id }) => ({
-        name: TRANSACTIONAL_MESSAGE_JOB,
-        data: { messageId: id },
-        opts: { jobId: `transactional-message-${id}` },
-      })),
+    // MT-8 §11.2: under tenancy the sweep fans out per READY tenant and
+    // stamps each job with its organization so the processor resolves the
+    // correct database. Legacy mode runs once, envelope-free.
+    if ((process.env.TENANCY_ENABLED || 'false') !== 'true') {
+      const messages = await this.messages.eligibleMessages(this.batchSize());
+      await this.queue.addBulk(
+        messages.map(({ id }) => this.jobFor(id)),
+      );
+      return { queuedCount: messages.length };
+    }
+
+    let queuedCount = 0;
+    const fanout = await this.fanout.forEachTenant(
+      async () => {
+        const messages = await this.messages.eligibleMessages(this.batchSize());
+        const context = tryGetTenantContext();
+        await this.queue.addBulk(
+          messages.map(({ id }) =>
+            this.jobFor(id, context?.organizationId),
+          ),
+        );
+        queuedCount += messages.length;
+      },
+      { label: 'transactional-message-dispatch' },
     );
-    return { queuedCount: jobs.length };
+    return {
+      queuedCount,
+      tenantsProcessed: fanout.processed,
+      tenantFailures: fanout.failures,
+    };
+  }
+
+  private jobFor(messageId: string, organizationId?: string) {
+    return {
+      name: TRANSACTIONAL_MESSAGE_JOB,
+      data: {
+        messageId,
+        ...(organizationId ? { organizationId } : {}),
+      },
+      // Job IDs embed the org so identical message ids across tenants can
+      // never collide or deduplicate each other away.
+      opts: {
+        jobId: organizationId
+          ? `t:${organizationId}:transactional-message-${messageId}`
+          : `transactional-message-${messageId}`,
+      },
+    };
   }
 
   async retry(messageId: string, actor: UserPayload) {

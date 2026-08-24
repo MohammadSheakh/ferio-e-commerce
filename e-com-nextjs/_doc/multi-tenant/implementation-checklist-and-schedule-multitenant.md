@@ -648,7 +648,7 @@ This is the largest migration slice. Existing feature behavior should remain sta
 ### 10.4A Transactional messaging outbox (pulled forward)
 
 - [x] `TransactionalMessagingService` (outbox, templates, attempts evidence) resolves through the tenant client — messages can never be orphaned from the tenant orders they reference.
-- [ ] **PARTIAL:** BullMQ dispatch worker reads tenant outboxes — worker-side tenant resolution lands with MT-8; `TENANCY_ENABLED` must remain false until that lands (documented sequencing constraint).
+- [x] Transactional-message dispatch + payment-expiry sweeps now fan out per READY/ACTIVE tenant (`TenantFanoutService`), processors resolve envelopes via `forOrganization`. Remaining flag-on blockers shrink to: courier polling/callback-retry sweeps, reconciliation schedule, socket room namespacing (§11.3), and integration credential vault (§11.5).
 
 ### MT-7 gate
 
@@ -663,9 +663,9 @@ This is the largest migration slice. Existing feature behavior should remain sta
 ## 11.1 Redis/cache namespace
 
 - [ ] Inventory all Redis keys.
-- [ ] Prefix tenant-scoped keys with trusted tenant identity.
+- [ ] **PARTIAL:** Prefix tenant-scoped keys with trusted tenant identity. (settings cache org-keyed in MT-7 slice 2; `scopedRedisKey` helper + OTP keys migrated this pass; remaining key inventory sweep pending)
 - [ ] Tenant-scope session adjunct data where applicable.
-- [ ] Tenant-scope OTP/rate-limit keys where business semantics require it.
+- [ ] **PARTIAL:** Tenant-scope OTP/rate-limit keys where business semantics require it. (OTP done — same email at two storefronts gets independent codes; rate-limit keys remain IP-scoped global by design)
 - [ ] Tenant-scope catalog/settings caches.
 - [x] Tenant-scope idempotency keys.
 - [ ] Tenant-scope distributed locks.
@@ -674,15 +674,15 @@ This is the largest migration slice. Existing feature behavior should remain sta
 ## 11.2 BullMQ
 
 - [ ] Inventory every queue.
-- [ ] Add tenant ID to trusted job envelope.
-- [ ] Validate tenant registry record before job DB access.
-- [ ] Resolve tenant DB inside worker from control plane.
-- [ ] Tenant-scope job IDs/deduplication keys.
+- [x] Add tenant ID to trusted job envelope. (transactional dispatch + payment expiry jobs carry `organizationId` from the fan-out context; type-extended)
+- [x] Validate tenant registry record before job DB access.
+- [x] Resolve tenant DB inside worker from control plane. (`TenantFanoutService.forOrganization` → registry → bounded manager → immutable context)
+- [x] Tenant-scope job IDs/deduplication keys. (`t:{orgId}:...` prefixes)
 - [ ] Tenant-scope scheduled jobs.
-- [ ] Prevent a poisoned/forged job from selecting arbitrary DB URL.
+- [x] Prevent a poisoned/forged job from selecting arbitrary DB URL. (workers only accept organizationId and resolve via registry — never connection strings)
 - [ ] Add dead-letter/failure evidence with tenant context.
 - [ ] Add per-tenant operational metrics where useful.
-- [ ] Prove one tenant's failed jobs do not starve the entire queue.
+- [x] Prove one tenant's failed jobs do not starve the entire queue. (`forEachTenant` isolates per-org failures with recorded evidence — unit-tested with an injected failing database)
 
 ## 11.3 WebSockets
 

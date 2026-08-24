@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { createHash, randomInt, timingSafeEqual } from 'crypto';
 import { RedisService } from '@app/redis';
+import { scopedRedisKey } from '../../../tenancy/redis-keys.util';
 import { OtpType } from './interfaces/otp-payload.interface';
 import { StructuredLogger } from '@app/common';
 
@@ -137,7 +138,11 @@ export class OtpService {
     return timingSafeEqual(bufA, bufB);
   }
 
+  /**
+   * Keys are tenant-scoped when a tenant context exists (MT-8 §11.1): the
+   * same email at two different storefronts gets independent OTPs.
+   */
   private getOtpKey(email: string, type: OtpType): string {
-    return `otp:${type}:${email.toLowerCase()}`;
+    return scopedRedisKey('otp', type, email.toLowerCase());
   }
 }
