@@ -7,11 +7,48 @@ on:
 
 jobs:
   backend:
-    name: Backend — build & unit tests
+    name: Backend — build & tests (incl. cross-tenant integration)
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: ferio-nest-prisma
+
+    # Disposable infrastructure: a fresh PostgreSQL and Redis exist only for
+    # this job run. The integration suites create/drop their own scratch
+    # databases against this server.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7
+        ports:
+          - 6380:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      # Superuser has CREATEDB — required by the tenant-bootstrap isolation
+      # suite, which creates and drops scratch databases per test case.
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+      # Queue smoke specs demand an isolated non-default port + prefix so a
+      # misconfigured run can never touch production queues.
+      TEST_REDIS_PORT: "6380"
+      TEST_QUEUE_PREFIX: ferio:test:ci
+
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -26,12 +63,16 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Generate Prisma clients (tenant + platform)
         run: pnpm prisma:generate
-      - name: Production build
-        run: pnpm build
       - name: Strict typecheck (incl. specs)
         run: pnpm exec tsc --noEmit -p tsconfig.json
+      - name: Production build
+        run: pnpm build
       - name: Unit tests
         run: pnpm test
+      - name: Cross-tenant isolation + bootstrap integration tests
+        run: pnpm test:integration
+      - name: BullMQ runtime smoke tests
+        run: pnpm test:queue-smoke
 
   customer-web:
     name: Customer Web — typecheck & build
