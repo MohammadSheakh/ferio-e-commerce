@@ -1,5 +1,7 @@
 import { Global, Module } from '@nestjs/common';
+import { BullModule } from '@nestjs/bullmq';
 import { JwtModule } from '@nestjs/jwt';
+import { QUEUE_NAMES } from '@app/queue';
 import { PlatformPrismaService } from './platform-prisma.service';
 import { OrganizationsService } from './services/organizations.service';
 import { DomainsService } from './services/domains.service';
@@ -12,6 +14,9 @@ import { PlatformAuditService } from './services/platform-audit.service';
 import { SupportAccessService } from './services/support-access.service';
 import { ProvisioningService } from './services/provisioning.service';
 import { PlatformAdminController } from './platform.controller';
+import { PlatformAuthService } from './services/platform-auth.service';
+import { MigrationOrchestratorService } from './services/migration-orchestrator.service';
+import { TenantMigrationProcessor } from './migration-orchestrator.processor';
 
 /**
  * Ferio control plane (MT-1). Owns SaaS metadata exclusively and is fully
@@ -25,10 +30,23 @@ import { PlatformAdminController } from './platform.controller';
       secret: process.env.PLATFORM_JWT_SECRET,
       signOptions: { expiresIn: '8h' },
     }),
+    BullModule.registerQueue(
+      {
+        name: QUEUE_NAMES.TENANT_MIGRATION,
+        connection: {
+          host: process.env.REDIS_HOST || 'localhost',
+          port: parseInt(process.env.REDIS_PORT || '6379'),
+        },
+      },
+    ),
   ],
   controllers: [PlatformAdminController],
+  // Tenant migration queue processor registered below with providers.
   providers: [
     PlatformPrismaService,
+    PlatformAuthService,
+    MigrationOrchestratorService,
+    TenantMigrationProcessor,
     OrganizationsService,
     DomainsService,
     TenantDatabasesService,

@@ -872,20 +872,20 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 
 ## 14.2 Migration orchestrator
 
-- [ ] Discover eligible tenant DBs.
-- [ ] Preflight tenant DB connectivity.
-- [ ] Verify current version.
-- [ ] Apply canary tenant migration.
-- [ ] Run post-migration health checks.
-- [ ] Roll out in bounded batches.
-- [ ] Limit concurrency.
-- [ ] Record per-tenant result.
+- [x] Discover eligible tenant DBs. (READY + ACTIVE org, ordered)
+- [x] Preflight tenant DB connectivity. (bootstrap opens a real connection; failures recorded per-tenant)
+- [x] Verify current version.
+- [x] Apply canary tenant migration.
+- [x] Run post-migration health checks. (schemaVersion stamped; registry health recorded)
+- [x] Roll out in bounded batches. (sequential batches sized by run concurrencyLimit)
+- [x] Limit concurrency. (1–10 clamp at API boundary)
+- [x] Record per-tenant result. (TenantMigrationResult upserted for success AND failure with detail)
 - [ ] Retry transient failures.
-- [ ] Stop/pause on failure threshold.
-- [ ] Isolate one failed tenant without blocking already healthy tenants unnecessarily.
-- [ ] Prevent application from serving incompatible schema silently.
-- [ ] Provide operator resume/retry.
-- [ ] Provide migration fleet dashboard.
+- [x] Stop/pause on failure threshold. (two consecutive-failure case unit-tested)
+- [x] Isolate one failed tenant without blocking already healthy tenants unnecessarily. (healthy members of a batch complete before the pause)
+- [x] Prevent application from serving incompatible schema silently.
+- [x] Provide operator resume/retry. (resume skips already-successful tenants via recorded results)
+- [x] Provide migration fleet dashboard. (console /migrations: start form, fleet results tables, pause/resume controls)
 
 ## 14.3 Migration safety
 

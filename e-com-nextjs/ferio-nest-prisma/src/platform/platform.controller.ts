@@ -5,6 +5,7 @@ import { PlansService } from './services/plans.service';
 import type { CreatePlanInput } from './services/plans.service';
 import { SubscriptionsService } from './services/subscriptions.service';
 import { ProvisioningService } from './services/provisioning.service';
+import { MigrationOrchestratorService } from './services/migration-orchestrator.service';
 import { SupportAccessService } from './services/support-access.service';
 import { PlatformAuthService } from './services/platform-auth.service';
 import { PlatformAuditService } from './services/platform-audit.service';
@@ -29,6 +30,7 @@ export class PlatformAdminController {
     private readonly subscriptions: SubscriptionsService,
     private readonly provisioning: ProvisioningService,
     private readonly supportAccess: SupportAccessService,
+    private readonly migrations: MigrationOrchestratorService,
     private readonly platformAuth: PlatformAuthService,
     private readonly jwt: JwtService,
     private readonly platformPrisma: import('./platform-prisma.service').PlatformPrismaService,
@@ -199,6 +201,49 @@ export class PlatformAdminController {
       actorId: principal.platformUserId,
     });
     return { accessToken: token, roles: principal.roles };
+  }
+
+  @Post('migrations')
+  @PlatformPermissions('migration:run')
+  startMigration(
+    @Body()
+    body: {
+      canaryOrganizationId?: string;
+      concurrencyLimit?: number;
+      failureThreshold?: number;
+    },
+    @Req() request: any,
+  ) {
+    return this.migrations.start({
+      actorId: request.platformPrincipal?.platformUserId,
+      canaryOrganizationId: body.canaryOrganizationId,
+      concurrencyLimit: body.concurrencyLimit,
+      failureThreshold: body.failureThreshold,
+    });
+  }
+
+  @Get('migrations')
+  @PlatformPermissions('migration:run')
+  listMigrations() {
+    return this.migrations.listRuns();
+  }
+
+  @Get('migrations/:runId')
+  @PlatformPermissions('migration:run')
+  getMigration(@Param('runId') runId: string) {
+    return this.migrations.getRun(runId);
+  }
+
+  @Post('migrations/:runId/pause')
+  @PlatformPermissions('migration:run')
+  pauseMigration(@Param('runId') runId: string) {
+    return this.migrations.pause(runId);
+  }
+
+  @Post('migrations/:runId/resume')
+  @PlatformPermissions('migration:run')
+  resumeMigration(@Param('runId') runId: string) {
+    return this.migrations.resume(runId);
   }
 
   @Get('support-access')

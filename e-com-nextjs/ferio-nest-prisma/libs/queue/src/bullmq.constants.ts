@@ -29,4 +29,5 @@ export const QUEUE_NAMES = {
   COURIER_POLL: 'courierPollQueue-ferio',
   TRANSACTIONAL_MESSAGE: 'transactionalMessageQueue-ferio',
   PAYMENT_RECOVERY: 'paymentRecoveryQueue-ferio',
+  TENANT_MIGRATION: 'tenantMigrationQueue-ferio',
 } as const;
