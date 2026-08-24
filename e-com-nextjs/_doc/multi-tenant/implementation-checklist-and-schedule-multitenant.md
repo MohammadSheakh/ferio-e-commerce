@@ -802,14 +802,14 @@ This is the largest migration slice. Existing feature behavior should remain sta
 
 ## 13.1 Tenant owner onboarding
 
-- [ ] Invitation/first-login flow.
+- [x] Invitation/first-login flow.
 - [ ] Organization/store setup wizard.
-- [ ] **PARTIAL:** Store identity. (CommerceSettings store name is tenant-scoped; consolidated wizard deferred)
+- [ ] **PARTIAL:** Store identity. (tenant-scoped via CommerceSettings; surfaced in the Store Setup checklist card — full consolidated wizard remains polish)
 - [ ] Logo/branding.
-- [ ] Support contacts.
+- [x] Support contacts.
 - [ ] Currency/timezone.
 - [ ] Order prefix.
-- [ ] Delivery zones.
+- [x] Delivery zones.
 - [ ] COD policy.
 - [ ] Payment configuration.
 - [ ] Courier configuration.
