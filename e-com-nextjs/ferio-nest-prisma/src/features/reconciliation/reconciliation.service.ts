@@ -3,11 +3,14 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { createHash, randomBytes } from 'crypto';
 import { Prisma, ReconciliationFindingType } from '@prisma/client';
 import type { UserPayload } from '@app/common';
+import type { PrismaClient } from '@prisma/client';
 import { PrismaService } from '@app/database';
+import { TenantDbService } from '../../tenancy/tenant-db.service';
 import { AuditService } from '../audit/audit.service';
 import {
   ReconciliationActionDto,
@@ -84,30 +87,41 @@ export class ReconciliationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
-  ) {}
+  
+    @Optional() private readonly tenantDb?: TenantDbService,) {}
 
+  /**
+   * MT-7/MT-8: inside a tenant-resolved request or worker fan-out this
+   * returns the resolved tenant database client; outside one it explicitly
+   * falls back to the legacy single-tenant DB. Never guesses.
+   */
+  private async db(): Promise<PrismaClient> {
+    const tenant = await this.tenantDb?.tryGet();
+    return tenant ?? (this.prisma as PrismaClient);
+  }
   async list(query: ReconciliationQueryDto) {
+    const db = await this.db();
     const where: Prisma.ReconciliationFindingWhereInput = {
       domain: query.domain,
       severity: query.severity,
       status: query.status,
     };
     const [items, total, open, acknowledged, resolved] =
-      await this.prisma.$transaction([
-        this.prisma.reconciliationFinding.findMany({
+      await db.$transaction([
+        db.reconciliationFinding.findMany({
           where,
           skip: (query.page - 1) * query.limit,
           take: query.limit,
           orderBy: [{ severity: 'desc' }, { lastSeenAt: 'desc' }],
         }),
-        this.prisma.reconciliationFinding.count({ where }),
-        this.prisma.reconciliationFinding.count({
+        db.reconciliationFinding.count({ where }),
+        db.reconciliationFinding.count({
           where: { ...where, status: 'OPEN' },
         }),
-        this.prisma.reconciliationFinding.count({
+        db.reconciliationFinding.count({
           where: { ...where, status: 'ACKNOWLEDGED' },
         }),
-        this.prisma.reconciliationFinding.count({
+        db.reconciliationFinding.count({
           where: { ...where, status: 'RESOLVED' },
         }),
       ]);
@@ -122,6 +136,7 @@ export class ReconciliationService {
   }
 
   async getOperationalAlerts() {
+    const db = await this.db();
     const now = new Date();
     const recentSince = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     const staleWebhookBefore = new Date(now.getTime() - 15 * 60 * 1000);
@@ -134,8 +149,8 @@ export class ReconciliationService {
       messages,
       refunds,
       runs,
-    ] = await this.prisma.$transaction([
-      this.prisma.reconciliationFinding.groupBy({
+    ] = await db.$transaction([
+      db.reconciliationFinding.groupBy({
         by: ['severity'],
         orderBy: { severity: 'asc' },
         where: {
@@ -146,7 +161,7 @@ export class ReconciliationService {
         _min: { firstDetectedAt: true },
         _max: { lastSeenAt: true },
       }),
-      this.prisma.commercePaymentAttempt.groupBy({
+      db.commercePaymentAttempt.groupBy({
         by: ['status'],
         orderBy: { status: 'asc' },
         where: {
@@ -157,7 +172,7 @@ export class ReconciliationService {
         _min: { createdAt: true },
         _max: { updatedAt: true },
       }),
-      this.prisma.shipmentWebhookLog.aggregate({
+      db.shipmentWebhookLog.aggregate({
         where: {
           processingError: { not: null },
           receivedAt: { gte: recentSince },
@@ -166,7 +181,7 @@ export class ReconciliationService {
         _min: { receivedAt: true },
         _max: { lastAttemptAt: true },
       }),
-      this.prisma.shipmentWebhookLog.aggregate({
+      db.shipmentWebhookLog.aggregate({
         where: {
           authValid: true,
           processed: false,
@@ -177,7 +192,7 @@ export class ReconciliationService {
         _min: { receivedAt: true },
         _max: { receivedAt: true },
       }),
-      this.prisma.shipmentPollAttempt.groupBy({
+      db.shipmentPollAttempt.groupBy({
         by: ['status'],
         orderBy: { status: 'asc' },
         where: { status: 'FAILED', createdAt: { gte: recentSince } },
@@ -185,7 +200,7 @@ export class ReconciliationService {
         _min: { createdAt: true },
         _max: { updatedAt: true },
       }),
-      this.prisma.commerceMessage.groupBy({
+      db.commerceMessage.groupBy({
         by: ['status'],
         orderBy: { status: 'asc' },
         where: {
@@ -196,7 +211,7 @@ export class ReconciliationService {
         _min: { createdAt: true },
         _max: { updatedAt: true },
       }),
-      this.prisma.commerceRefund.groupBy({
+      db.commerceRefund.groupBy({
         by: ['status'],
         orderBy: { status: 'asc' },
         where: { status: 'FAILED', createdAt: { gte: recentSince } },
@@ -204,7 +219,7 @@ export class ReconciliationService {
         _min: { createdAt: true },
         _max: { updatedAt: true },
       }),
-      this.prisma.reconciliationRun.groupBy({
+      db.reconciliationRun.groupBy({
         by: ['status'],
         orderBy: { status: 'asc' },
         where: { status: 'FAILED', createdAt: { gte: recentSince } },
@@ -392,7 +407,8 @@ export class ReconciliationService {
     queueJobId: string,
     initiatedByActorId?: string,
   ) {
-    const run = await this.prisma.reconciliationRun.findUnique({
+    const db = await this.db();
+    const run = await db.reconciliationRun.findUnique({
       where: { id: runId },
     });
     if (!run) throw new NotFoundException('Reconciliation run not found');
@@ -407,8 +423,9 @@ export class ReconciliationService {
     });
   }
 
-  recentRuns(limit = 10) {
-    return this.prisma.reconciliationRun.findMany({
+  async recentRuns(limit = 10) {
+    const db = await this.db();
+    return db.reconciliationRun.findMany({
       take: Math.min(Math.max(limit, 1), 50),
       orderBy: { startedAt: 'desc' },
       select: operationalRunSelect,
@@ -416,26 +433,27 @@ export class ReconciliationService {
   }
 
   async operationsSummary(windowHours = 24) {
+    const db = await this.db();
     const since = new Date(Date.now() - windowHours * 60 * 60 * 1000);
     const [lastSuccess, lastFailure, completedCount, failedCount, timedRuns] =
       await Promise.all([
-        this.prisma.reconciliationRun.findFirst({
+        db.reconciliationRun.findFirst({
           where: { status: 'COMPLETED' },
           orderBy: { completedAt: 'desc' },
           select: operationalRunSelect,
         }),
-        this.prisma.reconciliationRun.findFirst({
+        db.reconciliationRun.findFirst({
           where: { status: 'FAILED' },
           orderBy: { completedAt: 'desc' },
           select: operationalRunSelect,
         }),
-        this.prisma.reconciliationRun.count({
+        db.reconciliationRun.count({
           where: { status: 'COMPLETED', completedAt: { gte: since } },
         }),
-        this.prisma.reconciliationRun.count({
+        db.reconciliationRun.count({
           where: { status: 'FAILED', completedAt: { gte: since } },
         }),
-        this.prisma.reconciliationRun.findMany({
+        db.reconciliationRun.findMany({
           where: {
             status: { in: ['COMPLETED', 'FAILED'] },
             completedAt: { gte: since, not: null },
@@ -468,7 +486,8 @@ export class ReconciliationService {
   }
 
   async getRetryableRun(id: string) {
-    const run = await this.prisma.reconciliationRun.findUnique({
+    const db = await this.db();
+    const run = await db.reconciliationRun.findUnique({
       where: { id },
     });
     if (!run) throw new NotFoundException('Reconciliation run not found');
@@ -482,8 +501,9 @@ export class ReconciliationService {
     overdueHours: number,
     input: Omit<ExecuteRunInput, 'runId' | 'overdueHours'>,
   ) {
+    const db = await this.db();
     const idempotencyKeyHash = this.idempotencyHash(rawIdempotencyKey);
-    const duplicate = await this.prisma.reconciliationRun.findUnique({
+    const duplicate = await db.reconciliationRun.findUnique({
       where: { idempotencyKeyHash },
     });
     if (duplicate) {
@@ -496,7 +516,7 @@ export class ReconciliationService {
     }
     let run;
     try {
-      run = await this.prisma.reconciliationRun.create({
+      run = await db.reconciliationRun.create({
         data: {
           reference: this.runReference(),
           idempotencyKeyHash,
@@ -509,7 +529,7 @@ export class ReconciliationService {
     } catch (error) {
       if (!(error instanceof Prisma.PrismaClientKnownRequestError)) throw error;
       if (error.code !== 'P2002') throw error;
-      const concurrent = await this.prisma.reconciliationRun.findUnique({
+      const concurrent = await db.reconciliationRun.findUnique({
         where: { idempotencyKeyHash },
       });
       if (!concurrent) throw error;
@@ -519,8 +539,9 @@ export class ReconciliationService {
   }
 
   private async executeRun(input: ExecuteRunInput) {
+    const db = await this.db();
     const startedAt = new Date();
-    await this.prisma.reconciliationRun.update({
+    await db.reconciliationRun.update({
       where: { id: input.runId },
       data: {
         status: 'RUNNING',
@@ -535,7 +556,7 @@ export class ReconciliationService {
       },
     });
     try {
-      return await this.prisma.$transaction(
+      return await db.$transaction(
         async (transaction) => {
           const findings = await this.detect(
             transaction,
@@ -637,7 +658,7 @@ export class ReconciliationService {
     } catch (error) {
       const failureReason =
         error instanceof Error ? error.message.slice(0, 2000) : 'Unknown error';
-      const failed = await this.prisma.reconciliationRun.update({
+      const failed = await db.reconciliationRun.update({
         where: { id: input.runId },
         data: {
           status: 'FAILED',
@@ -659,7 +680,8 @@ export class ReconciliationService {
   }
 
   async action(id: string, dto: ReconciliationActionDto, actor: UserPayload) {
-    return this.prisma.$transaction(async (transaction) => {
+    const db = await this.db();
+    return db.$transaction(async (transaction) => {
       const previous = await transaction.reconciliationFinding.findUnique({
         where: { id },
       });

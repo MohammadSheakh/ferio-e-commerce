@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import type { Queue } from 'bullmq';
 import type { UserPayload } from '@app/common';
 import { TenantFanoutService } from '../../tenancy/tenant-fanout.service';
+import { tryGetTenantContext } from '../../tenancy/tenant-context';
 import { QUEUE_NAMES } from '@app/queue';
 import { AuditService } from '../audit/audit.service';
 import { TransactionalMessagingService } from './transactional-messaging.service';
@@ -12,7 +13,10 @@ export const TRANSACTIONAL_MESSAGE_JOB = 'dispatch-transactional-message';
 export const TRANSACTIONAL_MESSAGE_SWEEP_JOB = 'sweep-transactional-messages';
 export const TRANSACTIONAL_MESSAGE_SCHEDULER_ID = 'ferio-transactional-message-dispatch';
 
-export type TransactionalMessageJobData = { messageId?: string  organizationId?: string };
+export type TransactionalMessageJobData = {
+  messageId?: string;
+  organizationId?: string;
+};
 
 @Injectable()
 export class TransactionalMessageQueue implements OnModuleInit {
@@ -76,6 +80,7 @@ export class TransactionalMessageQueue implements OnModuleInit {
       return { queuedCount: messages.length };
     }
 
+    if (!this.fanout) throw new Error('TENANT_FANOUT_UNAVAILABLE');
     let queuedCount = 0;
     const fanout = await this.fanout.forEachTenant(
       async () => {

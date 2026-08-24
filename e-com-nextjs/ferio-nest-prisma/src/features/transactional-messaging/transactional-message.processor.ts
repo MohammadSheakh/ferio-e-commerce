@@ -30,9 +30,10 @@ export class TransactionalMessageProcessor extends WorkerHost {
         throw new Error(`Unsupported transactional message job: ${job.name}`);
       }
       const organizationId = (job.data as { organizationId?: string }).organizationId;
-      if (!organizationId) return this.dispatcher.execute(job.data.messageId);
-      return this.fanout.forOrganization(organizationId, () =>
-        this.dispatcher.execute(job.data.messageId),
+      const messageId = job.data.messageId as string;
+      if (!organizationId) return this.dispatcher.execute(messageId);
+      return this.fanout!.forOrganization(organizationId, () =>
+        this.dispatcher.execute(messageId),
       );
     });
   }

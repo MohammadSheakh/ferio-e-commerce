@@ -10,6 +10,7 @@ import { IsString, Matches } from 'class-validator';
 import { AuthGuard, Public, User } from '@app/common';
 import type { UserPayload } from '@app/common';
 import { SocketAuthService } from './services/socket-auth.service';
+import { tryGetTenantContext } from '../../tenancy/tenant-context';
 
 class GuestSocketTicketDto {
   @IsString()
@@ -24,7 +25,10 @@ export class SocketAuthController {
   @Post('ticket')
   @UseGuards(AuthGuard)
   async issueAuthenticatedTicket(@User() user: UserPayload) {
-    const token = await this.socketAuthService.issueSocketTicket(user);
+    const token = await this.socketAuthService.issueSocketTicket({
+      ...user,
+      organizationId: tryGetTenantContext()?.organizationId,
+    });
     return { token, expiresInSeconds: 300 };
   }
 

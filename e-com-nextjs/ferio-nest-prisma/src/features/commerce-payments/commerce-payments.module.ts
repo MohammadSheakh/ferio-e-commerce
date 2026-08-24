@@ -3,6 +3,7 @@ import { PrismaModule } from '@app/database';
 import { AuthModule } from '../authentication/auth.module';
 import { OrderModule } from '../order/order.module';
 import { AuditModule } from '../audit/audit.module';
+import { TenancyModule } from '../../tenancy/tenancy.module';
 import { AamarpayGateway } from './gateways/aamarpay.gateway';
 import { PaymentGatewayRegistry } from './gateways/payment-gateway.registry';
 import { SslcommerzGateway } from './gateways/sslcommerz.gateway';

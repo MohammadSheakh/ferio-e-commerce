@@ -678,21 +678,21 @@ This is the largest migration slice. Existing feature behavior should remain sta
 - [x] Validate tenant registry record before job DB access.
 - [x] Resolve tenant DB inside worker from control plane. (`TenantFanoutService.forOrganization` → registry → bounded manager → immutable context)
 - [x] Tenant-scope job IDs/deduplication keys. (`t:{orgId}:...` prefixes)
-- [ ] Tenant-scope scheduled jobs.
+- [x] Tenant-scope scheduled jobs. (courier polling, courier callback-retry, reconciliation scans — all fan out per READY tenant; retries carry org envelopes captured at enqueue time)
 - [x] Prevent a poisoned/forged job from selecting arbitrary DB URL. (workers only accept organizationId and resolve via registry — never connection strings)
-- [ ] Add dead-letter/failure evidence with tenant context.
-- [ ] Add per-tenant operational metrics where useful.
+- [ ] **PARTIAL:** Add dead-letter/failure evidence with tenant context. (fan-out failures recorded per-org in sweep outcomes + structured logs; BullMQ dead-letter retention policy pending)
+- [ ] **PARTIAL:** Add per-tenant operational metrics where useful. (fanout outcomes expose processed/tenantFailures per sweep; durable metrics storage remains §22 work)
 - [x] Prove one tenant's failed jobs do not starve the entire queue. (`forEachTenant` isolates per-org failures with recorded evidence — unit-tested with an injected failing database)
 
 ## 11.3 WebSockets
 
-- [ ] Resolve tenant during socket authentication.
-- [ ] Bind socket ticket/session to tenant.
-- [ ] Prefix rooms with tenant identity.
+- [x] Resolve tenant during socket authentication.
+- [x] Bind socket ticket/session to tenant. (tickets minted inside tenant-resolved requests embed `organizationId`; `SocketUser` propagates it)
+- [x] Prefix rooms with tenant identity. (`scopedSocketRoom` applied to personal/conversation/role/admin joins and message emissions; identical room IDs across tenants can never share a channel)
 - [ ] Tenant-scope Admin chat.
 - [ ] Tenant-scope rider live map.
 - [ ] Tenant-scope customer notifications if realtime.
-- [ ] Reject room joins across tenant boundaries.
+- [x] Reject room joins across tenant boundaries. (cross-tenant rooms are unreachable by construction — clients cannot learn another org's prefixed name from their own ticket)
 
 ## 11.4 Object/media storage
 

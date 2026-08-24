@@ -60,6 +60,7 @@ export class PaymentRecoveryQueue implements OnModuleInit {
       return { queuedCount: attempts.length };
     }
 
+    if (!this.fanout) throw new Error('TENANT_FANOUT_UNAVAILABLE');
     let queuedCount = 0;
     const fanout = await this.fanout.forEachTenant(
       async () => {

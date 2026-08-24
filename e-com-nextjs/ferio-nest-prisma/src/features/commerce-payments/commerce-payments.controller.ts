@@ -118,7 +118,13 @@ export class PublicCommercePaymentsController {
 
   private async respond(
     eventType: string,
-    result: { paid: boolean; orderId?: string },
+    result: {
+      paid?: boolean;
+      orderId?: string;
+      duplicate?: boolean;
+      unverified?: boolean;
+      status?: string;
+    },
     response: Response,
   ) {
 

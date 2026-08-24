@@ -1,3 +1,4 @@
+import { tryGetTenantContext } from '../../tenancy/tenant-context';
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { ConfigService } from '@nestjs/config';
@@ -13,6 +14,7 @@ export type ReconciliationJobData = {
   overdueHours: number;
   retryRunId?: string;
   initiatedByActorId?: string;
+  organizationId?: string;
 };
 
 @Injectable()
@@ -104,6 +106,7 @@ export class ReconciliationQueue implements OnModuleInit {
         overdueHours: run.overdueHours,
         retryRunId: run.id,
         initiatedByActorId,
+        organizationId: tryGetTenantContext()?.organizationId,
       },
       { jobId: `reconciliation-retry-${run.id}-${run.attemptCount}` },
     );

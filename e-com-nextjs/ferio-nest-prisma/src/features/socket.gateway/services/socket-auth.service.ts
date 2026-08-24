@@ -9,6 +9,15 @@ export interface SocketUser {
   userId: string;
   role: string;
   name: string;
+  /** Resolved tenant binding (MT-8 §11.3): present when the ticket was
+   * minted inside a tenant-resolved storefront request. */
+  organizationId?: string;
+}
+
+/** Tenant-scoped room names (MT-8 §11.3): identical room identifiers across
+ * tenants can never share a channel. Legacy sockets keep historical names. */
+export function scopedSocketRoom(user: { organizationId?: string } | null | undefined, room: string): string {
+  return user?.organizationId ? `org:${user.organizationId}:${room}` : room;
 }
 
 const ADMIN_ROLES = new Set(['admin', 'super_admin', 'super-admin']);
@@ -74,6 +83,7 @@ export class SocketAuthService implements OnModuleInit {
             userId: normalizedGuestId || `guest_${socket.id.slice(0, 8)}`,
             role: 'guest',
             name: 'Guest Visitor',
+            organizationId: payload.organizationId,
           };
         }
 
@@ -90,6 +100,7 @@ export class SocketAuthService implements OnModuleInit {
               userId: user.id,
               role: user.role,
               name: user.name,
+              organizationId: payload.organizationId,
             };
           }
 
@@ -104,6 +115,7 @@ export class SocketAuthService implements OnModuleInit {
               userId: rider.id,
               role: 'delivery_man',
               name: rider.name || 'Delivery Rider',
+              organizationId: payload.organizationId,
             };
           }
 
@@ -133,12 +145,18 @@ export class SocketAuthService implements OnModuleInit {
     }
   }
 
-  issueSocketTicket(user: { userId: string; email?: string; role: string }) {
+  issueSocketTicket(user: {
+    userId: string;
+    email?: string;
+    role: string;
+    organizationId?: string;
+  }) {
     return this.jwtService.signAsync(
       {
         userId: user.userId,
         email: user.email || '',
         role: user.role,
+        ...(user.organizationId ? { organizationId: user.organizationId } : {}),
         purpose: 'chat_socket',
       },
       {

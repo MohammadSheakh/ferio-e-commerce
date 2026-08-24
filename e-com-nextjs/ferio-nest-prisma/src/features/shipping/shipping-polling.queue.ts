@@ -1,4 +1,6 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { tryGetTenantContext } from '../../tenancy/tenant-context';
+import type { TenantFanoutService } from '../../tenancy/tenant-fanout.service';
+import { Injectable, OnModuleInit, Optional } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { ConfigService } from '@nestjs/config';
 import type { Queue } from 'bullmq';
@@ -13,6 +15,7 @@ export const COURIER_POLL_SCHEDULER_ID = 'ferio-courier-polling';
 
 export type CourierPollJobData = {
   pollAttemptId?: string;
+  organizationId?: string;
 };
 
 @Injectable()
@@ -25,7 +28,8 @@ export class ShippingPollingQueue implements OnModuleInit {
     private readonly config: ConfigService,
     private readonly polling: ShippingPollingService,
     private readonly audit: AuditService,
-  ) {}
+    @Optional() private readonly fanout?: TenantFanoutService,
+) {}
 
   async onModuleInit() {
     if (!this.scheduleEnabled()) return;
@@ -94,6 +98,26 @@ export class ShippingPollingQueue implements OnModuleInit {
   }
 
   async enqueueDue() {
+    // MT-8 §11.2: per-tenant fan-out with organization-stamped envelopes;
+    // legacy mode runs once, envelope-free.
+    if ((process.env.TENANCY_ENABLED || 'false') !== 'true') {
+      return this.enqueueForContext(undefined);
+    }
+    if (!this.fanout) throw new Error('TENANT_FANOUT_UNAVAILABLE');
+    let queuedCount = 0;
+    const fanout = await this.fanout.forEachTenant(
+      async () => {
+        const result = await this.enqueueForContext(
+          tryGetTenantContext()?.organizationId,
+        );
+        queuedCount += result.queuedCount;
+      },
+      { label: 'courier-poll-sweep' },
+    );
+    return { queuedCount, tenantFailures: fanout.failures };
+  }
+
+  private async enqueueForContext(organizationId?: string) {
     const shipments = await this.polling.eligibleShipments(this.batchSize());
     const attempts: Awaited<
       ReturnType<ShippingPollingService['prepareAttempt']>
@@ -105,8 +129,15 @@ export class ShippingPollingQueue implements OnModuleInit {
     const jobs = await this.queue.addBulk(
       attempts.map((attempt) => ({
         name: COURIER_POLL_JOB,
-        data: { pollAttemptId: attempt.id },
-        opts: { jobId: `courier-poll-${attempt.id}` },
+        data: {
+          pollAttemptId: attempt.id,
+          ...(organizationId ? { organizationId } : {}),
+        },
+        opts: {
+          jobId: organizationId
+            ? `t:${organizationId}:courier-poll-${attempt.id}`
+            : `courier-poll-${attempt.id}`,
+        },
       })),
     );
     await Promise.all(

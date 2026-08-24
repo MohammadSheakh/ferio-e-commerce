@@ -14,7 +14,8 @@ import { JwtService } from '@nestjs/jwt';
 import { createAdapter } from '@socket.io/redis-adapter';
 import { Redis } from 'ioredis';
 
-import { SocketAuthService } from './services/socket-auth.service';
+import { SocketAuthService, scopedSocketRoom } from './services/socket-auth.service';
+import { tryGetTenantContext } from '../../tenancy/tenant-context';
 import { SocketRoomService } from './services/socket-room.service';
 import { WsJwtGuard } from './guards/ws-jwt.guard';
 import { REDIS_PUB_CLIENT, REDIS_SUB_CLIENT } from '@app/redis';
@@ -109,8 +110,11 @@ export class SocketGateway
       await this.socketAuthService.handleUserConnection(client, user);
 
       // Auto-join user's personal room & conversation room
-      client.join(user.userId);
-      client.join(`conv-${user.userId}`);
+      // MT-8 §11.3: every join is namespaced by the ticket's organization so
+      // identical identifiers across tenants can never share a channel.
+      const orgRoom = (room: string) => scopedSocketRoom(user, room);
+      client.join(orgRoom(user.userId));
+      client.join(orgRoom(`conv-${user.userId}`));
       this.logger.log(`✅ User ${user.userId} joined rooms: ${user.userId}, conv-${user.userId}`);
 
       // Auto-join role-based room
@@ -120,9 +124,9 @@ export class SocketGateway
         client.join(`role::${lowerRole}`);
 
         if (['admin', 'super_admin', 'super-admin'].includes(lowerRole)) {
-          client.join('role::admin');
-          client.join('role::super-admin');
-          client.join('admin-room');
+          client.join(orgRoom('role::admin'));
+          client.join(orgRoom('role::super-admin'));
+          client.join(orgRoom('admin-room'));
           this.logger.log(`✅ Admin user ${user.userId} joined admin role rooms`);
         }
       }
@@ -284,10 +288,14 @@ export class SocketGateway
    */
   public broadcastLivePageStats() {
     const payload = this.getLivePageStatsPayload();
+    // Tenant-scoped admins receive org-prefixed rooms when the originating
+    // request carries a tenant binding; legacy listeners keep old rooms.
+    const orgId = tryGetTenantContext()?.organizationId;
     this.server
+      .to(scopedSocketRoom({ organizationId: orgId }, 'role::admin'))
+      .to(scopedSocketRoom({ organizationId: orgId }, 'role::super-admin'))
+      .to(scopedSocketRoom({ organizationId: orgId }, 'admin-room'))
       .to('role::admin')
-      .to('role::super-admin')
-      .to('admin-room')
       .emit('live-page-visitors-stats', payload);
   }
 
@@ -333,7 +341,7 @@ export class SocketGateway
       }
 
       // Join Socket.IO room
-      client.join(conversationId);
+      client.join(scopedSocketRoom(client.data?.user, conversationId));
 
       // Update Redis state
       await this.socketRoomService.joinRoom(userId, conversationId);
@@ -346,7 +354,7 @@ export class SocketGateway
       );
 
       // Notify others in the chat
-      client.to(conversationId).emit('user-joined-chat', {
+      client.to(scopedSocketRoom(client.data?.user, conversationId)).emit('user-joined-chat', {
         userId,
         userName: client.data.user?.name,
         conversationId,
@@ -387,7 +395,7 @@ export class SocketGateway
       await this.socketRoomService.leaveRoom(userId, conversationId);
 
       // Notify others
-      client.to(conversationId).emit('user-left-chat', {
+      client.to(scopedSocketRoom(client.data?.user, conversationId)).emit('user-left-chat', {
         userId,
         userName: client.data.user?.name,
         conversationId,
@@ -446,8 +454,12 @@ export class SocketGateway
       const rawConvId = targetConvId.replace(/^conv-/, '');
       const prefConvId = targetConvId.startsWith('conv-') ? targetConvId : `conv-${targetConvId}`;
 
-      // 1. Target Room Emission (broadcast to both raw and conv- prefixed rooms)
-      this.server.to(targetConvId).emit('new-message-received', payload);
+      // 1. Target Room Emission — tenant-scoped by the sender's binding
+      const senderUser: { organizationId?: string } | null =
+        (client?.data?.user as { organizationId?: string } | null) ?? null;
+      this.server
+        .to(scopedSocketRoom(senderUser, targetConvId))
+        .emit('new-message-received', payload);
       // Lookup target user and customer links to emit to all related rooms (Customer ID & User ID & Email)
       const targetIdToSearch = rawConvId;
       const [linkedUser, linkedCustomer] = await Promise.all([
@@ -474,16 +486,22 @@ export class SocketGateway
         }),
       ]);
 
-      const roomsToEmit = new Set<string>([rawConvId, prefConvId]);
+      const senderOrg = (
+        client?.data?.user as { organizationId?: string } | undefined
+      )?.organizationId;
+      const roomsToEmit = new Set<string>([
+        scopedSocketRoom({ organizationId: senderOrg }, rawConvId),
+        scopedSocketRoom({ organizationId: senderOrg }, prefConvId),
+      ]);
 
       if (linkedUser) {
         if (linkedUser.id) {
           roomsToEmit.add(linkedUser.id);
-          roomsToEmit.add(`conv-${linkedUser.id}`);
+          roomsToEmit.add(scopedSocketRoom({ organizationId: senderOrg }, `conv-${linkedUser.id}`));
         }
         if (linkedUser.customerId) {
           roomsToEmit.add(linkedUser.customerId);
-          roomsToEmit.add(`conv-${linkedUser.customerId}`);
+          roomsToEmit.add(scopedSocketRoom({ organizationId: senderOrg }, `conv-${linkedUser.customerId}`));
         }
       }
 

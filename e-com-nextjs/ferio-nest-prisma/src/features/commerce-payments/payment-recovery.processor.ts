@@ -34,10 +34,14 @@ export class PaymentRecoveryProcessor extends WorkerHost {
         return this.recovery.enqueueDue();
       if (job.name !== PAYMENT_EXPIRY_JOB || !job.data.attemptId)
         throw new Error(`Unsupported payment recovery job: ${job.name}`);
-      const organizationId = (job.data as { organizationId?: string }).organizationId;
-      if (!organizationId) return this.payments.expireAttempt(job.data.attemptId);
-      return this.fanout.forOrganization(organizationId, () =>
-        this.payments.expireAttempt(job.data.attemptId),
+      const organizationId = (
+        job.data as { organizationId?: string }
+      ).organizationId;
+      if (!organizationId) {
+        return this.payments.expireAttempt(job.data.attemptId as string);
+      }
+      return this.fanout!.forOrganization(organizationId, () =>
+        this.payments.expireAttempt(job.data.attemptId as string),
       );
     });
   }
