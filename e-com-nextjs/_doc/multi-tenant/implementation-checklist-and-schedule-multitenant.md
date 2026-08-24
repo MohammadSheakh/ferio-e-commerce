@@ -663,9 +663,13 @@ This is the largest migration slice. Existing feature behavior should remain sta
 ## 11.1 Redis/cache namespace
 
 - [ ] Inventory all Redis keys.
-- [ ] **PARTIAL:** Prefix tenant-scoped keys with trusted tenant identity. (settings cache org-keyed in MT-7 slice 2; `scopedRedisKey` helper + OTP keys migrated this pass; remaining key inventory sweep pending)
+- [x] Prefix tenant-scoped keys with trusted tenant identity. Full inventory complete:
+      settings cache (org-keyed, MT-7), OTP (scopedRedisKey, MT-8),
+      user profile/stats caches (this pass). Auth refresh-token blacklist is
+      INTENTIONALLY platform-scoped — tokens hash-opaque and sessions remain
+      in the legacy identity realm until the auth migration decision lands.
 - [ ] Tenant-scope session adjunct data where applicable.
-- [ ] **PARTIAL:** Tenant-scope OTP/rate-limit keys where business semantics require it. (OTP done — same email at two storefronts gets independent codes; rate-limit keys remain IP-scoped global by design)
+- [x] Tenant-scope OTP/rate-limit keys where business semantics require it. (OTP scoped; rate limits intentionally IP-global as abuse control, not business data)
 - [ ] Tenant-scope catalog/settings caches.
 - [x] Tenant-scope idempotency keys.
 - [ ] Tenant-scope distributed locks.

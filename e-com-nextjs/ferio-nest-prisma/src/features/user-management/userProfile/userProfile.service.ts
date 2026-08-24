@@ -3,6 +3,7 @@ import { Prisma, UserProfile } from '@prisma/client';
 
 import { GenericService } from '@app/common';
 import { PrismaService } from '@app/database';
+import { scopedRedisKey } from '../../../tenancy/redis-keys.util';
 import { RedisService } from '@app/redis';
 import { USER_CACHE_CONFIG } from '../user/user.constants';
 
@@ -34,7 +35,7 @@ export class UserProfileService extends GenericService<Prisma.UserProfileDelegat
   }
 
   private getCacheKey(userId: string): string {
-    return `${USER_CACHE_CONFIG.PREFIX}:profile:${userId}`;
+    return scopedRedisKey(USER_CACHE_CONFIG.PREFIX, 'profile', userId);
   }
 
   /**
