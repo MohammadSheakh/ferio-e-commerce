@@ -3,11 +3,14 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { createHash, randomBytes } from 'crypto';
 import { Prisma } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import type { UserPayload } from '@app/common';
 import { PrismaService } from '@app/database';
+import { TenantDbService } from '../../tenancy/tenant-db.service';
 import { AuditService } from '../audit/audit.service';
 import { ImportSettlementReportDto } from './dto/settlement.dto';
 import {
@@ -61,10 +64,21 @@ export class SettlementImportsService {
     private readonly settlements: SettlementsService,
     private readonly audit: AuditService,
     private readonly reportParser: SettlementReportParserService,
+    @Optional() private readonly tenantDb?: TenantDbService,
   ) {}
 
-  list() {
-    return this.prisma.courierSettlementImport.findMany({
+  /**
+   * MT-7: tenant client inside resolved contexts; explicit legacy fallback
+   * outside resolved requests. Never guesses.
+   */
+  private async db(): Promise<PrismaClient> {
+    const tenant = await this.tenantDb?.tryGet();
+    return tenant ?? (this.prisma as unknown as PrismaClient);
+  }
+
+  async list() {
+    const db = await this.db();
+    return db.courierSettlementImport.findMany({
       take: 100,
       include: importInclude,
       orderBy: { createdAt: 'desc' },
@@ -76,18 +90,19 @@ export class SettlementImportsService {
     dto: ImportSettlementReportDto,
     actor: UserPayload,
   ) {
+    const db = await this.db();
     const idempotencyKeyHash = this.idempotencyHash(rawIdempotencyKey);
     const duplicate = await this.loadByIdempotency(idempotencyKeyHash);
     if (duplicate) return duplicate;
     const parserEvidence = this.verifyParserEvidence(dto);
     this.validateDistinctRows(dto);
-    const provider = await this.prisma.shipmentProvider.findUnique({
+    const provider = await db.shipmentProvider.findUnique({
       where: { code: dto.provider },
     });
     if (!provider) throw new NotFoundException('Courier provider not found');
     const providerReportReference = this.clean(dto.providerReportReference);
     const sourceHash = this.sourceHash(dto, providerReportReference);
-    const existingReport = await this.prisma.courierSettlementImport.findFirst({
+    const existingReport = await db.courierSettlementImport.findFirst({
       where: {
         providerId: provider.id,
         OR: [{ providerReportReference }, { sourceHash }],
@@ -191,6 +206,7 @@ export class SettlementImportsService {
     dto: ImportSettlementReportDto,
     correctionTargetId?: string,
   ): Promise<ClassifiedRow[]> {
+    const db = await this.db();
     const normalizedRows = dto.rows.map((input) => ({
       input,
       providerRowReference: this.clean(input.providerRowReference),
@@ -200,7 +216,7 @@ export class SettlementImportsService {
       this.hash(`${dto.provider}:${row.providerRowReference}`),
     );
     const [shipments, existingRows] = await Promise.all([
-      this.prisma.shipment.findMany({
+      db.shipment.findMany({
         where: {
           provider: { code: dto.provider },
           trackingNumber: {
@@ -213,7 +229,7 @@ export class SettlementImportsService {
           settlementItem: true,
         },
       }),
-      this.prisma.courierSettlementImportRow.findMany({
+      db.courierSettlementImportRow.findMany({
         where: { deduplicationKey: { in: deduplicationKeys } },
         select: { id: true, importId: true, deduplicationKey: true },
       }),
@@ -314,11 +330,12 @@ export class SettlementImportsService {
     correctionClaimHash: string | null;
     parserEvidence: ParserEvidence | null;
   }) {
+    const db = await this.db();
     const exceptionCount = input.rows.filter(
       (row) => row.status !== 'APPLIED',
     ).length;
     try {
-      return await this.prisma.$transaction(async (transaction) => {
+      return await db.$transaction(async (transaction) => {
         if (input.supersedesImportId) {
           const claimed = await transaction.courierSettlementImport.updateMany({
             where: {
@@ -447,15 +464,17 @@ export class SettlementImportsService {
     }
   }
 
-  private loadByIdempotency(idempotencyKeyHash: string) {
-    return this.prisma.courierSettlementImport.findUnique({
+  private async loadByIdempotency(idempotencyKeyHash: string) {
+    const db = await this.db();
+    return db.courierSettlementImport.findUnique({
       where: { idempotencyKeyHash },
       include: importInclude,
     });
   }
 
   private async loadCorrectionTarget(id: string, providerId: string) {
-    const target = await this.prisma.courierSettlementImport.findUnique({
+    const db = await this.db();
+    const target = await db.courierSettlementImport.findUnique({
       where: { id },
       select: {
         id: true,
@@ -481,11 +500,12 @@ export class SettlementImportsService {
     importId: string,
     idempotencyKeyHash: string,
   ) {
+    const db = await this.db();
     const correctionClaimHash = this.hash(
       `settlement-correction:${idempotencyKeyHash}`,
     );
     const staleBefore = new Date(Date.now() - 15 * 60 * 1000);
-    const claimed = await this.prisma.courierSettlementImport.updateMany({
+    const claimed = await db.courierSettlementImport.updateMany({
       where: {
         id: importId,
         status: 'NEEDS_REVIEW',
@@ -506,11 +526,12 @@ export class SettlementImportsService {
     return correctionClaimHash;
   }
 
-  private releaseCorrectionClaim(
+  private async releaseCorrectionClaim(
     importId: string,
     correctionClaimHash: string,
   ) {
-    return this.prisma.courierSettlementImport.updateMany({
+    const db = await this.db();
+    return db.courierSettlementImport.updateMany({
       where: { id: importId, correctionClaimHash },
       data: { correctionClaimHash: null, correctionClaimedAt: null },
     });

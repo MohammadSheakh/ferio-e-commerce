@@ -1,17 +1,32 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import type { PrismaClient } from '@prisma/client';
+import { Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { PrismaService } from '@app/database';
+import { TenantDbService } from '../../tenancy/tenant-db.service';
 import { CreateProductRequestDto, QueryProductRequestDto, UpdateProductRequestStatusDto } from './dto/product-request.dto';
 
 @Injectable()
 export class ProductRequestService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly tenantDb?: TenantDbService,
+  ) {}
+
+  /**
+   * MT-7: tenant client inside resolved contexts; explicit legacy
+   * fallback outside resolved requests. Never guesses.
+   */
+  private async db(): Promise<PrismaClient> {
+    const tenant = await this.tenantDb?.tryGet();
+    return tenant ?? (this.prisma as PrismaClient);
+  }
 
   async createRequest(dto: CreateProductRequestDto, userId?: string) {
+    const db = await this.db();
     let finalPhone = dto.phone?.trim() || null;
     let finalName = dto.name?.trim() || null;
 
     if (userId) {
-      const u = await this.prisma.user.findUnique({
+      const u = await db.user.findUnique({
         where: { id: userId },
         select: { name: true, phoneNumber: true },
       });
@@ -21,7 +36,7 @@ export class ProductRequestService {
       }
     }
 
-    return this.prisma.productRequest.create({
+    return db.productRequest.create({
       data: {
         productName: dto.productName.trim(),
         name: finalName,
@@ -44,6 +59,7 @@ export class ProductRequestService {
   }
 
   async getAllRequests(query: QueryProductRequestDto) {
+    const db = await this.db();
     const page = Math.max(1, Number(query.page) || 1);
     const limit = Math.max(1, Number(query.limit) || 20);
     const skip = (page - 1) * limit;
@@ -66,7 +82,7 @@ export class ProductRequestService {
     }
 
     const [results, total] = await Promise.all([
-      this.prisma.productRequest.findMany({
+      db.productRequest.findMany({
         where,
         skip,
         take: limit,
@@ -83,7 +99,7 @@ export class ProductRequestService {
           },
         },
       }),
-      this.prisma.productRequest.count({ where }),
+      db.productRequest.count({ where }),
     ]);
 
     const totalPages = Math.ceil(total / limit) || 1;
@@ -107,12 +123,13 @@ export class ProductRequestService {
   }
 
   async updateStatus(id: string, dto: UpdateProductRequestStatusDto) {
-    const existing = await this.prisma.productRequest.findUnique({ where: { id } });
+    const db = await this.db();
+    const existing = await db.productRequest.findUnique({ where: { id } });
     if (!existing) {
       throw new NotFoundException('Product request not found.');
     }
 
-    return this.prisma.productRequest.update({
+    return db.productRequest.update({
       where: { id },
       data: {
         status: dto.status ? (dto.status as any) : existing.status,
@@ -133,11 +150,12 @@ export class ProductRequestService {
   }
 
   async deleteRequest(id: string) {
-    const existing = await this.prisma.productRequest.findUnique({ where: { id } });
+    const db = await this.db();
+    const existing = await db.productRequest.findUnique({ where: { id } });
     if (!existing) {
       throw new NotFoundException('Product request not found.');
     }
 
-    return this.prisma.productRequest.delete({ where: { id } });
+    return db.productRequest.delete({ where: { id } });
   }
 }

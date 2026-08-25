@@ -1,6 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { ShipmentProviderCode } from '@prisma/client';
 import { PrismaService } from '@app/database';
+import { TenantDbService } from '../../tenancy/tenant-db.service';
+import type { PrismaClient } from '@prisma/client';
 import { ConfigService } from '@nestjs/config';
 import { StructuredLogger } from '@app/common';
 
@@ -32,7 +34,17 @@ export class CourierRouterService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    @Optional() private readonly tenantDb?: TenantDbService,
   ) {}
+
+  /**
+   * MT-7: tenant client inside resolved contexts; explicit legacy fallback
+   * outside resolved requests. Never guesses.
+   */
+  private async db(): Promise<PrismaClient> {
+    const tenant = await this.tenantDb?.tryGet();
+    return tenant ?? (this.prisma as unknown as PrismaClient);
+  }
 
   /**
    * Selects the optimal courier provider based on destination, weight, COD amount, SLA, and active configuration.
@@ -40,11 +52,12 @@ export class CourierRouterService {
   async recommendProvider(
     input: CourierRouteInput,
   ): Promise<CourierRouteRecommendation> {
+    const db = await this.db();
     const isDhaka =
       input.district.trim().toLowerCase() === 'dhaka' ||
       input.district.trim().toLowerCase().includes('dhaka');
 
-    const dbProviders = await this.prisma.shipmentProvider.findMany();
+    const dbProviders = await db.shipmentProvider.findMany();
     const configuredStatus: Record<ShipmentProviderCode, boolean> = {
       PATHAO: Boolean(
         this.config.get('PATHAO_CLIENT_ID') &&

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '@app/database';
+import { TenancyModule } from '../../tenancy/tenancy.module';
 import { AuthModule } from '../authentication/auth.module';
 import { PathaoAdapter } from './adapters/pathao.adapter';
 import { SteadfastAdapter } from './adapters/steadfast.adapter';
@@ -27,6 +28,7 @@ import { ShippingPollingProcessor } from './shipping-polling.processor';
     AuthModule,
     TransactionalMessagingModule,
     AuditModule,
+    TenancyModule,
   ],
   controllers: [AdminShippingController, CourierWebhookController],
   providers: [

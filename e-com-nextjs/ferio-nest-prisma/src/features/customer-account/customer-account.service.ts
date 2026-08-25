@@ -1,19 +1,34 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException, Injectable, NotFoundException,
+  Optional,
+} from '@nestjs/common';
+import type { PrismaClient } from '@prisma/client';
 import { Prisma } from '@prisma/client';
 import type { UserPayload } from '@app/common';
 import { PrismaService } from '@app/database';
+import { TenantDbService } from '../../tenancy/tenant-db.service';
 import { timingSafeEqual } from 'crypto';
 import { normalizeBangladeshPhone } from '../checkout/utils/checkout.util';
 import { LinkCustomerAccountDto, UpdateCustomerProfileDto } from './customer-account.dto';
 
 @Injectable()
 export class CustomerAccountService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService,
+    @Optional() private readonly tenantDb?: TenantDbService,) {}
 
+  /**
+   * MT-7: tenant client inside resolved contexts; explicit legacy fallback
+   * outside resolved requests. Never guesses.
+   */
+  private async db(): Promise<PrismaClient> {
+    const tenant = await this.tenantDb?.tryGet();
+    return tenant ?? (this.prisma as PrismaClient);
+  }
   async link(dto: LinkCustomerAccountDto, actor: UserPayload) {
+    const db = await this.db();
     const reference = dto.reference.normalize('NFKC').trim().toUpperCase();
     const phone = normalizeBangladeshPhone(dto.phone);
-    const order = await this.prisma.order.findUnique({
+    const order = await db.order.findUnique({
       where: { reference },
       select: {
         customerId: true,
@@ -28,7 +43,7 @@ export class CustomerAccountService {
     if (!order || !valid) {
       throw new NotFoundException('Order could not be verified');
     }
-    const user = await this.prisma.user.findUnique({
+    const user = await db.user.findUnique({
       where: { id: actor.userId },
       select: { customerId: true },
     });
@@ -38,7 +53,7 @@ export class CustomerAccountService {
         'This account is already linked to another customer profile',
       );
     }
-    const existingLink = await this.prisma.user.findFirst({
+    const existingLink = await db.user.findFirst({
       where: { customerId: order.customerId, id: { not: actor.userId } },
       select: { id: true },
     });
@@ -47,7 +62,7 @@ export class CustomerAccountService {
         'This customer profile is already linked to another account',
       );
     }
-    await this.prisma.user.update({
+    await db.user.update({
       where: { id: actor.userId },
       data: { customerId: order.customerId },
     });
@@ -55,12 +70,13 @@ export class CustomerAccountService {
   }
 
   async updateProfile(dto: UpdateCustomerProfileDto, actor: UserPayload) {
+    const db = await this.db();
     const data: Prisma.UserUpdateInput = {};
     if (dto.name !== undefined) data.name = dto.name.trim();
     if (dto.phoneNumber !== undefined) data.phoneNumber = dto.phoneNumber.trim();
     if (dto.profileImageUrl !== undefined) data.profileImageUrl = dto.profileImageUrl.trim();
 
-    const user = await this.prisma.user.update({
+    const user = await db.user.update({
       where: { id: actor.userId },
       data,
       select: { customerId: true, email: true },
@@ -80,12 +96,12 @@ export class CustomerAccountService {
 
     if (Object.keys(customerData).length > 0) {
       if (user.customerId) {
-        await this.prisma.customer.update({
+        await db.customer.update({
           where: { id: user.customerId },
           data: customerData,
         });
       } else if (user.email) {
-        await this.prisma.customer.updateMany({
+        await db.customer.updateMany({
           where: { email: user.email },
           data: customerData,
         });
@@ -96,7 +112,8 @@ export class CustomerAccountService {
   }
 
   async profile(actor: UserPayload) {
-    const user = await this.prisma.user.findUnique({
+    const db = await this.db();
+    const user = await db.user.findUnique({
       where: { id: actor.userId },
       select: {
         id: true,
@@ -185,7 +202,8 @@ export class CustomerAccountService {
   }
 
   async ensureCustomerForUser(userId: string) {
-    const user = await this.prisma.user.findUnique({
+    const db = await this.db();
+    const user = await db.user.findUnique({
       where: { id: userId },
       select: { customerId: true, name: true, email: true, phoneNumber: true },
     });
@@ -198,7 +216,7 @@ export class CustomerAccountService {
       phoneNormalized = normalizeBangladeshPhone(phone);
     } catch {}
 
-    const existing = await this.prisma.customer.findFirst({
+    const existing = await db.customer.findFirst({
       where: {
         OR: [
           ...(user.email ? [{ email: user.email }] : []),
@@ -212,7 +230,7 @@ export class CustomerAccountService {
     const customerId = existing
       ? existing.id
       : (
-          await this.prisma.customer.create({
+          await db.customer.create({
             data: {
               name: user.name || 'Customer',
               phoneOriginal: phone,
@@ -222,7 +240,7 @@ export class CustomerAccountService {
           })
         ).id;
 
-    await this.prisma.user.update({
+    await db.user.update({
       where: { id: userId },
       data: { customerId },
     });
@@ -231,15 +249,16 @@ export class CustomerAccountService {
   }
 
   async addAddress(dto: any, actor: UserPayload) {
+    const db = await this.db();
     const customerId = await this.ensureCustomerForUser(actor.userId);
-    const existingCount = await this.prisma.customerAddress.count({
+    const existingCount = await db.customerAddress.count({
       where: { customerId },
     });
 
     const isDefault = dto.isDefault || existingCount === 0;
 
     if (isDefault) {
-      await this.prisma.customerAddress.updateMany({
+      await db.customerAddress.updateMany({
         where: { customerId },
         data: { isDefault: false },
       });
@@ -250,7 +269,7 @@ export class CustomerAccountService {
       phoneNormalized = normalizeBangladeshPhone(dto.phone);
     } catch {}
 
-    await this.prisma.customerAddress.create({
+    await db.customerAddress.create({
       data: {
         label: dto.label?.trim() || 'Home',
         recipientName: dto.recipientName.trim(),
@@ -271,14 +290,15 @@ export class CustomerAccountService {
   }
 
   async updateAddress(addressId: string, dto: any, actor: UserPayload) {
+    const db = await this.db();
     const customerId = await this.ensureCustomerForUser(actor.userId);
-    const address = await this.prisma.customerAddress.findFirst({
+    const address = await db.customerAddress.findFirst({
       where: { id: addressId, customerId },
     });
     if (!address) throw new NotFoundException('Address not found');
 
     if (dto.isDefault) {
-      await this.prisma.customerAddress.updateMany({
+      await db.customerAddress.updateMany({
         where: { customerId },
         data: { isDefault: false },
       });
@@ -293,7 +313,7 @@ export class CustomerAccountService {
       }
     }
 
-    await this.prisma.customerAddress.update({
+    await db.customerAddress.update({
       where: { id: addressId },
       data: {
         ...(dto.label !== undefined ? { label: dto.label.trim() } : {}),
@@ -313,23 +333,24 @@ export class CustomerAccountService {
   }
 
   async deleteAddress(addressId: string, actor: UserPayload) {
+    const db = await this.db();
     const customerId = await this.ensureCustomerForUser(actor.userId);
-    const address = await this.prisma.customerAddress.findFirst({
+    const address = await db.customerAddress.findFirst({
       where: { id: addressId, customerId },
     });
     if (!address) throw new NotFoundException('Address not found');
 
-    await this.prisma.customerAddress.delete({
+    await db.customerAddress.delete({
       where: { id: addressId },
     });
 
     if (address.isDefault) {
-      const remaining = await this.prisma.customerAddress.findFirst({
+      const remaining = await db.customerAddress.findFirst({
         where: { customerId },
         orderBy: { updatedAt: 'desc' },
       });
       if (remaining) {
-        await this.prisma.customerAddress.update({
+        await db.customerAddress.update({
           where: { id: remaining.id },
           data: { isDefault: true },
         });
