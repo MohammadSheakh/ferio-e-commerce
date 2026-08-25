@@ -8,6 +8,7 @@ import { RedisModule } from '@app/redis';
 import { PrismaModule } from '@app/database';
 import { FirebaseModule } from '@app/notification';
 import { ChattingModule } from '../chatting/chatting.module';
+import { TenancyModule } from '../../tenancy/tenancy.module';
 import { SocketAuthController } from './socket-auth.controller';
 
 /**
@@ -26,6 +27,7 @@ import { SocketAuthController } from './socket-auth.controller';
     PrismaModule,
     FirebaseModule,
     forwardRef(() => ChattingModule),
+    TenancyModule,
   ],
   providers: [
     SocketGateway,

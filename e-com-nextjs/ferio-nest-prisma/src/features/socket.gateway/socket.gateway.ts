@@ -120,14 +120,21 @@ export class SocketGateway
       // Auto-join role-based room
       if (user.role) {
         const lowerRole = String(user.role).toLowerCase();
-        client.join(`role::${user.role}`);
-        client.join(`role::${lowerRole}`);
-
         if (['admin', 'super_admin', 'super-admin'].includes(lowerRole)) {
+          // MT-8 §11.3: tenant-bound admins join ONLY org-prefixed rooms so
+          // one tenant's chats/notifications can never reach another's
+          // console. Raw rooms exist solely for legacy (unbound) sockets.
           client.join(orgRoom('role::admin'));
           client.join(orgRoom('role::super-admin'));
           client.join(orgRoom('admin-room'));
+          if (!user.organizationId) {
+            client.join(`role::${user.role}`);
+            client.join(`role::${lowerRole}`);
+          }
           this.logger.log(`✅ Admin user ${user.userId} joined admin role rooms`);
+        } else if (!user.organizationId) {
+          client.join(`role::${user.role}`);
+          client.join(`role::${lowerRole}`);
         }
       }
 
@@ -548,8 +555,17 @@ export class SocketGateway
         this.server.to(room).emit('new-message-received', payload);
       });
 
-      // 2. Broadcast to all admin role rooms
-      this.server.to('role::admin').to('role::super-admin').to('admin-room').emit('new-message-received', payload);
+      // 2. Broadcast to all admin role rooms — scoped by the sender's tenant
+      // binding; a customer chat can only reach admins of the same tenant.
+      if (senderOrg) {
+        this.server
+          .to(scopedSocketRoom({ organizationId: senderOrg }, 'role::admin'))
+          .to(scopedSocketRoom({ organizationId: senderOrg }, 'role::super-admin'))
+          .to(scopedSocketRoom({ organizationId: senderOrg }, 'admin-room'))
+          .emit('new-message-received', payload);
+      } else {
+        this.server.to('role::admin').to('role::super-admin').to('admin-room').emit('new-message-received', payload);
+      }
 
       // 3. Direct target emission
       if (payload.senderId) {
@@ -702,21 +718,25 @@ export class SocketGateway
         return { success: false, message: 'taskId is required' };
       }
 
+      // MT-8 §11.3: identical task identifiers across tenants cannot share a
+      // channel or presence list.
+      const taskRoom = scopedSocketRoom(client.data?.user, taskId);
+
       // Join Socket.IO room
-      client.join(taskId);
+      client.join(taskRoom);
 
       // Update Redis state
-      await this.socketRoomService.joinTaskRoom(userId, taskId);
+      await this.socketRoomService.joinTaskRoom(userId, taskRoom);
 
       // Get task room users
-      const roomUsers = await this.socketRoomService.getTaskRoomUsers(taskId);
+      const roomUsers = await this.socketRoomService.getTaskRoomUsers(taskRoom);
 
       this.logger.log(
-        `📋 Task room ${taskId} has ${roomUsers.length} users`,
+        `📋 Task room ${taskRoom} has ${roomUsers.length} users`,
       );
 
       // Notify others in the task
-      client.to(taskId).emit('user-joined-task', {
+      client.to(taskRoom).emit('user-joined-task', {
         userId,
         userName: client.data.user?.name,
         taskId,
@@ -746,14 +766,16 @@ export class SocketGateway
         return { success: false, message: 'taskId is required' };
       }
 
+      const taskRoom = scopedSocketRoom(client.data?.user, taskId);
+
       // Leave Socket.IO room
-      client.leave(taskId);
+      client.leave(taskRoom);
 
       // Update Redis state
-      await this.socketRoomService.leaveTaskRoom(userId, taskId);
+      await this.socketRoomService.leaveTaskRoom(userId, taskRoom);
 
       // Notify others
-      client.to(taskId).emit('user-left-task', {
+      client.to(taskRoom).emit('user-left-task', {
         userId,
         userName: client.data.user?.name,
         taskId,
@@ -830,19 +852,32 @@ export class SocketGateway
   // ────────────────────────────────────────────────────────────────────────
 
   /**
+   * MT-8 §11.3: server-side emissions resolve the ambient tenant context.
+   * Inside a resolved request/worker ONLY the org-prefixed room is targeted
+   * — tenant events can never reach legacy or foreign-tenant sockets.
+   * Outside a resolved context the historical raw room is preserved.
+   */
+  private ambientRooms(room: string): string[] {
+    const orgId = tryGetTenantContext()?.organizationId;
+    return [scopedSocketRoom({ organizationId: orgId }, room)];
+  }
+
+  /**
    * Emit Notification to User
-   * 
+   *
    * @param userId - User ID
    * @param notification - Notification data
    */
   async emitNotificationToUser(userId: string, notification: any): Promise<boolean> {
     try {
       const eventName = `notification::${userId}`;
-      
-      this.server.to(userId).emit(eventName, notification);
-      
+
+      for (const room of this.ambientRooms(userId)) {
+        this.server.to(room).emit(eventName, notification);
+      }
+
       this.logger.log(`🔔 Notification sent to user ${userId}`);
-      
+
       return true;
     } catch (error) {
       this.logger.error(`❌ Failed to emit notification: ${error.message}`);
@@ -852,16 +887,18 @@ export class SocketGateway
 
   /**
    * Emit Unread Count Update to User
-   * 
+   *
    * @param userId - User ID
    * @param count - Unread count
    */
   async emitUnreadCountUpdate(userId: string, count: number): Promise<void> {
     try {
       const eventName = `notification:unread-count::${userId}`;
-      
-      this.server.to(userId).emit(eventName, { count, hasUnread: count > 0 });
-      
+
+      for (const room of this.ambientRooms(userId)) {
+        this.server.to(room).emit(eventName, { count, hasUnread: count > 0 });
+      }
+
       this.logger.debug(`📊 Unread count update sent to user ${userId}: ${count}`);
     } catch (error) {
       this.logger.error(`❌ Failed to emit unread count: ${error.message}`);
@@ -870,7 +907,7 @@ export class SocketGateway
 
   /**
    * Broadcast to Role
-   * 
+   *
    * @param role - Role name
    * @param event - Event name
    * @param data - Data to emit
@@ -878,9 +915,11 @@ export class SocketGateway
   async broadcastToRole(role: string, event: string, data: any): Promise<void> {
     try {
       const roomName = `role::${role}`;
-      
-      this.server.to(roomName).emit(event, data);
-      
+
+      for (const room of this.ambientRooms(roomName)) {
+        this.server.to(room).emit(event, data);
+      }
+
       this.logger.log(`📢 Broadcast to role ${role}: ${event}`);
     } catch (error) {
       this.logger.error(`❌ Failed to broadcast to role: ${error.message}`);
@@ -889,17 +928,20 @@ export class SocketGateway
 
   /**
    * Check if User is Online
-   * 
+   *
    * @param userId - User ID
    */
   async isUserOnline(userId: string): Promise<boolean> {
-    const sockets = await this.server.in(userId).fetchSockets();
-    return sockets.length > 0;
+    for (const room of this.ambientRooms(userId)) {
+      const sockets = await this.server.in(room).fetchSockets();
+      if (sockets.length > 0) return true;
+    }
+    return false;
   }
 
   /**
    * Emit to User
-   * 
+   *
    * @param userId - User ID
    * @param event - Event name
    * @param data - Data to emit
@@ -908,7 +950,9 @@ export class SocketGateway
     try {
       const isOnline = await this.isUserOnline(userId);
       if (isOnline) {
-        this.server.to(userId).emit(event, data);
+        for (const room of this.ambientRooms(userId)) {
+          this.server.to(room).emit(event, data);
+        }
         this.logger.log(`🔔 Emitted to online user ${userId}`);
         return true;
       }
@@ -942,7 +986,9 @@ export class SocketGateway
    */
   async emitToRoom(roomId: string, event: string, data: any): Promise<boolean> {
     try {
-      this.server.to(roomId).emit(event, data);
+      for (const room of this.ambientRooms(roomId)) {
+        this.server.to(room).emit(event, data);
+      }
       return true;
     } catch (error) {
       this.logger.error(`❌ Failed to emit to room: ${error.message}`);
