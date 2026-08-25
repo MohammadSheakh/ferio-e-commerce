@@ -346,15 +346,17 @@ Provisioning should behave as an idempotent state machine, not a controller scri
 
 ## 7.4 Provisioning operations UI
 
-- [ ] Platform Admin organization list.
-- [ ] Organization detail.
-- [ ] Provisioning progress timeline.
-- [ ] Retry failed provisioning step.
-- [ ] Tenant DB health/readiness.
-- [ ] Domain status.
-- [ ] Owner/membership status.
-- [ ] Schema version.
-- [ ] Safe operational diagnostics without DB secrets.
+All surfaces live in the ferio-platform-admin console:
+
+- [x] Platform Admin organization list. (`/organizations` directory with create form)
+- [x] Organization detail. (`/organizations/[id]`: subscription, usage, domains, database, members)
+- [x] Provisioning progress timeline. (per-run step statuses on the detail page)
+- [x] Retry failed provisioning step. ("Run provisioning" drives the idempotent resumable orchestrator — replay continues from the first incomplete step)
+- [x] Tenant DB health/readiness. (detail DB card + `/database-health` fleet view)
+- [x] Domain status. (domains table with type/status/primary)
+- [x] Owner/membership status. (platform metadata member roster)
+- [x] Schema version. (per-database schemaVersion vs canonical head)
+- [x] Safe operational diagnostics without DB secrets. (registry views are credential-free by construction)
 
 ### MT-4 gate
 
@@ -747,7 +749,7 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 - [ ] Domain health.
 - [x] Tenant DB health. (fleet view surfaces registry status + schema version per tenant database)
 - [x] Platform billing outcomes. (`GET /platform/billing/invoices` + `/billing/payment-attempts`; Billing console page with invoice/payment tables and PAID/OPEN states)
-- [x] Usage/limit alerts. (`usage_warning_threshold_crossed` counter + structured warn fires exactly once per crossing; `GET /platform/organizations/:id/usage` exposes per-metric warning flags consumed by ops tooling)
+- [x] Usage/limit alerts. (`usage_warning_threshold_crossed` counter + structured warn exactly once per crossing; per-org Usage card on the console organization detail renders NEAR LIMIT states and a "Recount from facts" reconcile action)
 - [ ] Queue/system health.
 - [ ] Backup status.
 - [ ] Security/support-access alerts.
@@ -777,7 +779,8 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 
 ## 12.4 Tenant operations
 
-- [ ] Provisioning retry.
+- [x] Provisioning retry. (console "Run provisioning" action replays the resumable orchestrator; per-step timeline evidences recovery)
+
 - [ ] Tenant migration canary/batch control.
 - [ ] Pause rollout.
 - [ ] Retry failed tenant.
