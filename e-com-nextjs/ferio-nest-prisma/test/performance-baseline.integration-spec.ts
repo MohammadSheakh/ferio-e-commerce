@@ -299,7 +299,14 @@ describe('§16.3 connection manager baselines (real PostgreSQL)', () => {
     const result = await bootstrapper.bootstrap(conn);
     const elapsedMs = Math.round(performance.now() - started);
 
-    expect(result.applied).toHaveLength(43);
+    const migrationDirs = require('node:fs')
+      .readdirSync(require('node:path').join(__dirname, '../prisma/migrations'))
+      .filter((entry: string) =>
+        require('node:fs').existsSync(
+          require('node:path').join(__dirname, '../prisma/migrations', entry, 'migration.sql'),
+        ),
+      ).length;
+    expect(result.applied).toHaveLength(migrationDirs);
     evidence('perf_bootstrap_full_chain', { migrations: result.applied.length, elapsedMs });
     // Whole canonical chain on modest hardware stays inside 60s.
     expect(elapsedMs).toBeLessThan(60_000);
