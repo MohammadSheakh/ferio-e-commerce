@@ -743,11 +743,11 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 - [x] Organization counts by lifecycle. (`GET /platform/dashboard`)
 - [x] Active/trial/past-due/suspended subscription counts.
 - [x] Provisioning failures.
-- [ ] Tenant migration fleet status.
+- [x] Tenant migration fleet status. (`GET /platform/database-health` + Database Health console page: every registered tenant database vs the canonical migration-chain head, with behind-count summary)
 - [ ] Domain health.
-- [ ] Tenant DB health.
-- [ ] Platform billing outcomes.
-- [ ] Usage/limit alerts.
+- [x] Tenant DB health. (fleet view surfaces registry status + schema version per tenant database)
+- [x] Platform billing outcomes. (`GET /platform/billing/invoices` + `/billing/payment-attempts`; Billing console page with invoice/payment tables and PAID/OPEN states)
+- [x] Usage/limit alerts. (`usage_warning_threshold_crossed` counter + structured warn fires exactly once per crossing; `GET /platform/organizations/:id/usage` exposes per-metric warning flags consumed by ops tooling)
 - [ ] Queue/system health.
 - [ ] Backup status.
 - [ ] Security/support-access alerts.
@@ -769,8 +769,8 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 
 - [x] CRUD/version plans safely. (create + list in console; versioning model present)
 - [x] Configure entitlements/limits. (`featureKey=limit` compiler in the console form)
-- [ ] View subscriptions.
-- [ ] View platform invoices/payment attempts.
+- [x] View subscriptions. (`GET /platform/subscriptions` directory + Subscriptions console page)
+- [x] View platform invoices/payment attempts. (Billing console page backed by the two billing endpoints)
 - [ ] Manual billing operations require explicit permission/reason/audit.
 - [ ] Add internal/free entitlement state if approved.
 - [ ] Add tenant-specific override with expiry/reason if approved.
@@ -782,7 +782,7 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 - [ ] Pause rollout.
 - [ ] Retry failed tenant.
 - [ ] DB health probe.
-- [ ] Schema version drift view.
+- [x] Schema version drift view. (Database Health page highlights any tenant database behind the canonical head)
 - [ ] Backup evidence.
 - [ ] Restore workflow status.
 - [ ] Domain verification diagnostics.
