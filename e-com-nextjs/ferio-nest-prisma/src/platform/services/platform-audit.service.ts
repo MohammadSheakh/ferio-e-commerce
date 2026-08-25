@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { PlatformPrismaService } from '../platform-prisma.service';
+import { PlatformPrismaService } from '../platform-prisma.service';
 
 export interface RecordAuditInput {
   action: string;

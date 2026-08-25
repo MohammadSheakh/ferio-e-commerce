@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { StructuredLogger, TenantMetrics } from '@app/common';
-import type { PlatformPrismaService } from '../platform-prisma.service';
+import { PlatformPrismaService } from '../platform-prisma.service';
 import { getUsageMetric } from './usage-metrics.registry';
 
 export function currentPeriodKey(now = new Date()): string {

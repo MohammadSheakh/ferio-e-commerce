@@ -1,7 +1,7 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PlatformAuditService } from './platform-audit.service';
 import { decryptSecret, encryptSecret } from '../utils/secret-box';
-import type { PlatformPrismaService } from '../platform-prisma.service';
+import { PlatformPrismaService } from '../platform-prisma.service';
 
 export interface RegisterTenantDatabaseInput {
   organizationId: string;

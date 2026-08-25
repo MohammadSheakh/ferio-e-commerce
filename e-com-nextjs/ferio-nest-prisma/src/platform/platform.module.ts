@@ -11,6 +11,7 @@ import { TenantDatabasesService } from './services/tenant-databases.service';
 import { PlansService } from './services/plans.service';
 import { SubscriptionsService } from './services/subscriptions.service';
 import { EntitlementsService } from './services/entitlements.service';
+import { USAGE_READER } from './services/entitlements.service';
 import { UsageService } from './services/usage.service';
 import { PlatformAuditService } from './services/platform-audit.service';
 import { SupportAccessService } from './services/support-access.service';
@@ -98,6 +99,10 @@ import {
     PlansService,
     SubscriptionsService,
     EntitlementsService,
+    {
+      provide: USAGE_READER,
+      useExisting: UsageService,
+    },
     UsageService,
     PlatformAuditService,
     SupportAccessService,

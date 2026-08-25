@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { correlationHeaders } from '@app/common';
 import { StructuredLogger } from '@app/common';
-import type { PlatformPrismaService } from '../platform-prisma.service';
+import { PlatformPrismaService } from '../platform-prisma.service';
 import { PlatformAuditService } from './platform-audit.service';
 
 const SSLC_SANDBOX = 'https://sandbox.sslcommerz.com';

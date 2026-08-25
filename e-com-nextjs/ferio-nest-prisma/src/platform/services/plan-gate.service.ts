@@ -1,6 +1,6 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { EntitlementsService } from './entitlements.service';
-import type { PlatformPrismaService } from '../platform-prisma.service';
+import { PlatformPrismaService } from '../platform-prisma.service';
 
 /**
  * Concrete entitlement gates used by tenant-plane services (MT-10 §13.2A).
