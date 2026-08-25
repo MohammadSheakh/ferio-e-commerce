@@ -764,7 +764,7 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 - [x] View tenant DB registration/schema version.
 - [x] View provisioning timeline. (`/organizations/:id/provisioning-runs` with per-step status)
 - [x] Suspend/reactivate according to policy. (state-machine transitions from the console, audited)
-- [ ] Initiate closure/export according to policy.
+- [x] Initiate closure/export according to policy. (OrgActions console: 'Start closure' captures an audited reason → CLOSURE_PENDING with all domains disabled; 'Finalize closure' retires the registry behind a retention-window confirmation)
 - [x] Never show raw tenant DB password. (registry views are credential-free by construction)
 
 ## 12.3 Plan and billing administration
