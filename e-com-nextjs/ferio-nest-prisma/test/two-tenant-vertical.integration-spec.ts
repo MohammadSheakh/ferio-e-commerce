@@ -151,10 +151,12 @@ conditionalDescribe('Two-Tenant End-to-End Vertical Proof', () => {
   });
 
   afterAll(async () => {
+    // Release pooled tenant connections BEFORE terminating/dropping the
+    // scratch databases, otherwise backends are killed mid-idle (57P01).
+    await manager.onModuleDestroy();
     for (const name of created) {
       await dropScratchDatabase(name).catch(() => undefined);
     }
-    await manager.onModuleDestroy();
   });
 
   it(
@@ -180,8 +182,8 @@ conditionalDescribe('Two-Tenant End-to-End Vertical Proof', () => {
            ON CONFLICT ("id") DO NOTHING`
         );
         await pool.query(
-          `INSERT INTO "DeliveryZoneDistrict" ("id", "zoneId", "name", "normalizedName")
-           VALUES ('dzd-dhaka', 'zone-dhaka', 'Dhaka', 'dhaka')
+          `INSERT INTO "DeliveryZoneDistrict" ("id", "zoneId", "name", "normalizedName", "createdAt", "updatedAt")
+           VALUES ('dzd-dhaka', 'zone-dhaka', 'Dhaka', 'dhaka', now(), now())
            ON CONFLICT ("id") DO NOTHING`
         );
         await pool.end();
@@ -199,8 +201,6 @@ conditionalDescribe('Two-Tenant End-to-End Vertical Proof', () => {
         configStub as never,
         autoStub() as never,
         autoStub() as never,
-        undefined,
-        undefined,
         tenantDb,
       );
       const riders = new DeliveryPersonnelService({} as never, auditStub as never, tenantDb);
@@ -288,50 +288,52 @@ conditionalDescribe('Two-Tenant End-to-End Vertical Proof', () => {
       // ── Cross-tenant impossibility: references cannot leak ──
       const poolA = new Pool({ ...tA.conn, max: 1 });
       const poolB = new Pool({ ...tB.conn, max: 1 });
+      try {
+        const refInB = await poolB.query(
+          `SELECT id FROM "Order" WHERE reference = $1`,
+          [tA.orderReference],
+        );
+        const refInA = await poolA.query(
+          `SELECT id FROM "Order" WHERE reference = $1`,
+          [tB.orderReference],
+        );
+        expect(refInB.rowCount).toBe(0);
+        expect(refInA.rowCount).toBe(0);
 
-      const refInB = await poolB.query(
-        `SELECT id FROM "Order" WHERE reference = $1`,
-        [tA.orderReference],
-      );
-      const refInA = await poolA.query(
-        `SELECT id FROM "Order" WHERE reference = $1`,
-        [tB.orderReference],
-      );
-      expect(refInB.rowCount).toBe(0);
-      expect(refInA.rowCount).toBe(0);
+        // Confirmation in A reserves ONLY A's stock (COD policy ALWAYS keeps
+        // placement unreserved; confirmation mints the active reservation).
+        // Must run inside A's tenant context — no ambient scope here.
+        await inTenant(tA, () =>
+          orders.confirmOrder(tA.orderId, {} as never, adminActor as never),
+        );
 
-      // ── Confirmation in A consumes ONLY A's reservation state ──
-      const reservedBeforeB = await poolB.query(
-        `SELECT COALESCE(SUM("reserved"),0)::int AS r FROM "InventoryStock"`,
-      );
-      await orders.confirmOrder(tA.orderId, {} as never, adminActor as never);
+        const reservedAfter = await poolA.query(
+          `SELECT COALESCE(SUM("reserved"),0)::int AS r FROM "InventoryStock"`,
+        );
+        const reservedAfterB = await poolB.query(
+          `SELECT COALESCE(SUM("reserved"),0)::int AS r FROM "InventoryStock"`,
+        );
 
-      const reservedAfter = await poolA.query(
-        `SELECT COALESCE(SUM("reserved"),0)::int AS r FROM "InventoryStock"`,
-      );
-      const reservedAfterB = await poolB.query(
-        `SELECT COALESCE(SUM("reserved"),0)::int AS r FROM "InventoryStock"`,
-      );
+        // A's reservation state stays tenant-local: B remains at zero even
+        // though both tenants seeded identical catalog identifiers.
+        expect(reservedAfter.rows[0].r).toBe(2);
+        expect(reservedAfterB.rows[0].r).toBe(0);
 
-      // A consumed its reservation during confirmation.
-      expect(reservedBeforeB.rows[0].r >= 0).toBe(true);
-      expect(reservedAfter.rows[0].r).toBe(0);
-      expect(reservedAfterB.rows[0].r).toBe(0);
+        // ── Guest-cart token scoping: A's token is meaningless in B ──
+        const foreignCart = await inTenant(tB, () => carts.getCart(tA.token));
+        expect((foreignCart as { id?: string | null }).id ?? null).toBeNull();
 
-      // ── Guest-cart token scoping: A's token is meaningless in B ──
-      const foreignCart = await inTenant(tB, () => carts.getCart(tokenA));
-      expect((foreignCart as { id?: string | null }).id ?? null).toBeNull();
-
-      // ── Rider in B cannot act on A's order ──
-      await expect(
-        inTenant(tB, () =>
-          riders.updateDeliveryOrderStatus('rider-B', tA.orderId, {
-            status: 'DELIVERED',
-          } as never),
-        ),
-      ).rejects.toBeInstanceOf(NotFoundException);
-
-      await Promise.all([poolA.end(), poolB.end()]);
+        // ── Rider in B cannot act on A's order ──
+        await expect(
+          inTenant(tB, () =>
+            riders.updateDeliveryOrderStatus('rider-B', tA.orderId, {
+              status: 'DELIVERED',
+            } as never),
+          ),
+        ).rejects.toBeInstanceOf(NotFoundException);
+      } finally {
+        await Promise.all([poolA.end(), poolB.end()]);
+      }
     },
     300_000,
   );

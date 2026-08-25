@@ -1,6 +1,7 @@
 {
   "moduleFileExtensions": ["js", "json", "ts"],
   "rootDir": "..",
+  "globalSetup": "<rootDir>/test/integration-global-setup.js",
   "testEnvironment": "node",
   "testRegex": ".integration-spec.ts$",
   "transform": {
