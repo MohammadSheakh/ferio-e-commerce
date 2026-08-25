@@ -11,6 +11,12 @@ import { CatalogService } from '../src/features/catalog/catalog.service';
 import { OrderService } from '../src/features/order/order.service';
 import { TransactionalMessagingService } from '../src/features/transactional-messaging/transactional-messaging.service';
 
+function autoStub(): unknown {
+  return new Proxy({}, {
+    get: () => (..._args: unknown[]) => Promise.resolve({}),
+  });
+}
+
 const databaseUrl = process.env.TEST_DATABASE_URL;
 if (!databaseUrl) {
   throw new Error('TEST_DATABASE_URL is required for integration tests');
