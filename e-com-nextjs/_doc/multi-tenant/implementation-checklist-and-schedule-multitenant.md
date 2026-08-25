@@ -440,7 +440,7 @@ Provisioning should behave as an idempotent state machine, not a controller scri
 - [x] Implement suspended/restricted. (checkout denial CHECKOUT_DISABLED_SUSPENDED per PO-005; storefront stays browsable)
 - [x] Implement cancelled/non-renewing.
 - [x] Implement reactivation. (PAST_DUE/SUSPENDED/CANCELLED → ACTIVE)
-- [ ] Preserve tenant data across non-destructive subscription state changes.
+- [x] Preserve tenant data across non-destructive subscription state changes. (plan-limit lifecycle integration spec: every historical order survives an upgrade AND a downgrade byte-for-byte)
 - [ ] Define storefront behavior when subscription is overdue.
 - [ ] Define Tenant Admin behavior when subscription is overdue.
 - [x] Keep billing lifecycle separate from organization/database lifecycle.
@@ -480,7 +480,7 @@ Provisioning should behave as an idempotent state machine, not a controller scri
 
 ### MT-6 gate
 
-- [ ] One test tenant can subscribe/activate, hit a plan limit, upgrade, and unlock the capability.
+- [x] One test tenant can subscribe/activate, hit a plan limit, upgrade, and unlock the capability. (subscription/trial activation covered by the subscriptions unit suite; `test/plan-limit-lifecycle.integration-spec.ts` proves the full enforcement loop against REAL PostgreSQL — placement succeeds under limit, third order denied server-side with PLAN_LIMIT_REACHED and zero partial state, upgrade unlocks without touching tenant rows, downgrade blocks again)
 - [ ] SaaS billing is financially and technically isolated from customer commerce billing.
 
 ---
