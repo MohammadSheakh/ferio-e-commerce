@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '@app/database';
+import { TenancyModule } from '../../tenancy/tenancy.module';
 import { AuthModule } from '../authentication/auth.module';
 import { SettingsModule } from '../settings/settings.module';
 import {
@@ -9,7 +10,7 @@ import {
 import { ServiceBookingService } from './service-booking.service';
 
 @Module({
-  imports: [PrismaModule, AuthModule, SettingsModule],
+  imports: [ TenancyModule,PrismaModule, AuthModule, SettingsModule],
   controllers: [PublicServiceController, AdminServiceController],
   providers: [ServiceBookingService],
 })

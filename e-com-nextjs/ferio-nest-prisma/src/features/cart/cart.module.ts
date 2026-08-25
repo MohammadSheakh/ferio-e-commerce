@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '@app/database';
+import { TenancyModule } from '../../tenancy/tenancy.module';
 import { AuthModule } from '../authentication/auth.module';
 import {
   AdminCartEligibilityController,
@@ -8,7 +9,7 @@ import {
 import { CartService } from './cart.service';
 
 @Module({
-  imports: [PrismaModule, AuthModule],
+  imports: [ TenancyModule,PrismaModule, AuthModule],
   controllers: [CartController, AdminCartEligibilityController],
   providers: [CartService],
   exports: [CartService],
