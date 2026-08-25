@@ -629,7 +629,7 @@ This is the largest migration slice. Existing feature behavior should remain sta
 - [x] Tenant-scope conversation lookup/history. (chat REST swept; realtime rooms namespaced in MT-8)
 - [ ] Tenant-scope quick replies/folders if configurable.
 - [x] Reject cross-tenant socket subscriptions. (org-scoped rooms unreachable from foreign tickets)
-- [ ] Add multi-client E2E with two tenants active simultaneously.
+- [x] Add multi-client E2E with two tenants active simultaneously. (`test/socket-isolation.integration-spec.ts`: four live WebSocket clients — same-userId admins of org-a/org-b plus org-bound guests — over a real socket.io server; connection rooms, tenant-scoped notifications and chat relay proven isolated on the wire; foreign guest join denied)
 
 ## 10.12 Reports, analytics, purchase activity, audit, settings, health
 
@@ -731,8 +731,8 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 
 ### MT-8 gate
 
-- [ ] Identical Redis/job/socket/object identifiers in two tenants cannot collide.
-- [ ] Background and realtime paths meet the same isolation standard as HTTP.
+- [ ] Identical Redis/job/socket/object identifiers in two tenants cannot collide. (Redis/job/socket covered by collision spec + wire-level E2E; object storage remains BLOCKED)
+- [x] Background and realtime paths meet the same isolation standard as HTTP. (BullMQ: fan-out per-org envelopes with failure-isolation unit proof + dead-letter evidence; WebSockets: wire-level two-tenant E2E proves scoped rooms, notifications and chat relay)
 
 ---
 
