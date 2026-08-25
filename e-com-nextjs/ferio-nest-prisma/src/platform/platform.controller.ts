@@ -22,6 +22,7 @@ import {
   PlatformAuthGuard,
   PlatformPermissions,
 } from './guards/platform-auth.guard';
+import { ThrottlerGuard, Throttle } from '@nestjs/throttler';
 
 /**
  * Minimal Platform Admin API (MT-1 foundation). The full operational UI is
@@ -29,7 +30,8 @@ import {
  * and integration-tested before any console exists.
  */
 @Controller('platform')
-@UseGuards(PlatformAuthGuard)
+@UseGuards(ThrottlerGuard, PlatformAuthGuard)
+@Throttle({ platform: { limit: 300, ttl: 60_000 } })
 export class PlatformAdminController {
   constructor(
     private readonly organizations: OrganizationsService,
@@ -360,6 +362,9 @@ export class PlatformAdminController {
   }
 
   @Post('auth/login')
+  // Brute-force bound (FR-AUTH-005): 10 attempts / minute / IP on the most
+  // privileged credential surface in the system.
+  @Throttle({ platform: { limit: 10, ttl: 60_000 } })
   @PlatformPermissions() // public within the platform controller realm guard
   async login(
     @Body() body: { email?: string; password?: string },

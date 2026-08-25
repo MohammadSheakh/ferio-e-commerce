@@ -1,6 +1,7 @@
 import { Global, Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { JwtModule } from '@nestjs/jwt';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { QUEUE_NAMES } from '@app/queue';
 import { PlatformPrismaService } from './platform-prisma.service';
 import { TenancyModule } from '../tenancy/tenancy.module';
@@ -41,6 +42,13 @@ import {
 @Module({
   imports: [
     TenancyModule,
+    ThrottlerModule.forRoot({
+      throttlers: [
+        // Platform realm default: generous for operator workflows, but
+        // every route is bounded. auth/login tightens itself via @Throttle.
+        { name: 'platform', limit: 300, ttl: 60_000 },
+      ],
+    }),
     JwtModule.register({
       secret: process.env.PLATFORM_JWT_SECRET,
       signOptions: { expiresIn: '8h' },
