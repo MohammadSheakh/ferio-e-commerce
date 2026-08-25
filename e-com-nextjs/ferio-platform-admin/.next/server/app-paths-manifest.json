@@ -1,0 +1,13 @@
+{
+  "/_not-found/page": "app/_not-found/page.js",
+  "/api/auth/login/route": "app/api/auth/login/route.js",
+  "/api/auth/logout/route": "app/api/auth/logout/route.js",
+  "/login/page": "app/login/page.js",
+  "/migrations/page": "app/migrations/page.js",
+  "/organizations/[id]/page": "app/organizations/[id]/page.js",
+  "/page": "app/page.js",
+  "/organizations/page": "app/organizations/page.js",
+  "/plans/page": "app/plans/page.js",
+  "/support-access/page": "app/support-access/page.js",
+  "/api/platform/[...path]/route": "app/api/platform/[...path]/route.js"
+}

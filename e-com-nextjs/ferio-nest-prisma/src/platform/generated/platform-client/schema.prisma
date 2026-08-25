@@ -1,0 +1,467 @@
+// Ferio Platform Control Plane — separate database (PLATFORM_DATABASE_URL).
+// This schema owns SaaS metadata ONLY: organizations, domains, tenant DB
+// registry, plans, subscriptions, platform billing, usage, platform identity,
+// provisioning/migration runs, support access, and platform audit.
+// Tenant commerce data NEVER lives here, and this database is never queried
+// with a tenant-supplied connection string.
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/platform/generated/platform-client"
+}
+
+datasource platform_db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────────────────────
+// Organizations
+// ─────────────────────────────────────────────────────────────
+
+enum OrganizationStatus {
+  PROVISIONING
+  ACTIVE
+  SUSPENDED
+  PROVISIONING_FAILED
+  CLOSURE_PENDING
+  CLOSED
+  ARCHIVED
+}
+
+model Organization {
+  id       String             @id @default(cuid())
+  name     String
+  slug     String             @unique
+  status   OrganizationStatus @default(PROVISIONING)
+  currency String             @default("BDT")
+  timezone String             @default("Asia/Dhaka")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  domains       TenantDomain[]
+  databases     TenantDatabase[]
+  subscription  Subscription?
+  members       OrganizationMember[]
+  usageCounters UsageCounter[]
+  supportGrants SupportAccessGrant[]
+
+  lifecycleEvents  OrganizationLifecycleEvent[]
+  provisioningRuns ProvisioningRun[]
+
+  @@index([status])
+}
+
+model OrganizationLifecycleEvent {
+  id             String              @id @default(cuid())
+  organizationId String
+  fromStatus     OrganizationStatus?
+  toStatus       OrganizationStatus
+  actorId        String?
+  reason         String?
+  createdAt      DateTime            @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Domains — the only trusted source of host → tenant mapping
+// ─────────────────────────────────────────────────────────────
+
+enum TenantDomainType {
+  PLATFORM_SUBDOMAIN
+  CUSTOM
+}
+
+enum TenantDomainStatus {
+  ACTIVE
+  PENDING_VERIFICATION
+  VERIFICATION_FAILED
+  DISABLED
+}
+
+model TenantDomain {
+  id        String             @id @default(cuid())
+  // Lowercase host without port or trailing dot. Unique across the platform.
+  hostname  String             @unique
+  type      TenantDomainType
+  status    TenantDomainStatus @default(PENDING_VERIFICATION)
+  isPrimary Boolean            @default(false)
+
+  organizationId String
+
+  verificationToken String?
+  verifiedAt        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Tenant database registry — credentials encrypted at rest
+// ─────────────────────────────────────────────────────────────
+
+enum TenantDatabaseStatus {
+  REGISTERED
+  PROVISIONING
+  READY
+  UNHEALTHY
+  MIGRATION_REQUIRED
+  RETIRED
+}
+
+model TenantDatabase {
+  id             String               @id @default(cuid())
+  organizationId String               @unique
+  status         TenantDatabaseStatus @default(REGISTERED)
+
+  // Connection metadata (non-secret). Credentials stored encrypted.
+  host             String
+  port             Int    @default(5432)
+  databaseName     String
+  username         String
+  credentialCipher String // base64 AES-256-GCM ciphertext; never logged
+
+  schemaVersion String?
+  lastHealthAt  DateTime?
+  lastHealthy   Boolean?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization     Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  migrationResults TenantMigrationResult[]
+
+  @@index([status])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Provisioning & migration orchestration evidence
+// ─────────────────────────────────────────────────────────────
+
+enum ProvisioningRunStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  COMPENSATED
+}
+
+model ProvisioningRun {
+  id             String                @id @default(cuid())
+  organizationId String
+  status         ProvisioningRunStatus @default(PENDING)
+  idempotencyKey String                @unique
+  errorSummary   String?
+
+  steps ProvisioningStep[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status])
+}
+
+model ProvisioningStep {
+  id     String @id @default(cuid())
+  runId  String
+  name   String
+  status String // PENDING | RUNNING | COMPLETED | FAILED | SKIPPED
+  detail Json?
+
+  startedAt   DateTime?
+  completedAt DateTime?
+
+  run ProvisioningRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId, status])
+}
+
+enum TenantMigrationRunStatus {
+  PENDING
+  CANARY
+  BATCHING
+  PAUSED
+  COMPLETED
+  FAILED
+}
+
+model TenantMigrationRun {
+  id                  String                   @id @default(cuid())
+  targetSchemaVersion String
+  status              TenantMigrationRunStatus @default(PENDING)
+  concurrencyLimit    Int                      @default(2)
+  failureThreshold    Int                      @default(3)
+
+  results TenantMigrationResult[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+}
+
+model TenantMigrationResult {
+  id               String  @id @default(cuid())
+  migrationRunId   String
+  tenantDatabaseId String
+  fromVersion      String?
+  toVersion        String
+  success          Boolean
+  detail           Json?
+
+  createdAt DateTime @default(now())
+
+  run            TenantMigrationRun @relation(fields: [migrationRunId], references: [id], onDelete: Cascade)
+  tenantDatabase TenantDatabase     @relation(fields: [tenantDatabaseId], references: [id], onDelete: Cascade)
+
+  @@unique([migrationRunId, tenantDatabaseId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Plans, entitlements, subscriptions, SaaS billing
+// ─────────────────────────────────────────────────────────────
+
+enum PlanBillingInterval {
+  MONTHLY
+  YEARLY
+}
+
+model Plan {
+  id              String              @id @default(cuid())
+  key             String              @unique // stable machine key e.g. "starter"
+  displayName     String
+  billingInterval PlanBillingInterval @default(MONTHLY)
+  amountMinor     Int                 @default(0) // poisha; 0 = free/internal tier
+  currency        String              @default("BDT")
+  isActive        Boolean             @default(true)
+
+  entitlements  PlanEntitlement[]
+  subscriptions Subscription[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// featureKey examples: custom_domain, advanced_reports, staff_seats,
+// orders_per_month, products_max. limit == null means boolean entitlement.
+model PlanEntitlement {
+  id         String  @id @default(cuid())
+  planId     String
+  featureKey String
+  enabled    Boolean @default(true)
+  limit      Int?
+
+  plan Plan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, featureKey])
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  SUSPENDED
+  CANCELLED
+}
+
+model Subscription {
+  id             String             @id @default(cuid())
+  organizationId String             @unique
+  planId         String
+  status         SubscriptionStatus @default(TRIALING)
+
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+  trialEndsAt        DateTime?
+
+  cancelAtPeriodEnd Boolean   @default(false)
+  cancelledAt       DateTime?
+
+  events SubscriptionEvent[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  plan         Plan         @relation(fields: [planId], references: [id])
+
+  @@index([status])
+}
+
+model SubscriptionEvent {
+  id             String              @id @default(cuid())
+  subscriptionId String
+  fromStatus     SubscriptionStatus?
+  toStatus       SubscriptionStatus
+  actorId        String?
+  note           String?
+  createdAt      DateTime            @default(now())
+
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([subscriptionId, createdAt])
+}
+
+// SaaS platform billing is financially separate from tenant commerce money.
+enum SaasPaymentAttemptStatus {
+  INITIATED
+  SUCCEEDED
+  FAILED
+  REFUNDED
+}
+
+model SaasInvoice {
+  id             String   @id @default(cuid())
+  number         String   @unique
+  organizationId String
+  subscriptionId String
+  periodStart    DateTime
+  periodEnd      DateTime
+  amountMinor    Int
+  currency       String   @default("BDT")
+  paid           Boolean  @default(false)
+
+  paymentAttempts SaasPaymentAttempt[]
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId, createdAt])
+}
+
+model SaasPaymentAttempt {
+  id          String                   @id @default(cuid())
+  invoiceId   String
+  provider    String
+  reference   String                   @unique
+  status      SaasPaymentAttemptStatus @default(INITIATED)
+  amountMinor Int
+  raw         Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  invoice SaasInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+// ─────────────────────────────────────────────────────────────
+// Usage metering
+// ─────────────────────────────────────────────────────────────
+
+model UsageCounter {
+  id             String @id @default(cuid())
+  organizationId String
+  metric         String // e.g. orders_per_month, staff_seats
+  periodKey      String // e.g. "2026-08" — resets per billing semantics
+  value          BigInt
+
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, metric, periodKey])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Platform identity — separate realm from any tenant User
+// ─────────────────────────────────────────────────────────────
+
+model PlatformUser {
+  id           String  @id @default(cuid())
+  email        String  @unique
+  passwordHash String
+  displayName  String
+  isActive     Boolean @default(true)
+
+  roles         PlatformRole[]
+  supportGrants SupportAccessGrant[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PlatformRole {
+  id           String       @id @default(cuid())
+  userId       String
+  role         String // SUPERADMIN | OPS | SUPPORT | BILLING (permissions resolved in code/guard)
+  platformUser PlatformUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, role])
+}
+
+enum OrganizationMemberRole {
+  OWNER
+  STAFF
+}
+
+model OrganizationMember {
+  id             String                 @id @default(cuid())
+  organizationId String
+  platformUserId String? // set when a platform identity is linked
+  email          String
+  role           OrganizationMemberRole @default(STAFF)
+  isActive       Boolean                @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, email])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Support access — reason-bound, time-bound, audited
+// ─────────────────────────────────────────────────────────────
+
+model SupportAccessGrant {
+  id             String    @id @default(cuid())
+  organizationId String
+  platformUserId String
+  reason         String
+  scope          Json? // permission subset granted
+  expiresAt      DateTime
+  revokedAt      DateTime?
+  createdAt      DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  platformUser PlatformUser @relation(fields: [platformUserId], references: [id])
+
+  @@index([organizationId, expiresAt])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Platform feature flags & audit
+// ─────────────────────────────────────────────────────────────
+
+model PlatformFeatureFlag {
+  id      String  @id @default(cuid())
+  key     String  @unique
+  enabled Boolean @default(false)
+  note    String?
+
+  updatedAt DateTime @updatedAt
+}
+
+model PlatformAuditLog {
+  id            String   @id @default(cuid())
+  action        String
+  entityType    String
+  entityId      String?
+  actorId       String?
+  source        String   @default("PLATFORM_ADMIN")
+  previousValue Json?
+  newValue      Json?
+  metadata      Json?
+  createdAt     DateTime @default(now())
+
+  @@index([entityType, entityId, createdAt])
+  @@index([action, createdAt])
+}
