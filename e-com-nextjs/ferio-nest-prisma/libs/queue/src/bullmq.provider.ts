@@ -62,6 +62,20 @@ export const BullMQQueues = BullModule.registerQueueAsync(
     inject: [ConfigService],
   },
   {
+    name: QUEUE_NAMES.RETENTION,
+    useFactory: (configService: ConfigService) => ({
+      connection: getRedisOptions(configService),
+      prefix: configService.get<string>('QUEUE_PREFIX', 'bullmq'),
+      defaultJobOptions: {
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 60000 },
+        removeOnComplete: { count: 100 },
+        removeOnFail: { count: 500 },
+      },
+    }),
+    inject: [ConfigService],
+  },
+  {
     name: QUEUE_NAMES.RECONCILIATION,
     useFactory: (configService: ConfigService) => ({
       connection: getRedisOptions(configService),

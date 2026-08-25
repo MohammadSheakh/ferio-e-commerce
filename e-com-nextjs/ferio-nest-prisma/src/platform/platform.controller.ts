@@ -10,12 +10,14 @@ import { TenantClosureService } from './services/tenant-closure.service';
 import { SupportAccessService } from './services/support-access.service';
 import { PlatformAuthService } from './services/platform-auth.service';
 import { PlatformAuditService } from './services/platform-audit.service';
+import { PlatformPrismaService } from './platform-prisma.service';
 import { UsageService, currentPeriodKey } from './services/usage.service';
 import {
   USAGE_METRICS,
   usageMetricKeys,
 } from './services/usage-metrics.registry';
 import { UsageReconciliationService } from '../tenancy/usage-reconciliation.service';
+import { RetentionSweepService } from '../tenancy/retention-sweep.service';
 import { TenantSchemaBootstrapper } from '../tenancy/tenant-schema.bootstrapper';
 import { JwtService } from '@nestjs/jwt';
 import {
@@ -44,10 +46,11 @@ export class PlatformAdminController {
     private readonly closure: TenantClosureService,
     private readonly platformAuth: PlatformAuthService,
     private readonly jwt: JwtService,
-    private readonly platformPrisma: import('./platform-prisma.service').PlatformPrismaService,
+    private readonly platformPrisma: PlatformPrismaService,
     private readonly audit: PlatformAuditService,
     private readonly usage: UsageService,
     private readonly usageReconciliation: UsageReconciliationService,
+    private readonly retentionSweep: RetentionSweepService,
   ) {}
 
   @Post('organizations')
@@ -252,6 +255,28 @@ export class PlatformAdminController {
       metadata: { periodKey: report.periodKey },
     });
     return report;
+  }
+
+  /**
+   * MT-12 §15 / brutal-audit #7 — run a retention sweep across every READY
+   * tenant now (the daily scheduler also fires this). Audited; returns
+   * per-rule deletion counts so operators can see what was pruned.
+   */
+  @Post('maintenance/retention-sweep')
+  @PlatformPermissions('organization:write')
+  async runRetentionSweep(@Req() request: any) {
+    const result = await this.retentionSweep.sweepAllReady();
+    await this.audit.record({
+      action: 'RETENTION_SWEEP',
+      entityType: 'TenantDatabase',
+      actorId: request?.user?.platformUserId ?? request?.user?.userId ?? 'platform',
+      newValue: {
+        swept: result.swept,
+        totalDeleted: result.totalDeleted,
+        failures: result.failures,
+      },
+    });
+    return result;
   }
 
   @Patch('organizations/:id/status')

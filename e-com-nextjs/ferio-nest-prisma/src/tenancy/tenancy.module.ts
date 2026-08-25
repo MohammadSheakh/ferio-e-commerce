@@ -1,5 +1,14 @@
 import { Module } from '@nestjs/common';
 import { RedisModule, RedisService } from '@app/redis';
+import { JwtModule } from '@nestjs/jwt';
+import { BullModule } from '@nestjs/bullmq';
+import { QUEUE_NAMES } from '@app/queue';
+import {
+  RetentionQueue,
+  RETENTION_SWEEP_JOB,
+} from './retention.queue';
+import { RetentionProcessor } from './retention.processor';
+import { RetentionSweepService } from './retention-sweep.service';
 import { PlatformPrismaService } from '../platform/platform-prisma.service';
 import { TenancyController } from './tenancy.controller';
 import { TenancyPlanController } from './tenancy-plan.controller';
@@ -22,7 +31,19 @@ import { UsageReconciliationService } from './usage-reconciliation.service';
  * control-plane module — never on tenant commerce services.
  */
 @Module({
-  imports: [RedisModule],
+  imports: [
+    RedisModule,
+    JwtModule.register({
+      secret: process.env.JWT_ACCESS_SECRET as string,
+    }),
+    BullModule.registerQueue({
+      name: QUEUE_NAMES.RETENTION,
+      connection: {
+        host: process.env.REDIS_HOST || 'localhost',
+        port: parseInt(process.env.REDIS_PORT || '6379'),
+      },
+    }),
+  ],
   controllers: [TenancyController, TenancyPlanController],
   providers: [
     TenantResolverService,
@@ -44,7 +65,10 @@ import { UsageReconciliationService } from './usage-reconciliation.service';
     TenantFanoutService,
     TenancyObservabilityService,
     UsageReconciliationService,
+    RetentionSweepService,
+    RetentionQueue,
+    RetentionProcessor,
   ],
-  exports: [TenantResolverService, TenantDatabaseManager, TenantDbService, TenantSchemaBootstrapper, TenantCallbackRunner, TenantFanoutService, TenantMembershipGuard, UsageReconciliationService],
+  exports: [TenantResolverService, TenantDatabaseManager, TenantDbService, TenantSchemaBootstrapper, TenantCallbackRunner, TenantFanoutService, TenantMembershipGuard, TenantMembershipService, UsageReconciliationService, RetentionSweepService],
 })
 export class TenancyModule {}
