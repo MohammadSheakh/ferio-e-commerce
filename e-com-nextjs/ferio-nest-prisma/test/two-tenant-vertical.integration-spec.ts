@@ -82,6 +82,7 @@ const configStub = { get: (_key: string, fallback: unknown) => fallback };
 const auditStub = { record: jest.fn().mockResolvedValue({}) };
 
 conditionalDescribe('Two-Tenant End-to-End Vertical Proof', () => {
+  jest.setTimeout(120_000);
   let bootstrapper: TenantSchemaBootstrapper;
   let manager: TenantDatabaseManager;
   let tenantDb: TenantDbService;
@@ -167,6 +168,24 @@ conditionalDescribe('Two-Tenant End-to-End Vertical Proof', () => {
       const tB = tenantFrom(dbB);
       await bootstrapper.bootstrap(tA.conn);
       await bootstrapper.bootstrap(tB.conn);
+      await bootstrapper.seedBaseline({ ...tA.conn, organizationName: 'Tenant A' });
+      await bootstrapper.seedBaseline({ ...tB.conn, organizationName: 'Tenant B' });
+
+      // Seed a delivery zone + district so preview can resolve shipping.
+      for (const conn of [tA.conn, tB.conn]) {
+        const pool = new Pool({ ...conn, max: 1 });
+        await pool.query(
+          `INSERT INTO "DeliveryZone" ("id", "name", "deliveryFee", "freeDeliveryThreshold", "isActive", "createdAt", "updatedAt")
+           VALUES ('zone-dhaka', 'Dhaka Zone', 60, 100000, true, now(), now())
+           ON CONFLICT ("id") DO NOTHING`
+        );
+        await pool.query(
+          `INSERT INTO "DeliveryZoneDistrict" ("id", "zoneId", "name", "normalizedName")
+           VALUES ('dzd-dhaka', 'zone-dhaka', 'Dhaka', 'dhaka')
+           ON CONFLICT ("id") DO NOTHING`
+        );
+        await pool.end();
+      }
 
       // Shared service instances: tenant resolution is ambient per call.
       const catalog = new CatalogService({} as never, auditStub as never, tenantDb);
