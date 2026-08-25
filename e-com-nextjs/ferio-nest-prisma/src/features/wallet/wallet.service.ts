@@ -3,10 +3,13 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { Prisma } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import { PrismaService } from '@app/database';
+import { TenantDbService } from '../../tenancy/tenant-db.service';
 import type { UserPayload } from '@app/common';
 import { AuditService } from '../audit/audit.service';
 import { CustomerNotificationsService } from '../customer-notifications/customer-notifications.service';
@@ -24,8 +27,17 @@ export class WalletService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly notifications: CustomerNotificationsService,
-  ) {}
+  
+    @Optional() private readonly tenantDb?: TenantDbService,) {}
 
+  /**
+   * MT-7: inside a tenant-resolved request this returns the resolved tenant
+   * database client; outside one it explicitly falls back to the legacy DB.
+   */
+  private async db(): Promise<PrismaClient> {
+    const tenant = await this.tenantDb?.tryGet();
+    return tenant ?? (this.prisma as PrismaClient);
+  }
   private idempotencyHash(raw?: string) {
     const value = raw?.trim();
     if (!value || value.length < 16 || value.length > 200) {
@@ -65,13 +77,14 @@ export class WalletService {
   }
 
   async summary(userId: string, page = 1, limit = 20) {
-    const wallet = await this.prisma.$transaction((transaction) =>
+    const db = await this.db();
+    const wallet = await db.$transaction((transaction) =>
       this.ensureWallet(transaction, userId),
     );
     const boundedPage = Math.max(1, page);
     const boundedLimit = Math.min(50, Math.max(1, limit));
     const [transactions, total, topUps] = await Promise.all([
-      this.prisma.walletTransactionHistory.findMany({
+      db.walletTransactionHistory.findMany({
         where: { walletId: wallet.id, isDeleted: false },
         orderBy: { createdAt: 'desc' },
         skip: (boundedPage - 1) * boundedLimit,
@@ -90,10 +103,10 @@ export class WalletService {
           createdAt: true,
         },
       }),
-      this.prisma.walletTransactionHistory.count({
+      db.walletTransactionHistory.count({
         where: { walletId: wallet.id, isDeleted: false },
       }),
-      this.prisma.walletTopUp.findMany({
+      db.walletTopUp.findMany({
         where: { walletId: wallet.id },
         orderBy: { createdAt: 'desc' },
         take: 10,
@@ -133,8 +146,9 @@ export class WalletService {
     dto: CreateWalletTopUpDto,
     rawIdempotencyKey?: string,
   ) {
+    const db = await this.db();
     const idempotencyKey = this.idempotencyHash(rawIdempotencyKey);
-    return this.prisma.$transaction(
+    return db.$transaction(
       async (transaction) => {
         const existing = await transaction.walletTopUp.findUnique({
           where: { idempotencyKey },
@@ -176,6 +190,7 @@ export class WalletService {
   }
 
   async listTopUps(query: WalletTopUpQueryDto) {
+    const db = await this.db();
     const search = query.search?.normalize('NFKC').trim();
     const where: Prisma.WalletTopUpWhereInput = {
       status: query.status,
@@ -190,14 +205,14 @@ export class WalletService {
         : {}),
     };
     const [items, total] = await Promise.all([
-      this.prisma.walletTopUp.findMany({
+      db.walletTopUp.findMany({
         where,
         orderBy: { createdAt: 'desc' },
         skip: (query.page - 1) * query.limit,
         take: query.limit,
         include: { user: { select: { id: true, name: true, email: true } } },
       }),
-      this.prisma.walletTopUp.count({ where }),
+      db.walletTopUp.count({ where }),
     ]);
     return {
       items,
@@ -209,7 +224,8 @@ export class WalletService {
   }
 
   async reviewTopUp(id: string, dto: ReviewWalletTopUpDto, actor: UserPayload) {
-    const updated = await this.prisma.$transaction(
+    const db = await this.db();
+    const updated = await db.$transaction(
       async (transaction) => {
         const topUp = await transaction.walletTopUp.findUnique({
           where: { id },

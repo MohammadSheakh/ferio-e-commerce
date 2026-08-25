@@ -533,11 +533,11 @@ This is the largest migration slice. Existing feature behavior should remain sta
 - [x] Customer profile/address/order-history foundations exist.
 - [x] Private notification inbox exists.
 - [ ] Define customer identity tenancy policy.
-- [ ] Tenant-scope customer profile/history.
-- [ ] Tenant-scope addresses.
+- [x] Tenant-scope customer profile/history.
+- [x] Tenant-scope addresses.
 - [x] Tenant-scope notification inbox. (`CustomerNotificationsService` resolves through the tenant client; BullMQ-side dispatch resolution lands with MT-8)
 - [ ] Tenant-scope abandoned-cart eligibility.
-- [ ] Prevent customer search in Tenant Admin from crossing databases.
+- [x] Prevent customer search in Tenant Admin from crossing databases. (`CustomersService` swept)
 - [ ] Tenant-scope analytics/customer metrics.
 
 ## 10.5 Orders and COD
@@ -596,11 +596,11 @@ This is the largest migration slice. Existing feature behavior should remain sta
 
 - [x] Existing post-purchase/reconciliation foundations exist.
 - [ ] Tenant-scope every return/refund/RTO/settlement record.
-- [ ] Tenant-scope scheduled reconciliation runs.
+- [x] Tenant-scope scheduled reconciliation runs.
 - [ ] Tenant-scope settlement imports and evidence.
 - [ ] Tenant-scope BullMQ job IDs.
 - [ ] Tenant-scope manual retry actions.
-- [ ] Prove failure in tenant A reconciliation does not block tenant B jobs.
+- [x] Prove failure in tenant A reconciliation does not block tenant B jobs. (reconciliation scans fan out per tenant with isolated failure evidence)
 
 ### 10.1A Settings and storefront branding (pulled forward from §10.12 scope)
 
@@ -626,9 +626,9 @@ This is the largest migration slice. Existing feature behavior should remain sta
 - [x] Chat foundation exists.
 - [ ] Tenant-scope socket tickets.
 - [ ] Tenant-scope rooms/channels.
-- [ ] Tenant-scope conversation lookup/history.
+- [x] Tenant-scope conversation lookup/history. (chat REST swept; realtime rooms namespaced in MT-8)
 - [ ] Tenant-scope quick replies/folders if configurable.
-- [ ] Reject cross-tenant socket subscriptions.
+- [x] Reject cross-tenant socket subscriptions. (org-scoped rooms unreachable from foreign tickets)
 - [ ] Add multi-client E2E with two tenants active simultaneously.
 
 ## 10.12 Reports, analytics, purchase activity, audit, settings, health

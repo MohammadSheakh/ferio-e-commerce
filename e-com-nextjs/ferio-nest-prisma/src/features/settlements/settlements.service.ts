@@ -3,11 +3,14 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { createHash, randomBytes } from 'crypto';
+import type { PrismaClient } from '@prisma/client';
 import { Prisma } from '@prisma/client';
 import type { UserPayload } from '@app/common';
 import { PrismaService } from '@app/database';
+import { TenantDbService } from '../../tenancy/tenant-db.service';
 import { AuditService } from '../audit/audit.service';
 import { CreateCourierSettlementDto } from './dto/settlement.dto';
 
@@ -31,18 +34,29 @@ export class SettlementsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
-  ) {}
+  
+    @Optional() private readonly tenantDb?: TenantDbService,) {}
 
-  list() {
-    return this.prisma.courierSettlement.findMany({
+  /**
+   * MT-7: inside a tenant-resolved request this returns the resolved tenant
+   * database client; outside one it explicitly falls back to the legacy DB.
+   */
+  private async db(): Promise<PrismaClient> {
+    const tenant = await this.tenantDb?.tryGet();
+    return tenant ?? (this.prisma as PrismaClient);
+  }
+  async list() {
+    const db = await this.db();
+    return db.courierSettlement.findMany({
       take: 100,
       include: settlementInclude,
       orderBy: { settledAt: 'desc' },
     });
   }
 
-  eligibleCollections() {
-    return this.prisma.codCollection.findMany({
+  async eligibleCollections() {
+    const db = await this.db();
+    return db.codCollection.findMany({
       where: { status: 'EXPECTED', settlementItem: null },
       take: 500,
       include: {
@@ -66,6 +80,7 @@ export class SettlementsService {
     dto: CreateCourierSettlementDto,
     actor: UserPayload,
   ) {
+    const db = await this.db();
     const idempotencyKeyHash = this.idempotencyHash(rawIdempotencyKey);
     const providerReference = this.clean(dto.providerSettlementReference);
     const shipmentIds = dto.items.map((item) => item.shipmentId);
@@ -74,13 +89,13 @@ export class SettlementsService {
         'A shipment can appear only once in a settlement',
       );
     }
-    const duplicate = await this.prisma.courierSettlement.findUnique({
+    const duplicate = await db.courierSettlement.findUnique({
       where: { idempotencyKeyHash },
       include: settlementInclude,
     });
     if (duplicate) return duplicate;
     try {
-      return await this.prisma.$transaction(
+      return await db.$transaction(
         async (transaction) => {
           const concurrentDuplicate =
             await transaction.courierSettlement.findUnique({
@@ -260,12 +275,12 @@ export class SettlementsService {
         (error.code === 'P2002' || error.code === 'P2034')
       ) {
         const concurrentDuplicate =
-          await this.prisma.courierSettlement.findUnique({
+          await db.courierSettlement.findUnique({
             where: { idempotencyKeyHash },
             include: settlementInclude,
           });
         if (concurrentDuplicate) return concurrentDuplicate;
-        const existingReference = await this.prisma.courierSettlement.findFirst(
+        const existingReference = await db.courierSettlement.findFirst(
           {
             where: {
               provider: { code: dto.provider },
@@ -280,7 +295,7 @@ export class SettlementsService {
           );
         }
         const claimedShipment =
-          await this.prisma.courierSettlementItem.findFirst({
+          await db.courierSettlementItem.findFirst({
             where: { shipmentId: { in: shipmentIds } },
             select: { shipmentId: true },
           });

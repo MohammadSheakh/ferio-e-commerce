@@ -3,11 +3,14 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { randomBytes } from 'crypto';
+import type { PrismaClient } from '@prisma/client';
 import { Prisma, ReturnCaseStatus } from '@prisma/client';
 import type { UserPayload } from '@app/common';
 import { PrismaService } from '@app/database';
+import { TenantDbService } from '../../tenancy/tenant-db.service';
 import { AuditService } from '../audit/audit.service';
 import {
   CreateReturnCaseDto,
@@ -54,14 +57,25 @@ export class ReturnsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
-  ) {}
+  
+    @Optional() private readonly tenantDb?: TenantDbService,) {}
 
+  /**
+   * MT-7: inside a tenant-resolved request this returns the resolved tenant
+   * database client; outside one it explicitly falls back to the legacy DB.
+   */
+  private async db(): Promise<PrismaClient> {
+    const tenant = await this.tenantDb?.tryGet();
+    return tenant ?? (this.prisma as PrismaClient);
+  }
   async getEligibility(orderId: string) {
-    return this.loadEligibility(orderId, this.prisma);
+    const db = await this.db();
+    return this.loadEligibility(orderId, db);
   }
 
   async getOrderCases(orderId: string) {
-    return this.prisma.returnCase.findMany({
+    const db = await this.db();
+    return db.returnCase.findMany({
       where: { orderId },
       include: returnCaseInclude,
       orderBy: { createdAt: 'desc' },
@@ -69,16 +83,17 @@ export class ReturnsService {
   }
 
   async getCases(query: ReturnCaseQueryDto) {
+    const db = await this.db();
     const where: Prisma.ReturnCaseWhereInput = { status: query.status };
     const [items, total] = await Promise.all([
-      this.prisma.returnCase.findMany({
+      db.returnCase.findMany({
         where,
         include: returnCaseInclude,
         orderBy: { createdAt: 'desc' },
         skip: (query.page - 1) * query.limit,
         take: query.limit,
       }),
-      this.prisma.returnCase.count({ where }),
+      db.returnCase.count({ where }),
     ]);
     return {
       items,
@@ -90,7 +105,8 @@ export class ReturnsService {
   }
 
   async create(orderId: string, dto: CreateReturnCaseDto, actor: UserPayload) {
-    return this.prisma.$transaction(
+    const db = await this.db();
+    return db.$transaction(
       async (transaction) => {
         const eligibility = await this.loadEligibility(orderId, transaction);
         // Eligibility gates creation: INELIGIBLE requests are rejected here,
@@ -172,7 +188,8 @@ export class ReturnsService {
   }
 
   async review(id: string, dto: ReviewReturnCaseDto, actor: UserPayload) {
-    return this.prisma.$transaction(async (transaction) => {
+    const db = await this.db();
+    return db.$transaction(async (transaction) => {
       const existing = await transaction.returnCase.findUnique({
         where: { id },
         include: { items: true },
@@ -233,7 +250,8 @@ export class ReturnsService {
   }
 
   async inspect(id: string, dto: InspectReturnCaseDto, actor: UserPayload) {
-    return this.prisma.$transaction(
+    const db = await this.db();
+    return db.$transaction(
       async (transaction) => {
         const existing = await transaction.returnCase.findUnique({
           where: { id },

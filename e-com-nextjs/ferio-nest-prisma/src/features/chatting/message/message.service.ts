@@ -1,7 +1,12 @@
-import { Injectable, Logger, Inject, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable, Logger, Inject, NotFoundException, BadRequestException, ForbiddenException,
+  Optional,
+} from '@nestjs/common';
 import { Queue } from 'bullmq';
 
+import type { PrismaClient } from '@prisma/client';
 import { PrismaService } from '@app/database';
+import { TenantDbService } from '../../tenancy/tenant-db.service';
 import { SocketGateway } from '../../socket.gateway/socket.gateway';
 import {
   BULLMQ_CONVERSATION_LAST_MESSAGE_QUEUE,
@@ -18,8 +23,17 @@ export class MessageService {
     private readonly socketGateway: SocketGateway,
     @Inject(BULLMQ_CONVERSATION_LAST_MESSAGE_QUEUE) private conversationLastMessageQueue: Queue,
     @Inject(BULLMQ_NOTIFY_PARTICIPANTS_QUEUE) private notifyParticipantsQueue: Queue,
-  ) {}
+  
+    @Optional() private readonly tenantDb?: TenantDbService,) {}
 
+  /**
+   * MT-7: inside a tenant-resolved request this returns the resolved tenant
+   * database client; outside one it explicitly falls back to the legacy DB.
+   */
+  private async db(): Promise<PrismaClient> {
+    const tenant = await this.tenantDb?.tryGet();
+    return tenant ?? (this.prisma as PrismaClient);
+  }
   /**
    * Send Message
    */
@@ -28,9 +42,10 @@ export class MessageService {
     senderId: string,
     dto: SendMessageDto,
   ) {
+    const db = await this.db();
     const { text, attachments } = dto;
 
-    const conversation = await this.prisma.conversation.findUnique({
+    const conversation = await db.conversation.findUnique({
       where: { id: conversationId, isDeleted: false },
     });
 
@@ -38,7 +53,7 @@ export class MessageService {
       throw new NotFoundException('Conversation not found');
     }
 
-    const isParticipant = await this.prisma.conversationParticipents.findFirst({
+    const isParticipant = await db.conversationParticipents.findFirst({
       where: {
         userId: senderId,
         conversationId: conversationId,
@@ -50,7 +65,7 @@ export class MessageService {
       throw new BadRequestException('You are not a participant in this conversation');
     }
 
-    const message = await this.prisma.message.create({
+    const message = await db.message.create({
       data: {
         text,
         senderId,
@@ -96,6 +111,7 @@ export class MessageService {
     limit: number = 50,
     role?: string,
   ) {
+    const db = await this.db();
     await this.assertConversationAccess(conversationId, userId, role);
     const skip = (page - 1) * limit;
 
@@ -106,7 +122,7 @@ export class MessageService {
 
     try {
       const [user, customer] = await Promise.all([
-        this.prisma.user.findFirst({
+        db.user.findFirst({
           where: {
             OR: [
               { id: rawId },
@@ -116,7 +132,7 @@ export class MessageService {
             ],
           },
         }),
-        this.prisma.customer.findFirst({
+        db.customer.findFirst({
           where: {
             OR: [
               { id: rawId },
@@ -149,8 +165,8 @@ export class MessageService {
       const targetEmail = user?.email || customer?.email;
       if (targetEmail) {
         const [linkedUserByEmail, linkedCustByEmail] = await Promise.all([
-          this.prisma.user.findFirst({ where: { email: targetEmail } }),
-          this.prisma.customer.findFirst({
+          db.user.findFirst({ where: { email: targetEmail } }),
+          db.customer.findFirst({
             where: { email: targetEmail },
             include: { user: true },
           }),
@@ -179,7 +195,7 @@ export class MessageService {
 
     const queryIds = Array.from(possibleIds);
 
-    const messages = await this.prisma.message.findMany({
+    const messages = await db.message.findMany({
       where: {
         conversationId: { in: queryIds },
         isDeleted: false,
@@ -195,7 +211,7 @@ export class MessageService {
       take: limit,
     });
 
-    const total = await this.prisma.message.count({
+    const total = await db.message.count({
       where: {
         conversationId: { in: queryIds },
         isDeleted: false,
@@ -233,6 +249,7 @@ export class MessageService {
     } = {},
     role?: string,
   ) {
+    const db = await this.db();
     await this.assertConversationAccess(conversationId, userId, role);
     const { before, after, limit = 20 } = options;
 
@@ -242,16 +259,16 @@ export class MessageService {
     };
 
     if (before) {
-      const beforeMessage = await this.prisma.message.findUnique({ where: { id: before } });
+      const beforeMessage = await db.message.findUnique({ where: { id: before } });
       if (beforeMessage) query.createdAt = { lt: beforeMessage.createdAt };
     }
 
     if (after) {
-      const afterMessage = await this.prisma.message.findUnique({ where: { id: after } });
+      const afterMessage = await db.message.findUnique({ where: { id: after } });
       if (afterMessage) query.createdAt = { ...query.createdAt, gt: afterMessage.createdAt };
     }
 
-    const messages = await this.prisma.message.findMany({
+    const messages = await db.message.findMany({
       where: query,
       include: {
         sender: {
@@ -286,6 +303,7 @@ export class MessageService {
     userId?: string,
     role?: string,
   ) {
+    const db = await this.db();
     if (['admin', 'super_admin', 'super-admin'].includes(String(role || '').toLowerCase())) {
       return;
     }
@@ -293,7 +311,7 @@ export class MessageService {
 
     const allowedIds = new Set([userId, `conv-${userId}`]);
     if (role !== 'guest') {
-      const account = await this.prisma.user.findUnique({
+      const account = await db.user.findUnique({
         where: { id: userId },
         select: { customerId: true },
       });
@@ -316,7 +334,8 @@ export class MessageService {
     userId: string,
     text: string,
   ) {
-    const message = await this.prisma.message.findFirst({
+    const db = await this.db();
+    const message = await db.message.findFirst({
       where: {
         id: messageId,
         senderId: userId,
@@ -328,7 +347,7 @@ export class MessageService {
       throw new NotFoundException('Message not found or you do not have permission to edit it');
     }
 
-    const updatedMessage = await this.prisma.message.update({
+    const updatedMessage = await db.message.update({
       where: { id: messageId },
       data: { text },
     });
@@ -349,7 +368,8 @@ export class MessageService {
    * Delete Message
    */
   async deleteMessage(messageId: string, userId: string): Promise<void> {
-    const message = await this.prisma.message.findFirst({
+    const db = await this.db();
+    const message = await db.message.findFirst({
       where: {
         id: messageId,
         senderId: userId,
@@ -361,7 +381,7 @@ export class MessageService {
       throw new NotFoundException('Message not found or you do not have permission to delete it');
     }
 
-    await this.prisma.message.update({
+    await db.message.update({
       where: { id: messageId },
       data: { isDeleted: true },
     });
@@ -383,14 +403,15 @@ export class MessageService {
     userId: string,
     messageIds: string[],
   ): Promise<void> {
+    const db = await this.db();
     if (!messageIds || messageIds.length === 0) return;
 
     const latestMessageId = messageIds[messageIds.length - 1];
-    const latestMessage = await this.prisma.message.findUnique({ where: { id: latestMessageId } });
+    const latestMessage = await db.message.findUnique({ where: { id: latestMessageId } });
 
     if (!latestMessage) return;
 
-    await this.prisma.conversationParticipents.updateMany({
+    await db.conversationParticipents.updateMany({
       where: {
         userId: userId,
         conversationId: conversationId,
@@ -412,8 +433,9 @@ export class MessageService {
     conversationId: string,
     message: any,
   ): Promise<void> {
+    const db = await this.db();
     try {
-      const participants = await this.prisma.conversationParticipents.findMany({
+      const participants = await db.conversationParticipents.findMany({
         where: {
           conversationId,
           isDeleted: false,
@@ -478,7 +500,8 @@ export class MessageService {
    * Get Unread Message Count
    */
   async getUnreadCount(userId: string, conversationId: string): Promise<number> {
-    const participent = await this.prisma.conversationParticipents.findFirst({
+    const db = await this.db();
+    const participent = await db.conversationParticipents.findFirst({
       where: {
         userId,
         conversationId,
@@ -488,7 +511,7 @@ export class MessageService {
     });
 
     if (!participent || !participent.lastMessageReadAt) {
-      return await this.prisma.message.count({
+      return await db.message.count({
         where: {
           conversationId,
           senderId: { not: userId },
@@ -497,7 +520,7 @@ export class MessageService {
       });
     }
 
-    return await this.prisma.message.count({
+    return await db.message.count({
       where: {
         conversationId,
         senderId: { not: userId },
