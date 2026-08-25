@@ -238,7 +238,7 @@ Create a separate control-plane schema/database for platform metadata.
 
 ### MT-2 gate
 
-- [ ] Two test hostnames resolve deterministically to two different organizations.
+- [x] Two test hostnames resolve deterministically to two different organizations. (`src/tenancy/redis-collision.spec.ts`: tenant-a/tenant-b hosts resolve to their own orgs, interleaved resolutions never cross, positive-cache path stays deterministic)
 - [x] Unknown/suspended hosts fail closed. (negative tests prove no legacy-DB fallback)
 - [x] Changing an ID, cookie, host, or request payload cannot select another tenant's database. (manager accepts registry rows only)
 
@@ -567,12 +567,12 @@ This is the largest migration slice. Existing feature behavior should remain sta
 ## 10.7 Wallet
 
 - [x] Customer wallet and immutable ledger foundation exists.
-- [ ] Make wallet strictly tenant-local.
-- [ ] Prohibit cross-tenant wallet balance portability.
-- [ ] Tenant-scope top-up evidence/review.
-- [ ] Tenant-scope wallet checkout/refunds.
-- [ ] Prove tenant A customer identifier cannot debit tenant B wallet.
-- [ ] Add tenant-aware financial reconciliation tests.
+- [x] Make wallet strictly tenant-local. (`WalletService` resolves through the tenant client — balances and ledgers live inside each tenant database)
+- [x] Prohibit cross-tenant wallet balance portability. (no cross-database path exists by construction)
+- [x] Tenant-scope top-up evidence/review. (`requestTopUp`/`reviewTopUp` resolve per tenant; identical top-up idempotency keys succeed independently in two tenants)
+- [x] Tenant-scope wallet checkout/refunds. (`debitOrder`/`refundCancelledOrder` execute inside the caller's resolved-tenant transaction)
+- [x] Prove tenant A customer identifier cannot debit tenant B wallet. (`test/wallet-isolation.integration-spec.ts`: identical user/customer/order IDs seeded into two REAL PostgreSQL databases; A's debit consumes only A; replaying A's order refund against B fails closed with ConflictException)
+- [x] Add tenant-aware financial reconciliation tests. (same suite verifies per-tenant ledger visibility, exact transaction lists, and lifetime credit totals)
 
 ## 10.8 Fulfillment, courier, delivery, rider
 
@@ -656,7 +656,7 @@ All commerce-plane services now resolve through `TenantDbService` (`db()` helper
 
 Catalog, Cart, Checkout, Order, Shipping (+ CourierRouter), ShippingPolling, CommercePayments, Wallet, CustomerNotifications, Customers, **CustomerAccount**, **StaffAccess**, DeliveryPersonnel, Reconciliation, Refunds, Reports, Returns, RTO, Settlements (**+ SettlementImports**), Settings (CommerceSettings **+ admin SettingsService**), StorefrontAnalytics, PurchaseActivity, TransactionalMessaging, Chatting (Conversation + Message), ServiceBooking, Warranty, ProductContent (reviews/banners), ProductRequest, StoreLocations.
 
-Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccount`/`userDevices`/`userProfile`/`user` (identity plane — PO-015 auth-migration decision), `operations-health` (platform-scoped by design), `audit.service` (writes into whatever client the caller passes — per-DB by construction), `socket-auth`/`socket-room` (org-claim propagation is the remaining MT-8 socket slice).
+Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccount`/`userDevices`/`userProfile`/`user` (identity plane — PO-015 auth-migration decision), `operations-health` (platform-scoped by design), `audit.service` (writes into whatever client the caller passes — per-DB by construction). Socket identity/room services were subsequently swept with MT-8 WebSocket isolation; org propagation rides the socket ticket.
 
 ### MT-7 gate
 
@@ -681,7 +681,7 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 - [ ] Tenant-scope catalog/settings caches.
 - [x] Tenant-scope idempotency keys.
 - [ ] Tenant-scope distributed locks.
-- [ ] Add collision tests using identical record IDs in two tenants.
+- [x] Add collision tests using identical record IDs in two tenants. (`src/tenancy/redis-collision.spec.ts`: scopedRedisKey, OTP keys, and settings cache keys all diverge per organization for identical identifiers; legacy key shape preserved outside contexts)
 
 ## 11.2 BullMQ
 
