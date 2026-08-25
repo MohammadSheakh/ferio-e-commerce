@@ -459,15 +459,15 @@ Provisioning should behave as an idempotent state machine, not a controller scri
 
 ## 9.4 Usage metering
 
-- [ ] Define authoritative usage counters.
-- [ ] Decide real-time vs periodic aggregation by metric.
-- [ ] Add idempotent usage updates.
-- [ ] Add reconciliation of counters against tenant DB facts.
-- [ ] Add warning thresholds.
-- [ ] Add plan-limit denial behavior.
-- [ ] Add usage reset behavior per billing period where applicable.
-- [ ] Add Platform Admin usage view.
-- [ ] Add Tenant Owner usage view.
+- [x] Define authoritative usage counters. (`src/platform/services/usage-metrics.registry.ts`: orders_per_month · products_max · staff_seats — keys match plan entitlement featureKeys)
+- [x] Decide real-time vs periodic aggregation by metric. (encoded per metric in the registry: `orders_per_month` increments in real time at the monetizable event; derived metrics recount from facts)
+- [x] Add idempotent usage updates. (atomic upsert on organizationId+metric+periodKey — concurrent increments cannot lose counts)
+- [x] Add reconciliation of counters against tenant DB facts. (`UsageReconciliationService` recounts orders/catalog from the tenant database and seats from control-plane memberships, corrects drift, emits drift warnings + `usage_reconciliation_drift` counters; fleet-safe `reconcileAllReady`)
+- [x] Add warning thresholds. (per-metric fractions in the registry; `UsageService.increment` fires `usage_warning_threshold_crossed` exactly once per boundary crossing — structured warn + counter, never fails the business write)
+- [x] Add plan-limit denial behavior. (`EntitlementsService.evaluate` enforces server-side with stable codes; live hooks on order placement, product creation, staff invitations)
+- [x] Add usage reset behavior per billing period where applicable. (counters are periodKey-scoped `YYYY-MM` UTC — new billing periods start empty automatically; registry documents each metric's reset policy)
+- [x] Add Platform Admin usage view. (`GET /platform/organizations/:id/usage` — recorded counters vs plan limits with warning flags; `POST …/usage/reconcile` runs an audited correction pass)
+- [x] Add Tenant Owner usage view. (`GET /tenancy/my-plan` returns current plan, entitlement limits and live usage — consumed by the admin dashboard PlanUsageCard)
 
 ## 9.5 Entitlement test matrix
 
