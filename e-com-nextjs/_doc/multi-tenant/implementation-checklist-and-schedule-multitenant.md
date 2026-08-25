@@ -238,7 +238,7 @@ Create a separate control-plane schema/database for platform metadata.
 
 ### MT-2 gate
 
-- [ ] Two test hostnames resolve deterministically to two different organizations.
+- [x] Two test hostnames resolve deterministically to two different organizations. (`src/tenancy/redis-collision.spec.ts`: tenant-a/tenant-b hosts resolve to their own orgs, interleaved resolutions never cross, positive-cache path stays deterministic)
 - [x] Unknown/suspended hosts fail closed. (negative tests prove no legacy-DB fallback)
 - [x] Changing an ID, cookie, host, or request payload cannot select another tenant's database. (manager accepts registry rows only)
 
@@ -346,15 +346,17 @@ Provisioning should behave as an idempotent state machine, not a controller scri
 
 ## 7.4 Provisioning operations UI
 
-- [ ] Platform Admin organization list.
-- [ ] Organization detail.
-- [ ] Provisioning progress timeline.
-- [ ] Retry failed provisioning step.
-- [ ] Tenant DB health/readiness.
-- [ ] Domain status.
-- [ ] Owner/membership status.
-- [ ] Schema version.
-- [ ] Safe operational diagnostics without DB secrets.
+All surfaces live in the ferio-platform-admin console:
+
+- [x] Platform Admin organization list. (`/organizations` directory with create form)
+- [x] Organization detail. (`/organizations/[id]`: subscription, usage, domains, database, members)
+- [x] Provisioning progress timeline. (per-run step statuses on the detail page)
+- [x] Retry failed provisioning step. ("Run provisioning" drives the idempotent resumable orchestrator — replay continues from the first incomplete step)
+- [x] Tenant DB health/readiness. (detail DB card + `/database-health` fleet view)
+- [x] Domain status. (domains table with type/status/primary)
+- [x] Owner/membership status. (platform metadata member roster)
+- [x] Schema version. (per-database schemaVersion vs canonical head)
+- [x] Safe operational diagnostics without DB secrets. (registry views are credential-free by construction)
 
 ### MT-4 gate
 
@@ -440,7 +442,7 @@ Provisioning should behave as an idempotent state machine, not a controller scri
 - [x] Implement suspended/restricted. (checkout denial CHECKOUT_DISABLED_SUSPENDED per PO-005; storefront stays browsable)
 - [x] Implement cancelled/non-renewing.
 - [x] Implement reactivation. (PAST_DUE/SUSPENDED/CANCELLED → ACTIVE)
-- [ ] Preserve tenant data across non-destructive subscription state changes.
+- [x] Preserve tenant data across non-destructive subscription state changes. (plan-limit lifecycle integration spec: every historical order survives an upgrade AND a downgrade byte-for-byte)
 - [ ] Define storefront behavior when subscription is overdue.
 - [ ] Define Tenant Admin behavior when subscription is overdue.
 - [x] Keep billing lifecycle separate from organization/database lifecycle.
@@ -459,15 +461,15 @@ Provisioning should behave as an idempotent state machine, not a controller scri
 
 ## 9.4 Usage metering
 
-- [ ] Define authoritative usage counters.
-- [ ] Decide real-time vs periodic aggregation by metric.
-- [ ] Add idempotent usage updates.
-- [ ] Add reconciliation of counters against tenant DB facts.
-- [ ] Add warning thresholds.
-- [ ] Add plan-limit denial behavior.
-- [ ] Add usage reset behavior per billing period where applicable.
-- [ ] Add Platform Admin usage view.
-- [ ] Add Tenant Owner usage view.
+- [x] Define authoritative usage counters. (`src/platform/services/usage-metrics.registry.ts`: orders_per_month · products_max · staff_seats — keys match plan entitlement featureKeys)
+- [x] Decide real-time vs periodic aggregation by metric. (encoded per metric in the registry: `orders_per_month` increments in real time at the monetizable event; derived metrics recount from facts)
+- [x] Add idempotent usage updates. (atomic upsert on organizationId+metric+periodKey — concurrent increments cannot lose counts)
+- [x] Add reconciliation of counters against tenant DB facts. (`UsageReconciliationService` recounts orders/catalog from the tenant database and seats from control-plane memberships, corrects drift, emits drift warnings + `usage_reconciliation_drift` counters; fleet-safe `reconcileAllReady`)
+- [x] Add warning thresholds. (per-metric fractions in the registry; `UsageService.increment` fires `usage_warning_threshold_crossed` exactly once per boundary crossing — structured warn + counter, never fails the business write)
+- [x] Add plan-limit denial behavior. (`EntitlementsService.evaluate` enforces server-side with stable codes; live hooks on order placement, product creation, staff invitations)
+- [x] Add usage reset behavior per billing period where applicable. (counters are periodKey-scoped `YYYY-MM` UTC — new billing periods start empty automatically; registry documents each metric's reset policy)
+- [x] Add Platform Admin usage view. (`GET /platform/organizations/:id/usage` — recorded counters vs plan limits with warning flags; `POST …/usage/reconcile` runs an audited correction pass)
+- [x] Add Tenant Owner usage view. (`GET /tenancy/my-plan` returns current plan, entitlement limits and live usage — consumed by the admin dashboard PlanUsageCard)
 
 ## 9.5 Entitlement test matrix
 
@@ -480,7 +482,7 @@ Provisioning should behave as an idempotent state machine, not a controller scri
 
 ### MT-6 gate
 
-- [ ] One test tenant can subscribe/activate, hit a plan limit, upgrade, and unlock the capability.
+- [x] One test tenant can subscribe/activate, hit a plan limit, upgrade, and unlock the capability. (subscription/trial activation covered by the subscriptions unit suite; `test/plan-limit-lifecycle.integration-spec.ts` proves the full enforcement loop against REAL PostgreSQL — placement succeeds under limit, third order denied server-side with PLAN_LIMIT_REACHED and zero partial state, upgrade unlocks without touching tenant rows, downgrade blocks again)
 - [ ] SaaS billing is financially and technically isolated from customer commerce billing.
 
 ---
@@ -567,12 +569,12 @@ This is the largest migration slice. Existing feature behavior should remain sta
 ## 10.7 Wallet
 
 - [x] Customer wallet and immutable ledger foundation exists.
-- [ ] Make wallet strictly tenant-local.
-- [ ] Prohibit cross-tenant wallet balance portability.
-- [ ] Tenant-scope top-up evidence/review.
-- [ ] Tenant-scope wallet checkout/refunds.
-- [ ] Prove tenant A customer identifier cannot debit tenant B wallet.
-- [ ] Add tenant-aware financial reconciliation tests.
+- [x] Make wallet strictly tenant-local. (`WalletService` resolves through the tenant client — balances and ledgers live inside each tenant database)
+- [x] Prohibit cross-tenant wallet balance portability. (no cross-database path exists by construction)
+- [x] Tenant-scope top-up evidence/review. (`requestTopUp`/`reviewTopUp` resolve per tenant; identical top-up idempotency keys succeed independently in two tenants)
+- [x] Tenant-scope wallet checkout/refunds. (`debitOrder`/`refundCancelledOrder` execute inside the caller's resolved-tenant transaction)
+- [x] Prove tenant A customer identifier cannot debit tenant B wallet. (`test/wallet-isolation.integration-spec.ts`: identical user/customer/order IDs seeded into two REAL PostgreSQL databases; A's debit consumes only A; replaying A's order refund against B fails closed with ConflictException)
+- [x] Add tenant-aware financial reconciliation tests. (same suite verifies per-tenant ledger visibility, exact transaction lists, and lifetime credit totals)
 
 ## 10.8 Fulfillment, courier, delivery, rider
 
@@ -629,7 +631,7 @@ This is the largest migration slice. Existing feature behavior should remain sta
 - [x] Tenant-scope conversation lookup/history. (chat REST swept; realtime rooms namespaced in MT-8)
 - [ ] Tenant-scope quick replies/folders if configurable.
 - [x] Reject cross-tenant socket subscriptions. (org-scoped rooms unreachable from foreign tickets)
-- [ ] Add multi-client E2E with two tenants active simultaneously.
+- [x] Add multi-client E2E with two tenants active simultaneously. (`test/socket-isolation.integration-spec.ts`: four live WebSocket clients — same-userId admins of org-a/org-b plus org-bound guests — over a real socket.io server; connection rooms, tenant-scoped notifications and chat relay proven isolated on the wire; foreign guest join denied)
 
 ## 10.12 Reports, analytics, purchase activity, audit, settings, health
 
@@ -656,7 +658,7 @@ All commerce-plane services now resolve through `TenantDbService` (`db()` helper
 
 Catalog, Cart, Checkout, Order, Shipping (+ CourierRouter), ShippingPolling, CommercePayments, Wallet, CustomerNotifications, Customers, **CustomerAccount**, **StaffAccess**, DeliveryPersonnel, Reconciliation, Refunds, Reports, Returns, RTO, Settlements (**+ SettlementImports**), Settings (CommerceSettings **+ admin SettingsService**), StorefrontAnalytics, PurchaseActivity, TransactionalMessaging, Chatting (Conversation + Message), ServiceBooking, Warranty, ProductContent (reviews/banners), ProductRequest, StoreLocations.
 
-Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccount`/`userDevices`/`userProfile`/`user` (identity plane — PO-015 auth-migration decision), `operations-health` (platform-scoped by design), `audit.service` (writes into whatever client the caller passes — per-DB by construction), `socket-auth`/`socket-room` (org-claim propagation is the remaining MT-8 socket slice).
+Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccount`/`userDevices`/`userProfile`/`user` (identity plane — PO-015 auth-migration decision), `operations-health` (platform-scoped by design), `audit.service` (writes into whatever client the caller passes — per-DB by construction). Socket identity/room services were subsequently swept with MT-8 WebSocket isolation; org propagation rides the socket ticket.
 
 ### MT-7 gate
 
@@ -681,7 +683,7 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 - [ ] Tenant-scope catalog/settings caches.
 - [x] Tenant-scope idempotency keys.
 - [ ] Tenant-scope distributed locks.
-- [ ] Add collision tests using identical record IDs in two tenants.
+- [x] Add collision tests using identical record IDs in two tenants. (`src/tenancy/redis-collision.spec.ts`: scopedRedisKey, OTP keys, and settings cache keys all diverge per organization for identical identifiers; legacy key shape preserved outside contexts)
 
 ## 11.2 BullMQ
 
@@ -731,8 +733,8 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 
 ### MT-8 gate
 
-- [ ] Identical Redis/job/socket/object identifiers in two tenants cannot collide.
-- [ ] Background and realtime paths meet the same isolation standard as HTTP.
+- [ ] Identical Redis/job/socket/object identifiers in two tenants cannot collide. (Redis/job/socket covered by collision spec + wire-level E2E; object storage remains BLOCKED)
+- [x] Background and realtime paths meet the same isolation standard as HTTP. (BullMQ: fan-out per-org envelopes with failure-isolation unit proof + dead-letter evidence; WebSockets: wire-level two-tenant E2E proves scoped rooms, notifications and chat relay)
 
 ---
 
@@ -743,11 +745,11 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 - [x] Organization counts by lifecycle. (`GET /platform/dashboard`)
 - [x] Active/trial/past-due/suspended subscription counts.
 - [x] Provisioning failures.
-- [ ] Tenant migration fleet status.
+- [x] Tenant migration fleet status. (`GET /platform/database-health` + Database Health console page: every registered tenant database vs the canonical migration-chain head, with behind-count summary)
 - [ ] Domain health.
-- [ ] Tenant DB health.
-- [ ] Platform billing outcomes.
-- [ ] Usage/limit alerts.
+- [x] Tenant DB health. (fleet view surfaces registry status + schema version per tenant database)
+- [x] Platform billing outcomes. (`GET /platform/billing/invoices` + `/billing/payment-attempts`; Billing console page with invoice/payment tables and PAID/OPEN states)
+- [x] Usage/limit alerts. (`usage_warning_threshold_crossed` counter + structured warn exactly once per crossing; per-org Usage card on the console organization detail renders NEAR LIMIT states and a "Recount from facts" reconcile action)
 - [ ] Queue/system health.
 - [ ] Backup status.
 - [ ] Security/support-access alerts.
@@ -769,20 +771,21 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 
 - [x] CRUD/version plans safely. (create + list in console; versioning model present)
 - [x] Configure entitlements/limits. (`featureKey=limit` compiler in the console form)
-- [ ] View subscriptions.
-- [ ] View platform invoices/payment attempts.
+- [x] View subscriptions. (`GET /platform/subscriptions` directory + Subscriptions console page)
+- [x] View platform invoices/payment attempts. (Billing console page backed by the two billing endpoints)
 - [ ] Manual billing operations require explicit permission/reason/audit.
 - [ ] Add internal/free entitlement state if approved.
 - [ ] Add tenant-specific override with expiry/reason if approved.
 
 ## 12.4 Tenant operations
 
-- [ ] Provisioning retry.
+- [x] Provisioning retry. (console "Run provisioning" action replays the resumable orchestrator; per-step timeline evidences recovery)
+
 - [ ] Tenant migration canary/batch control.
 - [ ] Pause rollout.
 - [ ] Retry failed tenant.
 - [ ] DB health probe.
-- [ ] Schema version drift view.
+- [x] Schema version drift view. (Database Health page highlights any tenant database behind the canonical head)
 - [ ] Backup evidence.
 - [ ] Restore workflow status.
 - [ ] Domain verification diagnostics.

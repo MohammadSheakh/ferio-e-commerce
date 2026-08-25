@@ -13,6 +13,7 @@ import {
 import { TenantCallbackRunner } from './tenant-callback.runner';
 import { TenantFanoutService } from './tenant-fanout.service';
 import { TenancyObservabilityService } from './tenancy-observability.service';
+import { UsageReconciliationService } from './usage-reconciliation.service';
 
 /**
  * Tenant plane (MT-2/MT-3): trusted resolution, immutable request context,
@@ -33,7 +34,8 @@ import { TenancyObservabilityService } from './tenancy-observability.service';
     TenantCallbackRunner,
     TenantFanoutService,
     TenancyObservabilityService,
+    UsageReconciliationService,
   ],
-  exports: [TenantResolverService, TenantDatabaseManager, TenantDbService, TenantSchemaBootstrapper, TenantCallbackRunner, TenantFanoutService, TenantMembershipGuard],
+  exports: [TenantResolverService, TenantDatabaseManager, TenantDbService, TenantSchemaBootstrapper, TenantCallbackRunner, TenantFanoutService, TenantMembershipGuard, UsageReconciliationService],
 })
 export class TenancyModule {}

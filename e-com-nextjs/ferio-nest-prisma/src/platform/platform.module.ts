@@ -3,6 +3,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { JwtModule } from '@nestjs/jwt';
 import { QUEUE_NAMES } from '@app/queue';
 import { PlatformPrismaService } from './platform-prisma.service';
+import { TenancyModule } from '../tenancy/tenancy.module';
 import { OrganizationsService } from './services/organizations.service';
 import { DomainsService } from './services/domains.service';
 import { TenantDatabasesService } from './services/tenant-databases.service';
@@ -39,6 +40,7 @@ import {
 @Global()
 @Module({
   imports: [
+    TenancyModule,
     JwtModule.register({
       secret: process.env.PLATFORM_JWT_SECRET,
       signOptions: { expiresIn: '8h' },
