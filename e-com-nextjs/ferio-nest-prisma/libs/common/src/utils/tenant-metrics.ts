@@ -17,7 +17,9 @@ export type TenantMetricName =
   | 'entitlement_denied'
   | 'db_acquire_failure'
   | 'db_breaker_opened'
-  | 'queue_tenant_failure';
+  | 'queue_tenant_failure'
+  | 'usage_threshold_crossed'
+  | 'usage_reconciliation_drift';
 
 const MAX_LABEL_KEYS = 4;
 const MAX_LABEL_VALUE = 128;

@@ -10,6 +10,12 @@ import { TenantClosureService } from './services/tenant-closure.service';
 import { SupportAccessService } from './services/support-access.service';
 import { PlatformAuthService } from './services/platform-auth.service';
 import { PlatformAuditService } from './services/platform-audit.service';
+import { UsageService, currentPeriodKey } from './services/usage.service';
+import {
+  USAGE_METRICS,
+  usageMetricKeys,
+} from './services/usage-metrics.registry';
+import { UsageReconciliationService } from '../tenancy/usage-reconciliation.service';
 import { JwtService } from '@nestjs/jwt';
 import {
   PlatformAuthGuard,
@@ -37,6 +43,8 @@ export class PlatformAdminController {
     private readonly jwt: JwtService,
     private readonly platformPrisma: import('./platform-prisma.service').PlatformPrismaService,
     private readonly audit: PlatformAuditService,
+    private readonly usage: UsageService,
+    private readonly usageReconciliation: UsageReconciliationService,
   ) {}
 
   @Post('organizations')
@@ -64,6 +72,70 @@ export class PlatformAdminController {
   @PlatformPermissions('organization:read')
   getOrganization(@Param('id') id: string) {
     return this.organizations.getById(id);
+  }
+
+  /**
+   * MT-9 §9.4 — Platform Admin usage view: recorded counters for every
+   * authoritative metric against the current plan's limits, with warning
+   * flags at the registry thresholds. Pure control-plane read.
+   */
+  @Get('organizations/:id/usage')
+  @PlatformPermissions('organization:read')
+  async getOrganizationUsage(@Param('id') id: string, @Query('periodKey') periodKey?: string) {
+    const key = periodKey || currentPeriodKey();
+    const [subscription, counters] = await Promise.all([
+      this.platformPrisma.client.subscription.findUnique({
+        where: { organizationId: id },
+        include: { plan: { include: { entitlements: true } } },
+      }),
+      this.usage.snapshot(id, usageMetricKeys(), key),
+    ]);
+    const entitlements = new Map(
+      (subscription?.plan.entitlements ?? []).map((item: any) => [item.featureKey, item]),
+    );
+    const metrics = USAGE_METRICS.map((definition) => {
+      const entitlement = entitlements.get(definition.key) as
+        | { enabled: boolean; limit: number | null }
+        | undefined;
+      const recorded = counters[definition.key] ?? '0';
+      const limit = entitlement?.limit ?? null;
+      const warningThresholdValue =
+        limit !== null ? Math.floor(limit * definition.warningThreshold) : null;
+      return {
+        metric: definition.key,
+        label: definition.label,
+        aggregation: definition.aggregation,
+        reset: definition.reset,
+        recorded,
+        enabled: entitlement?.enabled ?? false,
+        limit,
+        usageRatio: limit && Number(limit) > 0 ? Number(recorded) / Number(limit) : null,
+        warning:
+          warningThresholdValue !== null &&
+          entitlement?.enabled === true &&
+          Number(recorded) >= warningThresholdValue,
+      };
+    });
+    return { organizationId: id, periodKey: key, metrics };
+  }
+
+  /**
+   * MT-9 §9.4 — recount authoritative facts for one tenant and correct any
+   * drifted counters. Audited; returns the drift report.
+   */
+  @Post('organizations/:id/usage/reconcile')
+  @PlatformPermissions('organization:write')
+  async reconcileOrganizationUsage(@Param('id') id: string, @Req() request: any) {
+    const report = await this.usageReconciliation.reconcileOrganization(id);
+    await this.audit.record({
+      action: 'USAGE_RECONCILED',
+      entityType: 'UsageCounter',
+      entityId: id,
+      actorId: request?.user?.platformUserId ?? request?.user?.userId ?? 'platform',
+      newValue: { drifted: report.drifted, entries: report.entries },
+      metadata: { periodKey: report.periodKey },
+    });
+    return report;
   }
 
   @Patch('organizations/:id/status')
