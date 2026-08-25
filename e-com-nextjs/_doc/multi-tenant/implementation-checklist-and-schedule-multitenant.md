@@ -859,7 +859,7 @@ This is the largest migration slice. Existing feature behavior should remain sta
 - [x] Order placement evaluates `orders_per_month` before work begins and meters usage post-commit (non-blocking; metering can never fail an order).
 - [x] Product creation evaluates `products_max` against the tenant's own live catalog count.
 - [x] All gates activate only inside a resolved tenant context — legacy mode unaffected — and deny with stable machine codes.
-- [ ] Staff-seat hook on invitations (same pattern) — next pass.
+- [x] Staff-seat hook on invitations. (`PLAN_GATE` + `ORG_MEMBERS_COUNTER` tokens; active-member count feeds the evaluation; over-limit invites throw `PLAN_LIMIT_REACHED`)
 
 ### MT-10 gate
 
