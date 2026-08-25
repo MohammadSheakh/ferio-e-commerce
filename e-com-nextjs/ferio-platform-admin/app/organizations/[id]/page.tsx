@@ -1,5 +1,6 @@
 import { platformApi } from "@/lib/platform-session";
 import { OrgActions } from "./org-actions";
+import { UsageCard, type UsageMetricRow } from "./usage-card";
 
 interface OrgDetail {
   id: string;
@@ -22,10 +23,14 @@ interface ProvisioningRun {
 export default async function OrganizationDetail({ params }: { params: { id: string } }) {
   let org: OrgDetail;
   let runs: ProvisioningRun[];
+  let usage: { organizationId: string; periodKey: string; metrics: UsageMetricRow[] };
   try {
-    [org, runs] = await Promise.all([
+    [org, runs, usage] = await Promise.all([
       platformApi<OrgDetail>(`/platform/organizations/${params.id}`),
       platformApi<ProvisioningRun[]>(`/platform/organizations/${params.id}/provisioning-runs`),
+      platformApi<{ organizationId: string; periodKey: string; metrics: UsageMetricRow[] }>(
+        `/platform/organizations/${params.id}/usage`,
+      ),
     ]);
   } catch (error) {
     return (
@@ -44,6 +49,13 @@ export default async function OrganizationDetail({ params }: { params: { id: str
       <p className="muted">{org.slug} · <span className="statuspill">{org.status}</span></p>
       <div style={{ height: 20 }} />
       <OrgActions organizationId={org.id} status={org.status} />
+
+      <div style={{ height: 28 }} />
+      <UsageCard
+        organizationId={org.id}
+        periodKey={usage.periodKey}
+        metrics={usage.metrics ?? []}
+      />
 
       <div style={{ height: 28 }} />
       <div className="card">
