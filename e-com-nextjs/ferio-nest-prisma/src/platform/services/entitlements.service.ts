@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { PlatformPrismaService } from '../platform-prisma.service';
+import { TenantMetrics } from '@app/common';
 
 export interface EntitlementDecision {
   allowed: boolean;
@@ -35,17 +36,21 @@ export class EntitlementsService {
       include: { plan: { include: { entitlements: true } } },
     });
     if (!subscription) {
+      TenantMetrics.increment('entitlement_denied', { code: 'ENTITLEMENT_NOT_FOUND', featureKey });
       return { allowed: false, code: 'ENTITLEMENT_NOT_FOUND' };
     }
     if (!['TRIALING', 'ACTIVE'].includes(subscription.status)) {
+      TenantMetrics.increment('entitlement_denied', { code: 'SUBSCRIPTION_INACTIVE', featureKey });
       return { allowed: false, code: 'SUBSCRIPTION_INACTIVE' };
     }
 
     const entitlement = subscription.plan.entitlements.find((e) => e.featureKey === featureKey);
     if (!entitlement) {
+      TenantMetrics.increment('entitlement_denied', { code: 'FEATURE_DISABLED', featureKey });
       return { allowed: false, code: 'FEATURE_DISABLED' };
     }
     if (!entitlement.enabled) {
+      TenantMetrics.increment('entitlement_denied', { code: 'FEATURE_DISABLED', featureKey });
       return { allowed: false, code: 'FEATURE_DISABLED' };
     }
     if (entitlement.limit === null || entitlement.limit === undefined) {
@@ -58,6 +63,7 @@ export class EntitlementsService {
         ? BigInt(options.currentOverride)
         : await this.usage.getValue(organizationId, featureKey, options.periodKey);
     if (Number(current) + requested > entitlement.limit) {
+      TenantMetrics.increment('entitlement_denied', { code: 'PLAN_LIMIT_REACHED', featureKey });
       return {
         allowed: false,
         code: 'PLAN_LIMIT_REACHED',

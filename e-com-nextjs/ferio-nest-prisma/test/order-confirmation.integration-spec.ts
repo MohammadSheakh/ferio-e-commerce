@@ -38,17 +38,25 @@ const carts = new CartService(prismaService);
 const notificationsStub = {
   notifyCustomer: jest.fn().mockResolvedValue({}),
 };
+const configStub = {
+  get: (key: string, fallback: unknown) =>
+    key === 'CHECKOUT_COUPONS_JSON'
+      ? JSON.stringify([
+          { code: 'INTEGRATION1000', type: 'FIXED', value: 1000 },
+        ])
+      : fallback,
+} as unknown as ConfigService;
 const orders = new OrderService(
   prismaService,
   carts,
   messages,
   audit,
-  { get: (_key: string, fallback: unknown) => fallback } as unknown as ConfigService,
+  configStub,
   {} as never, // wallet unused in COD placement proofs
   notificationsStub as never,
+  undefined, // tenantDb: legacy-mode database (canonical chain applied below)
   undefined, // entitlements: internal-plan semantics for integration proof
   undefined, // usage metering not asserted here
-  undefined, // tenantDb: legacy-mode database (canonical chain applied below)
 );
 const placementOrders = {
   placeCodOrder: (cartToken: string, idempotencyKey: string) =>
@@ -346,7 +354,7 @@ describe('Order confirmation PostgreSQL integration', () => {
       prisma.inventoryMovement.findMany({
         where: {
           inventoryId: fixture.inventoryId,
-          type: 'MANUAL_ADJUSTMENT',
+          type: 'CORRECTION',
         },
       }),
       prisma.auditLog.count({
@@ -463,7 +471,7 @@ describe('Order confirmation PostgreSQL integration', () => {
       [expect.objectContaining({ quantityDelta: -2 })],
     );
     expect(
-      movements.filter((movement) => movement.type === 'MANUAL_ADJUSTMENT'),
+      movements.filter((movement) => movement.type === 'CORRECTION'),
     ).toHaveLength(adjustmentCommitted ? 1 : 0);
     expect({ cancellationAudits, adjustmentAudits, outbox }).toEqual({
       cancellationAudits: 1,
@@ -756,8 +764,17 @@ async function createStockFixture(
       productId: product.id,
     },
   });
-  const warehouse = await prisma.warehouse.create({
-    data: { code: `${warehouseCode}_${Date.now()}_${Math.random().toString(36).slice(2,6)}`, name: `Warehouse ${suffix}` },
+  // CatalogService.adjustInventory resolves stock through the canonical
+  // MAIN warehouse, so its code must stay exact (and shared) across tests;
+  // every other fixture gets a unique code to satisfy the unique index.
+  const code =
+    warehouseCode === 'MAIN'
+      ? 'MAIN'
+      : `${warehouseCode}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+  const warehouse = await prisma.warehouse.upsert({
+    where: { code },
+    update: {},
+    create: { code, name: `Warehouse ${suffix}` },
   });
   const inventory = await prisma.inventoryStock.create({
     data: {
@@ -935,6 +952,7 @@ async function createPlacementFixture(
       termsAccepted: true,
       source: 'integration',
       medium: 'database-test',
+      couponCode: 'INTEGRATION1000',
       subtotal,
       discountTotal,
       deliveryFee,

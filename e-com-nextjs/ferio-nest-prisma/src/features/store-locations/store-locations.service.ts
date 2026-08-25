@@ -2,9 +2,11 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '@app/database';
-import { AuditService } from '../audit/audit.service';
+import { TenantDbService } from '../../tenancy/tenant-db.service';
+import type { PrismaClient } from '@prisma/client';import { AuditService } from '../audit/audit.service';
 import type { UserPayload } from '@app/common';
 import type {
   CheckStoreAvailabilityDto,
@@ -18,10 +20,19 @@ export class StoreLocationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    @Optional() private readonly tenantDb?: TenantDbService,
   ) {}
 
+  /**
+   * MT-7: tenant client inside resolved contexts; explicit legacy fallback.
+   */
+  private async db(): Promise<PrismaClient> {
+    const tenant = await this.tenantDb?.tryGet();
+    return tenant ?? (this.prisma as PrismaClient);
+  }
   async listPublicStores() {
-    const stores = await this.prisma.warehouse.findMany({
+    const db = await this.db();
+    const stores = await db.warehouse.findMany({
       where: { isStore: true, isActive: true },
       select: {
         id: true,
@@ -44,7 +55,8 @@ export class StoreLocationsService {
   }
 
   async checkStoreAvailability(dto: CheckStoreAvailabilityDto) {
-    const store = await this.prisma.warehouse.findUnique({
+    const db = await this.db();
+    const store = await db.warehouse.findUnique({
       where: { id: dto.storeId },
       include: {
         inventory: {
@@ -67,7 +79,7 @@ export class StoreLocationsService {
           : 0;
 
         // Check central hub stock if not in store
-        const hubStock = await this.prisma.inventoryStock.findFirst({
+        const hubStock = await db.inventoryStock.findFirst({
           where: { variantId, warehouse: { code: 'MAIN' } },
         });
         const hubAvailable = hubStock
@@ -98,6 +110,7 @@ export class StoreLocationsService {
   }
 
   async listAdminStores(query?: StoreQueryDto) {
+    const db = await this.db();
     const page = Math.max(1, Number(query?.page) || 1);
     const limit = Math.max(1, Number(query?.limit) || 20);
     const skip = (page - 1) * limit;
@@ -116,7 +129,7 @@ export class StoreLocationsService {
       : {};
 
     const [items, total] = await Promise.all([
-      this.prisma.warehouse.findMany({
+      db.warehouse.findMany({
         where,
         skip,
         take: limit,
@@ -125,7 +138,7 @@ export class StoreLocationsService {
         },
         orderBy: [{ isStore: 'desc' }, { name: 'asc' }],
       }),
-      this.prisma.warehouse.count({ where }),
+      db.warehouse.count({ where }),
     ]);
 
     const totalPages = Math.ceil(total / limit) || 1;
@@ -149,14 +162,15 @@ export class StoreLocationsService {
   }
 
   async createStore(dto: CreateStoreLocationDto, actor: UserPayload) {
-    const existing = await this.prisma.warehouse.findUnique({
+    const db = await this.db();
+    const existing = await db.warehouse.findUnique({
       where: { code: dto.code },
     });
     if (existing) {
       throw new ConflictException(`Store/Warehouse code '${dto.code}' already exists.`);
     }
 
-    const store = await this.prisma.warehouse.create({
+    const store = await db.warehouse.create({
       data: {
         code: dto.code,
         name: dto.name,
@@ -191,12 +205,13 @@ export class StoreLocationsService {
     dto: UpdateStoreLocationDto,
     actor: UserPayload,
   ) {
-    const existing = await this.prisma.warehouse.findUnique({ where: { id } });
+    const db = await this.db();
+    const existing = await db.warehouse.findUnique({ where: { id } });
     if (!existing) {
       throw new NotFoundException(`Store location with ID '${id}' not found.`);
     }
 
-    const updated = await this.prisma.warehouse.update({
+    const updated = await db.warehouse.update({
       where: { id },
       data: dto,
     });
@@ -213,7 +228,8 @@ export class StoreLocationsService {
   }
 
   async deleteStore(id: string, actor: UserPayload) {
-    const existing = await this.prisma.warehouse.findUnique({
+    const db = await this.db();
+    const existing = await db.warehouse.findUnique({
       where: { id },
       include: { _count: { select: { orders: true } } },
     });
@@ -228,7 +244,7 @@ export class StoreLocationsService {
       );
     }
 
-    await this.prisma.warehouse.delete({ where: { id } });
+    await db.warehouse.delete({ where: { id } });
 
     await this.audit.record({
       action: 'STORE_LOCATION_DELETED',

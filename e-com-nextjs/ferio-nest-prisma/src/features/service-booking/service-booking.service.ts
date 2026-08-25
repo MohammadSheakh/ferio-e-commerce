@@ -1,11 +1,14 @@
+import type { PrismaClient } from '@prisma/client';
 import {
   BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { randomBytes } from 'crypto';
 import { PrismaService } from '@app/database';
+import { TenantDbService } from '../../tenancy/tenant-db.service';
 import type { UserPayload } from '@app/common';
 import { normalizeBangladeshPhone } from '../checkout/utils/checkout.util';
 import {
@@ -15,7 +18,19 @@ import {
 } from './service-booking.dto';
 @Injectable()
 export class ServiceBookingService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Optional() private readonly tenantDb?: TenantDbService,
+  ) {}
+
+  /**
+   * MT-7: tenant client inside resolved contexts; explicit legacy
+   * fallback outside resolved requests. Never guesses.
+   */
+  private async db(): Promise<PrismaClient> {
+    const tenant = await this.tenantDb?.tryGet();
+    return tenant ?? (this.prisma as PrismaClient);
+  }
   private slug(v: string) {
     return v
       .trim()
@@ -23,40 +38,42 @@ export class ServiceBookingService {
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '');
   }
-  publicServices() {
-    return this.prisma.serviceOffering.findMany({
+  async publicServices() {
+    const db = await this.db();
+    return db.serviceOffering.findMany({
       where: { status: 'ACTIVE' },
       include: { category: true },
       orderBy: { createdAt: 'desc' },
     });
-  }
-  service(slug: string) {
-    return this.prisma.serviceOffering.findFirst({
+  }async service(slug: string) {
+    const db = await this.db();
+    return db.serviceOffering.findFirst({
       where: { slug, status: 'ACTIVE' },
       include: { category: true },
     });
-  }
-  adminServices() {
-    return this.prisma.serviceOffering.findMany({
+  }async adminServices() {
+    const db = await this.db();
+    return db.serviceOffering.findMany({
       include: { category: true, _count: { select: { bookings: true } } },
       orderBy: { createdAt: 'desc' },
     });
-  }
-  save(dto: SaveServiceDto, id?: string) {
+  }async save(dto: SaveServiceDto, id?: string) {
+    const db = await this.db();
     const data = {
       ...dto,
       slug: dto.slug || this.slug(dto.name),
       leadTimeHours: dto.leadTimeHours ?? 24,
     };
     return id
-      ? this.prisma.serviceOffering.update({ where: { id }, data })
-      : this.prisma.serviceOffering.create({ data });
-  }
-  delete(id: string) {
-    return this.prisma.serviceOffering.delete({ where: { id } });
+      ? db.serviceOffering.update({ where: { id }, data })
+      : db.serviceOffering.create({ data });
+  }async delete(id: string) {
+    const db = await this.db();
+    return db.serviceOffering.delete({ where: { id } });
   }
   async book(dto: CreateBookingDto) {
-    const service = await this.prisma.serviceOffering.findFirst({
+    const db = await this.db();
+    const service = await db.serviceOffering.findFirst({
       where: { id: dto.serviceId, status: 'ACTIVE' },
     });
     if (!service) throw new NotFoundException('Active service not found');
@@ -65,7 +82,7 @@ export class ServiceBookingService {
       throw new BadRequestException(
         `Book at least ${service.leadTimeHours} hours ahead`,
       );
-    return this.prisma.serviceBooking.create({
+    return db.serviceBooking.create({
       data: {
         reference: `SVC-${randomBytes(4).toString('hex').toUpperCase()}`,
         serviceId: service.id,
@@ -89,15 +106,16 @@ export class ServiceBookingService {
       },
       include: { history: true },
     });
-  }
-  bookings() {
-    return this.prisma.serviceBooking.findMany({
+  }async bookings() {
+    const db = await this.db();
+    return db.serviceBooking.findMany({
       include: { service: true, history: { orderBy: { createdAt: 'asc' } } },
       orderBy: { createdAt: 'desc' },
     });
   }
   async status(id: string, dto: UpdateBookingStatusDto, actor: UserPayload) {
-    const booking = await this.prisma.serviceBooking.findUnique({
+    const db = await this.db();
+    const booking = await db.serviceBooking.findUnique({
       where: { id },
     });
     if (!booking) throw new NotFoundException('Booking not found');
@@ -111,7 +129,7 @@ export class ServiceBookingService {
         `Cannot move booking from ${booking.status} to ${dto.status}`,
       );
     const now = new Date();
-    return this.prisma.$transaction(async (tx) => {
+    return db.$transaction(async (tx) => {
       await tx.serviceBooking.update({
         where: { id },
         data: {

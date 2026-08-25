@@ -9,10 +9,12 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { tryGetTenantContext } from '../../tenancy/tenant-context';
 import { Prisma, UserRole } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { createHash, randomBytes } from 'node:crypto';
 import type { UserPayload } from '@app/common';
 import { PrismaService } from '@app/database';
+import { TenantDbService } from '../../tenancy/tenant-db.service';
 import { AuditService } from '../audit/audit.service';
 import { EmailService } from '../authentication/email/email.service';
 import { InviteStaffDto, UpdateStaffAccessDto } from './staff-access.dto';
@@ -24,6 +26,7 @@ export class StaffAccessService {
     private readonly audit: AuditService,
     private readonly email: EmailService,
     private readonly config: ConfigService,
+    @Optional() private readonly tenantDb?: TenantDbService,
     @Optional() @Inject('PLAN_GATE')
     private readonly planGate?: {
       assertStaffSeat(organizationId: string, currentMemberCount: number): Promise<void>;
@@ -34,9 +37,19 @@ export class StaffAccessService {
     },
   ) {}
 
+  /**
+   * MT-7: tenant client inside resolved contexts; explicit legacy fallback
+   * outside resolved requests. Never guesses.
+   */
+  private async db(): Promise<PrismaClient> {
+    const tenant = await this.tenantDb?.tryGet();
+    return tenant ?? (this.prisma as unknown as PrismaClient);
+  }
+
   async list() {
+    const db = await this.db();
     const [staff, pendingInvitations] = await Promise.all([
-      this.prisma.user.findMany({
+      db.user.findMany({
         where: {
           role: { in: [UserRole.admin, UserRole.staff] },
           isDeleted: false,
@@ -53,7 +66,7 @@ export class StaffAccessService {
           updatedAt: true,
         },
       }),
-      this.prisma.staffAccessToken.findMany({
+      db.staffAccessToken.findMany({
         where: {
           purpose: 'INVITE',
           consumedAt: null,
@@ -74,6 +87,7 @@ export class StaffAccessService {
   }
 
   async invite(dto: InviteStaffDto, actor: UserPayload) {
+    const db = await this.db();
     // MT-10 §13.2A: staff-seat entitlement enforced server-side for tenants.
     const tenantContext = tryGetTenantContext();
     if (tenantContext && this.planGate && this.orgMembers) {
@@ -86,7 +100,7 @@ export class StaffAccessService {
       );
     }
     const email = dto.email.normalize('NFKC').trim().toLowerCase();
-    const existing = await this.prisma.user.findUnique({
+    const existing = await db.user.findUnique({
       where: { email },
       select: { id: true },
     });
@@ -120,10 +134,11 @@ export class StaffAccessService {
   }
 
   async acceptInvite(token: string, password: string) {
+    const db = await this.db();
     const accessToken = await this.requireToken(token, 'INVITE');
     const passwordHash = await bcrypt.hash(password, 12);
     try {
-      const user = await this.prisma.$transaction(async (transaction) => {
+      const user = await db.$transaction(async (transaction) => {
         await this.consumeToken(transaction, accessToken.id);
         const created = await transaction.user.create({
           data: {
@@ -163,11 +178,12 @@ export class StaffAccessService {
   }
 
   async deactivate(userId: string, actor: UserPayload) {
+    const db = await this.db();
     if (userId === actor.userId) {
       throw new BadRequestException('You cannot deactivate your own account');
     }
     const existing = await this.requireStaff(userId);
-    const updated = await this.prisma.user.update({
+    const updated = await db.user.update({
       where: { id: userId },
       data: {
         staffAccessStatus: 'inactive',
@@ -198,12 +214,13 @@ export class StaffAccessService {
     dto: UpdateStaffAccessDto,
     actor: UserPayload,
   ) {
+    const db = await this.db();
     if (userId === actor.userId) {
       throw new BadRequestException('You cannot change your own staff access');
     }
     const existing = await this.requireStaff(userId);
     const permissions = [...new Set(dto.permissions)].sort();
-    const updated = await this.prisma.user.update({
+    const updated = await db.user.update({
       where: { id: userId },
       data: {
         staffAccessStatus: dto.status,
@@ -237,6 +254,7 @@ export class StaffAccessService {
   }
 
   async issueReset(userId: string, actor: UserPayload) {
+    const db = await this.db();
     const staff = await this.requireStaff(userId);
     const issued = await this.issueToken({
       email: staff.email,
@@ -247,7 +265,7 @@ export class StaffAccessService {
       issuedByUserId: actor.userId,
       expiresInHours: this.config.get<number>('STAFF_RESET_EXPIRY_HOURS', 2),
     });
-    await this.prisma.user.update({
+    await db.user.update({
       where: { id: staff.id },
       data: { staffSessionVersion: { increment: 1 } },
     });
@@ -268,13 +286,14 @@ export class StaffAccessService {
   }
 
   async completeReset(token: string, password: string) {
+    const db = await this.db();
     const accessToken = await this.requireToken(token, 'RESET');
     if (!accessToken.targetUserId) {
       throw new BadRequestException('Invalid staff access token');
     }
     const targetUserId = accessToken.targetUserId;
     const passwordHash = await bcrypt.hash(password, 12);
-    await this.prisma.$transaction(async (transaction) => {
+    await db.$transaction(async (transaction) => {
       await this.consumeToken(transaction, accessToken.id);
       await transaction.user.update({
         where: { id: targetUserId },
@@ -290,7 +309,8 @@ export class StaffAccessService {
   }
 
   private async requireStaff(userId: string) {
-    const staff = await this.prisma.user.findFirst({
+    const db = await this.db();
+    const staff = await db.user.findFirst({
       where: { id: userId, role: UserRole.staff, isDeleted: false },
       select: {
         id: true,
@@ -305,7 +325,8 @@ export class StaffAccessService {
   }
 
   private async requireToken(token: string, purpose: 'INVITE' | 'RESET') {
-    const record = await this.prisma.staffAccessToken.findUnique({
+    const db = await this.db();
+    const record = await db.staffAccessToken.findUnique({
       where: { tokenHash: this.hashToken(token) },
     });
     if (
@@ -328,8 +349,9 @@ export class StaffAccessService {
     issuedByUserId: string;
     expiresInHours: number;
   }) {
+    const db = await this.db();
     const token = randomBytes(32).toString('base64url');
-    await this.prisma.staffAccessToken.updateMany({
+    await db.staffAccessToken.updateMany({
       where: {
         email: input.email,
         purpose: input.purpose,
@@ -337,7 +359,7 @@ export class StaffAccessService {
       },
       data: { consumedAt: new Date() },
     });
-    const record = await this.prisma.staffAccessToken.create({
+    const record = await db.staffAccessToken.create({
       data: {
         email: input.email,
         name: input.name,

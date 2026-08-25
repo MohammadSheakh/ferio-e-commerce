@@ -1,13 +1,14 @@
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
-  BadRequestException,
+  Optional,
 } from '@nestjs/common';
 import { randomBytes, timingSafeEqual } from 'crypto';
-import { Prisma } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';import { Prisma } from '@prisma/client';
 import { PrismaService } from '@app/database';
-import type { UserPayload } from '@app/common';
+import { TenantDbService } from '../../tenancy/tenant-db.service';import type { UserPayload } from '@app/common';
 import { normalizeBangladeshPhone } from '../checkout/utils/checkout.util';
 import {
   CreateWarrantyClaimDto,
@@ -34,11 +35,22 @@ const adminClaimInclude = {
 
 @Injectable()
 export class WarrantyService {
-  constructor(private prisma: PrismaService) {}
-  private async verifiedOrder(dto: VerifyWarrantyOrderDto) {
+  constructor(
+    private prisma: PrismaService,
+    @Optional() private readonly tenantDb?: TenantDbService,
+  ) {}
+
+  /**
+   * MT-7: tenant client inside resolved contexts; explicit legacy fallback.
+   */
+  private async db(): Promise<PrismaClient> {
+    const tenant = await this.tenantDb?.tryGet();
+    return tenant ?? (this.prisma as PrismaClient);
+  }  private async verifiedOrder(dto: VerifyWarrantyOrderDto) {
+    const db = await this.db();
     const reference = dto.reference.trim().toUpperCase();
     const phone = normalizeBangladeshPhone(dto.phone);
-    const order = await this.prisma.order.findUnique({
+    const order = await db.order.findUnique({
       where: { reference },
       include: { address: true, items: true },
     });
@@ -68,10 +80,11 @@ export class WarrantyService {
     };
   }
   async create(dto: CreateWarrantyClaimDto, user: UserPayload) {
+    const db = await this.db();
     const order = await this.verifiedOrder(dto);
     const item = order.items.find((i) => i.id === dto.orderItemId);
     if (!item) throw new NotFoundException('Order item not found');
-    const duplicate = await this.prisma.warrantyClaim.count({
+    const duplicate = await db.warrantyClaim.count({
       where: {
         orderItemId: item.id,
         status: { notIn: ['RESOLVED', 'REJECTED'] },
@@ -81,7 +94,7 @@ export class WarrantyService {
       throw new ConflictException(
         'An active warranty claim already exists for this item',
       );
-    return this.prisma.warrantyClaim.create({
+    return db.warrantyClaim.create({
       data: {
         reference: `WAR-${randomBytes(4).toString('hex').toUpperCase()}`,
         issueDescription: dto.issueDescription.trim(),
@@ -104,14 +117,16 @@ export class WarrantyService {
       include: { evidence: true, history: true },
     });
   }
-  mine(user: UserPayload) {
-    return this.prisma.warrantyClaim.findMany({
+  async mine(user: UserPayload) {
+    const db = await this.db();
+    return db.warrantyClaim.findMany({
       where: { submittedById: user.userId },
       include: { evidence: true, history: { orderBy: { createdAt: 'asc' } } },
       orderBy: { createdAt: 'desc' },
     });
   }
   async all(query: WarrantyClaimQueryDto) {
+    const db = await this.db();
     const search = query.search?.normalize('NFKC').trim();
     const where: Prisma.WarrantyClaimWhereInput = {
       status: query.status,
@@ -180,15 +195,15 @@ export class WarrantyService {
           }
         : {}),
     };
-    const [items, total] = await this.prisma.$transaction([
-      this.prisma.warrantyClaim.findMany({
+    const [items, total] = await db.$transaction([
+      db.warrantyClaim.findMany({
         where,
         skip: (query.page - 1) * query.limit,
         take: query.limit,
         include: adminClaimInclude,
         orderBy: { createdAt: 'desc' },
       }),
-      this.prisma.warrantyClaim.count({ where }),
+      db.warrantyClaim.count({ where }),
     ]);
     return {
       items,
@@ -199,7 +214,8 @@ export class WarrantyService {
     };
   }
   async update(id: string, dto: UpdateWarrantyClaimDto, actor: UserPayload) {
-    const claim = await this.prisma.warrantyClaim.findUnique({ where: { id } });
+    const db = await this.db();
+    const claim = await db.warrantyClaim.findUnique({ where: { id } });
     if (!claim) throw new NotFoundException('Warranty claim not found');
     if (!canTransitionWarranty(claim.status, dto.status))
       throw new ConflictException(
@@ -208,7 +224,7 @@ export class WarrantyService {
     if (dto.status === 'REJECTED' && !dto.rejectionReason?.trim())
       throw new BadRequestException('Rejection reason is required');
     const now = new Date();
-    return this.prisma.$transaction(async (tx) => {
+    return db.$transaction(async (tx) => {
       await tx.warrantyClaim.update({
         where: { id },
         data: {

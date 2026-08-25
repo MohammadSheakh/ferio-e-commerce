@@ -1,9 +1,11 @@
-import { Injectable, Inject, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Inject, Logger, OnModuleInit, Optional } from '@nestjs/common';
 import { Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { Redis } from 'ioredis';
 import { REDIS_CLIENT } from '@app/redis';
 import { PrismaService } from '@app/database';
+import { TenantDbService } from '../../../tenancy/tenant-db.service';
+import type { PrismaClient } from '@prisma/client';
 
 export interface SocketUser {
   userId: string;
@@ -49,7 +51,17 @@ export class SocketAuthService implements OnModuleInit {
     private jwtService: JwtService,
     @Inject(REDIS_CLIENT) private redisClient: Redis,
     private prisma: PrismaService,
+    @Optional() private readonly tenantDb?: TenantDbService,
   ) {}
+
+  /**
+   * MT-7/MT-8: tenant client inside resolved contexts; explicit legacy
+   * fallback outside resolved requests. Never guesses.
+   */
+  private async db(): Promise<PrismaClient> {
+    const tenant = await this.tenantDb?.tryGet();
+    return tenant ?? (this.prisma as unknown as PrismaClient);
+  }
 
   onModuleInit() {
     this.startCleanupJob();
@@ -59,6 +71,7 @@ export class SocketAuthService implements OnModuleInit {
    * Authenticate Socket Connection
    */
   async authenticateSocket(socket: Socket): Promise<SocketUser | null> {
+    const db = await this.db();
     try {
       const token = socket.handshake.auth?.token || (socket.handshake.headers?.token as string);
       const guestId = socket.handshake.auth?.guestId || (socket.handshake.query?.guestId as string);
@@ -90,7 +103,7 @@ export class SocketAuthService implements OnModuleInit {
         const targetId = payload?.userId || payload?.sub || payload?.id;
 
         if (targetId) {
-          const user = await this.prisma.user.findUnique({
+          const user = await db.user.findUnique({
             where: { id: targetId },
             select: { id: true, role: true, name: true },
           });
@@ -105,7 +118,7 @@ export class SocketAuthService implements OnModuleInit {
           }
 
           // Check DeliveryPersonnel table for rider tokens
-          const rider = await this.prisma.deliveryPersonnel.findUnique({
+          const rider = await db.deliveryPersonnel.findUnique({
             where: { id: targetId },
             select: { id: true, name: true },
           });
@@ -173,12 +186,13 @@ export class SocketAuthService implements OnModuleInit {
   }
 
   async canAccessConversation(user?: SocketUser | null, conversationId?: string): Promise<boolean> {
+    const db = await this.db();
     if (!user || !conversationId) return false;
     if (this.isAdmin(user.role)) return true;
 
     const allowedIds = new Set([user.userId, `conv-${user.userId}`]);
     if (user.role !== 'guest' && user.userId) {
-      const account = await this.prisma.user.findUnique({
+      const account = await db.user.findUnique({
         where: { id: user.userId },
         select: { customerId: true },
       });
@@ -248,7 +262,8 @@ export class SocketAuthService implements OnModuleInit {
   }
 
   async getUserProfile(userId: string) {
-    return await this.prisma.user.findUnique({
+    const db = await this.db();
+    return await db.user.findUnique({
       where: { id: userId },
       select: { name: true },
     });
@@ -358,6 +373,7 @@ export class SocketAuthService implements OnModuleInit {
    * Returns online users that the current user is related to (family or conversations)
    */
   async getRelatedOnlineUsers(userId: string): Promise<string[]> {
+    const db = await this.db();
     try {
       const allOnlineUsers = await this.getAllOnlineUsers();
       if (allOnlineUsers.length === 0) return [];
@@ -365,7 +381,7 @@ export class SocketAuthService implements OnModuleInit {
       const relatedUserIds = new Set<string>();
 
       // 1. Get family-related users from Prisma
-      const user = await this.prisma.user.findUnique({
+      const user = await db.user.findUnique({
         where: { id: userId },
         select: { id: true, accountCreatorId: true, childAccounts: { select: { id: true } } },
       });
@@ -376,7 +392,7 @@ export class SocketAuthService implements OnModuleInit {
       }
 
       // 2. Get conversation-related users from Prisma
-      const userParticipations = await this.prisma.conversationParticipents.findMany({
+      const userParticipations = await db.conversationParticipents.findMany({
         where: {
           userId,
           isDeleted: false,
@@ -386,7 +402,7 @@ export class SocketAuthService implements OnModuleInit {
 
       if (userParticipations.length > 0) {
         const conversationIds = userParticipations.map((p) => p.conversationId);
-        const otherParticipants = await this.prisma.conversationParticipents.findMany({
+        const otherParticipants = await db.conversationParticipents.findMany({
           where: {
             conversationId: { in: conversationIds },
             userId: { not: userId },

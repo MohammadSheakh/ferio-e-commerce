@@ -8,6 +8,7 @@ import {
 } from './tenant-errors';
 import { runWithTenantContext, type TenantDatabaseMaterial } from './tenant-context';
 import { setDomainCacheInvalidator } from '../platform/utils/domain-cache-invalidation';
+import { TenantMetrics } from '@app/common';
 
 const POSITIVE_CACHE_TTL_SECONDS = 60;
 const NEGATIVE_CACHE_TTL_SECONDS = 15;
@@ -56,6 +57,7 @@ export class TenantResolverService implements OnModuleInit {
     const cached = await this.readCache(hostname);
     if (cached === null) {
       // Negative cache hit: recently-proven-unknown host.
+      TenantMetrics.increment('resolver_unknown_domain', { hostname });
       throw new TenantResolutionException('TENANT_RESOLUTION_FAILED');
     }
     if (cached) return cached;
@@ -76,6 +78,7 @@ export class TenantResolverService implements OnModuleInit {
     });
 
     if (!domain || domain.status !== 'ACTIVE') {
+      TenantMetrics.increment('resolver_unknown_domain', { hostname });
       throw new TenantResolutionException('TENANT_RESOLUTION_FAILED');
     }
 
@@ -89,6 +92,7 @@ export class TenantResolverService implements OnModuleInit {
         organization.status,
       )
     ) {
+      TenantMetrics.increment('resolver_suspended', { hostname });
       throw new TenantResolutionException('TENANT_SUSPENDED', HttpStatus_SERVICE_UNAVAILABLE);
     }
 
@@ -96,15 +100,18 @@ export class TenantResolverService implements OnModuleInit {
       where: { organizationId: organization.id },
     });
     if (!registry || registry.status === 'RETIRED') {
+      TenantMetrics.increment('resolver_tenant_unavailable', { hostname });
       throw new TenantResolutionException('TENANT_UNAVAILABLE', HttpStatus_SERVICE_UNAVAILABLE);
     }
     if (registry.status === 'MIGRATION_REQUIRED') {
+      TenantMetrics.increment('resolver_migration_required', { hostname });
       throw new TenantResolutionException(
         'TENANT_MIGRATION_REQUIRED',
         HttpStatus_SERVICE_UNAVAILABLE,
       );
     }
     if (registry.status !== 'READY') {
+      TenantMetrics.increment('resolver_tenant_unavailable', { hostname });
       throw new TenantResolutionException('TENANT_UNAVAILABLE', HttpStatus_SERVICE_UNAVAILABLE);
     }
 

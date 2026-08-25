@@ -1,8 +1,10 @@
-import { Injectable, Inject, Logger } from '@nestjs/common';
+import { Injectable, Inject, Logger, Optional } from '@nestjs/common';
 import { Redis } from 'ioredis';
 
 import { REDIS_CLIENT } from '@app/redis';
 import { PrismaService } from '@app/database';
+import { TenantDbService } from '../../../tenancy/tenant-db.service';
+import type { PrismaClient } from '@prisma/client';
 
 /**
  * Socket Room Service
@@ -32,7 +34,17 @@ export class SocketRoomService {
   constructor(
     @Inject(REDIS_CLIENT) private redisClient: Redis,
     private prisma: PrismaService,
+    @Optional() private readonly tenantDb?: TenantDbService,
   ) {}
+
+  /**
+   * MT-7/MT-8: tenant client inside resolved contexts; explicit legacy
+   * fallback outside resolved requests. Never guesses.
+   */
+  private async db(): Promise<PrismaClient> {
+    const tenant = await this.tenantDb?.tryGet();
+    return tenant ?? (this.prisma as unknown as PrismaClient);
+  }
 
   // =============================================
   // Conversation Room Management
@@ -209,8 +221,9 @@ export class SocketRoomService {
    * Auto-join Family Room
    */
   async autoJoinFamilyRoom(socket: any, userId: string): Promise<void> {
+    const db = await this.db();
     try {
-      const user = await this.prisma.user.findUnique({
+      const user = await db.user.findUnique({
         where: { id: userId },
         select: { id: true, role: true, accountCreatorId: true },
       });

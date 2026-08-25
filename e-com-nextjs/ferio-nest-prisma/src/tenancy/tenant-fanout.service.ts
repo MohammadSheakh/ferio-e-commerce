@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { StructuredLogger } from '@app/common';
+import { StructuredLogger, TenantMetrics } from '@app/common';
 import { PlatformPrismaService } from '../platform/platform-prisma.service';
 import { runWithTenantContext, type TenantContext } from './tenant-context';
 import { TenantDatabaseManager } from './tenant-database.manager';
@@ -73,6 +73,10 @@ export class TenantFanoutService {
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         outcome.failures.push({ organizationId: registry.organizationId, error: message });
+        TenantMetrics.increment('queue_tenant_failure', {
+          label: options.label ?? 'unlabeled',
+          organizationId: registry.organizationId,
+        });
         this.logger.error('tenant_fanout_failure', error instanceof Error ? error : new Error(message), {
           label: options.label,
           organizationId: registry.organizationId,

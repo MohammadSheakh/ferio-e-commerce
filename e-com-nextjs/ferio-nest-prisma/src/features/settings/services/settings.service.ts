@@ -115,7 +115,8 @@ export class SettingsService {
   }
 
   async getAllSettings() {
-    return this.prisma.settings.findMany({ orderBy: { type: 'asc' } });
+    const db = await this.db();
+    return db.settings.findMany({ orderBy: { type: 'asc' } });
   }
 
   async getAllWithPagination(
@@ -124,6 +125,7 @@ export class SettingsService {
     include?: Record<string, any>,
     select?: Record<string, boolean>,
   ): Promise<PaginateResult<Settings>> {
+    const db = await this.db();
     const page = Number(options.page) > 0 ? Number(options.page) : 1;
     const limit = Number(options.limit) || 10;
     const where = cleanFilters(filters) as Prisma.SettingsWhereInput;
@@ -133,14 +135,14 @@ export class SettingsService {
     ) as Prisma.SettingsOrderByWithRelationInput;
 
     const [docs, total] = await Promise.all([
-      this.prisma.settings.findMany({
+      db.settings.findMany({
         where,
         skip: (page - 1) * limit,
         take: limit,
         orderBy,
         ...buildProjection(include, select),
       }),
-      this.prisma.settings.count({ where }),
+      db.settings.count({ where }),
     ]);
 
     return {
@@ -158,6 +160,7 @@ export class SettingsService {
     include?: Record<string, any>,
     select?: Record<string, boolean>,
   ): Promise<CursorPaginateResult<Settings>> {
+    const db = await this.db();
     const limit = Number(options.limit) || 10;
     const where = cleanFilters(filters) as Prisma.SettingsWhereInput;
 
@@ -181,7 +184,7 @@ export class SettingsService {
       prismaOptions.skip = 1; // Skip the cursor element itself
     }
 
-    const docs = await this.prisma.settings.findMany(prismaOptions);
+    const docs = await db.settings.findMany(prismaOptions);
 
     let nextCursor: string | undefined = undefined;
     let hasNextPage = false;
@@ -203,7 +206,8 @@ export class SettingsService {
     type: SettingsType,
     actor: UserPayload,
   ): Promise<void> {
-    await this.prisma.$transaction(async (transaction) => {
+    const db = await this.db();
+    await db.$transaction(async (transaction) => {
       const previous = await transaction.settings.delete({ where: { type } });
       await this.audit.record(
         {

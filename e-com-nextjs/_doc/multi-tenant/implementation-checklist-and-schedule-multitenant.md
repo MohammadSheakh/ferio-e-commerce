@@ -586,7 +586,7 @@ This is the largest migration slice. Existing feature behavior should remain sta
 - [x] Tenant-scope assignment.
 - [x] Tenant-scope duty state.
 - [x] Tenant-scope GPS history.
-- [ ] Tenant-scope WebSocket/live-map rooms.
+- [ ] **PARTIAL:** Tenant-scope WebSocket/live-map rooms. (all existing socket room families — conversations, tasks, admin, notifications — are org-scoped; a dedicated rider live-map emitter does not exist server-side yet)
 - [x] Tenant-scope location-history clearing.
 -[x] Prevent rider session from tenant A acting on tenant B order. (`DeliveryPersonnelService` resolves through the tenant client; assigned-order lookup is scoped to the same database — cross-tenant action has no resolution path)
 - [ ] Preserve COD staff-confirmation rule per tenant.
@@ -597,7 +597,7 @@ This is the largest migration slice. Existing feature behavior should remain sta
 - [x] Existing post-purchase/reconciliation foundations exist.
 - [ ] Tenant-scope every return/refund/RTO/settlement record.
 - [x] Tenant-scope scheduled reconciliation runs.
-- [ ] Tenant-scope settlement imports and evidence.
+- [x] Tenant-scope settlement imports and evidence. (`SettlementImportsService` resolves every import/classify/persist/claim path through the tenant client)
 - [ ] Tenant-scope BullMQ job IDs.
 - [ ] Tenant-scope manual retry actions.
 - [x] Prove failure in tenant A reconciliation does not block tenant B jobs. (reconciliation scans fan out per tenant with isolated failure evidence)
@@ -615,7 +615,7 @@ This is the largest migration slice. Existing feature behavior should remain sta
 - [x] Existing review/banner workflow exists.
 - [x] Existing product-request workflow exists.
 - [x] Existing store pickup/outlet workflow exists.
-- [ ] Tenant-scope all records and settings.
+- [x] Tenant-scope all records and settings. (`ServiceBookingService`, `WarrantyService`, `ProductContentService` (reviews/banners), `ProductRequestService`, `StoreLocationsService` all resolve through the tenant client with explicit legacy fallback)
 - [ ] Tenant-scope media/evidence.
 - [ ] Tenant-scope outlet inventory/pickup configuration.
 - [ ] Tenant-scope moderation and Admin queues.
@@ -625,7 +625,7 @@ This is the largest migration slice. Existing feature behavior should remain sta
 
 - [x] Chat foundation exists.
 - [ ] Tenant-scope socket tickets.
-- [ ] Tenant-scope rooms/channels.
+- [x] Tenant-scope rooms/channels. (conversations, tasks, admin role rooms, and every server-side emission path are org-prefixed; task-room Redis presence lists are scoped by the same names)
 - [x] Tenant-scope conversation lookup/history. (chat REST swept; realtime rooms namespaced in MT-8)
 - [ ] Tenant-scope quick replies/folders if configurable.
 - [x] Reject cross-tenant socket subscriptions. (org-scoped rooms unreachable from foreign tickets)
@@ -638,7 +638,7 @@ This is the largest migration slice. Existing feature behavior should remain sta
 - [ ] **PARTIAL:** Tenant-scope exports. (orders export routed through tenant client; remaining export surfaces pending)
 - [x] Tenant-scope purchase activity/social proof.
 - [ ] Clarify that "Global Order History" means tenant-global only.
-- [ ] Tenant-scope feature flags/settings.
+- [ ] **PARTIAL:** Tenant-scope feature flags/settings. (`SettingsService` — all settings CRUD/pagination/delete paths now resolve through the tenant client; platform-vs-tenant feature-flag separation still open)
 - [ ] Separate platform feature flags from tenant feature flags.
 - [ ] Tenant-scope operations health while keeping platform health separate.
 - [ ] Ensure Platform Admin aggregate metrics use approved metadata/aggregation and do not expose tenant PII by default.
@@ -649,6 +649,14 @@ This is the largest migration slice. Existing feature behavior should remain sta
 
 - [x] `TransactionalMessagingService` (outbox, templates, attempts evidence) resolves through the tenant client — messages can never be orphaned from the tenant orders they reference.
 - [x] Transactional-message dispatch + payment-expiry sweeps now fan out per READY/ACTIVE tenant (`TenantFanoutService`), processors resolve envelopes via `forOrganization`. Remaining flag-on blockers shrink to: courier polling/callback-retry sweeps, reconciliation schedule, socket room namespacing (§11.3), and integration credential vault (§11.5).
+
+### 10.13 Commerce service sweep inventory (completed)
+
+All commerce-plane services now resolve through `TenantDbService` (`db()` helper + `@Optional() tenantDb` injection; legacy fallback outside resolved requests):
+
+Catalog, Cart, Checkout, Order, Shipping (+ CourierRouter), ShippingPolling, CommercePayments, Wallet, CustomerNotifications, Customers, **CustomerAccount**, **StaffAccess**, DeliveryPersonnel, Reconciliation, Refunds, Reports, Returns, RTO, Settlements (**+ SettlementImports**), Settings (CommerceSettings **+ admin SettingsService**), StorefrontAnalytics, PurchaseActivity, TransactionalMessaging, Chatting (Conversation + Message), ServiceBooking, Warranty, ProductContent (reviews/banners), ProductRequest, StoreLocations.
+
+Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccount`/`userDevices`/`userProfile`/`user` (identity plane — PO-015 auth-migration decision), `operations-health` (platform-scoped by design), `audit.service` (writes into whatever client the caller passes — per-DB by construction), `socket-auth`/`socket-room` (org-claim propagation is the remaining MT-8 socket slice).
 
 ### MT-7 gate
 
@@ -693,9 +701,9 @@ This is the largest migration slice. Existing feature behavior should remain sta
 - [x] Resolve tenant during socket authentication.
 - [x] Bind socket ticket/session to tenant. (tickets minted inside tenant-resolved requests embed `organizationId`; `SocketUser` propagates it)
 - [x] Prefix rooms with tenant identity. (`scopedSocketRoom` applied to personal/conversation/role/admin joins and message emissions; identical room IDs across tenants can never share a channel)
-- [ ] Tenant-scope Admin chat.
-- [ ] Tenant-scope rider live map.
-- [ ] Tenant-scope customer notifications if realtime.
+- [x] Tenant-scope Admin chat. (org-bound admin sockets join ONLY org-prefixed role/admin rooms at connection; the message relay broadcasts to sender-scoped admin rooms so one tenant's chats can never reach another's console; REST-initiated chat mutations via `emitToRoom` resolve the ambient tenant)
+- [ ] Tenant-scope rider live map. (no server-side WebSocket live-map emitter exists yet — location surfaces are poll-based; scope the room when realtime lands)
+- [x] Tenant-scope customer notifications if realtime. (`emitNotificationToUser` / `emitUnreadCountUpdate` / `emitToUser` target ONLY the org-prefixed personal room inside a resolved context; raw rooms remain legacy-only since unbound sockets no longer coexist in them)
 - [x] Reject room joins across tenant boundaries. (cross-tenant rooms are unreachable by construction — clients cannot learn another org's prefixed name from their own ticket)
 
 ## 11.4 Object/media storage
@@ -977,18 +985,18 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 
 ## 16.1 Observability
 
-- [ ] Add organization/tenant ID to safe structured logs.
-- [ ] Add resolved domain where safe.
-- [ ] Add tenant DB connection metrics.
+- [x] Add organization/tenant ID to safe structured logs. (`StructuredLogger` stamps `organizationId`/`hostname` on every JSON entry via a bootstrap-registered context accessor — registry IDs only, never credentials)
+- [x] Add resolved domain where safe. (hostname rides the same envelope from the trusted `TenantContext`)
+- [x] Add tenant DB connection metrics. (`db_acquire_failure` / `db_breaker_opened` counters emitted per tenant database)
 - [ ] Add provisioning metrics.
 - [ ] Add migration fleet metrics.
-- [ ] Add subscription/entitlement denial metrics.
-- [ ] Add unknown-domain metrics.
-- [ ] Add per-tenant queue failure visibility.
+- [x] Add subscription/entitlement denial metrics. (`entitlement_denied{code,featureKey}` counted at every server-side denial in `EntitlementsService.evaluate`)
+- [x] Add unknown-domain metrics. (`resolver_unknown_domain` / `resolver_suspended` / `resolver_tenant_unavailable` / `resolver_migration_required` counted at each fail-closed branch)
+- [x] Add per-tenant queue failure visibility. (`queue_tenant_failure{label,organizationId}` counted per isolated fan-out failure; snapshots carry org labels)
 - [ ] Add platform billing metrics.
 - [ ] Add backup freshness metrics.
 - [ ] Add support-access security events.
-- [ ] Add alerting for isolation-critical failures.
+- [ ] **PARTIAL:** Add alerting for isolation-critical failures. (counters surface as periodic structured `tenant_metrics_snapshot` events any log pipeline can alert on; dedicated alert routing awaits metrics-stack decision)
 
 ## 16.2 Security tests
 
