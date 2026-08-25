@@ -12,6 +12,7 @@ import {
 } from './tenant-membership.guard';
 import { TenantCallbackRunner } from './tenant-callback.runner';
 import { TenantFanoutService } from './tenant-fanout.service';
+import { TenancyObservabilityService } from './tenancy-observability.service';
 
 /**
  * Tenant plane (MT-2/MT-3): trusted resolution, immutable request context,
@@ -31,6 +32,7 @@ import { TenantFanoutService } from './tenant-fanout.service';
     TenantSchemaBootstrapper,
     TenantCallbackRunner,
     TenantFanoutService,
+    TenancyObservabilityService,
   ],
   exports: [TenantResolverService, TenantDatabaseManager, TenantDbService, TenantSchemaBootstrapper, TenantCallbackRunner, TenantFanoutService, TenantMembershipGuard],
 })

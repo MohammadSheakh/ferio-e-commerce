@@ -16,6 +16,11 @@ export type StructuredLogEntry = {
   context: string;
   event: string;
   correlationId: string;
+  /** Safe tenant identity (MT-13 §16.1): present when the log point runs
+   * inside a resolved tenant request. Registry IDs and hostname only —
+   * never credentials. */
+  organizationId?: string;
+  hostname?: string;
   error?: {
     name: string;
     message: string;
@@ -23,6 +28,38 @@ export type StructuredLogEntry = {
   };
   metadata?: StructuredLogMetadata;
 };
+
+/**
+ * Dependency-direction hook: libs/common cannot import the tenancy module,
+ * so the tenancy layer registers an accessor at bootstrap that surfaces the
+ * ambient TenantContext for log enrichment.
+ */
+let tenantLogContextAccessor:
+  | (() => { organizationId?: string; hostname?: string } | undefined)
+  | null = null;
+
+export function registerTenantLogContextAccessor(
+  accessor: () => { organizationId?: string; hostname?: string } | undefined,
+): void {
+  tenantLogContextAccessor = accessor;
+}
+
+/** Test isolation helper. */
+export function resetTenantLogContextAccessor(): void {
+  tenantLogContextAccessor = null;
+}
+
+function resolveTenantLogContext(): {
+  organizationId?: string;
+  hostname?: string;
+} {
+  if (!tenantLogContextAccessor) return {};
+  try {
+    return tenantLogContextAccessor() ?? {};
+  } catch {
+    return {};
+  }
+}
 
 function normalizeFieldName(field: string): string {
   return field
@@ -92,6 +129,7 @@ export function buildStructuredLogEntry(
     context,
     event,
     correlationId: getCorrelationId(),
+    ...resolveTenantLogContext(),
   };
   const sanitizedMetadata = sanitizeStructuredMetadata(metadata);
   if (Object.keys(sanitizedMetadata).length > 0) {

@@ -2,7 +2,7 @@ import { Injectable, type OnModuleDestroy } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
-import { StructuredLogger } from '@app/common';
+import { StructuredLogger, TenantMetrics } from '@app/common';
 import { decryptSecret } from '../platform/utils/secret-box';
 
 interface CacheEntry {
@@ -143,8 +143,10 @@ export class TenantDatabaseManager implements OnModuleDestroy {
   private recordFailure(id: string): void {
     const breaker = this.breakers.get(id) ?? { failures: 0, openedAt: null };
     breaker.failures += 1;
+    TenantMetrics.increment('db_acquire_failure', { tenantDatabaseId: id });
     if (breaker.failures >= FAILURE_THRESHOLD) {
       breaker.openedAt = Date.now();
+      TenantMetrics.increment('db_breaker_opened', { tenantDatabaseId: id });
       this.logger.warn('tenant_database_breaker_opened', {
         tenantDatabaseId: id,
       });
