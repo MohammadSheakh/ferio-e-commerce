@@ -113,27 +113,17 @@ export class TenantSchemaBootstrapper {
     organizationName?: string;
   }): Promise<void> {
     const pool = new Pool({
-      host: connection.host,
-      port: connection.port,
-      database: connection.database,
-      user: connection.user,
-      password: connection.password,
+      ...connection,
       max: 1,
     });
     try {
-      // Store identity defaults to the tenant's own name; support channels
-      // intentionally empty until configured by the owner.
       await pool.query(
-        `INSERT INTO "CommerceSettings" ("id", "storeName", "createdAt", "updatedAt")
-         VALUES ('default', $1, now(), now())
-         ON CONFLICT ("id") DO NOTHING`,
-        [connection.organizationName ?? 'My Store'],
+        'INSERT INTO "CommerceSettings" ("id", "storeName", "createdAt", "updatedAt") VALUES ($1, $2, now(), now()) ON CONFLICT ("id") DO UPDATE SET "storeName" = EXCLUDED."storeName"',
+        ['default', connection.organizationName ?? 'My Store'],
       );
-      // COD verification starts at its safest mode.
       await pool.query(
-        `INSERT INTO "CodVerificationPolicy" ("id", "mode", "createdAt", "updatedAt")
-         VALUES ('default', 'ALWAYS', now(), now())
-         ON CONFLICT ("id") DO NOTHING`,
+        'INSERT INTO "CodVerificationPolicy" ("id", "mode", "createdAt", "updatedAt") VALUES ($1, $2, now(), now()) ON CONFLICT ("id") DO NOTHING',
+        ['default', 'ALWAYS'],
       );
     } finally {
       await pool.end().catch(() => undefined);
