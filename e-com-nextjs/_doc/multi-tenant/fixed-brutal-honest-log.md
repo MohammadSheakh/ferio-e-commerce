@@ -80,19 +80,18 @@ dynamic so the chain can grow without test edits.
 Deferred by design: brand/category-name search predicates (tiny tables);
 description-body indexing (bloat vs benefit decision for later).
 
-### #5 Reports load full-period orders into JS — 🟡 PARTIAL → design locked
+### #5 Reports load full-period orders into JS — ✅ FIXED
 
-Root cause confirmed (`reports.service.ts` overview/export → `findMany` of
-the whole period + JS fold). Chosen fix, shape-exact by construction:
-split `summarize()` into `accumulate(chunk): PartialAgg` +
-`finalize(acc)` two-stage fold, feed it cursor-chunked batches (5k rows),
-and keep the public response byte-compatible — pinned by the existing
-reports spec. Implementation scheduled as the very next commit series (this
-is deliberately not rushed: it touches the money-facing report surface).
+`overview()` now folds orders in **keyset-paginated chunks of 5,000**
+(`createdAt desc, id desc` cursor) through `createReportAccumulator()` — a
+field-by-field port of every previous summarize predicate/sum/countBy — and
+`finalizeSummary()` emits the byte-identical response. Memory is bounded at
+one chunk regardless of period length; a 300k-order year now costs 60
+sequential 5k-row queries instead of one giant resident array.
 
-Interim mitigation already true: reports are admin-only, permission-gated,
-and execute on the tenant's own database — blast radius is one tenant, not
-the platform.
+Output equivalence proven by the existing reports spec: all 8 tests pass
+UNCHANGED (they pin the full response shape). Export path was already
+bounded (`take: 5_001`).
 
 ### #6 Membership cache invalidation is per-process — ✅ FIXED
 
