@@ -1,6 +1,6 @@
 # ADR-0006 — Centralized Subscription/Entitlement Enforcement
 
-**Status:** ACCEPTED (plan catalog owner-blocked) · **Date:** 2026-08-24
+**Status:** ACCEPTED (PO-001 catalog seeded; prices pilot-dependent) · **Date:** 2026-08-24
 
 ## Context
 

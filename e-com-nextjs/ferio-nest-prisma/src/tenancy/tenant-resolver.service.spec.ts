@@ -60,15 +60,34 @@ describe('TenantResolverService fail-closed resolution (MT-2 gate)', () => {
     expect(platform.client.tenantDatabase.findUnique).not.toHaveBeenCalled();
   });
 
-  it('reports suspended organizations as TENANT_SUSPENDED, not not-found', async () => {
+  it('resolves SUSPENDED organizations as browsable per PO-005 (checkout disabled downstream)', async () => {
     platform.client.tenantDomain.findUnique.mockResolvedValue({
       id: 'dom-1',
       status: 'ACTIVE',
-      organization: { status: 'SUSPENDED', subscription: { status: 'ACTIVE' } },
+      organization: { id: 'org-1', status: 'SUSPENDED', subscription: { status: 'SUSPENDED' } },
+    });
+    platform.client.tenantDatabase.findUnique.mockResolvedValue({
+      id: 'tdb-1',
+      status: 'READY',
+      host: 'h', port: 5432, databaseName: 'd', username: 'u', credentialCipher: 'c',
     });
 
     await expect(
       service.resolveFromHost('suspended.example.com'),
+    ).resolves.toMatchObject({
+      organizationId: 'org-1',
+      subscriptionStatus: 'SUSPENDED',
+    });
+  });
+
+  it('still takes closure-pending and closed stores fully offline', async () => {
+    platform.client.tenantDomain.findUnique.mockResolvedValue({
+      id: 'dom-1',
+      status: 'ACTIVE',
+      organization: { id: 'org-9', status: 'CLOSURE_PENDING', subscription: null },
+    });
+    await expect(
+      service.resolveFromHost('closing.example.com'),
     ).rejects.toMatchObject({ code: 'TENANT_SUSPENDED' });
   });
 

@@ -1,6 +1,6 @@
 # ADR-0004 — Platform Identity vs Tenant Membership
 
-**Status:** ACCEPTED (cross-tenant staff-login policy owner-blocked) · **Date:** 2026-08-24
+**Status:** ACCEPTED (PO-014/PO-015) · **Date:** 2026-08-24
 
 ## Context
 

@@ -9,6 +9,9 @@ import { DomainsService } from './domains.service';
 import { TenantDatabasesService } from './tenant-databases.service';
 import { PlatformAuditService } from './platform-audit.service';
 
+/** PO-013: minimum recoverable period before final destruction. */
+const CLOSURE_RETENTION_DAYS = 90;
+
 /**
  * Tenant closure workflow (ADR-0007, checklist §15.3).
  *
@@ -72,18 +75,37 @@ export class TenantClosureService {
 
   async finalizeClosure(
     organizationId: string,
-    options: { actorId?: string; retentionAcknowledged?: boolean },
+    options: {
+      actorId?: string;
+      /** Confirms export/legal steps are done. */
+      retentionAcknowledged?: boolean;
+      /** Explicit early-destruction override inside the 90-day window. */
+      overrideRetentionPeriod?: boolean;
+    },
   ): Promise<void> {
-    if (!options.retentionAcknowledged) {
-      throw new ConflictException('RETENTION_POLICY_ACKNOWLEDGEMENT_REQUIRED');
-    }
     const organization = await this.platform.client.organization.findUnique({
       where: { id: organizationId },
-      include: { databases: true },
+      include: { databases: true, lifecycleEvents: true },
     });
     if (!organization) throw new NotFoundException('ORGANIZATION_NOT_FOUND');
     if (organization.status !== 'CLOSURE_PENDING') {
       throw new ConflictException('ORGANIZATION_NOT_IN_CLOSURE');
+    }
+
+    // PO-013: a 90-day recoverable period runs from the CLOSURE_PENDING
+    // transition. Finalizing inside the window requires an explicit
+    // operator override (audited); silence never destroys data.
+    const closureEvent = organization.lifecycleEvents
+      .filter((e) => e.toStatus === 'CLOSURE_PENDING')
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+    const closureStartedAt = closureEvent?.createdAt ?? new Date();
+    const retentionEndsAt =
+      closureStartedAt.getTime() + CLOSURE_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+    const insideRetentionWindow = Date.now() < retentionEndsAt;
+    if (insideRetentionWindow && !options.overrideRetentionPeriod) {
+      throw new ConflictException(
+        `CLOSURE_RETENTION_PERIOD_ACTIVE:${closureEvent ? closureEvent.createdAt.toISOString() : 'unknown'}`,
+      );
     }
 
     // Retire every database registration; the connection manager refuses

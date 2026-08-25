@@ -1,6 +1,6 @@
 # ADR-0001 — Database-per-Tenant Isolation Model
 
-**Status:** ACCEPTED (owner confirmation pending) · **Date:** 2026-08-24 · **Deciders:** Engineering
+**Status:** ACCEPTED (PO-009) · **Date:** 2026-08-24 · **Deciders:** Engineering
 
 ## Context
 

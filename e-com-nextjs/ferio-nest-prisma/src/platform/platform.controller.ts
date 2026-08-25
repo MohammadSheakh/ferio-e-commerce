@@ -265,12 +265,13 @@ export class PlatformAdminController {
   @PlatformPermissions('organization:write')
   finalizeClosure(
     @Param('id') id: string,
-    @Body() body: { retentionAcknowledged?: boolean },
+    @Body() body: { retentionAcknowledged?: boolean; overrideRetentionPeriod?: boolean },
     @Req() request: any,
   ) {
     return this.closure.finalizeClosure(id, {
       actorId: request.platformPrincipal?.platformUserId,
       retentionAcknowledged: body.retentionAcknowledged === true,
+      overrideRetentionPeriod: body.overrideRetentionPeriod === true,
     });
   }
 

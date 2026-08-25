@@ -1,6 +1,6 @@
 # ADR-0007 — Tenant Closure, Export, and Retention
 
-**Status:** PROPOSED (policy owner-blocked) · **Date:** 2026-08-24
+**Status:** ACCEPTED (PO-013: 90-day recoverable window implemented) · **Date:** 2026-08-24
 
 ## Context
 

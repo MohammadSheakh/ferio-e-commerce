@@ -3,6 +3,9 @@ import { SubscriptionStatus } from '../generated/platform-client';
 import type { PlatformPrismaService } from '../platform-prisma.service';
 import { PlatformAuditService } from './platform-audit.service';
 
+/** PO-004: grace period before a past-due subscription may be suspended. */
+const GRACE_PERIOD_DAYS = 7;
+
 /** Subscription lifecycle state machine (ADR-0006). */
 const ALLOWED_SUBSCRIPTION_TRANSITIONS: Record<SubscriptionStatus, SubscriptionStatus[]> = {
   TRIALING: ['ACTIVE', 'CANCELLED'],
@@ -15,6 +18,8 @@ const ALLOWED_SUBSCRIPTION_TRANSITIONS: Record<SubscriptionStatus, SubscriptionS
 export interface TransitionSubscriptionInput {
   actorId?: string;
   note?: string;
+  /** Operator-explicit bypass of the 7-day grace window (audited via note). */
+  overrideGracePeriod?: boolean;
   currentPeriodStart?: Date;
   currentPeriodEnd?: Date;
 }
@@ -65,6 +70,25 @@ export class SubscriptionsService {
       );
     }
 
+    // PO-004: a past-due subscription enters a 7-day grace period. Suspension
+    // is refused until the latest PAST_DUE event is at least that old.
+    if (
+      subscription.status === 'PAST_DUE' &&
+      to === 'SUSPENDED' &&
+      input.overrideGracePeriod !== true
+    ) {
+      const pastDueEvent = await this.platform.client.subscriptionEvent.findFirst({
+        where: { subscriptionId: subscription.id, toStatus: 'PAST_DUE' },
+        orderBy: { createdAt: 'desc' },
+      });
+      const graceEndsAt =
+        (pastDueEvent?.createdAt ?? new Date()).getTime() +
+        GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000;
+      if (Date.now() < graceEndsAt) {
+        throw new ConflictException('SUBSCRIPTION_GRACE_PERIOD_ACTIVE');
+      }
+    }
+
     const updated = await this.platform.client.$transaction(async (tx) => {
       const next = await tx.subscription.update({
         where: { id: subscription.id },
@@ -98,6 +122,22 @@ export class SubscriptionsService {
       metadata: { organizationId, note: input.note },
     });
     return updated;
+  }
+
+  /**
+   * PO-002: internal Ferio tenants get the explicit INTERNAL-style plan
+   * (key 'internal') with ACTIVE status — never faked as a paid subscription.
+   */
+  async startInternal(organizationId: string, actorId?: string) {
+    const existing = await this.platform.client.subscription.findUnique({
+      where: { organizationId },
+    });
+    if (existing) throw new ConflictException('SUBSCRIPTION_ALREADY_EXISTS');
+    const plan = await this.platform.client.plan.findUnique({ where: { key: 'internal' } });
+    if (!plan || !plan.isActive) throw new NotFoundException('INTERNAL_PLAN_NOT_SEEDED');
+    return this.platform.client.subscription.create({
+      data: { organizationId, planId: plan.id, status: 'ACTIVE' },
+    });
   }
 
   /** Plan changes never destroy data; entitlements simply re-evaluate. */

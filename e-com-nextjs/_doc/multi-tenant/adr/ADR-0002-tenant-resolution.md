@@ -1,6 +1,6 @@
 # ADR-0002 — Host-Based Trusted Tenant Resolution
 
-**Status:** ACCEPTED (default production domain owner-blocked) · **Date:** 2026-08-24
+**Status:** ACCEPTED (PO-007: `{slug}.{FERIO_PUBLIC_DOMAIN}`) · **Date:** 2026-08-24
 
 ## Context
 

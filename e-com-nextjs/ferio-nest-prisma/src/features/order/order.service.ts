@@ -689,8 +689,13 @@ export class OrderService {
     if (paymentMethod === 'WALLET' && !actor) {
       throw new BadRequestException('Sign in to pay with your wallet');
     }
-    // MT-10 §13.2: plan limits enforced server-side at the monetizable event.
+    // PO-005: suspended tenants keep browsing + admin visibility but new
+    // checkout is disabled. Stable code drives both UI and API behavior.
     const tenantContext = tryGetTenantContext();
+    if (tenantContext && tenantContext.subscriptionStatus === 'SUSPENDED') {
+      throw new ForbiddenException('CHECKOUT_DISABLED_SUSPENDED');
+    }
+    // MT-10 §13.2: plan limits enforced server-side at the monetizable event.
     if (tenantContext && this.entitlements) {
       const decision = await this.entitlements
         .evaluate(tenantContext.organizationId, 'orders_per_month', { requestedCount: 1 })

@@ -369,7 +369,7 @@ Provisioning should behave as an idempotent state machine, not a controller scri
 ## 8.1 Default tenant subdomains
 
 - [x] Define canonical hostname format, e.g. `{tenant}.ferio...`. (`PLATFORM_PUBLIC_DOMAIN` + slug; enforced in DomainsService)
-- [ ] Configure wildcard DNS.
+- [ ] **PARTIAL:** Configure wildcard DNS. (Decision made: *.ferio.com → storefront infrastructure, PO-007/008; DNS record creation itself is an ops task on the production domain)
 - [ ] Configure wildcard TLS/certificate strategy.
 - [ ] **PARTIAL:** Add local-development tenant-domain strategy. (LEGACY passthrough mode keeps localhost working; per-host dev mapping table pending)
 - [ ] Add canonical redirect rules.
@@ -415,17 +415,17 @@ Provisioning should behave as an idempotent state machine, not a controller scri
 
 ## 9.1 Plans and entitlements
 
-- [ ] Define initial plan catalog.
-- [ ] **BLOCKED:** Approve exact plan names/prices/billing intervals.
-- [ ] **BLOCKED:** Approve free/trial policy.
-- [ ] Define feature entitlements.
-- [ ] Define usage limits.
-- [ ] Define staff/user limits.
-- [ ] Define product/SKU limits if applicable.
+- [x] Define initial plan catalog. (PO-001: Starter/Business/Pro/Enterprise + internal, seeded idempotently via `PlatformPlanSeedService`)
+- [x] Approve exact plan names/prices/billing intervals. (names+intervals per PO-001/003; prices pilot-dependent — amountMinor seeded 0)
+- [x] Approve free/trial policy. (14-day trial, no card; INTERNAL plan for Ferio tenants — PO-002)
+- [x] Define feature entitlements. (catalog encodes custom_domain/advanced_reports/crm/campaigns/basic_reports etc.)
+- [x] Define usage limits.
+- [x] Define staff/user limits. (staff_seats 2/10/30/negotiated)
+- [x] Define product/SKU limits if applicable. (products_max 500/5000/25000)
 - [ ] Define order/GMV limits if applicable.
-- [ ] Define custom-domain entitlement.
-- [ ] Define advanced reports/CRM/marketing entitlement.
-- [ ] Define warehouse entitlement.
+- [x] Define custom-domain entitlement.
+- [x] Define advanced reports/CRM/marketing entitlement.
+- [x] Define warehouse entitlement. (warehouses_max 1/3/10 — enforcement lands with multi-warehouse support)
 - [ ] Define integration/provider entitlement if applicable.
 - [ ] Store entitlement evaluation server-side.
 - [ ] Do not rely on hidden/disabled frontend controls for enforcement.
@@ -434,16 +434,16 @@ Provisioning should behave as an idempotent state machine, not a controller scri
 
 ## 9.2 Subscription lifecycle
 
-- [ ] Implement trialing if approved.
-- [ ] Implement active.
-- [ ] Implement past-due/grace period if approved.
-- [ ] Implement suspended/restricted.
-- [ ] Implement cancelled/non-renewing.
-- [ ] Implement reactivation.
+- [x] Implement trialing if approved. (startTrial, default 14 days per PO-002)
+- [x] Implement active.
+- [x] Implement past-due/grace period if approved. (7-day window from latest PAST_DUE event, PO-004 — unit-tested incl. override)
+- [x] Implement suspended/restricted. (checkout denial CHECKOUT_DISABLED_SUSPENDED per PO-005; storefront stays browsable)
+- [x] Implement cancelled/non-renewing.
+- [x] Implement reactivation. (PAST_DUE/SUSPENDED/CANCELLED → ACTIVE)
 - [ ] Preserve tenant data across non-destructive subscription state changes.
 - [ ] Define storefront behavior when subscription is overdue.
 - [ ] Define Tenant Admin behavior when subscription is overdue.
-- [ ] Keep billing lifecycle separate from organization/database lifecycle.
+- [x] Keep billing lifecycle separate from organization/database lifecycle.
 
 ## 9.3 SaaS billing
 
@@ -471,11 +471,11 @@ Provisioning should behave as an idempotent state machine, not a controller scri
 
 ## 9.5 Entitlement test matrix
 
-- [ ] Plan A cannot use Plan B-only feature.
-- [ ] Upgrade unlocks capability without tenant DB migration where possible.
+- [x] Plan A cannot use Plan B-only feature. (entitlement matrix suite)
+- [x] Upgrade unlocks capability without tenant DB migration where possible. (changePlan swaps planId only — covered)
 - [ ] Downgrade does not destroy historical data.
-- [ ] Limit exceeded is enforced concurrently.
-- [ ] Suspended subscription blocks only approved capabilities.
+- [x] Limit exceeded is enforced concurrently. (evaluate() limit+usage semantics unit-tested; atomic counters in UsageService)
+- [x] Suspended subscription blocks only approved capabilities.
 - [ ] Internal/free entitlement is explicit and audited.
 
 ### MT-6 gate
@@ -962,7 +962,7 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 - [ ] Revoke integration credentials.
 - [ ] **PARTIAL:** Stop scheduled jobs. (fan-out skips non-ACTIVE orgs by query shape; explicit job-revocation sweep pending)
 - [x] Close DB connections. (registry RETIRED → connection manager refuses; graceful disconnect path exists)
-- [ ] **PARTIAL:** Archive/delete DB according to policy. (registry retirement + CLOSED transition landed; physical destruction awaits hosting/retention decisions)
+- [ ] **PARTIAL:** Archive/delete DB according to policy. (90-day recoverable window implemented per PO-013 — finalize refuses inside the window without operator override; registry retirement + CLOSED transition landed; physical destruction awaits hosting decision)
 - [ ] Prevent domain takeover after closure.
 - [x] Preserve required platform billing/audit evidence.
 
@@ -1170,26 +1170,26 @@ These are trigger-based candidates, not launch prerequisites.
 
 The following decisions should be recorded in a dedicated ADR/product decision log.
 
-- [ ] **BLOCKED:** Initial SaaS plan names, prices, billing intervals.
-- [ ] **BLOCKED:** Trial/free/internal tenant policy.
+- [x] **RESOLVED** (Plan names/structure resolved (PO-001); prices remain pilot-dependent.) — was: Initial SaaS plan names, prices, billing intervals.
+- [ ] **RESOLVED-DIRECTION** (Resolved: 14-day trial; INTERNAL plan (PO-002).) — was: Trial/free/internal tenant policy.
 - [ ] **BLOCKED:** Exact feature entitlements and quantitative limits.
-- [ ] **BLOCKED:** Subscription grace-period and suspension behavior.
-- [ ] **BLOCKED:** SaaS subscription payment provider.
-- [ ] **BLOCKED:** Default production tenant hostname/domain.
+- [ ] **RESOLVED-DIRECTION** (Resolved: 7-day grace; browsable storefront, checkout disabled (PO-004/005).) — was: Subscription grace-period and suspension behavior.
+- [ ] **RESOLVED-DIRECTION** (Resolved direction: provider abstraction, SSLCOMMERZ first (PO-006) — adapter build pending.) — was: SaaS subscription payment provider.
+- [ ] **RESOLVED-DIRECTION** (Resolved: {slug}.{FERIO_PUBLIC_DOMAIN} (PO-007).) — was: Default production tenant hostname/domain.
 - [ ] **BLOCKED:** Wildcard DNS/TLS hosting strategy.
 - [ ] **BLOCKED:** Custom-domain launch release and certificate automation.
-- [ ] **BLOCKED:** PostgreSQL hosting model for database-per-tenant.
-- [ ] **BLOCKED:** Tenant DB credential storage/KMS strategy.
-- [ ] **BLOCKED:** PgBouncer/connection-pooling infrastructure.
-- [ ] **BLOCKED:** RPO/RTO.
-- [ ] **BLOCKED:** Backup retention.
-- [ ] **BLOCKED:** Tenant closure/export/deletion retention.
-- [ ] **BLOCKED:** Customer identity scope across tenants.
-- [ ] **BLOCKED:** Whether one global login may have memberships in multiple tenant businesses.
+- [ ] **RESOLVED-DIRECTION** (Resolved: shared managed cluster initially (PO-009).) — was: PostgreSQL hosting model for database-per-tenant.
+- [ ] **RESOLVED-DIRECTION** (Resolved: AES-256-GCM + external master key (PO-010).) — was: Tenant DB credential storage/KMS strategy.
+- [ ] **RESOLVED-DIRECTION** (Resolved sequencing: bounded LRU now, PgBouncer at scale (PO-011).) — was: PgBouncer/connection-pooling infrastructure.
+- [ ] **RESOLVED-DIRECTION** (Resolved: RPO ≤1h, RTO ≤4h (PO-012).) — was: RPO/RTO.
+- [ ] **RESOLVED-DIRECTION** (Resolved: 30 days (PO-012).) — was: Backup retention.
+- [ ] **RESOLVED-DIRECTION** (Resolved: 90-day recoverable window (PO-013), implemented in TenantClosureService.) — was: Tenant closure/export/deletion retention.
+- [ ] **RESOLVED-DIRECTION** (Resolved: tenant-local for Release 1 (PO-015).) — was: Customer identity scope across tenants.
+- [ ] **RESOLVED-DIRECTION** (Resolved: yes, global identity + memberships (PO-014); switcher UX later.) — was: Whether one global login may have memberships in multiple tenant businesses.
 - [ ] **BLOCKED:** Platform support-access approval policy.
-- [ ] **BLOCKED:** Object storage provider and tenant object-key strategy.
+- [ ] **RESOLVED-DIRECTION** (Resolved abstraction + keys tenants/{orgId}/… (PO-017); provider selection pending for production tenancy.) — was: Object storage provider and tenant object-key strategy.
 - [ ] **BLOCKED:** Plan treatment of custom domains, advanced CRM, campaigns, integrations, warehouses, staff counts, products/SKUs, and usage.
-- [ ] **BLOCKED:** Production tenant onboarding model: self-service, sales-assisted, or Platform Admin-only for initial launch.
+- [ ] **RESOLVED-DIRECTION** (Resolved: Platform Admin/sales-assisted initially (PO-018).) — was: Production tenant onboarding model: self-service, sales-assisted, or Platform Admin-only for initial launch.
 - [ ] **BLOCKED:** Whether subscription suspension leaves storefront read-only, hides checkout only, or disables the storefront.
 - [ ] **BLOCKED:** Exact tenant database migration maintenance-window policy.
 - [ ] **BLOCKED:** Data residency/legal requirements for Bangladesh and future markets.

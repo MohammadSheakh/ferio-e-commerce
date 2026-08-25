@@ -26,7 +26,14 @@ describe('SubscriptionsService lifecycle state machine', () => {
             Promise.resolve(subscription('ACTIVE')),
           ),
         },
-        subscriptionEvent: { create: jest.fn() },
+        subscriptionEvent: {
+          create: jest.fn(),
+          // Default: latest PAST_DUE happened 8 days ago — outside the
+          // 7-day grace window, so matrix transitions proceed.
+          findFirst: jest.fn().mockResolvedValue({
+            createdAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000),
+          }),
+        },
         plan: { findUnique: jest.fn() },
         $transaction: jest.fn(async (fn) => fn(platform.client)),
       },
@@ -63,6 +70,32 @@ describe('SubscriptionsService lifecycle state machine', () => {
     } else {
       await expect(attempt).rejects.toBeInstanceOf(ConflictException);
     }
+  });
+
+  it('blocks suspension inside the 7-day grace window (PO-004)', async () => {
+    mockCurrent('PAST_DUE');
+    (platform.client.subscriptionEvent.findFirst as jest.Mock).mockResolvedValue({
+      createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
+    });
+
+    await expect(
+      service.transition('org-1', 'SUSPENDED' as never, { note: 'too early' }),
+    ).rejects.toMatchObject({ message: 'SUBSCRIPTION_GRACE_PERIOD_ACTIVE' });
+    expect(platform.client.subscription.update).not.toHaveBeenCalled();
+  });
+
+  it('allows operator override of the grace window with explicit flag', async () => {
+    mockCurrent('PAST_DUE');
+    (platform.client.subscriptionEvent.findFirst as jest.Mock).mockResolvedValue({
+      createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+    });
+
+    await expect(
+      service.transition('org-1', 'SUSPENDED' as never, {
+        note: 'operator override',
+        overrideGracePeriod: true,
+      }),
+    ).resolves.toBeDefined();
   });
 
   it('changePlan swaps plans without touching data and audits the move', async () => {

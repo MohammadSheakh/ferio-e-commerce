@@ -7,6 +7,7 @@ import {
   TenantResolutionException,
 } from './tenant-errors';
 import { runWithTenantContext, type TenantDatabaseMaterial } from './tenant-context';
+import { setDomainCacheInvalidator } from '../platform/utils/domain-cache-invalidation';
 
 const POSITIVE_CACHE_TTL_SECONDS = 60;
 const NEGATIVE_CACHE_TTL_SECONDS = 15;
@@ -79,7 +80,15 @@ export class TenantResolverService implements OnModuleInit {
     }
 
     const organization = domain.organization;
-    if (['SUSPENDED', 'CLOSURE_PENDING', 'CLOSED', 'ARCHIVED'].includes(organization.status)) {
+    // PO-005: a suspended business stays BROWSABLE — the storefront renders,
+    // checkout is disabled at the commerce layer, and admins can still sign
+    // in to view/export/renew. Only closure/closed states take the store
+    // fully offline (fail-closed below).
+    if (
+      ['CLOSURE_PENDING', 'CLOSED', 'ARCHIVED', 'PROVISIONING_FAILED'].includes(
+        organization.status,
+      )
+    ) {
       throw new TenantResolutionException('TENANT_SUSPENDED', HttpStatus_SERVICE_UNAVAILABLE);
     }
 

@@ -1,6 +1,6 @@
 # ADR-0003 — Bounded Tenant Prisma Connection Management
 
-**Status:** ACCEPTED · **Date:** 2026-08-24
+**Status:** ACCEPTED (PO-011: PgBouncer escalation confirmed) · **Date:** 2026-08-24
 
 ## Context
 
