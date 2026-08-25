@@ -16,6 +16,7 @@ import {
   usageMetricKeys,
 } from './services/usage-metrics.registry';
 import { UsageReconciliationService } from '../tenancy/usage-reconciliation.service';
+import { TenantSchemaBootstrapper } from '../tenancy/tenant-schema.bootstrapper';
 import { JwtService } from '@nestjs/jwt';
 import {
   PlatformAuthGuard,
@@ -66,6 +67,119 @@ export class PlatformAdminController {
   @PlatformPermissions('organization:read')
   listOrganizations() {
     return this.organizations.list();
+  }
+
+  private async organizationNames(): Promise<Map<string, string>> {
+    const orgs = await this.platformPrisma.client.organization.findMany({
+      select: { id: true, name: true },
+    });
+    return new Map(orgs.map((org: any) => [org.id, org.name]));
+  }
+
+  /** MT-9 §12.3 — subscription directory for the console billing views. */
+  @Get('subscriptions')
+  @PlatformPermissions('subscription:read')
+  async listSubscriptions() {
+    const rows = await this.platformPrisma.client.subscription.findMany({
+      take: 100,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        organization: { select: { name: true, slug: true, status: true } },
+        plan: { select: { key: true, displayName: true } },
+      },
+    });
+    return {
+      items: rows.map((row: any) => ({
+        id: row.id,
+        organizationId: row.organizationId,
+        organizationName: row.organization?.name ?? '—',
+        organizationSlug: row.organization?.slug ?? '—',
+        planKey: row.plan?.key ?? '—',
+        planName: row.plan?.displayName ?? '—',
+        status: row.status,
+        currentPeriodEnd: row.currentPeriodEnd,
+        cancelAtPeriodEnd: row.cancelAtPeriodEnd,
+      })),
+    };
+  }
+
+  /** MT-9 §12.3 — platform invoices with payment outcome at a glance. */
+  @Get('billing/invoices')
+  @PlatformPermissions('saas_billing:read')
+  async listInvoices() {
+    const [rows, orgNames] = await Promise.all([
+      this.platformPrisma.client.saasInvoice.findMany({
+        take: 100,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.organizationNames(),
+    ]);
+    return {
+      items: rows.map((row: any) => ({
+        id: row.id,
+        number: row.number,
+        organizationName: orgNames.get(row.organizationId) ?? '—',
+        periodStart: row.periodStart,
+        periodEnd: row.periodEnd,
+        amountMinor: row.amountMinor,
+        currency: row.currency,
+        paid: row.paid,
+        createdAt: row.createdAt,
+      })),
+    };
+  }
+
+  /** MT-9 §12.3 — provider payment attempts (initiated/succeeded/failed). */
+  @Get('billing/payment-attempts')
+  @PlatformPermissions('saas_billing:read')
+  async listPaymentAttempts() {
+    const rows = await this.platformPrisma.client.saasPaymentAttempt.findMany({
+      take: 100,
+      orderBy: { createdAt: 'desc' },
+      include: { invoice: { select: { number: true } } },
+    });
+    const orgNames = await this.organizationNames();
+    return {
+      items: rows.map((row: any) => ({
+        id: row.id,
+        invoiceNumber: row.invoice?.number ?? '—',
+        provider: row.provider,
+        reference: row.reference,
+        status: row.status,
+        amountMinor: row.amountMinor,
+        createdAt: row.createdAt,
+      })),
+    };
+  }
+
+  /**
+   * MT-9 §12.1/§12.4 — fleet schema health: every registered tenant
+   * database vs the canonical migration chain head.
+   */
+  @Get('database-health')
+  @PlatformPermissions('organization:read')
+  async databaseHealth() {
+    const bootstrapper = new TenantSchemaBootstrapper();
+    const migrations = bootstrapper.listMigrations();
+    const canonicalHead = migrations.at(-1) ?? null;
+    const rows = await this.platformPrisma.client.tenantDatabase.findMany({
+      orderBy: { createdAt: 'asc' },
+      include: { organization: { select: { name: true, status: true } } },
+    });
+    const databases = rows.map((row: any) => ({
+      tenantDatabaseId: row.id,
+      organizationName: row.organization?.name ?? '—',
+      organizationStatus: row.organization?.status ?? '—',
+      dbStatus: row.status,
+      schemaVersion: row.schemaVersion,
+      upToDate: canonicalHead ? row.schemaVersion === canonicalHead : true,
+    }));
+    return {
+      canonicalHead,
+      totalDatabases: databases.length,
+      upToDateCount: databases.filter((db: any) => db.upToDate).length,
+      databases,
+    };
   }
 
   @Get('organizations/:id')
