@@ -65,7 +65,7 @@ export class TenantDatabaseManager implements OnModuleDestroy {
       return existing.client;
     }
 
-    this.evictForCapacity();
+    await this.evictForCapacity();
 
     let entry: CacheEntry | undefined;
     try {
@@ -79,7 +79,9 @@ export class TenantDatabaseManager implements OnModuleDestroy {
         database: material.databaseName,
         user: material.username,
         password,
-        max: 5,
+        // MT-13 connection budget: per-tenant pools must sum inside the
+        // server's max_connections alongside control plane + workers.
+        max: Math.max(Number(process.env.TENANT_DB_POOL_MAX ?? 3), 1),
         connectionTimeoutMillis: Number(process.env.TENANT_DB_ACQUIRE_TIMEOUT_MS ?? 5000),
       });
       const client = new PrismaClient({ adapter: new PrismaPg(pool) });
@@ -112,11 +114,13 @@ export class TenantDatabaseManager implements OnModuleDestroy {
     };
   }
 
-  private evictForCapacity(): void {
+  private async evictForCapacity(): Promise<void> {
     while (this.cache.size >= this.maxClients) {
       const oldestKey = this.cache.keys().next().value as string | undefined;
       if (!oldestKey) break;
-      void this.disconnect(oldestKey);
+      // Awaited so burst churn can never transiently exceed the configured
+      // client budget or leak pools that are mid-teardown.
+      await this.disconnect(oldestKey);
     }
   }
 

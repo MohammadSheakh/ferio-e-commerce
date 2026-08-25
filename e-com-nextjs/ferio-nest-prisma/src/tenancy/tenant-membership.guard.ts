@@ -42,11 +42,60 @@ export class TenantMembershipService {
   >();
   private readonly CACHE_TTL_MS = 60_000;
 
-  constructor(private readonly platformClient: {
-    organizationMember: {
-      findFirst: (args: unknown) => Promise<MemberRow | null>;
-    };
-  }) {}
+  private readonly CHANNEL = 'tenancy:membership:invalidate';
+
+  constructor(
+    private readonly platformClient: {
+      organizationMember: {
+        findFirst: (args: unknown) => Promise<MemberRow | null>;
+      };
+    },
+    /**
+     * MT-13 multi-instance correctness: when present, invalidations are
+     * published to Redis and every backend instance subscribed here clears
+     * its local slice immediately — a deactivated staffer cannot ride
+     * another node's 60s cache tail.
+     */
+    private readonly redis?: {
+      getClient(): Promise<
+        | {
+            duplicate(): unknown;
+            publish(topic: string, payload: string): unknown;
+          }
+        | null
+      >;
+    },
+  ) {}
+
+  /**
+   * Wire cross-instance invalidation. Called by the tenancy module at
+   * bootstrap; failures degrade to per-process caching only.
+   */
+  async initCrossInstanceInvalidation(): Promise<void> {
+    if (!this.redis) return;
+    try {
+      const client = await this.redis.getClient();
+      if (!client) return;
+      const subscriber = client.duplicate() as {
+        on(event: 'message', handler: (channel: string, payload: string) => void): unknown;
+        subscribe(channel: string): Promise<unknown>;
+      };
+      subscriber.on('message', (_channel: string, payload: string) => {
+        try {
+          const parsed = JSON.parse(payload) as {
+            organizationId?: string;
+            email?: string;
+          };
+          this.clearLocal(parsed.organizationId, parsed.email);
+        } catch {
+          this.clearLocal();
+        }
+      });
+      await subscriber.subscribe(this.CHANNEL);
+    } catch {
+      // Cache stays local-only; TTL bounds staleness regardless.
+    }
+  }
 
   /** Active roster lookup with a short per-process cache (roster is cold data). */
   async findActive(
@@ -74,8 +123,26 @@ export class TenantMembershipService {
     return row ? { membershipId: row.id, role: row.role } : null;
   }
 
-  /** Roster changes take effect immediately for the affected identity. */
+  /** Roster changes take effect immediately for the affected identity —
+   * locally AND on every peer instance via the Redis channel. */
   invalidate(organizationId?: string, email?: string): void {
+    this.clearLocal(organizationId, email);
+    if (!this.redis) return;
+    void (async () => {
+      try {
+        const client = await this.redis!.getClient();
+        if (!client) return;
+        await client.publish(
+          this.CHANNEL,
+          JSON.stringify({ organizationId, email }),
+        );
+      } catch {
+        // Local clear already applied; peers expire via TTL.
+      }
+    })();
+  }
+
+  private clearLocal(organizationId?: string, email?: string): void {
     if (organizationId && email) {
       this.cache.delete(`${organizationId}:${email.toLowerCase()}`);
     } else if (!organizationId && !email) {

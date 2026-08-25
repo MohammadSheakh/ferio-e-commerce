@@ -62,7 +62,17 @@ export class TenantResolverService implements OnModuleInit {
     }
     if (cached) return cached;
 
-    const resolved = await this.resolveFromControlPlane(hostname);
+    let resolved: ResolvedTenant;
+    try {
+      resolved = await this.resolveFromControlPlane(hostname);
+    } catch (error) {
+      // Stable codes at the boundary: infrastructure outages must never leak
+      // driver errors to callers, must fail closed, and must NOT be
+      // negatively cached (an outage is not an answer).
+      if (error instanceof TenantResolutionException) throw error;
+      TenantMetrics.increment('resolver_failed', { hostname });
+      throw new TenantResolutionException('TENANT_RESOLUTION_FAILED');
+    }
     await this.writeCache(hostname, resolved);
     return resolved;
   }
@@ -79,6 +89,10 @@ export class TenantResolverService implements OnModuleInit {
 
     if (!domain || domain.status !== 'ACTIVE') {
       TenantMetrics.increment('resolver_unknown_domain', { hostname });
+      // Definitive "no active tenant here": cache it so hostile/garbage
+      // host storms cannot reach the control plane. Only true unknowns are
+      // negatively cached — control-plane outages never are.
+      await this.writeNegative(hostname);
       throw new TenantResolutionException('TENANT_RESOLUTION_FAILED');
     }
 
@@ -144,6 +158,21 @@ export class TenantResolverService implements OnModuleInit {
       ]);
     } catch {
       // Best-effort; TTL bounds staleness regardless.
+    }
+  }
+
+  private async writeNegative(hostname: string): Promise<void> {
+    try {
+      const client = await this.redis.getClient();
+      if (!client) return;
+      await client.set(
+        this.negativeKey(hostname),
+        '1',
+        'EX',
+        NEGATIVE_CACHE_TTL_SECONDS,
+      );
+    } catch {
+      // Best-effort; an uncached miss just costs one lookup.
     }
   }
 
