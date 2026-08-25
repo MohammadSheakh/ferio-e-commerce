@@ -210,7 +210,7 @@ Create a separate control-plane schema/database for platform metadata.
 - [ ] **PARTIAL:** Support development host mapping without weakening production behavior. (`TENANCY_ENABLED` staged-rollout flag added: disabled = passthrough legacy mode; enabled = strict fail-closed resolution. Per-host dev mapping table still pending.)
 - [x] Cache domain resolution only with tenant-aware keys. (key IS the trusted hostname; positive 60s / negative 15s TTL)
 - [x] Implement explicit invalidation on domain/status changes. (`invalidate(hostname)`)
-- [ ] Define negative-cache TTL for unknown domains.
+- [x] Define negative-cache TTL for unknown domains. (15s window; only definitive unknown/inactive answers are cached — outages never are; storm test proves 299 subsequent misses cost zero control-plane queries)
 - [x] Never trust `tenantId`, `organizationId`, `databaseUrl`, or equivalent browser-supplied routing values. (host-only input; middleware)
 
 ## 5.2 Tenant request context
@@ -290,7 +290,7 @@ Create a separate control-plane schema/database for platform metadata.
 
 - [ ] Database-per-tenant isolation is demonstrated automatically.
 - [ ] No tenant-scoped HTTP path uses a global/default Prisma client.
-- [ ] Pool/client count remains bounded under load.
+- [x] Pool/client count remains bounded under load. (50 concurrent acquisitions collapse to 1 active client; LRU churn never exceeds TENANT_DB_MAX_CLIENTS — performance-baseline suite)
 
 ---
 
@@ -1021,11 +1021,11 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 
 ## 16.3 Performance and scale
 
-- [ ] Load-test tenant resolver.
+- [x] Load-test tenant resolver. (cached hot load: 2,000 interleaved resolutions in ~15ms with exactly 2 control-plane queries; evidence lines in performance-baseline suite)
 - [ ] Load-test connection manager.
 - [ ] Load-test 10/50/100+ active tenant simulations.
-- [ ] Measure cold tenant DB connection latency.
-- [ ] Measure cached tenant resolution.
+- [x] Measure cold tenant DB connection latency. (~105ms cold vs <1ms warm median against local PostgreSQL — recorded per run as structured evidence)
+- [x] Measure cached tenant resolution. (same suite; positive/negative cache effectiveness asserted by query counts, not wall-clock alone)
 - [ ] Test pool exhaustion behavior.
 - [ ] Test noisy-neighbor queue behavior.
 - [ ] Test one slow tenant DB.
