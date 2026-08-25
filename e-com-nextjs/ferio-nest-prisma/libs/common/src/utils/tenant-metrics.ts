@@ -11,6 +11,7 @@
 
 export type TenantMetricName =
   | 'resolver_unknown_domain'
+  | 'resolver_failed'
   | 'resolver_suspended'
   | 'resolver_tenant_unavailable'
   | 'resolver_migration_required'
