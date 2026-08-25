@@ -113,7 +113,7 @@ conditionalDescribe('Two-Tenant End-to-End Vertical Proof', () => {
       port: serverConfig().port,
       databaseName: database,
       username: serverConfig().user,
-      credentialCipher: encryptSecret(`pw-${database}`, CREDENTIAL_KEY),
+      credentialCipher: encryptSecret(serverConfig().password, CREDENTIAL_KEY),
     };
   }
 

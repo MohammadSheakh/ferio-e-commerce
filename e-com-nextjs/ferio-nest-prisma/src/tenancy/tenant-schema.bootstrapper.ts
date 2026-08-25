@@ -124,15 +124,15 @@ export class TenantSchemaBootstrapper {
       // Store identity defaults to the tenant's own name; support channels
       // intentionally empty until configured by the owner.
       await pool.query(
-        `INSERT INTO "CommerceSettings" ("id", "storeName")
-         VALUES ('default', $1)
+        `INSERT INTO "CommerceSettings" ("id", "storeName", "createdAt", "updatedAt")
+         VALUES ('default', $1, now(), now())
          ON CONFLICT ("id") DO NOTHING`,
         [connection.organizationName ?? 'My Store'],
       );
       // COD verification starts at its safest mode.
       await pool.query(
-        `INSERT INTO "CodVerificationPolicy" ("id", "mode")
-         VALUES ('default', 'ALWAYS')
+        `INSERT INTO "CodVerificationPolicy" ("id", "mode", "createdAt", "updatedAt")
+         VALUES ('default', 'ALWAYS', now(), now())
          ON CONFLICT ("id") DO NOTHING`,
       );
     } finally {

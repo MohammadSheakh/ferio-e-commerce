@@ -1,8 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { randomBytes } from 'crypto';
+import { PlatformPrismaService } from '../platform-prisma.service';
 import type { Pool } from 'pg';
 import {
   TenantDatabaseProvisioner,
+  type CreatedTenantDatabase,
 } from './tenant-database-provisioner.interface';
 
 /**

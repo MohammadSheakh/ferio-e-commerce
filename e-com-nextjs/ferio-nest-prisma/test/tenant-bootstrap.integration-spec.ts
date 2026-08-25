@@ -115,7 +115,7 @@ conditionalDescribe('TenantSchemaBootstrapper (real PostgreSQL)', () => {
 
     // Deliberately similar identifiers in both databases.
     await poolA.query(
-      `INSERT INTO "Brand" ("id", "name", "slug") VALUES ('shared-brand-1', 'Shared Brand', 'shared-brand')`,
+      `INSERT INTO "Brand" ("id", "name", "slug", "createdAt", "updatedAt") VALUES ('shared-brand-1', 'Shared Brand', 'shared-brand', now(), now())`,
     );
 
     const seenInA = await poolA.query(`SELECT "name" FROM "Brand" WHERE id = 'shared-brand-1'`);
@@ -125,7 +125,7 @@ conditionalDescribe('TenantSchemaBootstrapper (real PostgreSQL)', () => {
 
     // B can use the same identifier for its own data without collision.
     await poolB.query(
-      `INSERT INTO "Brand" ("id", "name", "slug") VALUES ('shared-brand-1', 'B Own Brand', 'shared-brand')`,
+      `INSERT INTO "Brand" ("id", "name", "slug", "createdAt", "updatedAt") VALUES ('shared-brand-1', 'B Own Brand', 'shared-brand', now(), now())`,
     );
     const bOwn = await poolB.query(`SELECT "name" FROM "Brand" WHERE id = 'shared-brand-1'`);
     expect(bOwn.rows[0].name).toBe('B Own Brand');
@@ -160,11 +160,11 @@ conditionalDescribe('TenantSchemaBootstrapper (real PostgreSQL)', () => {
     for (const dbName of [dbA, dbB]) {
       const pool = new Pool({ ...config, database: dbName, max: 1 });
       await pool.query(
-        `INSERT INTO "Category" ("id", "name", "slug") VALUES ('shared-cat-1', 'Shared', 'shared')`,
+        `INSERT INTO "Category" ("id", "name", "slug", "createdAt", "updatedAt") VALUES ('shared-cat-1', 'Shared', 'shared', now(), now())`,
       );
       await pool.query(
-        `INSERT INTO "Product" ("id", "name", "slug", "description", "status", "categoryId")
-         VALUES ('shared-prod-1', 'Shared Product', 'shared-product', 'desc', 'DRAFT', 'shared-cat-1')`,
+        `INSERT INTO "Product" ("id", "name", "slug", "description", "status", "categoryId", "createdAt", "updatedAt")
+         VALUES ('shared-prod-1', 'Shared Product', 'shared-product', 'desc', 'DRAFT', 'shared-cat-1', now(), now())`,
       );
       await pool.end();
     }

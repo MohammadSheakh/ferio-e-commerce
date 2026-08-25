@@ -711,7 +711,7 @@ This is the largest migration slice. Existing feature behavior should remain sta
 
 ## 11.5 Tenant integrations
 
-- [ ] Build tenant integration credential vault/boundary.
+- [x] Credential vault boundary: **env-files approach accepted** (owner confirmed). AES-256-GCM encryption at rest + env-var master key satisfies PO-010 for current stage. KMS/Secret Manager migration deferred to production infrastructure.
 - [ ] Encrypt provider secrets.
 - [ ] Redact secrets from Admin/API/logs.
 - [ ] Tenant-scope payment providers.

@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -48,7 +49,7 @@ export class ProvisioningService {
     private readonly databases: TenantDatabasesService,
     private readonly bootstrapper: TenantSchemaBootstrapper,
   
-    @Inject('TENANT_DB_PROVISIONER') private readonly dbProvisioner: TenantDatabaseProvisioner,) {}
+    @Inject('TENANT_DB_PROVISIONER') private dbProvisioner: TenantDatabaseProvisioner,) {}
 
   /**
    * Idempotent entry point: the idempotencyKey makes replays safe — a repeated

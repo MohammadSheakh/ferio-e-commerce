@@ -1,0 +1,46 @@
+# ─── Ferio Commerce SaaS — Development Environment ───
+# Provides PostgreSQL (control plane + tenant DBs on same server) and Redis.
+# Run your apps natively against these containers.
+#
+#   docker compose up -d
+#
+# Then set these env vars in ferio-nest-prisma/.env:
+#   DATABASE_URL=postgresql://ferio:ferio@localhost:5432/ferio_dev
+#   PLATFORM_DATABASE_URL=postgresql://ferio:ferio@localhost:5432/ferio_platform
+#   REDIS_HOST=localhost
+#   REDIS_PORT=6379
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: ferio-postgres
+    environment:
+      POSTGRES_USER: ferio
+      POSTGRES_PASSWORD: ferio
+      POSTGRES_DB: ferio_dev
+      # Additional databases created by init script below
+      POSTGRES_MULTIPLE_DATABASES: ferio_platform
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ferio"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: ferio-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  pg_data:

@@ -50,8 +50,14 @@ const shipping = new ShippingService(
   prismaService,
   pathaoAdapter,
   new SteadfastAdapter(config),
+  new (require('../src/features/shipping/adapters/redx.adapter').RedxAdapter)(config),
+  new (require('../src/features/shipping/adapters/ecourier.adapter').EcourierAdapter)(config),
+  new (require('../src/features/shipping/adapters/paperfly.adapter').PaperflyAdapter)(config),
+  new (require('../src/features/shipping/adapters/carrybee.adapter').CarrybeeAdapter)(config),
+  new (require('../src/features/shipping/courier-router.service').CourierRouterService)(prismaService, config),
   messages,
   audit,
+  undefined, // tenantDb: legacy mode; suite targets the canonical database directly
 );
 const polling = new ShippingPollingService(prismaService, shipping);
 
