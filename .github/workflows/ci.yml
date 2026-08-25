@@ -63,6 +63,10 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Generate Prisma clients (tenant + platform)
         run: pnpm prisma:generate
+        env:
+          # Prisma 7 config resolves the datasource URL even for generate;
+          # no connection is attempted, so the service container URL suffices.
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
       - name: Strict typecheck (incl. specs)
         run: pnpm exec tsc --noEmit -p tsconfig.json
       - name: Production build
