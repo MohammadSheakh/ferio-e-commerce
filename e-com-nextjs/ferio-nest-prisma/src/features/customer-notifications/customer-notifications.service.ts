@@ -1,6 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { NotificationType, Prisma } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import { PrismaService } from '@app/database';
+import { TenantDbService } from '../../tenancy/tenant-db.service';
 
 export type CreateCustomerNotificationInput = {
   userId: string;
@@ -17,11 +19,24 @@ export type CreateCustomerNotificationInput = {
 
 @Injectable()
 export class CustomerNotificationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+  
+    @Optional() private readonly tenantDb?: TenantDbService,) {}
+
+  /**
+   * MT-7: inside a tenant-resolved request this returns the resolved tenant
+   * database client; outside one it explicitly falls back to the legacy DB.
+   */
+  private async db(): Promise<PrismaClient> {
+    const tenant = await this.tenantDb?.tryGet();
+    return tenant ?? (this.prisma as PrismaClient);
+  }
 
   async create(input: CreateCustomerNotificationInput) {
+    const db = await this.db();
     try {
-      return await this.prisma.notification.create({
+      return await db.notification.create({
         data: {
           receiverId: input.userId,
           deduplicationKey: input.deduplicationKey,
@@ -43,7 +58,7 @@ export class CustomerNotificationsService {
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2002'
       ) {
-        return this.prisma.notification.findUnique({
+        return db.notification.findUnique({
           where: { deduplicationKey: input.deduplicationKey },
         });
       }
@@ -55,7 +70,8 @@ export class CustomerNotificationsService {
     customerId: string,
     input: Omit<CreateCustomerNotificationInput, 'userId'>,
   ) {
-    const user = await this.prisma.user.findUnique({
+    const db = await this.db();
+    const user = await db.user.findUnique({
       where: { customerId },
       select: { id: true, isDeleted: true },
     });
@@ -64,6 +80,7 @@ export class CustomerNotificationsService {
   }
 
   async list(userId: string, page = 1, limit = 20, unreadOnly = false) {
+    const db = await this.db();
     const boundedPage = Math.max(1, page);
     const boundedLimit = Math.min(50, Math.max(1, limit));
     const where: Prisma.NotificationWhereInput = {
@@ -72,7 +89,7 @@ export class CustomerNotificationsService {
       ...(unreadOnly ? { isRead: false } : {}),
     };
     const [items, total, unread] = await Promise.all([
-      this.prisma.notification.findMany({
+      db.notification.findMany({
         where,
         orderBy: { createdAt: 'desc' },
         skip: (boundedPage - 1) * boundedLimit,
@@ -93,8 +110,8 @@ export class CustomerNotificationsService {
           createdAt: true,
         },
       }),
-      this.prisma.notification.count({ where }),
-      this.prisma.notification.count({
+      db.notification.count({ where }),
+      db.notification.count({
         where: { receiverId: userId, isDeleted: false, isRead: false },
       }),
     ]);
@@ -108,14 +125,16 @@ export class CustomerNotificationsService {
     };
   }
 
-  unreadCount(userId: string) {
-    return this.prisma.notification.count({
+  async unreadCount(userId: string) {
+    const db = await this.db();
+    return db.notification.count({
       where: { receiverId: userId, isDeleted: false, isRead: false },
     });
   }
 
   async markRead(userId: string, id: string) {
-    const result = await this.prisma.notification.updateMany({
+    const db = await this.db();
+    const result = await db.notification.updateMany({
       where: { id, receiverId: userId, isDeleted: false },
       data: { isRead: true, readAt: new Date(), status: 'read' },
     });
@@ -124,7 +143,8 @@ export class CustomerNotificationsService {
   }
 
   async markAllRead(userId: string) {
-    const result = await this.prisma.notification.updateMany({
+    const db = await this.db();
+    const result = await db.notification.updateMany({
       where: { receiverId: userId, isDeleted: false, isRead: false },
       data: { isRead: true, readAt: new Date(), status: 'read' },
     });
@@ -132,7 +152,8 @@ export class CustomerNotificationsService {
   }
 
   async remove(userId: string, id: string) {
-    const result = await this.prisma.notification.updateMany({
+    const db = await this.db();
+    const result = await db.notification.updateMany({
       where: { id, receiverId: userId, isDeleted: false },
       data: { isDeleted: true },
     });

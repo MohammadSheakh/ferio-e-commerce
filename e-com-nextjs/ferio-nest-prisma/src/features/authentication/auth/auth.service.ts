@@ -1,6 +1,7 @@
 import {
   Injectable,
   UnauthorizedException,
+  ServiceUnavailableException,
   BadRequestException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -305,7 +306,12 @@ export class AuthService {
     });
 
     if (existingUser) {
-      throw new BadRequestException('Email already registered');
+      // Enumeration-safe: respond identically to a successful registration
+      // without sending anything or revealing that the account exists.
+      return {
+        user: null,
+        message: 'Registration successful. Please verify your email.',
+      };
     }
 
     const hashedPassword = await bcrypt.hash(password, 12);
@@ -392,7 +398,19 @@ export class AuthService {
    */
   async refreshToken(refreshToken: string) {
     const client = await this.redisService.getClient();
-    if (client) {
+    // Fail closed: without Redis we cannot consult the revocation blacklist,
+    // so refresh must be refused rather than risk accepting revoked tokens.
+    if (!client) {
+      this.logger.error(
+        'authentication_refresh_service_unavailable',
+        new Error('Redis client unavailable'),
+        {},
+      );
+      throw new ServiceUnavailableException(
+        'Session service temporarily unavailable. Please sign in again.',
+      );
+    }
+    {
       const isBlacklisted = await client.get(
         this.getBlacklistKey(refreshToken),
       );
@@ -559,6 +577,14 @@ export class AuthService {
         'blacklisted',
         'EX',
         ttl || this.TOKEN_BLACKLIST_TTL,
+      );
+    } else {
+      // Revocation evidence could not be recorded. Refresh fails closed while
+      // Redis is unavailable, so revoked tokens still cannot be replayed.
+      this.logger.error(
+        'authentication_revocation_not_persisted',
+        new Error('Redis client unavailable during logout/refresh revocation'),
+        {},
       );
     }
   }

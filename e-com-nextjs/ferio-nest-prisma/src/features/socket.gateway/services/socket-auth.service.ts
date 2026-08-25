@@ -9,6 +9,15 @@ export interface SocketUser {
   userId: string;
   role: string;
   name: string;
+  /** Resolved tenant binding (MT-8 §11.3): present when the ticket was
+   * minted inside a tenant-resolved storefront request. */
+  organizationId?: string;
+}
+
+/** Tenant-scoped room names (MT-8 §11.3): identical room identifiers across
+ * tenants can never share a channel. Legacy sockets keep historical names. */
+export function scopedSocketRoom(user: { organizationId?: string } | null | undefined, room: string): string {
+  return user?.organizationId ? `org:${user.organizationId}:${room}` : room;
 }
 
 const ADMIN_ROLES = new Set(['admin', 'super_admin', 'super-admin']);
@@ -65,7 +74,7 @@ export class SocketAuthService implements OnModuleInit {
       // Verify JWT token
       try {
         const payload = await this.jwtService.verifyAsync(token, {
-          secret: process.env.JWT_ACCESS_SECRET || 'fallback-secret',
+          secret: process.env.JWT_ACCESS_SECRET as string,
         });
 
         if (payload?.purpose === 'chat_socket' && payload.userId && payload.role === 'guest') {
@@ -74,6 +83,7 @@ export class SocketAuthService implements OnModuleInit {
             userId: normalizedGuestId || `guest_${socket.id.slice(0, 8)}`,
             role: 'guest',
             name: 'Guest Visitor',
+            organizationId: payload.organizationId,
           };
         }
 
@@ -90,6 +100,7 @@ export class SocketAuthService implements OnModuleInit {
               userId: user.id,
               role: user.role,
               name: user.name,
+              organizationId: payload.organizationId,
             };
           }
 
@@ -104,23 +115,19 @@ export class SocketAuthService implements OnModuleInit {
               userId: rider.id,
               role: 'delivery_man',
               name: rider.name || 'Delivery Rider',
+              organizationId: payload.organizationId,
             };
           }
 
-          // Generic token payload fallback
-          return {
-            userId: targetId,
-            role: payload.role || 'guest',
-            name: payload.name || 'Visitor',
-          };
+          // Valid token for an account that no longer resolves (deleted user,
+          // stale rider): reject instead of trusting claim-derived roles.
+          return null;
         }
       } catch {
-        // Fall back to guest session if token is expired or invalid
-        return {
-          userId: this.normalizeGuestId(guestId) || `guest_${socket.id.slice(0, 8)}`,
-          role: 'guest',
-          name: 'Guest Visitor',
-        };
+        // A supplied-but-invalid token must never silently downgrade into a
+        // guest session bound to a client-asserted ID. Reject the socket;
+        // genuine guests connect without a token.
+        return null;
       }
 
       return {
@@ -138,12 +145,18 @@ export class SocketAuthService implements OnModuleInit {
     }
   }
 
-  issueSocketTicket(user: { userId: string; email?: string; role: string }) {
+  issueSocketTicket(user: {
+    userId: string;
+    email?: string;
+    role: string;
+    organizationId?: string;
+  }) {
     return this.jwtService.signAsync(
       {
         userId: user.userId,
         email: user.email || '',
         role: user.role,
+        ...(user.organizationId ? { organizationId: user.organizationId } : {}),
         purpose: 'chat_socket',
       },
       {

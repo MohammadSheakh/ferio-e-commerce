@@ -1,6 +1,8 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import type { Job } from 'bullmq';
 import { QUEUE_NAMES } from '@app/queue';
+import { Optional } from '@nestjs/common';
+import { TenantFanoutService } from '../../tenancy/tenant-fanout.service';
 import { runWithCorrelationId, StructuredLogger } from '@app/common';
 import { ShippingPollingService } from './shipping-polling.service';
 import {
@@ -17,6 +19,7 @@ export class ShippingPollingProcessor extends WorkerHost {
   constructor(
     private readonly polling: ShippingPollingService,
     private readonly pollingQueue: ShippingPollingQueue,
+    @Optional() private readonly fanout?: TenantFanoutService,
   ) {
     super();
   }
@@ -34,7 +37,12 @@ export class ShippingPollingProcessor extends WorkerHost {
       if (job.name !== COURIER_POLL_JOB || !job.data.pollAttemptId) {
         throw new Error(`Unsupported courier polling job: ${job.name}`);
       }
-      return this.polling.execute(job.data.pollAttemptId);
+      const organizationId = (job.data as { organizationId?: string }).organizationId;
+      if (!organizationId) return this.polling.execute(job.data.pollAttemptId);
+      const pollAttemptId = job.data.pollAttemptId as string;
+      return this.fanout!.forOrganization(organizationId, () =>
+        this.polling.execute(pollAttemptId),
+      );
     });
   }
 }

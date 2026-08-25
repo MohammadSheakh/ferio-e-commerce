@@ -83,10 +83,11 @@ export class AamarpayGateway extends PaymentGateway {
       merchantTransactionId: String(
         raw.mer_txnid ?? raw.request_id ?? merchantTransactionId,
       ),
-      amount: this.minorAmount(raw.amount ?? payload.amount),
-      currency: String(
-        raw.currency ?? raw.currency_merchant ?? payload.currency ?? '',
-      ),
+      // Trust only provider-reported values at this trust boundary; falling
+      // back to callback payload would let callers influence amount/currency
+      // comparisons. Missing provider values fail the equality check closed.
+      amount: raw.amount !== undefined ? this.minorAmount(raw.amount) : undefined,
+      currency: String(raw.currency ?? raw.currency_merchant ?? ''),
       providerTransactionId: String(raw.pg_txnid ?? raw.bank_txn ?? ''),
       raw,
     };

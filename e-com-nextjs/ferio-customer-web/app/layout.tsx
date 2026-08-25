@@ -11,6 +11,8 @@ import PageTracker from "@/components/PageTracker";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import { fallbackStoreConfig, getStoreConfig } from "@/lib/store";
 import { getCategories } from "@/lib/catalog";
+import { getTenantStatus } from "@/lib/tenancy";
+import { tenantStateForCode } from "@/components/tenant-states";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -31,6 +33,19 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // MT-5: the backend decides whether this host is a store. Non-active states
+  // replace the entire storefront — chrome, data fetches and all.
+  const tenant = await getTenantStatus();
+  if (tenant.code !== "ACTIVE" && tenant.code !== "LEGACY") {
+    return (
+      <html lang="en">
+        <body className={`${inter.variable} font-sans text-ink antialiased`}>
+          {tenantStateForCode(tenant.code, tenant.storeName)}
+        </body>
+      </html>
+    );
+  }
+
   const [store, categories] = await Promise.all([
     getStoreConfig().catch(() => fallbackStoreConfig),
     getCategories().catch(() => []),

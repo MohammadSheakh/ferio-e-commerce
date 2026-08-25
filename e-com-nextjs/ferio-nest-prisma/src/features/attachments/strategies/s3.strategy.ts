@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
+import { tenantObjectKey } from '../../../tenancy/object-keys.util';
   S3Client,
   PutObjectCommand,
   DeleteObjectCommand,
@@ -43,7 +44,8 @@ export class S3Strategy implements IFileUploadStrategy {
    */
   async uploadFile(file: Express.Multer.File, folder: string): Promise<FileUploadResult> {
     try {
-      const fileName = `${folder}/${Date.now()}-${file.originalname.replace(/\s+/g, '-')}`;
+      // PO-017: keys are namespaced under the resolved organization.
+      const fileName = tenantObjectKey(folder, `${Date.now()}-${file.originalname.replace(/\s+/g, '-')}`);
 
       const uploadParams = {
         Bucket: process.env.AWS_BUCKET_NAME!,

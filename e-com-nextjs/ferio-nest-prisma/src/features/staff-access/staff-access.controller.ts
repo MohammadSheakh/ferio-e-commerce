@@ -17,6 +17,7 @@ import {
   User,
 } from '@app/common';
 import type { UserPayload } from '@app/common';
+import { TenantMembershipGuard } from '../../tenancy/tenant-membership.guard';
 import {
   CompleteStaffAccessDto,
   InviteStaffDto,
@@ -40,7 +41,7 @@ export class PublicStaffAccessController {
 }
 
 @Controller('admin/staff')
-@UseGuards(AuthGuard, RolesGuard, PermissionsGuard)
+@UseGuards(AuthGuard, RolesGuard, PermissionsGuard, TenantMembershipGuard)
 @Roles('admin')
 @Permissions(PERMISSIONS.STAFF_READ)
 export class AdminStaffAccessController {

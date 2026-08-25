@@ -55,10 +55,12 @@ export class RedxAdapter implements CourierAdapter {
         : 1,
       customer_address: input.recipientAddress,
       merchant_invoice_id: input.orderReference,
-      cash_collection_amount: String(input.codAmount),
+      // RedX expects amounts in major units (BDT taka); internal money is
+      // minor units (poisha) — divide to avoid demanding 100x COD at the door.
+      cash_collection_amount: String(input.codAmount / 100),
       parcel_weight: Math.max(100, input.weightGrams),
       instruction: input.note || input.itemDescription,
-      value: input.codAmount,
+      value: input.codAmount / 100,
     };
 
     const response = await fetch(`${this.baseUrl.replace(/\/$/, '')}/parcel`, {

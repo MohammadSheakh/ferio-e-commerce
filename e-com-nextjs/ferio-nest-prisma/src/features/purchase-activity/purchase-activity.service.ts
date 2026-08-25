@@ -1,13 +1,29 @@
-import { Injectable } from '@nestjs/common';
+import {
+  Injectable,
+  Optional,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import { PrismaService } from '@app/database';
+import { TenantDbService } from '../../tenancy/tenant-db.service';
 import { PurchaseActivityQueryDto } from './purchase-activity.dto';
 import { maskPurchaseCustomerName } from './purchase-activity.util';
 
 @Injectable()
 export class PurchaseActivityService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly tenantDb?: TenantDbService,
+  ) {}
 
+  /**
+   * MT-7/MT-8: tenant client inside resolved storefront/admin requests;
+   * explicit legacy fallback otherwise. Never guesses.
+   */
+  private async db(): Promise<PrismaClient> {
+    const tenant = await this.tenantDb?.tryGet();
+    return tenant ?? (this.prisma as PrismaClient);
+  }
   async getPublic(query: PurchaseActivityQueryDto) {
     const settings = await this.getSettings();
     const enabled =
@@ -26,6 +42,7 @@ export class PurchaseActivityService {
     query: PurchaseActivityQueryDto,
     settings: Awaited<ReturnType<PurchaseActivityService['getSettings']>>,
   ) {
+    const db = await this.db();
     const cutoff = new Date(
       Date.now() - settings.purchaseActivityMaxAgeDays * 86_400_000,
     );
@@ -44,7 +61,7 @@ export class PurchaseActivityService {
       items: { some: visibleItemWhere },
     };
     const [orders, total] = await Promise.all([
-      this.prisma.order.findMany({
+      db.order.findMany({
         where,
         skip: (query.page - 1) * query.limit,
         take: query.limit,
@@ -72,7 +89,7 @@ export class PurchaseActivityService {
           },
         },
       }),
-      this.prisma.order.count({ where }),
+      db.order.count({ where }),
     ]);
     return this.response(
       orders.map((order) => {
@@ -127,8 +144,9 @@ export class PurchaseActivityService {
     };
   }
 
-  private getSettings() {
-    return this.prisma.commerceSettings.upsert({
+  private async getSettings() {
+    const db = await this.db();
+    return db.commerceSettings.upsert({
       where: { id: 'default' },
       update: {},
       create: { id: 'default', storeName: 'Ferio' },

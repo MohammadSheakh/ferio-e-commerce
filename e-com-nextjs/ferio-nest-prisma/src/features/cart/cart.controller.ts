@@ -20,6 +20,7 @@ import {
   User,
 } from '@app/common';
 import type { UserPayload } from '@app/common';
+import { TenantMembershipGuard } from '../../tenancy/tenant-membership.guard';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CartService } from './cart.service';
 import {
@@ -135,23 +136,26 @@ export class CartController {
   }
 
   @Post('reorder/:orderId')
-  @ApiOperation({ summary: 'Reorder available items from a past order into active cart' })
+  @UseGuards(AuthGuard)
+  @ApiOperation({ summary: 'Reorder available items from one of your past orders into active cart' })
   reorder(
     @Param('orderId') orderId: string,
     @Body() dto: ReorderDto,
+    @User() user: UserPayload,
     @Headers('x-cart-token') token?: string,
   ) {
     return this.cartService.reorderFromOrder(
       orderId,
       dto.orderItemIds,
       token,
+      user,
     );
   }
 }
 
 @ApiTags('Admin Cart Eligibility')
 @Controller('admin/abandoned-carts')
-@UseGuards(AuthGuard, RolesGuard, PermissionsGuard)
+@UseGuards(AuthGuard, RolesGuard, PermissionsGuard, TenantMembershipGuard)
 @Roles('admin')
 @Permissions(PERMISSIONS.MESSAGING_READ)
 export class AdminCartEligibilityController {

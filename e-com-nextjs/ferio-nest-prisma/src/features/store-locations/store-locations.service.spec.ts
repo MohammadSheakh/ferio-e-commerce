@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import type { UserPayload } from '@app/common';
 import { StoreLocationsService } from './store-locations.service';
 import { PrismaService } from '@app/database';
 import { AuditService } from '../audit/audit.service';
@@ -10,7 +11,7 @@ describe('StoreLocationsService', () => {
   let audit: AuditService;
 
   const mockAdminActor = {
-    sub: 'admin-1',
+    userId: 'admin-1',
     email: 'admin@ferio.com',
     role: 'admin' as const,
   };

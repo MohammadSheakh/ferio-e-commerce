@@ -1,4 +1,5 @@
 import { withCorrelationId } from "@/lib/correlation";
+import { hostForwardHeaders } from "@/lib/host-forward";
 
 function getBackendApiUrl(): string {
   if (process.env.NEXT_PUBLIC_FERIO_API_URL) {
@@ -37,14 +38,20 @@ export async function getPublicApi<T>(
   path: string,
   init?: RequestInit,
 ): Promise<T> {
+  // Server components must forward the storefront host so the backend can
+  // resolve the tenant; client components have nothing to forward.
+  const tenantHeaders =
+    typeof window === "undefined" ? await hostForwardHeaders() : {};
   const response = await fetch(
     `${getBackendApiUrl()}${path.startsWith("/") ? path : `/${path}`}`,
     {
       ...init,
       headers: withCorrelationId({
         Accept: "application/json",
+        ...tenantHeaders,
         ...init?.headers,
       }),
+      ...(typeof window === "undefined" ? { cache: init?.cache ?? "no-store" } : {}),
     },
   );
 

@@ -1,11 +1,17 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '@app/database';
+import type { PrismaClient } from '@prisma/client';
+import { Optional } from '@nestjs/common';
+import { assertTenantCommerceWritable } from '../../tenancy/commerce-write-guard.util';
+import { TenantDbService } from '../../tenancy/tenant-db.service';
+import { tryGetTenantContext } from '../../tenancy/tenant-context';
 import type { UserPayload } from '@app/common';
 import { AuditService } from '../audit/audit.service';
 import {
@@ -51,7 +57,20 @@ export class CatalogService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    @Optional() private readonly tenantDb?: TenantDbService,
+    @Optional() private readonly entitlements?: import('../../platform/services/entitlements.service').EntitlementsService,
   ) {}
+
+  /**
+   * MT-7 storefront reads: inside a tenant-resolved request this returns the
+   * resolved tenant database client; outside one (legacy deployments, admin
+   * plane during migration) it falls back to the legacy single-tenant DB.
+   * The fallback is EXPLICIT here — TenantDbService.tryGet() never guesses.
+   */
+  private async db(): Promise<PrismaClient> {
+    const tenant = await this.tenantDb?.tryGet();
+    return tenant ?? (this.prisma as PrismaClient);
+  }
 
   private slugify(value: string): string {
     return value
@@ -259,8 +278,9 @@ export class CatalogService {
   }
 
   async createCategory(dto: CreateCategoryDto, actor: UserPayload) {
+    const db = await this.db();
     if (dto.parentId) {
-      const parent = await this.prisma.category.findUnique({
+      const parent = await db.category.findUnique({
         where: { id: dto.parentId },
         select: { id: true },
       });
@@ -268,7 +288,7 @@ export class CatalogService {
     }
 
     try {
-      return await this.prisma.$transaction(async (transaction) => {
+      return await db.$transaction(async (transaction) => {
         const category = await transaction.category.create({
           data: {
             name: dto.name.trim(),
@@ -297,7 +317,8 @@ export class CatalogService {
   }
 
   async updateCategory(id: string, dto: UpdateCategoryDto, actor: UserPayload) {
-    const category = await this.prisma.category.findUnique({
+    const db = await this.db();
+    const category = await db.category.findUnique({
       where: { id },
       select: { id: true, name: true },
     });
@@ -306,7 +327,7 @@ export class CatalogService {
       throw new BadRequestException('A category cannot be its own parent');
     }
     if (dto.parentId) {
-      const parent = await this.prisma.category.findUnique({
+      const parent = await db.category.findUnique({
         where: { id: dto.parentId },
         select: { id: true, parentId: true },
       });
@@ -318,7 +339,7 @@ export class CatalogService {
       }
     }
     if (dto.isActive === false) {
-      const publishedProducts = await this.prisma.product.count({
+      const publishedProducts = await db.product.count({
         where: { categoryId: id, status: 'ACTIVE' },
       });
       if (publishedProducts > 0) {
@@ -329,7 +350,7 @@ export class CatalogService {
     }
 
     try {
-      return await this.prisma.$transaction(async (transaction) => {
+      return await db.$transaction(async (transaction) => {
         const updated = await transaction.category.update({
           where: { id },
           data: {
@@ -363,7 +384,8 @@ export class CatalogService {
   }
 
   async deleteCategory(id: string, actor: UserPayload) {
-    const category = await this.prisma.category.findUnique({
+    const db = await this.db();
+    const category = await db.category.findUnique({
       where: { id },
       include: { _count: { select: { products: true, children: true } } },
     });
@@ -379,7 +401,7 @@ export class CatalogService {
       );
     }
 
-    return this.prisma.$transaction(async (transaction) => {
+    return db.$transaction(async (transaction) => {
       const deleted = await transaction.category.delete({ where: { id } });
       await this.audit.record(
         {
@@ -396,7 +418,8 @@ export class CatalogService {
   }
 
   async getCategories(publicOnly = false) {
-    return this.prisma.category.findMany({
+    const db = await this.db();
+    return db.category.findMany({
       where: publicOnly ? { isActive: true } : undefined,
       select: {
         id: true,
@@ -419,8 +442,9 @@ export class CatalogService {
   }
 
   async createBrand(dto: CreateBrandDto, actor: UserPayload) {
+    const db = await this.db();
     try {
-      return await this.prisma.$transaction(async (transaction) => {
+      return await db.$transaction(async (transaction) => {
         const brand = await transaction.brand.create({
           data: {
             name: dto.name.trim(),
@@ -448,11 +472,12 @@ export class CatalogService {
   }
 
   async updateBrand(id: string, dto: UpdateBrandDto, actor: UserPayload) {
-    const brand = await this.prisma.brand.findUnique({ where: { id } });
+    const db = await this.db();
+    const brand = await db.brand.findUnique({ where: { id } });
     if (!brand) throw new NotFoundException('Brand not found');
 
     try {
-      return await this.prisma.$transaction(async (transaction) => {
+      return await db.$transaction(async (transaction) => {
         const updated = await transaction.brand.update({
           where: { id },
           data: {
@@ -485,13 +510,14 @@ export class CatalogService {
   }
 
   async deleteBrand(id: string, actor: UserPayload) {
-    const brand = await this.prisma.brand.findUnique({
+    const db = await this.db();
+    const brand = await db.brand.findUnique({
       where: { id },
       include: { _count: { select: { products: true } } },
     });
     if (!brand) throw new NotFoundException('Brand not found');
 
-    return this.prisma.$transaction(async (transaction) => {
+    return db.$transaction(async (transaction) => {
       const deleted = await transaction.brand.delete({ where: { id } });
       await this.audit.record(
         {
@@ -508,10 +534,11 @@ export class CatalogService {
   }
 
   async getBrands(query?: BrandQueryDto, publicOnly = false) {
+    const db = await this.db();
     const search = query?.search?.trim();
     const categoryId = query?.categoryId?.trim();
 
-    return this.prisma.brand.findMany({
+    return db.brand.findMany({
       where: {
         ...(publicOnly ? { isActive: true } : {}),
         ...(search ? { name: { contains: search, mode: 'insensitive' } } : {}),
@@ -540,6 +567,24 @@ export class CatalogService {
   }
 
   async createProduct(dto: CreateProductDto, actor: UserPayload) {
+    assertTenantCommerceWritable();
+    const db = await this.db();
+    // MT-10 §13.2: SKU entitlement enforced server-side for tenants.
+    const ctx = tryGetTenantContext();
+    if (ctx && this.entitlements) {
+      const currentCount = await db.product.count({
+        where: { status: { not: 'ARCHIVED' } },
+      });
+      const decision = await this.entitlements
+        .evaluate(ctx.organizationId, 'products_max', {
+          requestedCount: currentCount + 1,
+          currentOverride: currentCount,
+        })
+        .catch(() => null);
+      if (decision && !decision.allowed) {
+        throw new ForbiddenException(decision.code ?? 'PLAN_LIMIT_REACHED');
+      }
+    }
     dto.variants.forEach((variant) =>
       this.ensureValidPrice(variant.price, variant.compareAtPrice),
     );
@@ -550,14 +595,14 @@ export class CatalogService {
       dto.conditionNote,
     );
 
-    const category = await this.prisma.category.findFirst({
+    const category = await db.category.findFirst({
       where: { id: dto.categoryId, isActive: true },
       select: { id: true },
     });
     if (!category) throw new NotFoundException('Active category not found');
 
     try {
-      const productId = await this.prisma.$transaction(async (transaction) => {
+      const productId = await db.$transaction(async (transaction) => {
         const warehouse = await transaction.warehouse.upsert({
           where: { code: 'MAIN' },
           update: { isActive: true },
@@ -735,7 +780,9 @@ export class CatalogService {
   }
 
   async updateProduct(id: string, dto: UpdateProductDto, actor: UserPayload) {
-    const existing = await this.prisma.product.findUnique({
+    assertTenantCommerceWritable();
+    const db = await this.db();
+    const existing = await db.product.findUnique({
       where: { id },
       include: { variants: { select: { id: true } } },
     });
@@ -753,7 +800,7 @@ export class CatalogService {
     this.ensureConditionDetails(condition, conditionGrade, conditionNote);
 
     if (dto.categoryId) {
-      const category = await this.prisma.category.findFirst({
+      const category = await db.category.findFirst({
         where: { id: dto.categoryId, isActive: true },
         select: { id: true },
       });
@@ -773,7 +820,7 @@ export class CatalogService {
     }
 
     try {
-      await this.prisma.$transaction(async (transaction) => {
+      await db.$transaction(async (transaction) => {
         let resolvedBrandId: string | null | undefined = dto.brandId;
         let resolvedBrandName: string | null | undefined = dto.brand?.trim();
 
@@ -1056,14 +1103,19 @@ export class CatalogService {
     query: ProductQueryDto | AdminProductQueryDto,
     publicOnly: boolean,
   ) {
+    const db = await this.db();
     const page = query.page || 1;
-    const limit = query.limit || 24;
+    const limit = Math.min(query.limit || 24, 100);
     const where = this.buildProductWhere(query, publicOnly);
     const isPriceSort =
       query.sort === 'price-asc' || query.sort === 'price-desc';
+    // Application-side pagination (price sort / stock filter) must stay
+    // bounded: cap the candidate window so a large catalog cannot force a
+    // full-table scan into memory per request.
+    const APPLICATION_PAGINATION_WINDOW = 2000;
     const needsApplicationPagination = isPriceSort || query.inStock === 'true';
     const [products, databaseTotal] = await Promise.all([
-      this.prisma.product.findMany({
+      db.product.findMany({
         where,
         include: productInclude,
         orderBy:
@@ -1071,9 +1123,11 @@ export class CatalogService {
             ? { name: 'asc' }
             : [{ isFeatured: 'desc' }, { createdAt: 'desc' }],
         skip: needsApplicationPagination ? undefined : (page - 1) * limit,
-        take: needsApplicationPagination ? undefined : limit,
+        take: needsApplicationPagination
+          ? APPLICATION_PAGINATION_WINDOW
+          : limit,
       }),
-      this.prisma.product.count({ where }),
+      db.product.count({ where }),
     ]);
     let serialized = products.map((product) =>
       this.serializeProduct(product, publicOnly),
@@ -1114,7 +1168,8 @@ export class CatalogService {
   }
 
   async getPublicProductBySlug(slug: string) {
-    const product = await this.prisma.product.findFirst({
+    const db = await this.db();
+    const product = await db.product.findFirst({
       where: {
         slug,
         status: 'ACTIVE',
@@ -1128,7 +1183,8 @@ export class CatalogService {
   }
 
   async getAdminProductById(id: string) {
-    const product = await this.prisma.product.findUnique({
+    const db = await this.db();
+    const product = await db.product.findUnique({
       where: { id },
       include: productInclude,
     });
@@ -1141,7 +1197,9 @@ export class CatalogService {
     dto: UpdateProductStatusDto,
     actor: UserPayload,
   ) {
-    const existing = await this.prisma.product.findUnique({
+    assertTenantCommerceWritable();
+    const db = await this.db();
+    const existing = await db.product.findUnique({
       where: { id },
       select: {
         id: true,
@@ -1163,7 +1221,7 @@ export class CatalogService {
         'A published product requires an active category and variant',
       );
     }
-    const product = await this.prisma.$transaction(async (transaction) => {
+    const product = await db.$transaction(async (transaction) => {
       const updated = await transaction.product.update({
         where: { id },
         data: {
@@ -1192,8 +1250,9 @@ export class CatalogService {
   }
 
   async getInventory(query: InventoryQueryDto) {
+    const db = await this.db();
     const search = query.search?.trim();
-    const stocks = await this.prisma.inventoryStock.findMany({
+    const stocks = await db.inventoryStock.findMany({
       where: {
         warehouse: { code: 'MAIN' },
         variant: {
@@ -1224,6 +1283,8 @@ export class CatalogService {
         _count: { select: { movements: true } },
       },
       orderBy: [{ updatedAt: 'desc' }, { variant: { sku: 'asc' } }],
+      // Bounded scan: inventory views must not load an unbounded table.
+      take: 2000,
     });
     const rows = stocks
       .map((stock) => {
@@ -1288,13 +1349,14 @@ export class CatalogService {
   }
 
   async getInventoryMovements(variantId: string, limit = 30) {
-    const inventory = await this.prisma.inventoryStock.findFirst({
+    const db = await this.db();
+    const inventory = await db.inventoryStock.findFirst({
       where: { variantId, warehouse: { code: 'MAIN' } },
       select: { id: true },
     });
     if (!inventory) throw new NotFoundException('Inventory record not found');
 
-    return this.prisma.inventoryMovement.findMany({
+    return db.inventoryMovement.findMany({
       where: { inventoryId: inventory.id },
       orderBy: { createdAt: 'desc' },
       take: Math.min(Math.max(limit, 1), 100),
@@ -1306,13 +1368,15 @@ export class CatalogService {
     dto: AdjustInventoryDto,
     actor: UserPayload,
   ) {
+    assertTenantCommerceWritable();
+    const db = await this.db();
     if (dto.quantityDelta === 0) {
       throw new BadRequestException('Inventory adjustment cannot be zero');
     }
     const effectiveAt = this.validateInventoryAdjustment(dto);
 
     try {
-      return await this.prisma.$transaction(
+      return await db.$transaction(
         async (transaction) => {
           const inventory = await transaction.inventoryStock.findFirst({
             where: { variantId, warehouse: { code: 'MAIN' } },

@@ -1,12 +1,17 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { Prisma } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import { PrismaService } from '@app/database';
+import { assertTenantCommerceWritable } from '../../tenancy/commerce-write-guard.util';
+import { TenantDbService } from '../../tenancy/tenant-db.service';
 import type { UserPayload } from '@app/common';
 import { AuditService } from '../audit/audit.service';
 import { CustomerNotificationsService } from '../customer-notifications/customer-notifications.service';
@@ -24,8 +29,17 @@ export class WalletService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly notifications: CustomerNotificationsService,
-  ) {}
+  
+    @Optional() private readonly tenantDb?: TenantDbService,) {}
 
+  /**
+   * MT-7: inside a tenant-resolved request this returns the resolved tenant
+   * database client; outside one it explicitly falls back to the legacy DB.
+   */
+  private async db(): Promise<PrismaClient> {
+    const tenant = await this.tenantDb?.tryGet();
+    return tenant ?? (this.prisma as PrismaClient);
+  }
   private idempotencyHash(raw?: string) {
     const value = raw?.trim();
     if (!value || value.length < 16 || value.length > 200) {
@@ -65,13 +79,14 @@ export class WalletService {
   }
 
   async summary(userId: string, page = 1, limit = 20) {
-    const wallet = await this.prisma.$transaction((transaction) =>
+    const db = await this.db();
+    const wallet = await db.$transaction((transaction) =>
       this.ensureWallet(transaction, userId),
     );
     const boundedPage = Math.max(1, page);
     const boundedLimit = Math.min(50, Math.max(1, limit));
     const [transactions, total, topUps] = await Promise.all([
-      this.prisma.walletTransactionHistory.findMany({
+      db.walletTransactionHistory.findMany({
         where: { walletId: wallet.id, isDeleted: false },
         orderBy: { createdAt: 'desc' },
         skip: (boundedPage - 1) * boundedLimit,
@@ -90,10 +105,10 @@ export class WalletService {
           createdAt: true,
         },
       }),
-      this.prisma.walletTransactionHistory.count({
+      db.walletTransactionHistory.count({
         where: { walletId: wallet.id, isDeleted: false },
       }),
-      this.prisma.walletTopUp.findMany({
+      db.walletTopUp.findMany({
         where: { walletId: wallet.id },
         orderBy: { createdAt: 'desc' },
         take: 10,
@@ -133,8 +148,10 @@ export class WalletService {
     dto: CreateWalletTopUpDto,
     rawIdempotencyKey?: string,
   ) {
+    assertTenantCommerceWritable();
+    const db = await this.db();
     const idempotencyKey = this.idempotencyHash(rawIdempotencyKey);
-    return this.prisma.$transaction(
+    return db.$transaction(
       async (transaction) => {
         const existing = await transaction.walletTopUp.findUnique({
           where: { idempotencyKey },
@@ -176,6 +193,7 @@ export class WalletService {
   }
 
   async listTopUps(query: WalletTopUpQueryDto) {
+    const db = await this.db();
     const search = query.search?.normalize('NFKC').trim();
     const where: Prisma.WalletTopUpWhereInput = {
       status: query.status,
@@ -190,14 +208,14 @@ export class WalletService {
         : {}),
     };
     const [items, total] = await Promise.all([
-      this.prisma.walletTopUp.findMany({
+      db.walletTopUp.findMany({
         where,
         orderBy: { createdAt: 'desc' },
         skip: (query.page - 1) * query.limit,
         take: query.limit,
         include: { user: { select: { id: true, name: true, email: true } } },
       }),
-      this.prisma.walletTopUp.count({ where }),
+      db.walletTopUp.count({ where }),
     ]);
     return {
       items,
@@ -209,7 +227,8 @@ export class WalletService {
   }
 
   async reviewTopUp(id: string, dto: ReviewWalletTopUpDto, actor: UserPayload) {
-    const updated = await this.prisma.$transaction(
+    const db = await this.db();
+    const updated = await db.$transaction(
       async (transaction) => {
         const topUp = await transaction.walletTopUp.findUnique({
           where: { id },
@@ -221,9 +240,9 @@ export class WalletService {
           throw new ConflictException(`Top-up is already ${topUp.status.toLowerCase()}`);
         }
         if (dto.status === 'COMPLETED') {
-          const balanceBefore = topUp.wallet.amount;
-          const balanceAfter = balanceBefore + topUp.amount;
-          await transaction.wallet.update({
+          // Prisma returns the post-update row: derive an exact audit trail
+          // instead of trusting the pre-read balance under concurrency.
+          const updatedWallet = await transaction.wallet.update({
             where: { id: topUp.walletId },
             data: {
               amount: { increment: topUp.amount },
@@ -239,8 +258,8 @@ export class WalletService {
               type: 'credit',
               amount: topUp.amount,
               currency: 'bdt',
-              balanceBefore,
-              balanceAfter,
+              balanceBefore: updatedWallet.amount - topUp.amount,
+              balanceAfter: updatedWallet.amount,
               description: `${topUp.provider} wallet top-up approved`,
               status: 'completed',
               referenceFor: 'WalletTopUp',
@@ -312,6 +331,11 @@ export class WalletService {
       data: { amount: { decrement: amount } },
     });
     if (!changed.count) throw new ConflictException('Insufficient wallet balance');
+    // Re-read inside this transaction for the authoritative post-debit value.
+    const walletAfterDebit = await transaction.wallet.findUniqueOrThrow({
+      where: { id: wallet.id },
+      select: { amount: true },
+    });
     return transaction.walletTransactionHistory.create({
       data: {
         userId,
@@ -321,8 +345,8 @@ export class WalletService {
         type: 'debit',
         amount,
         currency: 'bdt',
-        balanceBefore: wallet.amount,
-        balanceAfter: wallet.amount - amount,
+        balanceBefore: walletAfterDebit.amount + amount,
+        balanceAfter: walletAfterDebit.amount,
         description: 'Ferio order paid from wallet',
         status: 'completed',
         referenceFor: 'OrderPurchase',
@@ -341,13 +365,27 @@ export class WalletService {
       where: { idempotencyKey: `order:${orderId}:refund` },
     });
     if (existing) return existing;
+    // Fail closed against over-crediting: a refund can never exceed the
+    // wallet debit recorded for this order.
+    const originalDebit = await transaction.walletTransactionHistory.findUnique({
+      where: { idempotencyKey: `order:${orderId}:debit` },
+    });
+    if (
+      !originalDebit ||
+      originalDebit.type !== 'debit' ||
+      amount > originalDebit.amount
+    ) {
+      throw new ConflictException(
+        'Refund amount exceeds the wallet-paid total for this order',
+      );
+    }
     const user = await transaction.user.findUnique({
       where: { customerId },
       select: { id: true },
     });
     if (!user) throw new ConflictException('Wallet owner could not be resolved');
     const wallet = await this.ensureWallet(transaction, user.id);
-    await transaction.wallet.update({
+    const updatedWallet = await transaction.wallet.update({
       where: { id: wallet.id },
       data: { amount: { increment: amount }, totalBalance: { increment: amount } },
     });
@@ -360,8 +398,8 @@ export class WalletService {
         type: 'credit',
         amount,
         currency: 'bdt',
-        balanceBefore: wallet.amount,
-        balanceAfter: wallet.amount + amount,
+        balanceBefore: updatedWallet.amount - amount,
+        balanceAfter: updatedWallet.amount,
         description: 'Cancelled order refunded to Ferio wallet',
         status: 'completed',
         referenceFor: 'OrderRefund',

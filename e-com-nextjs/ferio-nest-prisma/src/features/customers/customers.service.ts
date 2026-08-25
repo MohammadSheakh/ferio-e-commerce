@@ -1,6 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable, NotFoundException,
+  Optional,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import { PrismaService } from '@app/database';
+import { TenantDbService } from '../../tenancy/tenant-db.service';
 import { CustomerQueryDto } from './customers.dto';
 import {
   CustomerMetrics,
@@ -11,9 +16,21 @@ import {
 
 @Injectable()
 export class CustomersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly tenantDb?: TenantDbService,
+  ) {}
 
+  /**
+   * MT-7: inside a tenant-resolved request this returns the resolved tenant
+   * database client; outside one it explicitly falls back to the legacy DB.
+   */
+  private async db(): Promise<PrismaClient> {
+    const tenant = await this.tenantDb?.tryGet();
+    return tenant ?? (this.prisma as PrismaClient);
+  }
   async list(query: CustomerQueryDto) {
+    const db = await this.db();
     const search = query.search?.normalize('NFKC').trim();
     const where: Prisma.CustomerWhereInput = {
       ...(search
@@ -59,7 +76,7 @@ export class CustomersService {
     }
 
     const [customers, total] = await Promise.all([
-      this.prisma.customer.findMany({
+      db.customer.findMany({
         where,
         skip: (query.page - 1) * query.limit,
         take: query.limit,
@@ -85,7 +102,7 @@ export class CustomersService {
           },
         },
       }),
-      this.prisma.customer.count({ where }),
+      db.customer.count({ where }),
     ]);
 
     const unlinkedEmails = customers
@@ -97,7 +114,7 @@ export class CustomersService {
       { profileImageUrl: string; phoneNumber?: string | null; updatedAt: Date }
     >();
     if (unlinkedEmails.length > 0) {
-      const usersByEmail = await this.prisma.user.findMany({
+      const usersByEmail = await db.user.findMany({
         where: { email: { in: unlinkedEmails, mode: 'insensitive' }, isDeleted: false },
         select: { email: true, profileImageUrl: true, phoneNumber: true, updatedAt: true },
       });
@@ -150,7 +167,8 @@ export class CustomersService {
   }
 
   async detail(id: string) {
-    const customer = await this.prisma.customer.findUnique({
+    const db = await this.db();
+    const customer = await db.customer.findUnique({
       where: { id },
       include: {
         user: {
@@ -201,18 +219,19 @@ export class CustomersService {
   }
 
   private async metrics(customerIds: string[]) {
+    const db = await this.db();
     const empty = new Map<string, CustomerMetrics>();
     for (const id of customerIds) empty.set(id, this.emptyMetrics());
     if (!customerIds.length) return empty;
     const [totals, delivered, cancelled, returned, rto] =
       await Promise.all([
-        this.prisma.order.groupBy({
+        db.order.groupBy({
           by: ['customerId'],
           orderBy: { customerId: 'asc' },
           where: { customerId: { in: customerIds } },
           _count: { id: true },
         }),
-        this.prisma.order.groupBy({
+        db.order.groupBy({
           by: ['customerId'],
           orderBy: { customerId: 'asc' },
           where: {
@@ -223,13 +242,13 @@ export class CustomersService {
           _sum: { total: true },
           _max: { createdAt: true },
         }),
-        this.prisma.order.groupBy({
+        db.order.groupBy({
           by: ['customerId'],
           orderBy: { customerId: 'asc' },
           where: { customerId: { in: customerIds }, status: 'CANCELLED' },
           _count: { id: true },
         }),
-        this.prisma.order.groupBy({
+        db.order.groupBy({
           by: ['customerId'],
           orderBy: { customerId: 'asc' },
           where: {
@@ -238,7 +257,7 @@ export class CustomersService {
           },
           _count: { id: true },
         }),
-        this.prisma.order.groupBy({
+        db.order.groupBy({
           by: ['customerId'],
           orderBy: { customerId: 'asc' },
           where: { customerId: { in: customerIds }, shipmentStatus: 'RTO' },

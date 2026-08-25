@@ -7,7 +7,7 @@ import { customerSessionFetch } from "@/lib/customer-session";
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as { idempotencyKey?: string; paymentMethod?: "COD" | "PREPAID" | "PAY_AT_STORE" | "WALLET"; paymentProvider?: "SSLCOMMERZ" | "AAMARPAY" };
+    const body = (await request.json()) as { idempotencyKey?: string; paymentMethod?: "COD" | "PREPAID" | "PAY_AT_STORE" | "WALLET"; paymentProvider?: "SSLCOMMERZ" | "AAMARPAY"; phone?: string };
     if (body.paymentMethod === "WALLET") {
       const cartToken = cookies().get("ferio_cart")?.value;
       const result = await customerSessionFetch("/checkout/orders/wallet", {
@@ -56,7 +56,13 @@ export async function POST(request: Request) {
       const payment = await cartApi<NonNullable<CheckoutOrderResult["payment"]>>("/payments/initiate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId: order.id, provider: body.paymentProvider }),
+        // Reference + placement phone prove the caller placed this order.
+        body: JSON.stringify({
+          orderId: order.id,
+          provider: body.paymentProvider,
+          reference: order.reference,
+          phone: body.phone,
+        }),
       });
       result = { ...order, payment };
     }

@@ -1,10 +1,13 @@
 import {
   BadRequestException,
   ConflictException,
+  Inject,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { tryGetTenantContext } from '../../tenancy/tenant-context';
 import { Prisma, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { createHash, randomBytes } from 'node:crypto';
@@ -21,6 +24,14 @@ export class StaffAccessService {
     private readonly audit: AuditService,
     private readonly email: EmailService,
     private readonly config: ConfigService,
+    @Optional() @Inject('PLAN_GATE')
+    private readonly planGate?: {
+      assertStaffSeat(organizationId: string, currentMemberCount: number): Promise<void>;
+    },
+    @Optional() @Inject('ORG_MEMBERS_COUNTER')
+    private readonly orgMembers?: {
+      countActiveMembers(organizationId: string): Promise<number>;
+    },
   ) {}
 
   async list() {
@@ -63,6 +74,17 @@ export class StaffAccessService {
   }
 
   async invite(dto: InviteStaffDto, actor: UserPayload) {
+    // MT-10 §13.2A: staff-seat entitlement enforced server-side for tenants.
+    const tenantContext = tryGetTenantContext();
+    if (tenantContext && this.planGate && this.orgMembers) {
+      const currentMemberCount = await this.orgMembers
+        .countActiveMembers(tenantContext.organizationId)
+        .catch(() => 0);
+      await this.planGate.assertStaffSeat(
+        tenantContext.organizationId,
+        currentMemberCount,
+      );
+    }
     const email = dto.email.normalize('NFKC').trim().toLowerCase();
     const existing = await this.prisma.user.findUnique({
       where: { email },

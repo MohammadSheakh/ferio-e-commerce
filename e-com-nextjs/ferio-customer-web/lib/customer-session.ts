@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { hostForwardHeaders } from "@/lib/host-forward";
 import { withCorrelationId } from "@/lib/correlation";
 
 const backendApiUrl =
@@ -76,11 +77,12 @@ export async function customerSessionFetch(
   let accessToken = cookies().get("ferio_customer_access")?.value;
   if (!accessToken) accessToken = (await refreshCustomerSession()) ?? undefined;
   if (!accessToken) return null;
-  const call = (token: string) =>
+  const call = async (token: string) =>
     fetch(`${backendApiUrl}${path.startsWith("/") ? path : `/${path}`}`, {
       ...init,
       headers: withCorrelationId({
         Authorization: `Bearer ${token}`,
+        ...(await hostForwardHeaders()),
         ...init?.headers,
       }),
       cache: "no-store",

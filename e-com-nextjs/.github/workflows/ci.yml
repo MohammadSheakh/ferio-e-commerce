@@ -1,0 +1,176 @@
+name: CI
+
+on:
+  push:
+    branches: [main, ox-alpha-saas]
+  pull_request:
+
+jobs:
+  backend:
+    name: Backend — build & tests (incl. cross-tenant integration)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ferio-nest-prisma
+
+    # Disposable infrastructure: a fresh PostgreSQL and Redis exist only for
+    # this job run. The integration suites create/drop their own scratch
+    # databases against this server.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7
+        ports:
+          - 6380:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      # Superuser has CREATEDB — required by the tenant-bootstrap isolation
+      # suite, which creates and drops scratch databases per test case.
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+      # Queue smoke specs demand an isolated non-default port + prefix so a
+      # misconfigured run can never touch production queues.
+      TEST_REDIS_PORT: "6380"
+      TEST_QUEUE_PREFIX: ferio:test:ci
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: ferio-nest-prisma/pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Generate Prisma clients (tenant + platform)
+        run: pnpm prisma:generate
+      - name: Strict typecheck (incl. specs)
+        run: pnpm exec tsc --noEmit -p tsconfig.json
+      - name: Production build
+        run: pnpm build
+      - name: Unit tests
+        run: pnpm test
+      - name: Cross-tenant isolation + bootstrap integration tests
+        run: pnpm test:integration
+      - name: BullMQ runtime smoke tests
+        run: pnpm test:queue-smoke
+
+  security-scan:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  dependency-audit:
+    name: Dependency audit (backend + web apps)
+    runs-on: ubuntu-latest
+    continue-on-error: true # advisory noise tolerated initially; tighten after pilot
+    strategy:
+      matrix:
+        app: [ferio-nest-prisma, ferio-customer-web, ferio-admin-dashboard/ferio-admin, ferio-platform-admin]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Audit production dependencies (${{ matrix.app }})
+        run: |
+          cd ${{ matrix.app }}
+          if command -v pnpm >/dev/null 2>&1; then true; fi
+          npm install -g pnpm@9 >/dev/null 2>&1
+          pnpm audit --prod --audit-level critical
+
+  customer-web:
+    name: Customer Web — typecheck & build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ferio-customer-web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: ferio-customer-web/pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: TypeScript check
+        run: pnpm exec tsc --noEmit
+      - name: Production build
+        run: pnpm build
+        env:
+          NEXT_PUBLIC_FERIO_API_URL: http://localhost:6733/api/v1
+
+  admin-web:
+    name: Admin Web — typecheck & build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ferio-admin-dashboard/ferio-admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: ferio-admin-dashboard/ferio-admin/pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: TypeScript check
+        run: pnpm exec tsc --noEmit
+      - name: Production build
+        run: pnpm build
+
+  platform-admin:
+    name: Platform Admin — typecheck & build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ferio-platform-admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: ferio-platform-admin/pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: TypeScript check
+        run: pnpm exec tsc --noEmit
+      - name: Production build
+        run: pnpm build

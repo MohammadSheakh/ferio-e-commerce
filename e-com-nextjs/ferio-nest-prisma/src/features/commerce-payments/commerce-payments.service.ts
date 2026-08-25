@@ -2,11 +2,19 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { CommercePaymentProvider, Prisma } from '@prisma/client';
 import { createHash, randomBytes } from 'crypto';
 import { PrismaService } from '@app/database';
+import type { PrismaClient } from '@prisma/client';
+import { TenantDbService } from '../../tenancy/tenant-db.service';
+import {
+  buildCallbackToken,
+  verifyCallbackToken,
+} from '../../tenancy/callback-tenant.util';
+import { tryGetTenantContext } from '../../tenancy/tenant-context';
 import { OrderService } from '../order/order.service';
 import { normalizeBangladeshPhone } from '../checkout/utils/checkout.util';
 import { PaymentGatewayRegistry } from './gateways/payment-gateway.registry';
@@ -21,7 +29,17 @@ export class CommercePaymentsService {
     private readonly orders: OrderService,
     private readonly gateways: PaymentGatewayRegistry,
     private readonly audit: AuditService,
+    @Optional() private readonly tenantDb?: TenantDbService,
   ) {}
+
+  /**
+   * MT-7: tenant client inside callback/storefront contexts (bound via the
+   * HMAC-verified callback token); legacy DB otherwise. Never guesses.
+   */
+  private async db(): Promise<PrismaClient> {
+    const tenant = await this.tenantDb?.tryGet();
+    return tenant ?? (this.prisma as PrismaClient);
+  }
 
   providers() {
     return this.gateways.readiness();
@@ -32,7 +50,8 @@ export class CommercePaymentsService {
     phone: string,
     provider: CommercePaymentProvider,
   ) {
-    const order = await this.prisma.order.findUnique({
+    const db = await this.db();
+    const order = await db.order.findUnique({
       where: { reference: reference.normalize('NFKC').trim().toUpperCase() },
       include: { address: true },
     });
@@ -42,36 +61,53 @@ export class CommercePaymentsService {
     ) {
       throw new NotFoundException('Order is unavailable for payment retry');
     }
-    return this.initiate(order.id, provider);
+    return this.initiate(order.id, order.reference, phone, provider);
   }
 
   async returnContext(orderId?: string) {
+    const db = await this.db();
     if (!orderId) return null;
-    return this.prisma.order.findUnique({
+    return db.order.findUnique({
       where: { id: orderId },
       select: { reference: true, status: true, paymentStatus: true },
     });
   }
 
-  async initiate(orderId: string, provider: CommercePaymentProvider) {
+  async initiate(
+    orderId: string,
+    reference: string,
+    phone: string,
+    provider: CommercePaymentProvider,
+  ) {
+    const db = await this.db();
     const adapter = this.gateways.get(provider);
     if (!adapter.isConfigured())
       throw new ConflictException(`${provider} is not configured`);
-    const order = await this.prisma.order.findUnique({
+    const order = await db.order.findUnique({
       where: { id: orderId },
       include: {
         address: true,
         paymentAttempts: { orderBy: { createdAt: 'desc' }, take: 1 },
       },
     });
-    if (!order?.address) throw new NotFoundException('Order not found');
+    // Ownership proof: caller must know the order reference AND the phone
+    // used at placement. Prevents anonymous initiation against arbitrary
+    // order IDs (IDOR / gateway-session spam).
+    if (
+      !order?.address ||
+      !reference ||
+      order.reference !== reference.normalize('NFKC').trim().toUpperCase() ||
+      order.address.phoneNormalized !== normalizeBangladeshPhone(phone)
+    ) {
+      throw new NotFoundException('Order is unavailable for payment');
+    }
     if (order.paymentMethod !== 'PREPAID' || order.paymentStatus === 'PAID') {
       throw new ConflictException(
         'Order is not eligible for prepaid initiation',
       );
     }
     if (order.checkoutDraftId) {
-      const draft = await this.prisma.checkoutDraft.findUnique({
+      const draft = await db.checkoutDraft.findUnique({
         where: { id: order.checkoutDraftId },
       });
       if (draft?.paymentProvider !== provider)
@@ -95,12 +131,12 @@ export class CommercePaymentsService {
         .slice(0, 30)
         .toUpperCase();
     const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
-    await this.prisma.$transaction(
+    await db.$transaction(
       (transaction) =>
         this.orders.preparePrepaidRetry(transaction, order.id, expiresAt),
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
-    const attempt = await this.prisma.commercePaymentAttempt.create({
+    const attempt = await db.commercePaymentAttempt.create({
       data: {
         merchantTransactionId,
         provider,
@@ -118,6 +154,18 @@ export class CommercePaymentsService {
     const callbackBase = rawPublicUrl.endsWith('/api/v1')
       ? rawPublicUrl
       : `${rawPublicUrl}/api/v1`;
+    // MT-7 §10.6: bind callbacks to THIS organization with an HMAC-signed
+    // token embedded in the URLs we hand the gateway. Providers echo our URLs
+    // verbatim; forgery fails signature verification server-side.
+    let callbackTenantQuery = { value: '' };
+    const context = tryGetTenantContext();
+    if (context && this.config.get<string>('PLATFORM_CALLBACK_SECRET')) {
+      const token = buildCallbackToken(
+        context.organizationId,
+        this.config.get<string>('PLATFORM_CALLBACK_SECRET'),
+      );
+      callbackTenantQuery = { value: `&cbt=${encodeURIComponent(token)}` };
+    }
     try {
       const result = await adapter.initiate({
         merchantTransactionId,
@@ -136,13 +184,13 @@ export class CommercePaymentsService {
           address: `${order.address.detailedAddress}, ${order.address.area}`,
           city: order.address.district,
         },
-        successUrl: `${callbackBase}/payments/callback/${provider}/success?merchantTransactionId=${merchantTransactionId}`,
-        failUrl: `${callbackBase}/payments/callback/${provider}/fail?merchantTransactionId=${merchantTransactionId}`,
-        cancelUrl: `${callbackBase}/payments/callback/${provider}/cancel?merchantTransactionId=${merchantTransactionId}`,
-        ipnUrl: `${callbackBase}/payments/callback/${provider}/ipn?merchantTransactionId=${merchantTransactionId}`,
+        successUrl: `${callbackBase}/payments/callback/${provider}/success?merchantTransactionId=${merchantTransactionId}${callbackTenantQuery.value}`,
+        failUrl: `${callbackBase}/payments/callback/${provider}/fail?merchantTransactionId=${merchantTransactionId}${callbackTenantQuery.value}`,
+        cancelUrl: `${callbackBase}/payments/callback/${provider}/cancel?merchantTransactionId=${merchantTransactionId}${callbackTenantQuery.value}`,
+        ipnUrl: `${callbackBase}/payments/callback/${provider}/ipn?merchantTransactionId=${merchantTransactionId}${callbackTenantQuery.value}`,
       });
       return this.publicAttempt(
-        await this.prisma.commercePaymentAttempt.update({
+        await db.commercePaymentAttempt.update({
           where: { id: attempt.id },
           data: {
             status: 'PENDING',
@@ -153,7 +201,7 @@ export class CommercePaymentsService {
         }),
       );
     } catch (error) {
-      await this.prisma.commercePaymentAttempt.update({
+      await db.commercePaymentAttempt.update({
         where: { id: attempt.id },
         data: {
           status: 'FAILED',
@@ -184,6 +232,7 @@ export class CommercePaymentsService {
     eventType: string,
     payload: Record<string, unknown>,
   ) {
+    const db = await this.db();
     const adapter = this.gateways.get(provider);
 
     // Step 1: Generate unique deduplication key for callback logging
@@ -191,7 +240,7 @@ export class CommercePaymentsService {
       .update(`${provider}:${eventType}:${JSON.stringify(payload)}`)
       .digest('hex');
 
-    const existingLog = await this.prisma.commercePaymentCallback.findUnique({
+    const existingLog = await db.commercePaymentCallback.findUnique({
       where: { deduplicationKey: key },
     });
 
@@ -203,7 +252,7 @@ export class CommercePaymentsService {
 
     const log =
       existingLog ??
-      (await this.prisma.commercePaymentCallback.create({
+      (await db.commercePaymentCallback.create({
         data: {
           deduplicationKey: key,
           provider,
@@ -215,7 +264,7 @@ export class CommercePaymentsService {
     try {
       // Step 2: Validate transaction with Gateway (e.g. SSLCommerz server-to-server API)
       const validation = await adapter.validate(payload);
-      const attempt = await this.prisma.commercePaymentAttempt.findUnique({
+      const attempt = await db.commercePaymentAttempt.findUnique({
         where: { merchantTransactionId: validation.merchantTransactionId },
         include: { order: { select: { paymentStatus: true } } },
       });
@@ -225,7 +274,7 @@ export class CommercePaymentsService {
 
       // If already processed as SUCCEEDED, mark log as duplicate
       if (attempt.status === 'SUCCEEDED') {
-        await this.prisma.commercePaymentCallback.update({
+        await db.commercePaymentCallback.update({
           where: { id: log.id },
           data: {
             attemptId: attempt.id,
@@ -251,7 +300,7 @@ export class CommercePaymentsService {
         }
 
         // Step 4: Atomic DB Transaction - Update order to PAID/CONFIRMED & mark attempt SUCCEEDED
-        await this.prisma.$transaction(
+        await db.$transaction(
           async (transaction) => {
             // Confirm prepaid order (paymentStatus: PAID, status: CONFIRMED)
             await this.orders.confirmVerifiedPrepaidOrder(
@@ -306,6 +355,22 @@ export class CommercePaymentsService {
         );
         return { paid: true, orderId: attempt.orderId };
       }
+      // Browser-reported fail/cancel outcomes cannot be verified against the
+      // provider. Record them as evidence but never mutate attempt or order
+      // state — the payment-recovery expiry sweep is the authoritative path
+      // for abandoned/failed sessions.
+      if (validation.outcome === 'UNVERIFIED_REPORT') {
+        await db.commercePaymentCallback.update({
+          where: { id: log.id },
+          data: {
+            status: 'REJECTED',
+            processedAt: new Date(),
+            errorMessage: 'Unverified browser report ignored',
+          },
+        });
+        return { paid: false, unverified: true };
+      }
+
       const status =
         validation.outcome === 'CANCELLED'
           ? 'CANCELLED'
@@ -314,7 +379,7 @@ export class CommercePaymentsService {
             : validation.outcome === 'PENDING'
               ? 'PENDING'
               : 'UNKNOWN';
-      await this.prisma.$transaction(async (transaction) => {
+      await db.$transaction(async (transaction) => {
         await transaction.commercePaymentAttempt.update({
           where: { id: attempt.id },
           data: {
@@ -368,7 +433,7 @@ export class CommercePaymentsService {
       });
       return { paid: false, status, orderId: attempt.orderId };
     } catch (error) {
-      await this.prisma.commercePaymentCallback.update({
+      await db.commercePaymentCallback.update({
         where: { id: log.id },
         data: {
           status: 'REJECTED',
@@ -377,13 +442,15 @@ export class CommercePaymentsService {
           processedAt: new Date(),
         },
       });
+      // Do not reflect internal validation details to untrusted callers.
       throw new ConflictException(
-        error instanceof Error ? error.message : 'Callback rejected',
+        'Payment callback could not be validated. If you were completing a payment, check your order status or contact support.',
       );
     }
   }
 
   async listAttempts(query: PaymentLedgerQueryDto) {
+    const db = await this.db();
     const search = query.search?.normalize('NFKC').trim();
     const where: Prisma.CommercePaymentAttemptWhereInput = {
       provider: query.provider,
@@ -405,7 +472,7 @@ export class CommercePaymentsService {
         : undefined,
     };
     const [items, total] = await Promise.all([
-      this.prisma.commercePaymentAttempt.findMany({
+      db.commercePaymentAttempt.findMany({
         where,
         orderBy: { createdAt: 'desc' },
         skip: (query.page - 1) * query.limit,
@@ -423,7 +490,7 @@ export class CommercePaymentsService {
           callbacks: { orderBy: { createdAt: 'desc' }, take: 5 },
         },
       }),
-      this.prisma.commercePaymentAttempt.count({ where }),
+      db.commercePaymentAttempt.count({ where }),
     ]);
     return {
       items,
@@ -435,7 +502,8 @@ export class CommercePaymentsService {
   }
 
   async attemptDetail(id: string) {
-    const attempt = await this.prisma.commercePaymentAttempt.findUnique({
+    const db = await this.db();
+    const attempt = await db.commercePaymentAttempt.findUnique({
       where: { id },
       select: {
         id: true,
@@ -499,8 +567,9 @@ export class CommercePaymentsService {
     return attempt;
   }
 
-  eligibleExpiredAttempts(limit: number) {
-    return this.prisma.commercePaymentAttempt.findMany({
+  async eligibleExpiredAttempts(limit: number) {
+    const db = await this.db();
+    return db.commercePaymentAttempt.findMany({
       where: {
         status: { in: ['INITIATING', 'PENDING'] },
         expiresAt: { lte: new Date() },
@@ -513,7 +582,8 @@ export class CommercePaymentsService {
   }
 
   async expireAttempt(attemptId: string) {
-    return this.prisma.$transaction(
+    const db = await this.db();
+    return db.$transaction(
       async (transaction) => {
         const attempt = await transaction.commercePaymentAttempt.findUnique({
           where: { id: attemptId },

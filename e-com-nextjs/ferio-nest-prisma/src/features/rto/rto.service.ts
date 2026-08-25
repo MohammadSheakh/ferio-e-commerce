@@ -3,10 +3,13 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
+import type { PrismaClient } from '@prisma/client';
 import { Prisma } from '@prisma/client';
 import type { UserPayload } from '@app/common';
 import { PrismaService } from '@app/database';
+import { TenantDbService } from '../../tenancy/tenant-db.service';
 import { AuditService } from '../audit/audit.service';
 import { InspectRtoCaseDto } from './dto/rto.dto';
 
@@ -37,10 +40,20 @@ export class RtoService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
-  ) {}
+  
+    @Optional() private readonly tenantDb?: TenantDbService,) {}
 
-  list() {
-    return this.prisma.rtoCase.findMany({
+  /**
+   * MT-7: inside a tenant-resolved request this returns the resolved tenant
+   * database client; outside one it explicitly falls back to the legacy DB.
+   */
+  private async db(): Promise<PrismaClient> {
+    const tenant = await this.tenantDb?.tryGet();
+    return tenant ?? (this.prisma as PrismaClient);
+  }
+  async list() {
+    const db = await this.db();
+    return db.rtoCase.findMany({
       take: 100,
       include: rtoInclude,
       orderBy: { courierReturnedAt: 'desc' },
@@ -48,7 +61,8 @@ export class RtoService {
   }
 
   async inspect(id: string, dto: InspectRtoCaseDto, actor: UserPayload) {
-    return this.prisma.$transaction(
+    const db = await this.db();
+    return db.$transaction(
       async (transaction) => {
         const rtoCase = await transaction.rtoCase.findUnique({
           where: { id },

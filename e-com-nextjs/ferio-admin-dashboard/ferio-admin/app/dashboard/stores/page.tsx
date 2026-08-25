@@ -63,11 +63,7 @@ export default function StoresPage() {
       });
       if (search) query.set("search", search);
 
-      const res = await fetch(`/api/admin/store-locations?${query.toString()}`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("admin_access_token") || ""}`,
-        },
-      });
+      const res = await fetch(`/api/admin/store-locations?${query.toString()}`);
       if (!res.ok) throw new Error("Failed to fetch store locations");
       const data = await res.json();
       const items = Array.isArray(data) ? data : data.items || data.results || [];
@@ -134,7 +130,6 @@ export default function StoresPage() {
           method: "PATCH",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("admin_access_token") || ""}`,
           },
           body: JSON.stringify({
             name: form.name,
@@ -161,7 +156,6 @@ export default function StoresPage() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${localStorage.getItem("admin_access_token") || ""}`,
           },
           body: JSON.stringify({ ...form, isStore: true, isActive: true }),
         });
@@ -189,7 +183,6 @@ export default function StoresPage() {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("admin_access_token") || ""}`,
         },
         body: JSON.stringify({ isActive: !store.isActive }),
       });

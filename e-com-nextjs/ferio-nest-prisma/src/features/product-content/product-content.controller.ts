@@ -18,6 +18,7 @@ import {
   User,
 } from '@app/common';
 import type { UserPayload } from '@app/common';
+import { TenantMembershipGuard } from '../../tenancy/tenant-membership.guard';
 import { ProductContentService } from './product-content.service';
 import {
   CreateReviewBannerDto,
@@ -47,7 +48,7 @@ export class ProductContentController {
 }
 
 @Controller('admin/product-content')
-@UseGuards(AuthGuard, RolesGuard, PermissionsGuard)
+@UseGuards(AuthGuard, RolesGuard, PermissionsGuard, TenantMembershipGuard)
 @Roles('admin')
 @Permissions(PERMISSIONS.PRODUCT_CONTENT_READ)
 export class AdminProductContentController {

@@ -1,8 +1,13 @@
+import type { PrismaClient } from '@prisma/client';
+import type { TenantFanoutService } from '../../tenancy/tenant-fanout.service';
+import { tryGetTenantContext } from '../../tenancy/tenant-context';
+import { TenantDbService } from '../../tenancy/tenant-db.service';
 import {
   ConflictException,
   Injectable,
   NotFoundException,
   OnModuleInit,
+  Optional,
 } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { ConfigService } from '@nestjs/config';
@@ -21,7 +26,7 @@ export const COURIER_CALLBACK_PROCESSING_LEASE_MS = 5 * 60 * 1000;
 export type CourierCallbackJobData = {
   callbackLogId?: string;
   initiatedByActorId?: string;
-};
+ organizationId?: string };
 
 @Injectable()
 export class ShippingWebhookQueue implements OnModuleInit {
@@ -33,7 +38,9 @@ export class ShippingWebhookQueue implements OnModuleInit {
     private readonly config: ConfigService,
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
-  ) {}
+    @Optional() private readonly tenantDb?: TenantDbService,
+    @Optional() private readonly fanout?: TenantFanoutService,
+) {}
 
   async onModuleInit() {
     if (!this.scheduleEnabled()) return;
@@ -102,7 +109,30 @@ export class ShippingWebhookQueue implements OnModuleInit {
   }
 
   async enqueueRecoverable() {
-    const callbacks = await this.prisma.shipmentWebhookLog.findMany({
+    // MT-8 §11.2: per-tenant fan-out with organization-stamped envelopes;
+    // legacy mode runs once, envelope-free.
+    if ((process.env.TENANCY_ENABLED || 'false') !== 'true') {
+      return this.enqueueForContext(undefined);
+    }
+    if (!this.fanout) throw new Error('TENANT_FANOUT_UNAVAILABLE');
+    let queuedCount = 0;
+    const fanout = await this.fanout.forEachTenant(
+      async () => {
+        const result = await this.enqueueForContext(
+          tryGetTenantContext()?.organizationId,
+        );
+        queuedCount += result.queuedCount;
+      },
+      { label: 'courier-callback-retry-sweep' },
+    );
+    return { queuedCount, tenantFailures: fanout.failures };
+  }
+
+  private async enqueueForContext(organizationId?: string) {
+    const db = await this.tenantDb?.tryGet().then((c) => c) ?? undefined;
+    void db;
+    const client = (await this.tenantDb?.tryGet()) ?? this.prisma;
+    const callbacks = await client.shipmentWebhookLog.findMany({
       where: this.recoverableWhere(),
       orderBy: [{ lastAttemptAt: 'asc' }, { receivedAt: 'asc' }],
       take: 100,
@@ -112,8 +142,16 @@ export class ShippingWebhookQueue implements OnModuleInit {
     await this.queue.addBulk(
       callbacks.map((callback) => ({
         name: COURIER_CALLBACK_RETRY_JOB,
-        data: { callbackLogId: callback.id },
-        opts: { jobId: this.retryJobId(callback.id, callback.attemptCount) },
+        data: {
+          callbackLogId: callback.id,
+          ...(organizationId ? { organizationId } : {}),
+        },
+        opts: {
+          jobId:
+            organizationId
+              ? `t:${organizationId}:${this.retryJobId(callback.id, callback.attemptCount)}`
+              : this.retryJobId(callback.id, callback.attemptCount),
+        },
       })),
     );
     return { queuedCount: callbacks.length };

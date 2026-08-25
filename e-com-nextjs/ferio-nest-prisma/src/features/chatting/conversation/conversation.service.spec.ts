@@ -14,7 +14,6 @@ describe('ConversationService participant authorization', () => {
     const socketGateway = { emitToRoom: jest.fn() };
     const service = new ConversationService(
       prisma as never,
-      {} as never,
       socketGateway as never,
       {} as never,
       {} as never,

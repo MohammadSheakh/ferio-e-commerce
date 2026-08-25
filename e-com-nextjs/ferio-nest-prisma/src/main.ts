@@ -39,8 +39,11 @@ async function bootstrap() {
   const logger = new Logger('Bootstrap');
 
   // Create NestJS application
+  // rawBody is required for HMAC signature verification of provider webhooks
+  // (Stripe, RevenueCat) — re-serialized JSON breaks signature checks.
   const app = await NestFactory.create(AppModule, {
     logger: ['error', 'warn', 'log', 'debug', 'verbose'],
+    rawBody: true,
   });
 
   const configService = app.get(ConfigService);
@@ -147,7 +150,8 @@ async function bootstrap() {
   // Swagger Documentation
   // ────────────────────────────────────────────────────────────────────────
 
-  if (nodeEnv === 'development' || nodeEnv === 'production') {
+  // Swagger is a development convenience: never expose API docs in production.
+  if (nodeEnv !== 'production') {
     const config = new DocumentBuilder()
       .setTitle('Ferio Commerce API')
       .setDescription('Ferio modular NestJS backend with PostgreSQL and Prisma')

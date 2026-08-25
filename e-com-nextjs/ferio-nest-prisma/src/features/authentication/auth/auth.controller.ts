@@ -22,7 +22,11 @@ import {
   ResendVerificationDto,
   VerifyEmailDto,
 } from './dto/email-verification.dto';
-import { CreateOtpDto, VerifyOtpDto } from '../otp/dto/create-otp.dto';
+import {
+  CreateOtpDto,
+  ResetPasswordDto,
+  VerifyOtpDto,
+} from '../otp/dto/create-otp.dto';
 import {
   SlidingWindowRateLimitGuard,
   RateLimit,
@@ -349,6 +353,8 @@ export class AuthController {
    */
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(SlidingWindowRateLimitGuard)
+  @RateLimit(GLOBAL_RATE_LIMITS.strict)
   @ApiOperation({
     summary: 'Forgot password',
     description: 'Send password reset OTP to email',
@@ -368,6 +374,8 @@ export class AuthController {
    */
   @Post('verify-otp')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(SlidingWindowRateLimitGuard)
+  @RateLimit(GLOBAL_RATE_LIMITS.strict)
   @ApiOperation({
     summary: 'Verify OTP',
     description: 'Verify OTP for email verification or password reset',
@@ -392,15 +400,15 @@ export class AuthController {
    */
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(SlidingWindowRateLimitGuard)
+  @RateLimit(GLOBAL_RATE_LIMITS.strict)
   @ApiOperation({
     summary: 'Reset password',
     description: 'Reset password with OTP verification',
   })
   @ApiResponse({ status: 200, description: 'Password reset successful' })
   @ApiResponse({ status: 400, description: 'Invalid OTP' })
-  async resetPassword(
-    @Body() body: { email: string; otp: string; newPassword: string },
-  ) {
+  async resetPassword(@Body() body: ResetPasswordDto) {
     await this.authService.resetPassword(
       body.email,
       body.otp,

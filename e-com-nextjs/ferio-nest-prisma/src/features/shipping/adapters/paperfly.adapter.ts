@@ -56,7 +56,9 @@ export class PaperflyAdapter implements CourierAdapter {
         'Ferio E-Commerce',
       ),
       productBrief: input.itemDescription || 'General Goods',
-      packagePrice: String(input.codAmount),
+      // Paperfly expects amounts in major units (BDT taka); internal money is
+      // minor units (poisha) — divide to avoid demanding 100x COD at the door.
+      packagePrice: String(input.codAmount / 100),
       max_weight: String(Math.max(0.1, input.weightGrams / 1000)),
       customerName: input.recipientName,
       customerAddress: input.recipientAddress,

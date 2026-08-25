@@ -3,11 +3,14 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { createHash, randomBytes } from 'crypto';
+import type { PrismaClient } from '@prisma/client';
 import { Prisma } from '@prisma/client';
 import type { UserPayload } from '@app/common';
 import { PrismaService } from '@app/database';
+import { TenantDbService } from '../../tenancy/tenant-db.service';
 import { AuditService } from '../audit/audit.service';
 import { CreateRefundDto, RecordRefundResultDto } from './dto/refund.dto';
 
@@ -33,10 +36,20 @@ export class RefundsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
-  ) {}
+  
+    @Optional() private readonly tenantDb?: TenantDbService,) {}
 
+  /**
+   * MT-7: inside a tenant-resolved request this returns the resolved tenant
+   * database client; outside one it explicitly falls back to the legacy DB.
+   */
+  private async db(): Promise<PrismaClient> {
+    const tenant = await this.tenantDb?.tryGet();
+    return tenant ?? (this.prisma as PrismaClient);
+  }
   async eligibility(returnCaseId: string) {
-    const returnCase = await this.prisma.returnCase.findUnique({
+    const db = await this.db();
+    const returnCase = await db.returnCase.findUnique({
       where: { id: returnCaseId },
       include: {
         order: { select: { id: true, currency: true, paymentMethod: true } },
@@ -78,7 +91,8 @@ export class RefundsService {
   }
 
   async getReturnRefunds(returnCaseId: string) {
-    return this.prisma.commerceRefund.findMany({
+    const db = await this.db();
+    return db.commerceRefund.findMany({
       where: { returnCaseId },
       include: refundInclude,
       orderBy: { createdAt: 'desc' },
@@ -91,14 +105,15 @@ export class RefundsService {
     dto: CreateRefundDto,
     actor: UserPayload,
   ) {
+    const db = await this.db();
     const idempotencyKeyHash = this.idempotencyHash(rawIdempotencyKey);
-    const duplicate = await this.prisma.commerceRefund.findUnique({
+    const duplicate = await db.commerceRefund.findUnique({
       where: { idempotencyKeyHash },
       include: refundInclude,
     });
     if (duplicate) return duplicate;
 
-    return this.prisma.$transaction(
+    return db.$transaction(
       async (transaction) => {
         const concurrentDuplicate = await transaction.commerceRefund.findUnique(
           {
@@ -176,8 +191,9 @@ export class RefundsService {
     dto: RecordRefundResultDto,
     actor: UserPayload,
   ) {
+    const db = await this.db();
     const deduplicationHash = this.idempotencyHash(rawIdempotencyKey);
-    return this.prisma.$transaction(async (transaction) => {
+    return db.$transaction(async (transaction) => {
       const duplicate = await transaction.refundAttempt.findUnique({
         where: { deduplicationHash },
         include: { refund: { include: refundInclude } },

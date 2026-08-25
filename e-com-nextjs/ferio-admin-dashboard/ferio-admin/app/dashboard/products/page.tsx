@@ -40,9 +40,6 @@ export default function ProductsPage() {
 
       const res = await fetch(`/api/catalog/products?${query.toString()}`, {
         cache: "no-store",
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("admin_access_token") || ""}`,
-        },
       });
       if (!res.ok) throw new Error("Unable to load products");
       const data = await res.json();

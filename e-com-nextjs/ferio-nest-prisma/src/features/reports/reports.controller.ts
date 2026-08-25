@@ -1,4 +1,5 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { TenantMembershipGuard } from '../../tenancy/tenant-membership.guard';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import {
   AuthGuard,
@@ -16,7 +17,7 @@ import { ReportsService } from './reports.service';
 @ApiTags('Admin Reports')
 @ApiBearerAuth()
 @Controller('admin/reports')
-@UseGuards(AuthGuard, RolesGuard, PermissionsGuard)
+@UseGuards(AuthGuard, RolesGuard, PermissionsGuard, TenantMembershipGuard)
 @Roles('admin')
 @Permissions(PERMISSIONS.REPORTS_READ)
 export class ReportsController {

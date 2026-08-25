@@ -137,9 +137,12 @@ export default function CheckoutScreen() {
 
       let status = order.status;
       if (form.paymentMethod === 'PREPAID') {
+        // Reference + placement phone prove the caller placed this order.
         const payment = await apiPost<{ redirectUrl?: string }>('/payments/initiate', {
           orderId: order.id,
           provider: form.paymentProvider,
+          reference: order.reference,
+          phone: form.phone,
         });
         if (!payment.redirectUrl) throw new Error('The payment provider did not return a redirect URL.');
         await WebBrowser.openBrowserAsync(payment.redirectUrl);

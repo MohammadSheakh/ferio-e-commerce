@@ -3,9 +3,14 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
+import { Prisma } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import { PrismaService } from '@app/database';
+import { TenantDbService } from '../../tenancy/tenant-db.service';
+import { AuditService } from '../audit/audit.service';
 import {
   ApplyDeliveryPersonnelDto,
   AssignOrderDto,
@@ -31,40 +36,58 @@ function normalizePhone(phone: string): string {
 
 @Injectable()
 export class DeliveryPersonnelService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly audit: AuditService,
+  
+    @Optional() private readonly tenantDb?: TenantDbService,) {}
 
+  /**
+   * MT-7: tenant client inside resolved storefront/worker contexts; explicit
+   * legacy fallback otherwise. Never guesses.
+   */
+  private async db(): Promise<PrismaClient> {
+    const tenant = await this.tenantDb?.tryGet();
+    return tenant ?? (this.prisma as PrismaClient);
+  }
   /**
    * Public Self-Registration for Bangladesh Candidates
    */
   async apply(dto: ApplyDeliveryPersonnelDto) {
+    const db = await this.db();
     const phoneNorm = normalizePhone(dto.phone);
+    const emailNorm = dto.email ? dto.email.toLowerCase().trim() : null;
 
-    const existingPhone = await this.prisma.deliveryPersonnel.findUnique({
-      where: { phoneNormalized: phoneNorm },
-    });
-    if (existingPhone) {
+    const [existingPhone, existingEmail, conflictingUser] = await Promise.all([
+      db.deliveryPersonnel.findUnique({
+        where: { phoneNormalized: phoneNorm },
+      }),
+      emailNorm
+        ? db.deliveryPersonnel.findUnique({ where: { email: emailNorm } })
+        : Promise.resolve(null),
+      emailNorm
+        ? db.user.findUnique({ where: { email: emailNorm } })
+        : Promise.resolve(null),
+    ]);
+    if (existingPhone || existingEmail) {
       throw new ConflictException(
-        'An application or rider account with this phone number already exists.',
+        'This application could not be accepted. If you already applied, please wait for review or contact support.',
+      );
+    }
+    // Never allow an application email that already belongs to an existing
+    // account: approval must never be able to hijack or reset that account.
+    if (conflictingUser) {
+      throw new ConflictException(
+        'This email address cannot be used for a rider application. Please use a different personal email address.',
       );
     }
 
-    if (dto.email) {
-      const existingEmail = await this.prisma.deliveryPersonnel.findUnique({
-        where: { email: dto.email.toLowerCase().trim() },
-      });
-      if (existingEmail) {
-        throw new ConflictException(
-          'An application or rider account with this email address already exists.',
-        );
-      }
-    }
-
-    return this.prisma.deliveryPersonnel.create({
+    return db.deliveryPersonnel.create({
       data: {
         name: dto.name.trim(),
         phoneOriginal: dto.phone.trim(),
         phoneNormalized: phoneNorm,
-        email: dto.email ? dto.email.toLowerCase().trim() : null,
+        email: emailNorm,
         nidNumber: dto.nidNumber.trim(),
         vehicleType: dto.vehicleType || 'BIKE',
         operatingZone: dto.operatingZone.trim(),
@@ -79,19 +102,31 @@ export class DeliveryPersonnelService {
    * Direct Creation by Admin
    */
   async createDirectByAdmin(dto: CreateDeliveryPersonnelDto) {
+    const db = await this.db();
     const phoneNorm = normalizePhone(dto.phone);
     const emailNorm = dto.email.toLowerCase().trim();
 
-    // Check if user already exists
-    const existingUser = await this.prisma.user.findUnique({
+    // An existing platform account must never be silently converted into a
+    // rider account (that would reset the victim's password and role).
+    const existingUser = await db.user.findUnique({
       where: { email: emailNorm },
     });
+    if (existingUser && existingUser.role !== 'delivery_man') {
+      throw new ConflictException(
+        'A platform account with this email already exists with a different role. Choose a different email or manage that account through staff/user administration.',
+      );
+    }
 
     let userId = existingUser?.id;
 
     if (!existingUser) {
+      if (!dto.password || dto.password.trim().length < 10) {
+        throw new BadRequestException(
+          'An initial password of at least 10 characters is required when creating a rider account.',
+        );
+      }
       const hashedPassword = await bcrypt.hash(dto.password, 12);
-      const newUser = await this.prisma.user.create({
+      const newUser = await db.user.create({
         data: {
           name: dto.name.trim(),
           email: emailNorm,
@@ -102,28 +137,17 @@ export class DeliveryPersonnelService {
         },
       });
       userId = newUser.id;
-    } else {
-      // Update role to delivery_man, set password, and verify email
-      const hashedPassword = await bcrypt.hash(dto.password, 12);
-      await this.prisma.user.update({
-        where: { id: existingUser.id },
-        data: {
-          role: 'delivery_man',
-          password: hashedPassword,
-          isEmailVerified: true,
-        },
-      });
     }
 
     // Check existing delivery personnel profile
-    const existingRider = await this.prisma.deliveryPersonnel.findFirst({
+    const existingRider = await db.deliveryPersonnel.findFirst({
       where: {
         OR: [{ phoneNormalized: phoneNorm }, { email: emailNorm }, { userId }],
       },
     });
 
     if (existingRider) {
-      return this.prisma.deliveryPersonnel.update({
+      return db.deliveryPersonnel.update({
         where: { id: existingRider.id },
         data: {
           name: dto.name.trim(),
@@ -141,7 +165,7 @@ export class DeliveryPersonnelService {
       });
     }
 
-    return this.prisma.deliveryPersonnel.create({
+    return db.deliveryPersonnel.create({
       data: {
         name: dto.name.trim(),
         phoneOriginal: dto.phone.trim(),
@@ -160,9 +184,14 @@ export class DeliveryPersonnelService {
 
   /**
    * Admin Approval / Rejection Workflow
+   *
+   * Approval provisions a NEW rider account only. It must never mutate an
+   * existing platform account (no password resets, no role changes) — that
+   * would turn one admin click into an account-takeover primitive.
    */
   async updateApproval(id: string, dto: UpdateApprovalDto) {
-    const personnel = await this.prisma.deliveryPersonnel.findUnique({
+    const db = await this.db();
+    const personnel = await db.deliveryPersonnel.findUnique({
       where: { id },
     });
     if (!personnel) {
@@ -176,50 +205,77 @@ export class DeliveryPersonnelService {
         const email =
           personnel.email ||
           `rider.${personnel.phoneNormalized.replace('+', '')}@ferio.local`;
-        const initialPassword = dto.initialPassword || 'RiderPass123!';
-        const hashedPassword = await bcrypt.hash(initialPassword, 12);
 
-        // Check if user exists with this email
-        const existingUser = await this.prisma.user.findUnique({
+        const existingUser = await db.user.findUnique({
           where: { email },
         });
-
-        if (existingUser) {
-          userId = existingUser.id;
-          await this.prisma.user.update({
-            where: { id: existingUser.id },
-            data: {
-              role: 'delivery_man',
-              password: hashedPassword,
-              isEmailVerified: true,
-            },
-          });
-        } else {
-          const newUser = await this.prisma.user.create({
-            data: {
-              name: personnel.name,
-              email,
-              password: hashedPassword,
-              phoneNumber: personnel.phoneNormalized,
-              role: 'delivery_man',
-              isEmailVerified: true,
-            },
-          });
-          userId = newUser.id;
+        if (existingUser && existingUser.role !== 'delivery_man') {
+          throw new ConflictException(
+            'A platform account with this email already exists with a different role. Resolve the account conflict before approving this rider.',
+          );
         }
+
+        if (!dto.initialPassword || dto.initialPassword.trim().length < 10) {
+          throw new BadRequestException(
+            'An initial password of at least 10 characters is required to provision this rider account.',
+          );
+        }
+
+        userId = await db.$transaction(async (tx) => {
+          let txUserId = existingUser?.id;
+          if (txUserId) {
+            // Existing rider-linked account (same role): reset credential so a
+            // known password can be handed over securely by the owner.
+            const hashedPassword = await bcrypt.hash(dto.initialPassword!, 12);
+            await tx.user.update({
+              where: { id: txUserId },
+              data: { password: hashedPassword },
+            });
+          } else {
+            const hashedPassword = await bcrypt.hash(dto.initialPassword!, 12);
+            const newUser = await tx.user.create({
+              data: {
+                name: personnel.name,
+                email,
+                password: hashedPassword,
+                phoneNumber: personnel.phoneNormalized,
+                role: 'delivery_man',
+                isEmailVerified: true,
+              },
+            });
+            txUserId = newUser.id;
+          }
+          return txUserId;
+        });
       }
 
-      return this.prisma.deliveryPersonnel.update({
-        where: { id },
-        data: {
-          status: 'APPROVED',
-          notes: dto.notes ? dto.notes.trim() : personnel.notes,
-          userId,
-        },
+      return db.$transaction(async (tx) => {
+        const updated = await tx.deliveryPersonnel.update({
+          where: { id },
+          data: {
+            status: 'APPROVED',
+            notes: dto.notes ? dto.notes.trim() : personnel.notes,
+            userId,
+          },
+        });
+        await this.audit.record(
+          {
+            action: 'DELIVERY_PERSONNEL_APPROVED',
+            entityType: 'DeliveryPersonnel',
+            entityId: id,
+            newValue: {
+              riderUserId: userId,
+              status: 'APPROVED',
+              provisionedNewAccount: !personnel.userId,
+            },
+          },
+          tx as any,
+        );
+        return updated;
       });
     }
 
-    return this.prisma.deliveryPersonnel.update({
+    return db.deliveryPersonnel.update({
       where: { id },
       data: {
         status: dto.status as any,
@@ -232,7 +288,8 @@ export class DeliveryPersonnelService {
    * Admin: Full Update Rider Profile & Reset Password
    */
   async updateRiderByAdmin(id: string, dto: UpdateDeliveryPersonnelDto) {
-    const personnel = await this.prisma.deliveryPersonnel.findUnique({
+    const db = await this.db();
+    const personnel = await db.deliveryPersonnel.findUnique({
       where: { id },
       include: { user: true },
     });
@@ -268,7 +325,7 @@ export class DeliveryPersonnelService {
         `rider.${(updateData.phoneNormalized || personnel.phoneNormalized).replace('+', '')}@ferio.local`;
 
       if (userId) {
-        await this.prisma.user.update({
+        await db.user.update({
           where: { id: userId },
           data: {
             password: hashedPassword,
@@ -278,7 +335,7 @@ export class DeliveryPersonnelService {
           },
         });
       } else {
-        const newUser = await this.prisma.user.create({
+        const newUser = await db.user.create({
           data: {
             name: updateData.name || personnel.name,
             email: email,
@@ -292,7 +349,7 @@ export class DeliveryPersonnelService {
         updateData.userId = userId;
       }
     } else if (userId && (updateData.name || updateData.email || updateData.phoneNormalized)) {
-      await this.prisma.user.update({
+      await db.user.update({
         where: { id: userId },
         data: {
           name: updateData.name || personnel.name,
@@ -302,7 +359,7 @@ export class DeliveryPersonnelService {
       });
     }
 
-    return this.prisma.deliveryPersonnel.update({
+    return db.deliveryPersonnel.update({
       where: { id },
       data: updateData,
       include: { user: { select: { id: true, email: true, role: true } } },
@@ -313,6 +370,7 @@ export class DeliveryPersonnelService {
    * List Delivery Personnel for Admin
    */
   async listAll(query: QueryDeliveryPersonnelDto) {
+    const db = await this.db();
     const where: any = {};
 
     if (query.status) {
@@ -335,7 +393,7 @@ export class DeliveryPersonnelService {
     }
 
     const [items, total] = await Promise.all([
-      this.prisma.deliveryPersonnel.findMany({
+      db.deliveryPersonnel.findMany({
         where,
         orderBy: { createdAt: 'desc' },
         include: {
@@ -347,7 +405,7 @@ export class DeliveryPersonnelService {
           },
         },
       }),
-      this.prisma.deliveryPersonnel.count({ where }),
+      db.deliveryPersonnel.count({ where }),
     ]);
 
     return { items, total };
@@ -357,7 +415,8 @@ export class DeliveryPersonnelService {
    * Detail View for Admin
    */
   async findOne(id: string) {
-    const personnel = await this.prisma.deliveryPersonnel.findUnique({
+    const db = await this.db();
+    const personnel = await db.deliveryPersonnel.findUnique({
       where: { id },
       include: {
         user: { select: { id: true, email: true, role: true } },
@@ -387,7 +446,8 @@ export class DeliveryPersonnelService {
    * Admin Assign Order to Delivery Rider
    */
   async assignOrder(dto: AssignOrderDto) {
-    const personnel = await this.prisma.deliveryPersonnel.findUnique({
+    const db = await this.db();
+    const personnel = await db.deliveryPersonnel.findUnique({
       where: { id: dto.deliveryPersonnelId },
     });
     if (!personnel || personnel.status !== 'APPROVED') {
@@ -396,14 +456,14 @@ export class DeliveryPersonnelService {
       );
     }
 
-    const order = await this.prisma.order.findUnique({
+    const order = await db.order.findUnique({
       where: { id: dto.orderId },
     });
     if (!order) {
       throw new NotFoundException('Order not found.');
     }
 
-    return this.prisma.order.update({
+    return db.order.update({
       where: { id: dto.orderId },
       data: {
         assignedDeliveryPersonnelId: personnel.id,
@@ -416,17 +476,18 @@ export class DeliveryPersonnelService {
   }
 
   private async resolveDeliveryPersonnel(userId: string) {
+    const db = await this.db();
     if (!userId) {
       throw new BadRequestException('User ID is missing from authorization token.');
     }
-    let personnel = await this.prisma.deliveryPersonnel.findUnique({
+    let personnel = await db.deliveryPersonnel.findUnique({
       where: { userId },
     });
 
     if (!personnel) {
-      const user = await this.prisma.user.findUnique({ where: { id: userId } });
+      const user = await db.user.findUnique({ where: { id: userId } });
       if (user) {
-        personnel = await this.prisma.deliveryPersonnel.findFirst({
+        const candidate = await db.deliveryPersonnel.findFirst({
           where: {
             OR: [
               { email: { equals: user.email, mode: 'insensitive' } },
@@ -434,32 +495,21 @@ export class DeliveryPersonnelService {
             ],
           },
         });
-        if (personnel && !personnel.userId) {
-          await this.prisma.deliveryPersonnel.update({
-            where: { id: personnel.id },
-            data: { userId: user.id },
-          });
-        }
-        if (!personnel) {
-          return {
-            id: user.id,
-            name: user.name,
-            phoneOriginal: user.phoneNumber || user.email,
-            phoneNormalized: user.phoneNumber || '',
-            email: user.email,
-            vehicleType: 'BIKE',
-            operatingZone: 'Dhaka North',
-            status: 'APPROVED',
-            currentLat: null,
-            currentLng: null,
-            lastLocationAt: null,
-            userId: user.id,
-          } as any;
+        // Auto-link only a genuinely approved rider record; never fabricate
+        // an approved profile for accounts without one.
+        if (candidate && candidate.status === 'APPROVED') {
+          personnel = candidate;
+          if (!personnel.userId) {
+            await db.deliveryPersonnel.update({
+              where: { id: personnel.id },
+              data: { userId: user.id },
+            });
+          }
         }
       }
     }
 
-    if (!personnel) {
+    if (!personnel || personnel.status !== 'APPROVED') {
       throw new NotFoundException('No active rider profile is linked to this account.');
     }
 
@@ -478,13 +528,14 @@ export class DeliveryPersonnelService {
    * Toggle Rider Online / Offline Duty Status
    */
   async toggleOnlineStatus(userId: string, isOnline: boolean) {
+    const db = await this.db();
     const personnel = await this.resolveDeliveryPersonnel(userId);
     // If turning online, update lastLocationAt timestamp
     const updateData: any = {};
     if (isOnline) {
       updateData.lastLocationAt = new Date();
     }
-    return this.prisma.deliveryPersonnel.update({
+    return db.deliveryPersonnel.update({
       where: { id: personnel.id },
       data: updateData,
     });
@@ -494,9 +545,10 @@ export class DeliveryPersonnelService {
    * Rider Gets Assigned Orders
    */
   async getMyAssignedOrders(userId: string) {
+    const db = await this.db();
     const personnel = await this.resolveDeliveryPersonnel(userId);
 
-    return this.prisma.order.findMany({
+    return db.order.findMany({
       where: { assignedDeliveryPersonnelId: personnel.id },
       orderBy: { createdAt: 'desc' },
       include: {
@@ -509,20 +561,19 @@ export class DeliveryPersonnelService {
 
   /**
    * Rider Updates Delivery Status of an Assigned Order
+   *
+   * DELIVERED must follow the same invariants as the courier path:
+   * reservations are consumed, fulfillment history is written, and the
+   * transition is validated. Riders can never move a cancelled/completed
+   * order, and every change runs inside one transaction.
    */
   async updateDeliveryOrderStatus(
     userId: string,
     orderId: string,
     dto: UpdateDeliveryOrderStatusDto,
   ) {
+    const db = await this.db();
     const personnel = await this.resolveDeliveryPersonnel(userId);
-
-    const order = await this.prisma.order.findFirst({
-      where: { id: orderId, assignedDeliveryPersonnelId: personnel.id },
-    });
-    if (!order) {
-      throw new NotFoundException('Assigned order not found.');
-    }
 
     const shipmentStatusMap: Record<string, any> = {
       PICKED_UP: 'PICKED_UP',
@@ -531,9 +582,10 @@ export class DeliveryPersonnelService {
       DELIVERED: 'DELIVERED',
       DELIVERY_FAILED: 'DELIVERY_FAILED',
     };
-
-    const newShipmentStatus = shipmentStatusMap[dto.status] || order.shipmentStatus;
-    const newOrderStatus = dto.status === 'DELIVERED' ? 'DELIVERED' : order.status;
+    const newShipmentStatus = shipmentStatusMap[dto.status];
+    if (!newShipmentStatus) {
+      throw new BadRequestException(`Unsupported rider status: ${dto.status}`);
+    }
 
     if (typeof dto.latitude === 'number' && typeof dto.longitude === 'number') {
       try {
@@ -546,37 +598,172 @@ export class DeliveryPersonnelService {
       }
     }
 
-    return this.prisma.order.update({
-      where: { id: orderId },
-      data: {
-        shipmentStatus: newShipmentStatus,
-        status: newOrderStatus,
-        statusHistory: {
-          create: {
-            newStatus: newOrderStatus,
-            oldStatus: order.status,
-            source: 'SYSTEM',
-            actorId: userId,
-            note: dto.note || `Rider status update: ${dto.status}`,
+    return db.$transaction(
+      async (tx) => {
+        const order = await tx.order.findFirst({
+          where: { id: orderId, assignedDeliveryPersonnelId: personnel.id },
+        });
+        if (!order) {
+          throw new NotFoundException('Assigned order not found.');
+        }
+
+        const terminalOrBlocked = [
+          'CANCELLED',
+          'DELIVERED',
+          'COMPLETED',
+        ];
+        if (
+          terminalOrBlocked.includes(order.status) ||
+          ['DELIVERED', 'RETURNED', 'CANCELLED', 'RTO'].includes(
+            order.shipmentStatus as any,
+          )
+        ) {
+          throw new ConflictException(
+            `Order in status ${order.status}/${order.shipmentStatus} cannot be updated by a rider.`,
+          );
+        }
+        // Only approved riders may move orders.
+        if (personnel.status !== 'APPROVED') {
+          throw new ConflictException(
+            'Rider profile is not approved for delivery operations.',
+          );
+        }
+        // Riders only operate on orders that were actually handed to them.
+        if (!['SHIPPED', 'READY_TO_SHIP'].includes(order.status)) {
+          throw new ConflictException(
+            `Order must be handed over for delivery before rider updates (current status: ${order.status}).`,
+          );
+        }
+
+        const isDelivered = dto.status === 'DELIVERED';
+        const newOrderStatus = isDelivered ? 'DELIVERED' : order.status;
+
+        if (isDelivered) {
+          await this.consumeDeliveredReservations(tx, order.id);
+          if (order.fulfillmentStatus !== 'FULFILLED') {
+            await tx.fulfillmentHistory.create({
+              data: {
+                orderId: order.id,
+                oldStatus: order.fulfillmentStatus,
+                newStatus: 'FULFILLED',
+                source: 'ADMIN',
+                actorId: userId,
+                note: `Rider confirmed parcel delivery (${personnel.name})`,
+              },
+            });
+          }
+        }
+
+        const updated = await tx.order.update({
+          where: { id: orderId },
+          data: {
+            shipmentStatus: newShipmentStatus,
+            status: newOrderStatus,
+            ...(isDelivered ? { fulfillmentStatus: 'FULFILLED' as const } : {}),
+            statusHistory: {
+              create: {
+                newStatus: newOrderStatus,
+                oldStatus: order.status,
+                source: 'ADMIN',
+                actorId: userId,
+                note:
+                  dto.note ||
+                  `Rider status update: ${dto.status} (rider ${personnel.name})`,
+              },
+            },
           },
-        },
+        });
+
+        if (isDelivered) {
+          // COD cash collection evidence cannot be fabricated here: there is
+          // no courier shipment to attach a CodCollection to, so finance
+          // reviews rider-collected COD through audit + reconciliation.
+          // Payment status intentionally remains PENDING for COD orders until
+          // staff confirm the handover of collected cash.
+          await this.audit.record(
+            {
+              action: 'RIDER_DELIVERY_CONFIRMED',
+              entityType: 'Order',
+              entityId: order.id,
+              actor: { userId, role: 'delivery_man' },
+              newValue: {
+                reference: order.reference,
+                paymentMethod: order.paymentMethod,
+                totalMinor: order.total,
+                codCashPendingStaffConfirmation: order.paymentMethod === 'COD',
+              },
+            },
+            tx as any,
+          );
+        }
+
+        return updated;
       },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
+  }
+
+  /**
+   * Consume ACTIVE stock reservations for a delivered order that has no
+   * courier shipment (rider-delivered). Mirrors ShippingService's delivery
+   * accounting so inventory stays consistent regardless of who delivered.
+   */
+  private async consumeDeliveredReservations(
+    tx: Prisma.TransactionClient,
+    orderId: string,
+  ) {
+    const reservations = await tx.inventoryReservation.findMany({
+      where: { orderItem: { orderId }, status: 'ACTIVE' },
     });
+    for (const reservation of reservations) {
+      const stock = await tx.inventoryStock.findUnique({
+        where: { id: reservation.inventoryId },
+      });
+      if (
+        !stock ||
+        stock.reserved < reservation.quantity ||
+        stock.onHand < reservation.quantity
+      ) {
+        throw new ConflictException('Delivered reservation is inconsistent');
+      }
+      await tx.inventoryStock.update({
+        where: { id: reservation.inventoryId },
+        data: {
+          reserved: { decrement: reservation.quantity },
+          onHand: { decrement: reservation.quantity },
+        },
+      });
+      await tx.inventoryReservation.update({
+        where: { id: reservation.id },
+        data: { status: 'CONSUMED', consumedAt: new Date() },
+      });
+      await tx.inventoryMovement.create({
+        data: {
+          inventoryId: reservation.inventoryId,
+          type: 'SALE',
+          quantityDelta: -reservation.quantity,
+          reason: 'Rider confirmed delivery',
+          referenceType: 'Order',
+          referenceId: orderId,
+        },
+      });
+    }
   }
 
   /**
    * Rider Pings Location via Browser Geolocation API
    */
   async updateLocation(userId: string, dto: UpdateLocationDto) {
+    const db = await this.db();
     const personnel = await this.resolveDeliveryPersonnel(userId);
 
-    const count = await this.prisma.deliveryLocationHistory.count({
+    const count = await db.deliveryLocationHistory.count({
       where: { deliveryPersonnelId: personnel.id },
     });
 
     const nextSeq = count + 1;
 
-    await this.prisma.deliveryLocationHistory.create({
+    await db.deliveryLocationHistory.create({
       data: {
         deliveryPersonnelId: personnel.id,
         latitude: dto.latitude,
@@ -585,7 +772,7 @@ export class DeliveryPersonnelService {
       },
     });
 
-    return this.prisma.deliveryPersonnel.update({
+    return db.deliveryPersonnel.update({
       where: { id: personnel.id },
       data: {
         currentLat: dto.latitude,
@@ -599,14 +786,15 @@ export class DeliveryPersonnelService {
    * Admin Clears Location Waypoint History for a Rider
    */
   async clearLocationHistory(id: string) {
-    const personnel = await this.prisma.deliveryPersonnel.findUnique({
+    const db = await this.db();
+    const personnel = await db.deliveryPersonnel.findUnique({
       where: { id },
     });
     if (!personnel) {
       throw new NotFoundException('Delivery personnel record not found.');
     }
 
-    await this.prisma.deliveryLocationHistory.deleteMany({
+    await db.deliveryLocationHistory.deleteMany({
       where: { deliveryPersonnelId: id },
     });
 
@@ -617,8 +805,9 @@ export class DeliveryPersonnelService {
    * Admin Map View Data: All Riders with sequence pins & All active orders with lat/lng
    */
   async getDeliveryMapData() {
+    const db = await this.db();
     const [riders, activeOrders] = await Promise.all([
-      this.prisma.deliveryPersonnel.findMany({
+      db.deliveryPersonnel.findMany({
         where: { status: 'APPROVED' },
         select: {
           id: true,
@@ -635,7 +824,7 @@ export class DeliveryPersonnelService {
           },
         },
       }),
-      this.prisma.order.findMany({
+      db.order.findMany({
         orderBy: { createdAt: 'desc' },
         take: 200,
         select: {

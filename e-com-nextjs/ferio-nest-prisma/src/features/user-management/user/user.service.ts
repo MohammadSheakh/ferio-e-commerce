@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 
 import { RedisService } from '@app/redis';
 import { PrismaService } from '@app/database';
+import { scopedRedisKey } from '../../../tenancy/redis-keys.util';
 import { USER_CACHE_CONFIG } from './user.constants';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 
@@ -46,9 +47,9 @@ export class UserService {
   ) {}
 
   private getCacheKey(type: 'profile' | 'stats', id: string): string {
-    return type === 'profile' 
-      ? `${USER_CACHE_CONFIG.PREFIX}:${id}` 
-      : `${USER_CACHE_CONFIG.PREFIX}:stats:${id}`;
+    return type === 'profile'
+      ? scopedRedisKey(USER_CACHE_CONFIG.PREFIX, id)
+      : scopedRedisKey(USER_CACHE_CONFIG.PREFIX, 'stats', id);
   }
 
   async findById(id: string): Promise<PublicUserRecord | null> {

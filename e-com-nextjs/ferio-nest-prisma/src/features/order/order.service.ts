@@ -1,13 +1,18 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { createHash, randomBytes, timingSafeEqual } from 'crypto';
+import { createHash, randomBytes, randomInt, timingSafeEqual } from 'crypto';
+import type { PrismaClient } from '@prisma/client';
 import { CodVerificationMode, OrderStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '@app/database';
+import { TenantDbService } from '../../tenancy/tenant-db.service';
+import { tryGetTenantContext } from '../../tenancy/tenant-context';
 import type { UserPayload } from '@app/common';
 import { CartService } from '../cart/cart.service';
 import { TransactionalMessagingService } from '../transactional-messaging/transactional-messaging.service';
@@ -69,10 +74,33 @@ export class OrderService {
     private readonly config: ConfigService,
     private readonly wallet: WalletService,
     private readonly customerNotifications: CustomerNotificationsService,
+    @Optional() private readonly tenantDb?: TenantDbService,
+    @Optional() private readonly entitlements?: import('../../platform/services/entitlements.service').EntitlementsService,
+    @Optional() private readonly usage?: import('../../platform/services/usage.service').UsageService,
   ) {}
 
+  /**
+   * MT-7: inside a tenant-resolved request this returns the resolved tenant
+   * database client; outside one (legacy mode, platform workers pre-MT-8) it
+   * explicitly falls back to the legacy single-tenant DB. Never guesses.
+   */
+  private async db(): Promise<PrismaClient> {
+    const tenant = await this.tenantDb?.tryGet();
+    return tenant ?? (this.prisma as PrismaClient);
+  }
   private hashIdempotencyKey(value: string): string {
     return createHash('sha256').update(value).digest('hex');
+  }
+
+  private timingSafeEqualStrings(a: string, b: string): boolean {
+    const bufA = Buffer.from(a);
+    const bufB = Buffer.from(b);
+    if (bufA.length !== bufB.length) {
+      // Compare against self to keep timing uniform, then fail.
+      timingSafeEqual(bufA, bufA);
+      return false;
+    }
+    return timingSafeEqual(bufA, bufB);
   }
 
   private orderReference(prefix = 'FER'): string {
@@ -154,7 +182,8 @@ export class OrderService {
   }
 
   private async loadDetailedOrder(id: string) {
-    const order = await this.prisma.order.findUnique({
+    const db = await this.db();
+    const order = await db.order.findUnique({
       where: { id },
       include: orderDetailInclude,
     });
@@ -241,6 +270,17 @@ export class OrderService {
     });
   }
 
+  private async recordOrderUsage(): Promise<void> {
+    try {
+      const ctx = tryGetTenantContext();
+      if (ctx && this.usage) {
+        await this.usage.increment(ctx.organizationId, 'orders_per_month', 1);
+      }
+    } catch {
+      // Metering must never fail an order.
+    }
+  }
+
   private async confirmationAfterCommit(
     order: Prisma.OrderGetPayload<{ include: typeof orderDetailInclude }>,
   ) {
@@ -248,6 +288,8 @@ export class OrderService {
       'ORDER_PLACED',
       ...(order.status === 'CONFIRMED' ? ['ORDER_CONFIRMED'] : []),
     ]);
+    // Non-blocking SaaS usage metering (MT-10 §9.4): never fails an order.
+    void this.recordOrderUsage();
     return this.serializeConfirmation(order);
   }
 
@@ -514,8 +556,7 @@ export class OrderService {
     orderId: string,
     reason: string,
     actorId: string,
-  ) {
-    const reservations = await transaction.inventoryReservation.findMany({
+  ) {    const reservations = await transaction.inventoryReservation.findMany({
       where: { orderItem: { orderId }, status: 'ACTIVE' },
     });
     for (const reservation of reservations) {
@@ -547,16 +588,65 @@ export class OrderService {
     }
   }
 
+  /**
+   * Consume ACTIVE reservations when a store-pickup handover completes.
+   * Mirrors the courier delivery accounting (ShippingService) so inventory
+   * stays consistent regardless of fulfilment channel.
+   */
+  private async consumeDeliveredReservations(
+    transaction: Prisma.TransactionClient,
+    orderId: string,
+  ) {
+    const reservations = await transaction.inventoryReservation.findMany({
+      where: { orderItem: { orderId }, status: 'ACTIVE' },
+    });
+    for (const reservation of reservations) {
+      const stock = await transaction.inventoryStock.findUnique({
+        where: { id: reservation.inventoryId },
+      });
+      if (
+        !stock ||
+        stock.reserved < reservation.quantity ||
+        stock.onHand < reservation.quantity
+      ) {
+        throw new ConflictException('Delivered reservation is inconsistent');
+      }
+      await transaction.inventoryStock.update({
+        where: { id: reservation.inventoryId },
+        data: {
+          reserved: { decrement: reservation.quantity },
+          onHand: { decrement: reservation.quantity },
+        },
+      });
+      await transaction.inventoryReservation.update({
+        where: { id: reservation.id },
+        data: { status: 'CONSUMED', consumedAt: new Date() },
+      });
+      await transaction.inventoryMovement.create({
+        data: {
+          inventoryId: reservation.inventoryId,
+          type: 'SALE',
+          quantityDelta: -reservation.quantity,
+          reason: 'Store pickup handover completed',
+          referenceType: 'Order',
+          referenceId: orderId,
+        },
+      });
+    }
+  }
+
   async getCodPolicy() {
-    return this.prisma.codVerificationPolicy.upsert({
+    const db = await this.db();
+    return db.codVerificationPolicy.upsert({
       where: { id: 'default' },
       update: {},
       create: { id: 'default', mode: 'ALWAYS' },
     });
   }
 
-  updateCodPolicy(dto: UpdateCodPolicyDto, actor: UserPayload) {
-    return this.prisma.$transaction(async (transaction) => {
+  async updateCodPolicy(dto: UpdateCodPolicyDto, actor: UserPayload) {
+    const db = await this.db();
+    return db.$transaction(async (transaction) => {
       const previous = await transaction.codVerificationPolicy.findUnique({
         where: { id: 'default' },
       });
@@ -595,12 +685,28 @@ export class OrderService {
     rawIdempotencyKey?: string,
     actor?: UserPayload,
   ) {
+    const db = await this.db();
     if (paymentMethod === 'WALLET' && !actor) {
       throw new BadRequestException('Sign in to pay with your wallet');
     }
+    // PO-005: suspended tenants keep browsing + admin visibility but new
+    // checkout is disabled. Stable code drives both UI and API behavior.
+    const tenantContext = tryGetTenantContext();
+    if (tenantContext && tenantContext.subscriptionStatus === 'SUSPENDED') {
+      throw new ForbiddenException('CHECKOUT_DISABLED_SUSPENDED');
+    }
+    // MT-10 §13.2: plan limits enforced server-side at the monetizable event.
+    if (tenantContext && this.entitlements) {
+      const decision = await this.entitlements
+        .evaluate(tenantContext.organizationId, 'orders_per_month', { requestedCount: 1 })
+        .catch(() => null);
+      if (decision && !decision.allowed) {
+        throw new ForbiddenException(decision.code ?? 'PLAN_LIMIT_REACHED');
+      }
+    }
     const idempotencyKey = this.cleanIdempotencyKey(rawIdempotencyKey);
     const idempotencyKeyHash = this.hashIdempotencyKey(idempotencyKey);
-    const existing = await this.prisma.order.findUnique({
+    const existing = await db.order.findUnique({
       where: { idempotencyKeyHash },
       include: orderDetailInclude,
     });
@@ -623,7 +729,7 @@ export class OrderService {
     }
 
     try {
-      const orderId = await this.prisma.$transaction(
+      const orderId = await db.$transaction(
         async (transaction) => {
           const cart = await transaction.cart.findUnique({
             where: { id: validatedCart.id! },
@@ -731,7 +837,7 @@ export class OrderService {
               : 'CONFIRMED';
           const isStorePickup = draft.deliveryMethod === 'STORE_PICKUP';
           const storePickupOtp = isStorePickup
-            ? Math.floor(100000 + Math.random() * 900000).toString()
+            ? String(randomInt(0, 1_000_000)).padStart(6, '0')
             : null;
 
           const order = await transaction.order.create({
@@ -903,7 +1009,7 @@ export class OrderService {
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2002'
       ) {
-        const duplicate = await this.prisma.order.findUnique({
+        const duplicate = await db.order.findUnique({
           where: { idempotencyKeyHash },
           include: orderDetailInclude,
         });
@@ -913,7 +1019,7 @@ export class OrderService {
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2034'
       ) {
-        const duplicate = await this.prisma.order.findUnique({
+        const duplicate = await db.order.findUnique({
           where: { idempotencyKeyHash },
           include: orderDetailInclude,
         });
@@ -925,6 +1031,7 @@ export class OrderService {
   }
 
   async getOrders(query: OrderQueryDto) {
+    const db = await this.db();
     const search = query.search?.normalize('NFKC').trim();
     const where: Prisma.OrderWhereInput = {
       status: query.status,
@@ -962,7 +1069,7 @@ export class OrderService {
         : undefined,
     };
     const [items, total] = await Promise.all([
-      this.prisma.order.findMany({
+      db.order.findMany({
         where,
         skip: (query.page - 1) * query.limit,
         take: query.limit,
@@ -987,7 +1094,7 @@ export class OrderService {
           },
         },
       }),
-      this.prisma.order.count({ where }),
+      db.order.count({ where }),
     ]);
     const totalPages = Math.ceil(total / query.limit) || 1;
     return {
@@ -1010,8 +1117,9 @@ export class OrderService {
   }
 
   async getOrder(id: string) {
+    const db = await this.db();
     const order = await this.loadDetailedOrder(id);
-    const shipment = await this.prisma.shipment.findUnique({
+    const shipment = await db.shipment.findUnique({
       where: { orderId: id },
       select: {
         id: true,
@@ -1038,7 +1146,7 @@ export class OrderService {
         : []),
     ];
     const [payments, returnCases, refunds, messages] = await Promise.all([
-      this.prisma.commercePaymentAttempt.findMany({
+      db.commercePaymentAttempt.findMany({
         where: { orderId: id },
         orderBy: { createdAt: 'asc' },
         select: {
@@ -1060,7 +1168,7 @@ export class OrderService {
           },
         },
       }),
-      this.prisma.returnCase.findMany({
+      db.returnCase.findMany({
         where: { orderId: id },
         orderBy: { createdAt: 'asc' },
         select: {
@@ -1079,7 +1187,7 @@ export class OrderService {
           },
         },
       }),
-      this.prisma.commerceRefund.findMany({
+      db.commerceRefund.findMany({
         where: { orderId: id },
         orderBy: { createdAt: 'asc' },
         select: {
@@ -1104,7 +1212,7 @@ export class OrderService {
           },
         },
       }),
-      this.prisma.commerceMessage.findMany({
+      db.commerceMessage.findMany({
         where: { OR: messageReferences },
         orderBy: { createdAt: 'asc' },
         take: 100,
@@ -1132,8 +1240,9 @@ export class OrderService {
   }
 
   async confirmOrder(id: string, dto: ConfirmOrderDto, actor: UserPayload) {
+    const db = await this.db();
     try {
-      await this.prisma.$transaction(
+      await db.$transaction(
         async (transaction) => {
           const order = await transaction.order.findUnique({
             where: { id },
@@ -1218,8 +1327,9 @@ export class OrderService {
   }
 
   async cancelOrder(id: string, dto: CancelOrderDto, actor: UserPayload) {
+    const db = await this.db();
     try {
-      await this.prisma.$transaction(
+      await db.$transaction(
         async (transaction) => {
           const order = await transaction.order.findUnique({ where: { id } });
           if (!order) throw new NotFoundException('Order not found');
@@ -1320,7 +1430,8 @@ export class OrderService {
     dto: UpdateFulfillmentDto,
     actor: UserPayload,
   ) {
-    await this.prisma.$transaction(
+    const db = await this.db();
+    await db.$transaction(
       async (transaction) => {
         const order = await transaction.order.findUnique({
           where: { id },
@@ -1410,7 +1521,8 @@ export class OrderService {
     dto: CreateFulfillmentExceptionDto,
     actor: UserPayload,
   ) {
-    const order = await this.prisma.order.findUnique({
+    const db = await this.db();
+    const order = await db.order.findUnique({
       where: { id },
       include: { items: { select: { id: true } } },
     });
@@ -1431,7 +1543,7 @@ export class OrderService {
         'Shortages require an order item and affected quantity',
       );
     }
-    await this.prisma.$transaction(async (transaction) => {
+    await db.$transaction(async (transaction) => {
       const exception = await transaction.fulfillmentException.create({
         data: {
           orderId: id,
@@ -1463,7 +1575,8 @@ export class OrderService {
     dto: ResolveFulfillmentExceptionDto,
     actor: UserPayload,
   ) {
-    const exception = await this.prisma.fulfillmentException.findFirst({
+    const db = await this.db();
+    const exception = await db.fulfillmentException.findFirst({
       where: { id: exceptionId, orderId: id },
     });
     if (!exception)
@@ -1471,7 +1584,7 @@ export class OrderService {
     if (exception.status !== 'OPEN') {
       throw new ConflictException('Fulfillment exception is already resolved');
     }
-    await this.prisma.$transaction(async (transaction) => {
+    await db.$transaction(async (transaction) => {
       const resolved = await transaction.fulfillmentException.update({
         where: { id: exceptionId },
         data: {
@@ -1498,9 +1611,10 @@ export class OrderService {
   }
 
   async trackOrder(dto: TrackOrderDto) {
+    const db = await this.db();
     const reference = dto.reference.normalize('NFKC').trim().toUpperCase();
     const phone = normalizeBangladeshPhone(dto.phone);
-    const order = await this.prisma.order.findUnique({
+    const order = await db.order.findUnique({
       where: { reference },
       include: {
         address: { select: { phoneNormalized: true } },
@@ -1573,7 +1687,8 @@ export class OrderService {
     },
     actor?: UserPayload,
   ) {
-    const order = await this.prisma.order.findUnique({
+    const db = await this.db();
+    const order = await db.order.findUnique({
       where: { id: orderId },
       include: { pickupStore: true },
     });
@@ -1582,10 +1697,23 @@ export class OrderService {
       throw new BadRequestException('Order is not configured for store pickup');
     }
 
+    // Only the owning customer (or an admin caller) may schedule a pickup.
+    if (actor?.role !== 'admin') {
+      const viewer = actor?.userId
+        ? await db.user.findUnique({
+            where: { id: actor.userId },
+            select: { customerId: true },
+          })
+        : null;
+      if (!viewer?.customerId || viewer.customerId !== order.customerId) {
+        throw new NotFoundException('Order not found');
+      }
+    }
+
     const scheduledDate = dto.pickupScheduledAt
       ? new Date(dto.pickupScheduledAt)
       : order.pickupScheduledAt;
-    const updated = await this.prisma.order.update({
+    const updated = await db.order.update({
       where: { id: orderId },
       data: {
         pickupScheduledAt: scheduledDate,
@@ -1594,6 +1722,17 @@ export class OrderService {
         customerPickupNotes:
           dto.customerPickupNotes ?? order.customerPickupNotes,
         storePickupStatus: 'SCHEDULED_BY_CUSTOMER',
+      },
+      // Payload-safe response: never echo handover secrets.
+      select: {
+        id: true,
+        reference: true,
+        status: true,
+        deliveryMethod: true,
+        storePickupStatus: true,
+        pickupScheduledAt: true,
+        preferredPickupSlot: true,
+        customerPickupNotes: true,
       },
     });
 
@@ -1620,7 +1759,8 @@ export class OrderService {
       | 'CANCELLED',
     actor: UserPayload,
   ) {
-    const order = await this.prisma.order.findUnique({
+    const db = await this.db();
+    const order = await db.order.findUnique({
       where: { id: orderId },
     });
     if (!order) throw new NotFoundException('Order not found');
@@ -1628,7 +1768,7 @@ export class OrderService {
       throw new BadRequestException('Order is not configured for store pickup');
     }
 
-    const updated = await this.prisma.order.update({
+    const updated = await db.order.update({
       where: { id: orderId },
       data: { storePickupStatus },
     });
@@ -1648,7 +1788,8 @@ export class OrderService {
   }
 
   async verifyStoreHandover(orderId: string, otp: string, actor: UserPayload) {
-    const order = await this.prisma.order.findUnique({
+    const db = await this.db();
+    const order = await db.order.findUnique({
       where: { id: orderId },
       include: { items: true, pickupStore: true },
     });
@@ -1659,13 +1800,16 @@ export class OrderService {
     if (order.storePickupStatus === 'COMPLETED') {
       throw new ConflictException('Order pickup has already been completed.');
     }
-    if (order.storePickupOtp !== otp.trim()) {
+    if (
+      !order.storePickupOtp ||
+      !this.timingSafeEqualStrings(order.storePickupOtp, otp.trim())
+    ) {
       throw new BadRequestException(
         'Invalid pickup OTP code. Verification failed.',
       );
     }
 
-    const updated = await this.prisma.order.update({
+    const updated = await db.order.update({
       where: { id: orderId },
       data: {
         storePickupStatus: 'COMPLETED',
@@ -1678,6 +1822,36 @@ export class OrderService {
             : order.paymentStatus,
       },
     });
+
+    // Handover is a delivery event: record it in the order history like the
+    // courier path does, so completion/return windows and reporting stay
+    // consistent.
+    await db.orderStatusHistory.create({
+      data: {
+        orderId,
+        oldStatus: order.status,
+        newStatus: 'DELIVERED',
+        source: 'ADMIN',
+        actorId: actor.userId || (actor as any).sub,
+        note: `Store pickup handover completed at ${order.pickupStore?.name ?? 'store'}`,
+      },
+    });
+    if (order.fulfillmentStatus !== 'FULFILLED') {
+      await db.fulfillmentHistory.create({
+        data: {
+          orderId,
+          oldStatus: order.fulfillmentStatus,
+          newStatus: 'FULFILLED',
+          source: 'ADMIN',
+          actorId: actor.userId || (actor as any).sub,
+          note: 'Store pickup handover completed',
+        },
+      });
+    }
+    await db.$transaction(async (tx) => {
+      await this.consumeDeliveredReservations(tx, orderId);
+    });
+
 
     await this.audit.record({
       action: 'STORE_PICKUP_HANDOVER_COMPLETED',

@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { TenantMembershipGuard } from '../../tenancy/tenant-membership.guard';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import {
   AuthGuard,
@@ -16,7 +17,7 @@ import { RtoService } from './rto.service';
 @ApiTags('Admin RTO')
 @ApiBearerAuth()
 @Controller('admin/rto')
-@UseGuards(AuthGuard, RolesGuard, PermissionsGuard)
+@UseGuards(AuthGuard, RolesGuard, PermissionsGuard, TenantMembershipGuard)
 @Roles('admin')
 @Permissions(PERMISSIONS.RTO_READ)
 export class RtoController {

@@ -40,20 +40,27 @@ import { ConfigModule as NestConfigModule } from '@nestjs/config';
         }
 
         // Validation rules
-        if (config.JWT_ACCESS_SECRET && config.JWT_ACCESS_SECRET.length < 32) {
-          throw new Error(
-            'JWT_ACCESS_SECRET must be at least 32 characters for security',
-          );
-        }
-
-        if (
-          config.JWT_REFRESH_SECRET &&
-          config.JWT_REFRESH_SECRET.length < 32
-        ) {
-          throw new Error(
-            'JWT_REFRESH_SECRET must be at least 32 characters for security',
-          );
-        }
+        const knownWeakSecrets = [
+          'your-64-character-random-string-here',
+          'fallback-secret',
+          'your_jwt_secret',
+          'changeme',
+          'secret',
+        ];
+        const assertStrongSecret = (key: string) => {
+          const value = config[key];
+          if (!value) return;
+          if (value.length < 32) {
+            throw new Error(`${key} must be at least 32 characters for security`);
+          }
+          if (knownWeakSecrets.some((weak) => value.toLowerCase().includes(weak))) {
+            throw new Error(
+              `${key} is still set to a placeholder/template value. Generate a cryptographically random secret (e.g. openssl rand -hex 64) before starting the server.`,
+            );
+          }
+        };
+        assertStrongSecret('JWT_ACCESS_SECRET');
+        assertStrongSecret('JWT_REFRESH_SECRET');
 
         if (
           config.JWT_ACCESS_EXPIRY &&

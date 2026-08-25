@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import CopyableId from "@/components/CopyableId";
 import LivePageVisitorsCard from "@/components/LivePageVisitorsCard";
+import PlanUsageCard from "@/components/PlanUsageCard";
+import StoreSetupChecklist from "@/components/StoreSetupChecklist";
 import OperationalAlerts from "@/components/operations/OperationalAlerts";
 import StatCard from "@/components/StatCard";
 import Topbar from "@/components/Topbar";
@@ -350,6 +352,8 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 gap-8 xl:grid-cols-3">
             <RecentOrders orders={orders} loading={loading} />
             <LivePageVisitorsCard />
+          <PlanUsageCard />
+          <StoreSetupChecklist />
           </div>
         )}
 

@@ -7,9 +7,10 @@ import {
   PublicStaffAccessController,
 } from './staff-access.controller';
 import { StaffAccessService } from './staff-access.service';
+import { TenancyModule } from '../../tenancy/tenancy.module';
 
 @Module({
-  imports: [PrismaModule, AuthModule, AuditModule],
+  imports: [PrismaModule, AuthModule, AuditModule, TenancyModule],
   controllers: [PublicStaffAccessController, AdminStaffAccessController],
   providers: [StaffAccessService],
 })

@@ -1,6 +1,8 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import type { Job } from 'bullmq';
 import { QUEUE_NAMES } from '@app/queue';
+import { Optional } from '@nestjs/common';
+import { TenantFanoutService } from '../../tenancy/tenant-fanout.service';
 import { runWithCorrelationId, StructuredLogger } from '@app/common';
 import { CommercePaymentsService } from './commerce-payments.service';
 import {
@@ -17,6 +19,7 @@ export class PaymentRecoveryProcessor extends WorkerHost {
   constructor(
     private readonly payments: CommercePaymentsService,
     private readonly recovery: PaymentRecoveryQueue,
+      @Optional() private readonly fanout?: TenantFanoutService,
   ) {
     super();
   }
@@ -31,7 +34,15 @@ export class PaymentRecoveryProcessor extends WorkerHost {
         return this.recovery.enqueueDue();
       if (job.name !== PAYMENT_EXPIRY_JOB || !job.data.attemptId)
         throw new Error(`Unsupported payment recovery job: ${job.name}`);
-      return this.payments.expireAttempt(job.data.attemptId);
+      const organizationId = (
+        job.data as { organizationId?: string }
+      ).organizationId;
+      if (!organizationId) {
+        return this.payments.expireAttempt(job.data.attemptId as string);
+      }
+      return this.fanout!.forOrganization(organizationId, () =>
+        this.payments.expireAttempt(job.data.attemptId as string),
+      );
     });
   }
 }

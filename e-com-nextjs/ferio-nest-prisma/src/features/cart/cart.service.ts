@@ -1,11 +1,16 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { createHash, randomBytes } from 'crypto';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '@app/database';
+import { Optional } from '@nestjs/common';
+import type { PrismaClient } from '@prisma/client';
+import { assertTenantCommerceWritable } from '../../tenancy/commerce-write-guard.util';
+import { TenantDbService } from '../../tenancy/tenant-db.service';
 import { ConfigService } from '@nestjs/config';
 import { AddCartItemDto, UpdateCartItemDto } from './cart.dto';
 
@@ -48,7 +53,19 @@ export class CartService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config?: ConfigService,
+    @Optional() private readonly tenantDb?: TenantDbService,
   ) {}
+
+  /**
+   * MT-7 slice 3: guest/authenticated carts resolve against the tenant
+   * database inside storefront requests (guest tokens are therefore
+   * inherently tenant-local under database-per-tenant). Outside resolved
+   * requests the legacy single-tenant DB applies, unchanged.
+   */
+  private async db(): Promise<PrismaClient> {
+    const tenant = await this.tenantDb?.tryGet();
+    return tenant ?? (this.prisma as PrismaClient);
+  }
 
   private tokenHash(token: string): string {
     return createHash('sha256').update(token).digest('hex');
@@ -102,7 +119,8 @@ export class CartService {
   }
 
   private async getSellableVariant(variantId: string) {
-    const variant = await this.prisma.productVariant.findUnique({
+    const db = await this.db();
+    const variant = await db.productVariant.findUnique({
       where: { id: variantId },
       include: {
         inventory: true,
@@ -117,8 +135,9 @@ export class CartService {
     token?: string,
     userId?: string,
   ): Promise<CartRecord | null> {
+    const db = await this.db();
     if (token && token.length <= 512) {
-      const cart = await this.prisma.cart.findFirst({
+      const cart = await db.cart.findFirst({
         where: {
           tokenHash: this.tokenHash(token),
           status: 'ACTIVE',
@@ -129,7 +148,7 @@ export class CartService {
       if (cart) return cart;
     }
     if (userId) {
-      return this.prisma.cart.findFirst({
+      return db.cart.findFirst({
         where: {
           userId,
           status: 'ACTIVE',
@@ -143,7 +162,8 @@ export class CartService {
   }
 
   private async loadCart(id: string): Promise<CartRecord> {
-    const cart = await this.prisma.cart.findUnique({
+    const db = await this.db();
+    const cart = await db.cart.findUnique({
       where: { id },
       include: cartInclude,
     });
@@ -258,6 +278,7 @@ export class CartService {
   }
 
   async listAbandonedCartEligibility() {
+    const db = await this.db();
     const now = new Date();
     const minimumAgeHours = Math.max(
       1,
@@ -273,7 +294,7 @@ export class CartService {
     const consentAfter = new Date(
       now.getTime() - consentMaxAgeDays * 24 * 60 * 60 * 1000,
     );
-    const carts = await this.prisma.cart.findMany({
+    const carts = await db.cart.findMany({
       where: {
         status: 'ACTIVE',
         expiresAt: { gt: now },
@@ -335,13 +356,14 @@ export class CartService {
   }
 
   async mergeGuestCart(userId: string, token?: string) {
+    const db = await this.db();
     const target = await this.findActiveCart(token);
     if (!target) return { ...this.emptyCart(), mergedCartCount: 0 };
     if (target.userId && target.userId !== userId) {
       throw new ConflictException('This cart belongs to another account');
     }
 
-    const mergedCartCount = await this.prisma.$transaction(
+    const mergedCartCount = await db.$transaction(
       async (transaction) => {
         const sources = await transaction.cart.findMany({
           where: {
@@ -404,6 +426,8 @@ export class CartService {
   }
 
   async addItem(dto: AddCartItemDto, token?: string) {
+    assertTenantCommerceWritable();
+    const db = await this.db();
     const variant = await this.getSellableVariant(dto.variantId);
     const existingCart = await this.findActiveCart(token);
     const existingItem = existingCart?.items.find(
@@ -414,7 +438,7 @@ export class CartService {
 
     let cartId = existingCart?.id;
     let effectiveToken = token;
-    await this.prisma.$transaction(async (transaction) => {
+    await db.$transaction(async (transaction) => {
       if (!cartId) {
         effectiveToken = randomBytes(32).toString('base64url');
         const cart = await transaction.cart.create({
@@ -457,6 +481,8 @@ export class CartService {
   }
 
   async updateItem(variantId: string, dto: UpdateCartItemDto, token?: string) {
+    assertTenantCommerceWritable();
+    const db = await this.db();
     const cart = await this.findActiveCart(token);
     if (!cart) throw new NotFoundException('Active cart not found');
     const item = cart.items.find((entry) => entry.variantId === variantId);
@@ -477,7 +503,7 @@ export class CartService {
         : dto.quantity;
     this.assertSellable(variant, nextQuantity);
 
-    await this.prisma.$transaction(async (transaction) => {
+    await db.$transaction(async (transaction) => {
       if (targetItem && targetItem.id !== item.id) {
         await transaction.cartItem.update({
           where: { id: targetItem.id },
@@ -503,11 +529,13 @@ export class CartService {
   }
 
   async removeItem(variantId: string, token?: string) {
+    assertTenantCommerceWritable();
+    const db = await this.db();
     const cart = await this.findActiveCart(token);
     if (!cart) throw new NotFoundException('Active cart not found');
     const item = cart.items.find((entry) => entry.variantId === variantId);
     if (!item) throw new NotFoundException('Cart item not found');
-    await this.prisma.cartItem.delete({ where: { id: item.id } });
+    await db.cartItem.delete({ where: { id: item.id } });
     return this.serializeCart(await this.loadCart(cart.id));
   }
 
@@ -580,6 +608,7 @@ export class CartService {
   }
 
   async saveActiveCart(name?: string, userId?: string, token?: string) {
+    const db = await this.db();
     const cart = await this.findActiveCart(token, userId);
     if (!cart || cart.items.length === 0) {
       throw new ConflictException('Your cart is empty. Add items before saving.');
@@ -593,7 +622,7 @@ export class CartService {
     const finalName = name?.trim() || defaultName;
 
     const shareToken = randomBytes(16).toString('hex');
-    const savedCart = await this.prisma.savedCart.create({
+    const savedCart = await db.savedCart.create({
       data: {
         name: finalName,
         shareToken,
@@ -628,7 +657,8 @@ export class CartService {
   }
 
   async getSavedCarts(userId: string) {
-    const savedCarts = await this.prisma.savedCart.findMany({
+    const db = await this.db();
+    const savedCarts = await db.savedCart.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
       include: {
@@ -654,7 +684,8 @@ export class CartService {
   }
 
   async getSharedCart(shareToken: string) {
-    const savedCart = await this.prisma.savedCart.findUnique({
+    const db = await this.db();
+    const savedCart = await db.savedCart.findUnique({
       where: { shareToken },
       include: {
         user: { select: { id: true, name: true } },
@@ -681,7 +712,8 @@ export class CartService {
   }
 
   async importSharedCart(shareToken: string, token?: string) {
-    const savedCart = await this.prisma.savedCart.findUnique({
+    const db = await this.db();
+    const savedCart = await db.savedCart.findUnique({
       where: { shareToken },
       include: {
         items: {
@@ -741,14 +773,15 @@ export class CartService {
   }
 
   async copySharedCartToAccount(shareToken: string, userId: string) {
-    const source = await this.prisma.savedCart.findUnique({
+    const db = await this.db();
+    const source = await db.savedCart.findUnique({
       where: { shareToken },
       include: { items: true },
     });
     if (!source) throw new NotFoundException('Shared cart not found');
 
     const newShareToken = randomBytes(16).toString('hex');
-    const newSavedCart = await this.prisma.savedCart.create({
+    const newSavedCart = await db.savedCart.create({
       data: {
         name: `${source.name} (Saved)`,
         shareToken: newShareToken,
@@ -783,11 +816,12 @@ export class CartService {
   }
 
   async deleteSavedCart(id: string, userId: string) {
-    const savedCart = await this.prisma.savedCart.findFirst({
+    const db = await this.db();
+    const savedCart = await db.savedCart.findFirst({
       where: { id, userId },
     });
     if (!savedCart) throw new NotFoundException('Saved cart not found');
-    await this.prisma.savedCart.delete({ where: { id } });
+    await db.savedCart.delete({ where: { id } });
     return { success: true, message: 'Saved cart deleted' };
   }
 
@@ -795,9 +829,24 @@ export class CartService {
     orderId: string,
     orderItemIds?: string[],
     token?: string,
+    actor?: { userId: string },
   ) {
-    const order = await this.prisma.order.findUnique({
-      where: { id: orderId },
+    const db = await this.db();
+    // Ownership: only the account linked to the order's customer profile may
+    // reorder it. Unauthenticated callers can no longer enumerate arbitrary
+    // order IDs and echo back their contents.
+    const viewer = actor?.userId
+      ? await db.user.findUnique({
+          where: { id: actor.userId },
+          select: { customerId: true },
+        })
+      : null;
+    if (!viewer?.customerId) {
+      throw new NotFoundException('Order not found');
+    }
+
+    const order = await db.order.findFirst({
+      where: { id: orderId, customerId: viewer.customerId },
       include: {
         items: {
           include: {

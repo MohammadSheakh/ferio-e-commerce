@@ -22,6 +22,10 @@ import { RtoModule } from './features/rto/rto.module';
 import { SettlementsModule } from './features/settlements/settlements.module';
 import { ReconciliationModule } from './features/reconciliation/reconciliation.module';
 import { CommercePaymentsModule } from './features/commerce-payments/commerce-payments.module';
+import { NestModule, MiddlewareConsumer } from '@nestjs/common';
+import { PlatformModule } from './platform/platform.module';
+import { TenancyModule } from './tenancy/tenancy.module';
+import { TenantContextMiddleware } from './tenancy/tenant-resolver.service';
 import { ProductContentModule } from './features/product-content/product-content.module';
 import { ServiceBookingModule } from './features/service-booking/service-booking.module';
 import { WarrantyModule } from './features/warranty/warranty.module';
@@ -47,6 +51,8 @@ import { WalletModule } from './features/wallet/wallet.module';
     ConfigModule,
     PrismaModule,
     RedisModule,
+    PlatformModule,
+    TenancyModule,
     BullMQModule,
     SocketModule,
     ChattingModule,
@@ -86,4 +92,19 @@ import { WalletModule } from './features/wallet/wallet.module';
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer
+      .apply(TenantContextMiddleware)
+      .exclude(
+        'api/v1/platform/(.*)',
+        'platform/(.*)',
+        'api/v1/tenancy/(.*)',
+        'tenancy/(.*)',
+        'health',
+        'api/v1/health',
+        'socket.io/(.*)',
+      )
+      .forRoutes('*');
+  }
+}

@@ -1,4 +1,7 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import type { TenantContext } from '../../tenancy/tenant-context';
+import { tryGetTenantContext } from '../../tenancy/tenant-context';
+import { TenantFanoutService } from '../../tenancy/tenant-fanout.service';
+import { Injectable, OnModuleInit, Optional } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { ConfigService } from '@nestjs/config';
 import type { Queue } from 'bullmq';
@@ -10,7 +13,7 @@ import { CommercePaymentsService } from './commerce-payments.service';
 export const PAYMENT_EXPIRY_JOB = 'expire-prepaid-attempt';
 export const PAYMENT_EXPIRY_SWEEP_JOB = 'sweep-expired-prepaid-attempts';
 export const PAYMENT_RECOVERY_SCHEDULER_ID = 'ferio-payment-expiry-recovery';
-export type PaymentRecoveryJobData = { attemptId?: string };
+export type PaymentRecoveryJobData = { attemptId?: string; organizationId?: string };
 
 @Injectable()
 export class PaymentRecoveryQueue implements OnModuleInit {
@@ -21,6 +24,7 @@ export class PaymentRecoveryQueue implements OnModuleInit {
     private readonly config: ConfigService,
     private readonly payments: CommercePaymentsService,
     private readonly audit: AuditService,
+    @Optional() private readonly fanout?: TenantFanoutService,
   ) {}
 
   async onModuleInit() {
@@ -46,17 +50,51 @@ export class PaymentRecoveryQueue implements OnModuleInit {
   }
 
   async enqueueDue() {
-    const attempts = await this.payments.eligibleExpiredAttempts(
-      this.batchSize(),
+    // MT-8 §11.2: per-tenant fan-out with organization-stamped envelopes;
+    // legacy mode runs once, envelope-free (unchanged behavior).
+    if ((process.env.TENANCY_ENABLED || 'false') !== 'true') {
+      const attempts = await this.payments.eligibleExpiredAttempts(
+        this.batchSize(),
+      );
+      await this.queue.addBulk(attempts.map((a) => this.jobFor(a.id)));
+      return { queuedCount: attempts.length };
+    }
+
+    if (!this.fanout) throw new Error('TENANT_FANOUT_UNAVAILABLE');
+    let queuedCount = 0;
+    const fanout = await this.fanout.forEachTenant(
+      async () => {
+        const attempts = await this.payments.eligibleExpiredAttempts(
+          this.batchSize(),
+        );
+        const context = tryGetTenantContext();
+        await this.queue.addBulk(
+          attempts.map((a) => this.jobFor(a.id, context?.organizationId)),
+        );
+        queuedCount += attempts.length;
+      },
+      { label: 'payment-recovery-sweep' },
     );
-    const jobs = await this.queue.addBulk(
-      attempts.map((attempt) => ({
-        name: PAYMENT_EXPIRY_JOB,
-        data: { attemptId: attempt.id },
-        opts: { jobId: `payment-expiry-${attempt.id}` },
-      })),
-    );
-    return { queuedCount: jobs.length };
+    return {
+      queuedCount,
+      tenantsProcessed: fanout.processed,
+      tenantFailures: fanout.failures,
+    };
+  }
+
+  private jobFor(attemptId: string, organizationId?: string) {
+    return {
+      name: PAYMENT_EXPIRY_JOB,
+      data: {
+        attemptId,
+        ...(organizationId ? { organizationId } : {}),
+      },
+      opts: {
+        jobId: organizationId
+          ? `t:${organizationId}:payment-expiry-${attemptId}`
+          : `payment-expiry-${attemptId}`,
+      },
+    };
   }
 
   async enqueueSweep(actor: UserPayload) {

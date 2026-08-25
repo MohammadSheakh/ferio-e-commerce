@@ -33,12 +33,6 @@ export default function RegisterPage() {
     });
     const payload = await response.json();
     if (response.ok) {
-      if (payload.data.developmentOtp) {
-        sessionStorage.setItem(
-          "ferio_development_verification_code",
-          payload.data.developmentOtp,
-        );
-      }
       const next = new URLSearchParams(window.location.search).get("next");
       const query = new URLSearchParams({ email: payload.data.email });
       if (next?.startsWith("/") && !next.startsWith("//")) query.set("next", next);

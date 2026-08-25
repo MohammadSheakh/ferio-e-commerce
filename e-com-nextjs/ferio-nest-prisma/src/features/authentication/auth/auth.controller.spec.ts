@@ -18,7 +18,7 @@ describe('AuthController native session contract', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    controller = new AuthController(authService as never);
+    controller = new AuthController(authService as never, { verify: jest.fn() } as never);
   });
 
   it('rotates a refresh token supplied by a native client body', async () => {

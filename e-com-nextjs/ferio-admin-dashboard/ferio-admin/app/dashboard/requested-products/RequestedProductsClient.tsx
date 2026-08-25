@@ -102,11 +102,7 @@ export default function RequestedProductsClient({ initialItems, initialTotal }: 
       if (statusFilter !== "ALL") query.set("status", statusFilter);
       if (search) query.set("search", search);
 
-      const res = await fetch(`/api/admin/product-requests?${query.toString()}`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("admin_access_token") || ""}`,
-        },
-      });
+      const res = await fetch(`/api/admin/product-requests?${query.toString()}`);
       if (res.ok) {
         const data = await res.json();
         const results: ProductRequestItem[] = data.results || data.items || [];

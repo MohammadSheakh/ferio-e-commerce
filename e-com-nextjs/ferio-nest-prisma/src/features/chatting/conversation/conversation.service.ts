@@ -1,14 +1,16 @@
 import {
   ForbiddenException,
+  Inject,
   Injectable,
   Logger,
-  Inject,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { Queue } from 'bullmq';
 
+import type { PrismaClient } from '@prisma/client';
 import { PrismaService } from '@app/database';
-import { RedisService } from '@app/redis';
+import { TenantDbService } from '../../../tenancy/tenant-db.service';
 import { SocketGateway } from '../../socket.gateway/socket.gateway';
 import { SocketRoomService } from '../../socket.gateway/services/socket-room.service';
 import {
@@ -24,19 +26,28 @@ export class ConversationService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly redisService: RedisService,
     private readonly socketGateway: SocketGateway,
     private readonly socketRoomService: SocketRoomService,
     @Inject(BULLMQ_CONVERSATION_LAST_MESSAGE_QUEUE)
     private conversationLastMessageQueue: Queue,
     @Inject(BULLMQ_NOTIFY_PARTICIPANTS_QUEUE)
     private notifyParticipantsQueue: Queue,
-  ) {}
+  
+    @Optional() private readonly tenantDb?: TenantDbService,) {}
 
+  /**
+   * MT-7: inside a tenant-resolved request this returns the resolved tenant
+   * database client; outside one it explicitly falls back to the legacy DB.
+   */
+  private async db(): Promise<PrismaClient> {
+    const tenant = await this.tenantDb?.tryGet();
+    return tenant ?? (this.prisma as PrismaClient);
+  }
   /**
    * Create Conversation
    */
   async createConversation(dto: CreateConversationDto, creatorId: string) {
+    const db = await this.db();
     const { participants, message, groupName, groupProfilePicture } = dto;
     const allParticipants = [...new Set([...participants, creatorId])];
 
@@ -56,7 +67,7 @@ export class ConversationService {
     }
 
     if (!existingConversation) {
-      const conversation = await this.prisma.conversation.create({
+      const conversation = await db.conversation.create({
         data: {
           creatorId,
           type: type === ConversationType.GROUP ? 'group' : 'direct',
@@ -89,7 +100,8 @@ export class ConversationService {
    * Find existing direct conversation
    */
   private async findExistingDirectConversation(participantIds: string[]) {
-    const conversations = await this.prisma.conversation.findMany({
+    const db = await this.db();
+    const conversations = await db.conversation.findMany({
       where: {
         type: 'direct',
         isDeleted: false,
@@ -121,8 +133,9 @@ export class ConversationService {
     creatorId: string,
     enforceActorPermission = false,
   ) {
+    const db = await this.db();
     if (enforceActorPermission) {
-      const actor = await this.prisma.conversationParticipents.findFirst({
+      const actor = await db.conversationParticipents.findFirst({
         where: {
           conversationId,
           userId: creatorId,
@@ -139,14 +152,14 @@ export class ConversationService {
     }
 
     for (const userId of participantIds) {
-      const existing = await this.prisma.conversationParticipents.findFirst({
+      const existing = await db.conversationParticipents.findFirst({
         where: { userId, conversationId, isDeleted: false },
       });
 
       if (existing) continue;
 
       const user = await this.getUserInfo(userId);
-      await this.prisma.conversationParticipents.create({
+      await db.conversationParticipents.create({
         data: {
           conversationId,
           userId,
@@ -164,14 +177,15 @@ export class ConversationService {
    * Send Message (integrated with conversation update)
    */
   async sendMessage(conversationId: string, senderId: string, text: string) {
-    const message = await this.prisma.message.create({
+    const db = await this.db();
+    const message = await db.message.create({
       data: { conversationId, senderId, text },
       include: {
         sender: { select: { name: true, profileImageUrl: true, role: true } },
       },
     });
 
-    await this.prisma.conversation.update({
+    await db.conversation.update({
       where: { id: conversationId },
       data: {
         lastMessageId: message.id,
@@ -202,7 +216,8 @@ export class ConversationService {
     conversationId: string,
     message: any,
   ) {
-    const participants = await this.prisma.conversationParticipents.findMany({
+    const db = await this.db();
+    const participants = await db.conversationParticipents.findMany({
       where: { conversationId, isDeleted: false },
       select: { userId: true },
     });
@@ -237,9 +252,10 @@ export class ConversationService {
     limit: number = 10,
     search: string = '',
   ) {
+    const db = await this.db();
     const skip = (page - 1) * limit;
 
-    const participants = await this.prisma.conversationParticipents.findMany({
+    const participants = await db.conversationParticipents.findMany({
       where: { userId, isDeleted: false },
       include: {
         conversation: {
@@ -259,7 +275,7 @@ export class ConversationService {
 
     const results = await Promise.all(
       participants.map(async (p) => {
-        const unreadCount = await this.prisma.message.count({
+        const unreadCount = await db.message.count({
           where: {
             conversationId: p.conversationId,
             senderId: { not: userId },
@@ -289,7 +305,7 @@ export class ConversationService {
       }),
     );
 
-    const total = await this.prisma.conversationParticipents.count({
+    const total = await db.conversationParticipents.count({
       where: { userId, isDeleted: false },
     });
 
@@ -310,7 +326,8 @@ export class ConversationService {
     participantId: string,
     actorId: string,
   ) {
-    const actor = await this.prisma.conversationParticipents.findFirst({
+    const db = await this.db();
+    const actor = await db.conversationParticipents.findFirst({
       where: { conversationId, userId: actorId, isDeleted: false },
       select: { role: true },
     });
@@ -321,7 +338,7 @@ export class ConversationService {
       );
     }
 
-    await this.prisma.conversationParticipents.updateMany({
+    await db.conversationParticipents.updateMany({
       where: { conversationId, userId: participantId },
       data: { isDeleted: true },
     });
@@ -336,7 +353,8 @@ export class ConversationService {
    * Mark as read
    */
   async markAsRead(userId: string, conversationId: string) {
-    await this.prisma.conversationParticipents.updateMany({
+    const db = await this.db();
+    await db.conversationParticipents.updateMany({
       where: { conversationId, userId },
       data: { lastMessageReadAt: new Date(), unreadCount: 0 },
     });
@@ -346,9 +364,10 @@ export class ConversationService {
    * Get all conversations (Admin)
    */
   async getAllConversations(page: number = 1, limit: number = 50) {
+    const db = await this.db();
     const skip = (page - 1) * limit;
 
-    const conversations = await this.prisma.conversation.findMany({
+    const conversations = await db.conversation.findMany({
       where: { isDeleted: false },
       orderBy: { updatedAt: 'desc' },
       skip,
@@ -362,7 +381,7 @@ export class ConversationService {
       },
     });
 
-    const total = await this.prisma.conversation.count({
+    const total = await db.conversation.count({
       where: { isDeleted: false },
     });
 
@@ -392,7 +411,8 @@ export class ConversationService {
    * Get user info
    */
   private async getUserInfo(userId: string) {
-    const user = await this.prisma.user.findUnique({
+    const db = await this.db();
+    const user = await db.user.findUnique({
       where: { id: userId },
       select: { name: true, role: true, profileImageUrl: true },
     });

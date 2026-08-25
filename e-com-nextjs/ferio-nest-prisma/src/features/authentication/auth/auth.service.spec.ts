@@ -46,6 +46,9 @@ describe('AuthService token lifecycle', () => {
       get: jest.fn((_key: string, fallback: string) => fallback),
       getOrThrow: jest.fn((key: string) => key),
     };
+    const twoFactorService = {
+      verifyLogin: jest.fn(),
+    };
     const service = new AuthService(
       prisma as never,
       jwtService as never,
@@ -54,6 +57,7 @@ describe('AuthService token lifecycle', () => {
       {} as never,
       redisService as never,
       configService as never,
+      twoFactorService as never,
     );
     const logger = { log: jest.fn(), warn: jest.fn(), error: jest.fn() };
     (service as unknown as { logger: typeof logger }).logger = logger;
@@ -65,14 +69,16 @@ describe('AuthService token lifecycle', () => {
       get: jest.fn((_key: string, fallback: string) => fallback),
       getOrThrow: jest.fn((key: string) => key),
     };
+  const twoFactorService = { verifyLogin: jest.fn() };
     const service = new AuthService(
-      {} as never,
-      { signAsync } as never,
-      {} as never,
-      {} as never,
-      {} as never,
-      {} as never,
-      configService as never,
+      {} as never,                    // prisma
+      { signAsync } as never,         // jwt
+      {} as never,                    // otp
+      {} as never,                    // email
+      {} as never,                    // oauth
+      { getClient: jest.fn() } as never,       // redis
+      configService as never,         // config
+      twoFactorService as never,      // 2fa
     );
 
     await (

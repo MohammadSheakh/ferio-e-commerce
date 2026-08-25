@@ -1,4 +1,5 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { TenantMembershipGuard } from '../../tenancy/tenant-membership.guard';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import {
   AuthGuard,
@@ -14,7 +15,7 @@ import { AuditLogQueryDto } from './dto/audit.dto';
 @ApiTags('Admin Audit')
 @ApiBearerAuth()
 @Controller('admin/audit-logs')
-@UseGuards(AuthGuard, RolesGuard, PermissionsGuard)
+@UseGuards(AuthGuard, RolesGuard, PermissionsGuard, TenantMembershipGuard)
 @Roles('admin')
 @Permissions(PERMISSIONS.AUDIT_READ)
 export class AuditController {

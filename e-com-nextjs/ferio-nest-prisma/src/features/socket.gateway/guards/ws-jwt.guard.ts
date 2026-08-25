@@ -26,7 +26,7 @@ export class WsJwtGuard implements CanActivate {
       }
 
       const payload = await this.jwtService.verifyAsync(token, {
-        secret: process.env.JWT_ACCESS_SECRET || 'fallback-secret',
+        secret: process.env.JWT_ACCESS_SECRET as string,
       });
 
       if (!payload || !payload.userId) {

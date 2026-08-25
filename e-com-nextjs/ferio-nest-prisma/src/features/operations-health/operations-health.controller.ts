@@ -1,4 +1,5 @@
 import { Controller, Get, UseGuards } from '@nestjs/common';
+import { TenantMembershipGuard } from '../../tenancy/tenant-membership.guard';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import {
   AuthGuard,
@@ -13,7 +14,7 @@ import { OperationsHealthService } from './operations-health.service';
 @ApiTags('Admin Operations')
 @ApiBearerAuth()
 @Controller('admin/operations')
-@UseGuards(AuthGuard, RolesGuard, PermissionsGuard)
+@UseGuards(AuthGuard, RolesGuard, PermissionsGuard, TenantMembershipGuard)
 @Roles('admin')
 @Permissions(PERMISSIONS.RECONCILIATION_READ)
 export class OperationsHealthController {

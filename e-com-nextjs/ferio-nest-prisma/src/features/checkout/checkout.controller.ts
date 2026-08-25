@@ -9,6 +9,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { TenantMembershipGuard } from '../../tenancy/tenant-membership.guard';
 import {
   AuthGuard,
   PERMISSIONS,
@@ -57,7 +58,7 @@ export class PublicCheckoutController {
 @ApiTags('Admin Delivery')
 @ApiBearerAuth()
 @Controller('admin/delivery-zones')
-@UseGuards(AuthGuard, RolesGuard, PermissionsGuard)
+@UseGuards(AuthGuard, RolesGuard, PermissionsGuard, TenantMembershipGuard)
 @Roles('admin')
 @Permissions(PERMISSIONS.DELIVERY_ZONES_READ)
 export class AdminDeliveryController {

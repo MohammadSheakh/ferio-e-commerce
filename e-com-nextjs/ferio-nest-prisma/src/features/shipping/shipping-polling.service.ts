@@ -2,10 +2,13 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { Prisma } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import { PrismaService } from '@app/database';
+import { TenantDbService } from '../../tenancy/tenant-db.service';
 import { ShippingService } from './shipping.service';
 
 const TERMINAL_SHIPMENT_STATUSES = [
@@ -20,10 +23,21 @@ export class ShippingPollingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly shipping: ShippingService,
-  ) {}
+  
+    @Optional() private readonly tenantDb?: TenantDbService,) {}
 
-  getAttempts() {
-    return this.prisma.shipmentPollAttempt.findMany({
+  /**
+   * MT-7/MT-8: inside a tenant-resolved request or worker fan-out this
+   * returns the resolved tenant database client; outside one it explicitly
+   * falls back to the legacy single-tenant DB. Never guesses.
+   */
+  private async db(): Promise<PrismaClient> {
+    const tenant = await this.tenantDb?.tryGet();
+    return tenant ?? (this.prisma as PrismaClient);
+  }
+  async getAttempts() {
+    const db = await this.db();
+    return db.shipmentPollAttempt.findMany({
       take: 100,
       orderBy: { createdAt: 'desc' },
       include: {
@@ -41,7 +55,8 @@ export class ShippingPollingService {
   }
 
   async eligibleShipments(limit: number) {
-    const shipments = await this.prisma.shipment.findMany({
+    const db = await this.db();
+    const shipments = await db.shipment.findMany({
       where: {
         status: { notIn: [...TERMINAL_SHIPMENT_STATUSES] },
         provider: { isActive: true },
@@ -60,7 +75,8 @@ export class ShippingPollingService {
   }
 
   async prepareAttempt(shipmentId: string, requestedByActorId?: string) {
-    const shipment = await this.prisma.shipment.findUnique({
+    const db = await this.db();
+    const shipment = await db.shipment.findUnique({
       where: { id: shipmentId },
       include: { provider: true },
     });
@@ -76,11 +92,11 @@ export class ShippingPollingService {
         `${shipment.provider.code} polling is not configured`,
       );
     }
-    const active = await this.prisma.shipmentPollAttempt.findFirst({
+    const active = await db.shipmentPollAttempt.findFirst({
       where: { shipmentId, status: { in: ['QUEUED', 'PROCESSING'] } },
     });
     if (active) return active;
-    return this.prisma.shipmentPollAttempt.create({
+    return db.shipmentPollAttempt.create({
       data: {
         correlationId: randomUUID(),
         shipmentId,
@@ -89,15 +105,17 @@ export class ShippingPollingService {
     });
   }
 
-  attachQueueJob(attemptId: string, queueJobId: string) {
-    return this.prisma.shipmentPollAttempt.update({
+  async attachQueueJob(attemptId: string, queueJobId: string) {
+    const db = await this.db();
+    return db.shipmentPollAttempt.update({
       where: { id: attemptId },
       data: { queueJobId },
     });
   }
 
   async execute(attemptId: string) {
-    const attempt = await this.prisma.shipmentPollAttempt.findUnique({
+    const db = await this.db();
+    const attempt = await db.shipmentPollAttempt.findUnique({
       where: { id: attemptId },
       include: {
         shipment: {
@@ -110,7 +128,7 @@ export class ShippingPollingService {
     if (attempt.status === 'SUCCEEDED' || attempt.status === 'SKIPPED') {
       return attempt;
     }
-    await this.prisma.shipmentPollAttempt.update({
+    await db.shipmentPollAttempt.update({
       where: { id: attempt.id },
       data: {
         status: 'PROCESSING',
@@ -139,8 +157,8 @@ export class ShippingPollingService {
       const terminal = TERMINAL_SHIPMENT_STATUSES.includes(
         result.normalizedStatus as never,
       );
-      await this.prisma.$transaction([
-        this.prisma.shipmentPollAttempt.update({
+      await db.$transaction([
+        db.shipmentPollAttempt.update({
           where: { id: attempt.id },
           data: {
             status: 'SUCCEEDED',
@@ -150,7 +168,7 @@ export class ShippingPollingService {
             finishedAt: completedAt,
           },
         }),
-        this.prisma.shipment.update({
+        db.shipment.update({
           where: { id: attempt.shipmentId },
           data: {
             lastPolledAt: completedAt,
@@ -162,7 +180,7 @@ export class ShippingPollingService {
           },
         }),
       ]);
-      return this.prisma.shipmentPollAttempt.findUniqueOrThrow({
+      return db.shipmentPollAttempt.findUniqueOrThrow({
         where: { id: attempt.id },
       });
     } catch (error) {
@@ -170,8 +188,8 @@ export class ShippingPollingService {
       const delayMinutes = Math.min(15 * 2 ** (failureCount - 1), 360);
       const errorMessage =
         error instanceof Error ? error.message : 'Courier polling failed';
-      await this.prisma.$transaction([
-        this.prisma.shipmentPollAttempt.update({
+      await db.$transaction([
+        db.shipmentPollAttempt.update({
           where: { id: attempt.id },
           data: {
             status: 'FAILED',
@@ -180,7 +198,7 @@ export class ShippingPollingService {
             finishedAt: new Date(),
           },
         }),
-        this.prisma.shipment.update({
+        db.shipment.update({
           where: { id: attempt.shipmentId },
           data: {
             pollingFailureCount: failureCount,

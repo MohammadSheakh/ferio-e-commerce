@@ -7,9 +7,10 @@ import {
 } from './catalog.controller';
 import { CatalogService } from './catalog.service';
 import { AuditModule } from '../audit/audit.module';
+import { TenancyModule } from '../../tenancy/tenancy.module';
 
 @Module({
-  imports: [PrismaModule, AuthModule, AuditModule],
+  imports: [PrismaModule, AuthModule, AuditModule, TenancyModule],
   controllers: [PublicCatalogController, AdminCatalogController],
   providers: [CatalogService],
   exports: [CatalogService],

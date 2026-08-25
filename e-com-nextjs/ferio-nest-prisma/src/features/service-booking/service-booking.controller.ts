@@ -20,6 +20,7 @@ import {
   User,
 } from '@app/common';
 import type { UserPayload } from '@app/common';
+import { TenantMembershipGuard } from '../../tenancy/tenant-membership.guard';
 import { ServiceBookingService } from './service-booking.service';
 import { CommerceSettingsService } from '../settings/services/commerce-settings.service';
 import {
@@ -61,7 +62,7 @@ export class PublicServiceController {
 }
 
 @Controller('admin/services')
-@UseGuards(AuthGuard, RolesGuard, PermissionsGuard)
+@UseGuards(AuthGuard, RolesGuard, PermissionsGuard, TenantMembershipGuard)
 @Roles('admin')
 @Permissions(PERMISSIONS.SERVICES_READ)
 export class AdminServiceController {

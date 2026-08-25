@@ -11,6 +11,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { TenantMembershipGuard } from '../../tenancy/tenant-membership.guard';
 import {
   AuthGuard,
   PERMISSIONS,
@@ -35,7 +36,7 @@ import { ShippingPollingQueue } from './shipping-polling.queue';
 @ApiTags('Admin Shipping')
 @ApiBearerAuth()
 @Controller('admin/shipping')
-@UseGuards(AuthGuard, RolesGuard, PermissionsGuard)
+@UseGuards(AuthGuard, RolesGuard, PermissionsGuard, TenantMembershipGuard)
 @Roles('admin')
 @Permissions(PERMISSIONS.SHIPPING_READ)
 export class AdminShippingController {

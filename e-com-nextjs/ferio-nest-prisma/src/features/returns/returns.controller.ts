@@ -8,6 +8,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { TenantMembershipGuard } from '../../tenancy/tenant-membership.guard';
 import {
   AuthGuard,
   PERMISSIONS,
@@ -29,7 +30,7 @@ import { ReturnsService } from './returns.service';
 @ApiTags('Admin Returns')
 @ApiBearerAuth()
 @Controller('admin')
-@UseGuards(AuthGuard, RolesGuard, PermissionsGuard)
+@UseGuards(AuthGuard, RolesGuard, PermissionsGuard, TenantMembershipGuard)
 @Roles('admin')
 @Permissions(PERMISSIONS.RETURNS_READ)
 export class ReturnsController {
