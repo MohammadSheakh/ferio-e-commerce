@@ -29,13 +29,25 @@ const audit = new AuditService(prismaService);
 const messages = new TransactionalMessagingService(prismaService);
 const catalog = new CatalogService(prismaService, audit);
 const carts = new CartService(prismaService);
+const notificationsStub = {
+  notifyCustomer: jest.fn().mockResolvedValue({}),
+};
 const orders = new OrderService(
   prismaService,
-  {} as CartService,
+  carts,
   messages,
   audit,
+  { get: (_key: string, fallback: unknown) => fallback } as unknown as ConfigService,
+  {} as never, // wallet unused in COD placement proofs
+  notificationsStub as never,
+  undefined, // entitlements: internal-plan semantics for integration proof
+  undefined, // usage metering not asserted here
+  undefined, // tenantDb: legacy-mode database (canonical chain applied below)
 );
-const placementOrders = new OrderService(prismaService, carts, messages, audit);
+const placementOrders = {
+  placeCodOrder: (cartToken: string, idempotencyKey: string) =>
+    orders.placeOrder('COD', cartToken, idempotencyKey),
+};
 const actor = { userId: 'integration-admin', role: 'admin' } as UserPayload;
 
 describe('Order confirmation PostgreSQL integration', () => {
@@ -739,7 +751,7 @@ async function createStockFixture(
     },
   });
   const warehouse = await prisma.warehouse.create({
-    data: { code: warehouseCode, name: `Warehouse ${suffix}` },
+    data: { code: `${warehouseCode}_${Date.now()}_${Math.random().toString(36).slice(2,6)}`, name: `Warehouse ${suffix}` },
   });
   const inventory = await prisma.inventoryStock.create({
     data: {
