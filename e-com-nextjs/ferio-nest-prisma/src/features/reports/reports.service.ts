@@ -62,6 +62,178 @@ const reportOrderSelect = {
 
 type ReportOrder = Prisma.OrderGetPayload<{ select: typeof reportOrderSelect }>;
 
+const REPORT_CHUNK_SIZE = 5_000;
+
+export type ReportAccumulator = ReturnType<typeof createReportAccumulator>;
+type ReportOrderAcc = {
+  currency?: string;
+  placed: number;
+  confirmed: number;
+  shipped: number;
+  delivered: number;
+  cancelled: number;
+  returned: number;
+  returnCases: number;
+  rto: number;
+  rtoCost: number;
+  grossTotals: number[];
+  grossConfirmedTotals: number[];
+  grossDeliveredTotals: number[];
+  knownCollectedTotals: number[];
+  codExpectedAmount: number;
+  codSettlementAmount: number;
+  codCollectionVariance: number;
+  refundAffectedOrders: number;
+  succeededRefundAmount: number;
+  deliveredRefundAmount: number;
+  pendingConfirmation: number;
+  readyForFulfillment: number;
+  openFulfillmentExceptions: number;
+  deliveryExceptions: number;
+  unresolvedCodCollections: number;
+  codCollectionVariances: number;
+  paymentStatusCounts: Map<string, number>;
+  refundStatusCounts: Map<string, number>;
+  sourceCounts: Map<string, number>;
+  providerCounts: Map<string, number>;
+};
+
+function bump(counts: Map<string, number>, key: string): void {
+  counts.set(key, (counts.get(key) ?? 0) + 1);
+}
+
+/**
+ * §16.3 bounded aggregation: per-order fold replacing whole-period
+ * findMany+JS-reduce. Field-by-field port of the previous summarize() so
+ * report output is unchanged; only residency differs.
+ */
+function createReportAccumulator(): ReportOrderAcc & {
+  add(order: ReportOrder): void;
+} {
+  const acc: ReportOrderAcc = {
+    currency: undefined,
+    placed: 0,
+    confirmed: 0,
+    shipped: 0,
+    delivered: 0,
+    cancelled: 0,
+    returned: 0,
+    returnCases: 0,
+    rto: 0,
+    rtoCost: 0,
+    grossTotals: [],
+    grossConfirmedTotals: [],
+    grossDeliveredTotals: [],
+    knownCollectedTotals: [],
+    codExpectedAmount: 0,
+    codSettlementAmount: 0,
+    codCollectionVariance: 0,
+    refundAffectedOrders: 0,
+    succeededRefundAmount: 0,
+    deliveredRefundAmount: 0,
+    pendingConfirmation: 0,
+    readyForFulfillment: 0,
+    openFulfillmentExceptions: 0,
+    deliveryExceptions: 0,
+    unresolvedCodCollections: 0,
+    codCollectionVariances: 0,
+    paymentStatusCounts: new Map(),
+    refundStatusCounts: new Map(),
+    sourceCounts: new Map(),
+    providerCounts: new Map(),
+  };
+  const isConfirmed = (o: ReportOrder) => o.confirmedAt !== null;
+  const isShipped = (o: ReportOrder) => Boolean(o.shipment?.pickedUpAt);
+  const isDelivered = (o: ReportOrder) =>
+    Boolean(o.shipment?.deliveredAt) ||
+    o.status === 'DELIVERED' ||
+    o.status === 'COMPLETED';
+
+  return {
+    ...acc,
+    add(order: ReportOrder): void {
+      if (!this.currency) this.currency = order.currency;
+      this.placed += 1;
+      if (isConfirmed(order)) {
+        this.confirmed += 1;
+        this.grossConfirmedTotals.push(order.total);
+      }
+      if (isShipped(order)) this.shipped += 1;
+      const delivered = isDelivered(order);
+      if (delivered) {
+        this.delivered += 1;
+        this.grossDeliveredTotals.push(order.total);
+      }
+      if (order.cancelledAt !== null || order.status === 'CANCELLED') {
+        this.cancelled += 1;
+      }
+      if (order.returnStatus === 'RECEIVED') this.returned += 1;
+      if (order.returnStatus !== 'NONE') this.returnCases += 1;
+
+      const orderIsRto =
+        ['RTO', 'RETURNED'].includes(order.shipment?.status ?? '') ||
+        order.rtoCases.length > 0;
+      if (orderIsRto) this.rto += 1;
+      for (const rtoCase of order.rtoCases) {
+        this.rtoCost += rtoCase.totalCost;
+      }
+
+      this.grossTotals.push(order.total);
+      if (order.paymentStatus === 'PAID') {
+        this.knownCollectedTotals.push(order.total);
+      }
+
+      if (order.codCollection) {
+        this.codExpectedAmount += order.codCollection.expectedAmount ?? 0;
+        this.codSettlementAmount +=
+          order.codCollection.collectedAmount ?? 0;
+        this.codCollectionVariance +=
+          order.codCollection.collectionVariance ?? 0;
+      }
+      if (order.codCollection?.status === 'EXPECTED') {
+        this.unresolvedCodCollections += 1;
+      }
+      if (order.codCollection?.status === 'VARIANCE') {
+        this.codCollectionVariances += 1;
+      }
+
+      if (
+        ['PARTIAL', 'REFUNDED', 'FAILED'].includes(order.refundStatus)
+      ) {
+        this.refundAffectedOrders += 1;
+      }
+      for (const refund of order.refunds) {
+        if (refund.status === 'SUCCEEDED') {
+          this.succeededRefundAmount += refund.amount;
+          if (delivered) this.deliveredRefundAmount += refund.amount;
+        }
+      }
+
+      if (order.status === 'PENDING_CONFIRMATION') {
+        this.pendingConfirmation += 1;
+      }
+      if (order.fulfillmentStatus === 'READY_FOR_FULFILLMENT') {
+        this.readyForFulfillment += 1;
+      }
+      this.openFulfillmentExceptions += order.fulfillmentExceptions.length;
+      if (
+        ['DELIVERY_FAILED', 'FAILED', 'UNKNOWN'].includes(
+          order.shipment?.status ?? '',
+        )
+      ) {
+        this.deliveryExceptions += 1;
+      }
+
+      bump(this.paymentStatusCounts, order.paymentStatus);
+      bump(this.refundStatusCounts, order.refundStatus);
+      bump(this.sourceCounts, order.source || 'DIRECT');
+      if (order.shipment) {
+        bump(this.providerCounts, order.shipment.provider.code);
+      }
+    },
+  };
+}
+
 @Injectable()
 export class ReportsService {
   constructor(
@@ -82,23 +254,56 @@ export class ReportsService {
     const db = await this.db();
     const period = reportPeriod(query);
     const source = query.source?.normalize('NFKC').trim();
-    const orders = await db.order.findMany({
-      where: {
-        createdAt: { gte: period.from, lte: period.to },
-        source:
-          source === 'DIRECT'
-            ? null
-            : source
-              ? { equals: source, mode: 'insensitive' }
-              : undefined,
-        shipment: query.provider
-          ? { provider: { code: query.provider } }
-          : undefined,
-      },
-      select: reportOrderSelect,
-      orderBy: { createdAt: 'desc' },
-    });
-    return this.summarize(orders, period.dateFrom, period.dateTo, query);
+    const baseWhere: Prisma.OrderWhereInput = {
+      createdAt: { gte: period.from, lte: period.to },
+      source:
+        source === 'DIRECT'
+          ? null
+          : source
+            ? { equals: source, mode: 'insensitive' }
+            : undefined,
+      shipment: query.provider
+        ? { provider: { code: query.provider } }
+        : undefined,
+    };
+
+    // §16.3 bounded aggregation: the overview folds orders in keyset-
+    // paginated chunks so a merchant's whole history can never be resident
+    // in memory. Output is identical to folding one giant array.
+    const acc = createReportAccumulator();
+    let last: { createdAt: Date; id: string } | undefined;
+    for (;;) {
+      const pageWhere = last
+        ? {
+            AND: [
+              baseWhere,
+              {
+                OR: [
+                  { createdAt: { lt: last.createdAt } },
+                  {
+                    AND: [
+                      { createdAt: { equals: last.createdAt } },
+                      { id: { lt: last.id } },
+                    ],
+                  },
+                ],
+              },
+            ],
+          }
+        : baseWhere;
+      const batch = (await db.order.findMany({
+        where: pageWhere,
+        select: reportOrderSelect,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        take: REPORT_CHUNK_SIZE,
+      })) as unknown as ReportOrder[];
+      if (batch.length === 0) break;
+      for (const order of batch) acc.add(order);
+      if (batch.length < REPORT_CHUNK_SIZE) break;
+      const tail = batch[batch.length - 1];
+      last = { createdAt: tail.createdAt, id: tail.id };
+    }
+    return this.finalizeSummary(acc, period.dateFrom, period.dateTo, query);
   }
 
   async ordersExport(query: ReportQueryDto, actor: UserPayload) {
@@ -264,76 +469,21 @@ export class ReportsService {
     };
   }
 
-  private summarize(
-    orders: ReportOrder[],
+  private finalizeSummary(
+    acc: ReportAccumulator,
     dateFrom: string,
     dateTo: string,
     query: ReportQueryDto,
   ) {
-    const confirmed = orders.filter((order) => order.confirmedAt !== null);
-    const shipped = orders.filter((order) =>
-      Boolean(order.shipment?.pickedUpAt),
-    );
-    const delivered = orders.filter(
-      (order) =>
-        Boolean(order.shipment?.deliveredAt) ||
-        order.status === 'DELIVERED' ||
-        order.status === 'COMPLETED',
-    );
-    const cancelled = orders.filter(
-      (order) => order.cancelledAt !== null || order.status === 'CANCELLED',
-    );
-    const returned = orders.filter(
-      (order) => order.returnStatus === 'RECEIVED',
-    );
-    const returnCases = orders.filter((order) => order.returnStatus !== 'NONE');
-    const rto = orders.filter(
-      (order) =>
-        ['RTO', 'RETURNED'].includes(order.shipment?.status ?? '') ||
-        order.rtoCases.length > 0,
-    );
-    const rtoCost = sumMoney(
-      orders.flatMap((order) =>
-        order.rtoCases.map((rtoCase) => rtoCase.totalCost),
-      ),
-    );
-    const knownCollected = orders.filter(
-      (order) => order.paymentStatus === 'PAID',
-    );
-    const codExpectedAmount = sumMoney(
-      orders.map((order) => order.codCollection?.expectedAmount ?? 0),
-    );
-    const codSettlementAmount = sumMoney(
-      orders.map((order) => order.codCollection?.collectedAmount ?? 0),
-    );
-    const codCollectionVariance = sumMoney(
-      orders.map((order) => order.codCollection?.collectionVariance ?? 0),
-    );
-    const refundAffected = orders.filter((order) =>
-      ['PARTIAL', 'REFUNDED', 'FAILED'].includes(order.refundStatus),
-    );
-    const succeededRefundAmount = sumMoney(
-      orders.flatMap((order) =>
-        order.refunds
-          .filter((refund) => refund.status === 'SUCCEEDED')
-          .map((refund) => refund.amount),
-      ),
-    );
-    const deliveredRefundAmount = sumMoney(
-      delivered.flatMap((order) =>
-        order.refunds
-          .filter((refund) => refund.status === 'SUCCEEDED')
-          .map((refund) => refund.amount),
-      ),
-    );
-    const sourceCounts = this.countBy(
-      orders,
-      (order) => order.source || 'DIRECT',
-    );
-    const providerCounts = this.countBy(
-      orders.filter((order) => order.shipment),
-      (order) => order.shipment!.provider.code,
-    );
+    const sorted = (
+      counts: Map<string, number>,
+    ): Array<{ value: string; count: number }> =>
+      [...counts]
+        .map(([value, count]) => ({ value, count }))
+        .sort(
+          (left, right) =>
+            right.count - left.count || left.value.localeCompare(right.value),
+        );
 
     return {
       basis: {
@@ -349,24 +499,23 @@ export class ReportsService {
         },
       },
       outcomes: {
-        placed: orders.length,
-        confirmed: confirmed.length,
-        shipped: shipped.length,
-        delivered: delivered.length,
-        cancelled: cancelled.length,
-        returned: returned.length,
-        returnCases: returnCases.length,
-        rto: rto.length,
+        placed: acc.placed,
+        confirmed: acc.confirmed,
+        shipped: acc.shipped,
+        delivered: acc.delivered,
+        cancelled: acc.cancelled,
+        returned: acc.returned,
+        returnCases: acc.returnCases,
+        rto: acc.rto,
       },
       revenue: {
-        currency: orders[0]?.currency ?? 'BDT',
-        grossPlaced: sumMoney(orders.map((order) => order.total)),
-        grossConfirmed: sumMoney(confirmed.map((order) => order.total)),
-        grossDelivered: sumMoney(delivered.map((order) => order.total)),
-        knownCollected: sumMoney(knownCollected.map((order) => order.total)),
+        currency: acc.currency ?? 'BDT',
+        grossPlaced: sumMoney(acc.grossTotals),
+        grossConfirmed: sumMoney(acc.grossConfirmedTotals),
+        grossDelivered: sumMoney(acc.grossDeliveredTotals),
+        knownCollected: sumMoney(acc.knownCollectedTotals),
         netOfRefund:
-          sumMoney(delivered.map((order) => order.total)) -
-          deliveredRefundAmount,
+          sumMoney(acc.grossDeliveredTotals) - acc.deliveredRefundAmount,
         definitions: {
           grossPlaced: 'Order total for every order in the cohort.',
           grossConfirmed:
@@ -380,38 +529,24 @@ export class ReportsService {
         },
       },
       finance: {
-        paymentStatus: this.countBy(orders, (order) => order.paymentStatus),
-        refundStatus: this.countBy(orders, (order) => order.refundStatus),
-        refundAffectedOrders: refundAffected.length,
-        refundAmount: succeededRefundAmount,
-        rtoCost,
-        codExpectedAmount,
-        codSettlementAmount,
-        codCollectionVariance,
-        unresolvedCodCollections: orders.filter(
-          (order) => order.codCollection?.status === 'EXPECTED',
-        ).length,
-        codCollectionVariances: orders.filter(
-          (order) => order.codCollection?.status === 'VARIANCE',
-        ).length,
+        paymentStatus: sorted(acc.paymentStatusCounts),
+        refundStatus: sorted(acc.refundStatusCounts),
+        refundAffectedOrders: acc.refundAffectedOrders,
+        refundAmount: acc.succeededRefundAmount,
+        rtoCost: acc.rtoCost,
+        codExpectedAmount: acc.codExpectedAmount,
+        codSettlementAmount: acc.codSettlementAmount,
+        codCollectionVariance: acc.codCollectionVariance,
+        unresolvedCodCollections: acc.unresolvedCodCollections,
+        codCollectionVariances: acc.codCollectionVariances,
         settlementModelAvailable: true,
       },
       operations: {
-        pendingConfirmation: orders.filter(
-          (order) => order.status === 'PENDING_CONFIRMATION',
-        ).length,
-        readyForFulfillment: orders.filter(
-          (order) => order.fulfillmentStatus === 'READY_FOR_FULFILLMENT',
-        ).length,
-        openFulfillmentExceptions: sumMoney(
-          orders.map((order) => order.fulfillmentExceptions.length),
-        ),
-        deliveryExceptions: orders.filter((order) =>
-          ['DELIVERY_FAILED', 'FAILED', 'UNKNOWN'].includes(
-            order.shipment?.status ?? '',
-          ),
-        ).length,
-        rto: rto.length,
+        pendingConfirmation: acc.pendingConfirmation,
+        readyForFulfillment: acc.readyForFulfillment,
+        openFulfillmentExceptions: acc.openFulfillmentExceptions,
+        deliveryExceptions: acc.deliveryExceptions,
+        rto: acc.rto,
       },
       contribution: {
         status: 'INCOMPLETE' as const,
@@ -427,23 +562,9 @@ export class ReportsService {
         ],
       },
       dimensions: {
-        sources: sourceCounts,
-        providers: providerCounts,
+        sources: sorted(acc.sourceCounts),
+        providers: sorted(acc.providerCounts),
       },
     };
-  }
-
-  private countBy<T>(rows: T[], key: (row: T) => string) {
-    const counts = new Map<string, number>();
-    for (const row of rows) {
-      const value = key(row);
-      counts.set(value, (counts.get(value) ?? 0) + 1);
-    }
-    return [...counts]
-      .map(([value, count]) => ({ value, count }))
-      .sort(
-        (left, right) =>
-          right.count - left.count || left.value.localeCompare(right.value),
-      );
   }
 }
