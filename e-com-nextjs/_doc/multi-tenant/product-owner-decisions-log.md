@@ -40,3 +40,19 @@
 | `basic_reports` / `cod` / `couriers_basic` / `ferio_subdomain` | ✔ | ✔ | ✔ | ✔ |
 
 Plus seeded `internal` plan: every feature enabled, no limits, ৳0 — assigned only through the audited internal-entitlement workflow (PO-002).
+
+---
+
+## Refinements — August 25, 2026 (second owner pass)
+
+| ID | Decision | Engineering consequence |
+|---|---|---|
+| PO-021 | **Staging domain**: development/staging continues on `sheakh.qzz.io` via Cloudflare. `PLATFORM_PUBLIC_DOMAIN` stays environment-driven; production domain TBD. | No code change; env value per environment. |
+| PO-022 | **Hosting abstraction preserved**: do NOT introduce Neon/RDS/Supabase coupling. Provisioning stays behind a `TenantDatabaseProvisioner` interface (`LocalPostgresProvisioner` today, `ManagedPostgresProvisioner` later). | Formalized the interface as a DI token in this pass. |
+| PO-023 | **Secrets**: environment variables for dev/CI; keep the secret layer abstract for later KMS move. Never commit production secrets. | Matches current design; CI secret-scan job added to enforce. |
+| PO-024 | **Platform SSLCommerz merchant account not yet available.** SaaS billing stays implemented behind its adapter/config boundary and must never block other SaaS work; platform billing credentials stay fully separate from tenant commerce credentials. | `billingConfigured()` gate already ships; no blocking dependency created. |
+| PO-005-R | **Suspension scope refined**: block commerce MUTATIONS as well as checkout when suspended (product create/edit, inventory mutations, cart changes, new orders, campaigns). Storefront browsable/read-only; existing customers may view orders/tracking/account; Tenant Admin accessible primarily for viewing/exporting/billing/renewal/reactivation-config. No data deletion. | Implemented via `assertTenantCommerceWritable()` at mutation entry points; stable code `COMMERCE_MUTATION_DISABLED_SUSPENDED`. |
+| PO-013-R | **Closure retention confirmed**: 90-day non-operational-but-recoverable period; after that eligible for permanent deletion subject to financial/audit/legal retention. | Matches implemented `finalizeClosure` window + override audit. |
+| PO-018-R | **Self-service signup stays OFF initially**, re-evaluate after ~50 successful production provisionings AND proven billing/migration/backup/abuse controls. | Console-driven creation remains the only sanctioned path. |
+| PO-025 | **Pilot tenants supplied later** — do not block engineering on pilot data. | MT-14 alpha proceeds with internal tenants first. |
+| PO-026 | **CI-first capstone**: run the two-tenant vertical against real disposable PostgreSQL via PR; treat first failures as diagnostic evidence; fix root causes, never weaken tests. | PR opened; integration suites mandatory in backend job. |

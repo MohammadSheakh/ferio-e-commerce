@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   Optional,
@@ -9,6 +10,7 @@ import { createHash } from 'crypto';
 import { Prisma } from '@prisma/client';
 import type { PrismaClient } from '@prisma/client';
 import { PrismaService } from '@app/database';
+import { assertTenantCommerceWritable } from '../../tenancy/commerce-write-guard.util';
 import { TenantDbService } from '../../tenancy/tenant-db.service';
 import type { UserPayload } from '@app/common';
 import { AuditService } from '../audit/audit.service';
@@ -146,6 +148,7 @@ export class WalletService {
     dto: CreateWalletTopUpDto,
     rawIdempotencyKey?: string,
   ) {
+    assertTenantCommerceWritable();
     const db = await this.db();
     const idempotencyKey = this.idempotencyHash(rawIdempotencyKey);
     return db.$transaction(

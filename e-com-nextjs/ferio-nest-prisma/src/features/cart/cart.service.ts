@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -8,6 +9,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '@app/database';
 import { Optional } from '@nestjs/common';
 import type { PrismaClient } from '@prisma/client';
+import { assertTenantCommerceWritable } from '../../tenancy/commerce-write-guard.util';
 import { TenantDbService } from '../../tenancy/tenant-db.service';
 import { ConfigService } from '@nestjs/config';
 import { AddCartItemDto, UpdateCartItemDto } from './cart.dto';
@@ -424,6 +426,7 @@ export class CartService {
   }
 
   async addItem(dto: AddCartItemDto, token?: string) {
+    assertTenantCommerceWritable();
     const db = await this.db();
     const variant = await this.getSellableVariant(dto.variantId);
     const existingCart = await this.findActiveCart(token);
@@ -478,6 +481,7 @@ export class CartService {
   }
 
   async updateItem(variantId: string, dto: UpdateCartItemDto, token?: string) {
+    assertTenantCommerceWritable();
     const db = await this.db();
     const cart = await this.findActiveCart(token);
     if (!cart) throw new NotFoundException('Active cart not found');
@@ -525,6 +529,7 @@ export class CartService {
   }
 
   async removeItem(variantId: string, token?: string) {
+    assertTenantCommerceWritable();
     const db = await this.db();
     const cart = await this.findActiveCart(token);
     if (!cart) throw new NotFoundException('Active cart not found');

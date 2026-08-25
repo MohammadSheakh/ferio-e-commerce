@@ -9,6 +9,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '@app/database';
 import type { PrismaClient } from '@prisma/client';
 import { Optional } from '@nestjs/common';
+import { assertTenantCommerceWritable } from '../../tenancy/commerce-write-guard.util';
 import { TenantDbService } from '../../tenancy/tenant-db.service';
 import { tryGetTenantContext } from '../../tenancy/tenant-context';
 import type { UserPayload } from '@app/common';
@@ -566,6 +567,7 @@ export class CatalogService {
   }
 
   async createProduct(dto: CreateProductDto, actor: UserPayload) {
+    assertTenantCommerceWritable();
     const db = await this.db();
     // MT-10 §13.2: SKU entitlement enforced server-side for tenants.
     const ctx = tryGetTenantContext();
@@ -778,6 +780,7 @@ export class CatalogService {
   }
 
   async updateProduct(id: string, dto: UpdateProductDto, actor: UserPayload) {
+    assertTenantCommerceWritable();
     const db = await this.db();
     const existing = await db.product.findUnique({
       where: { id },
@@ -1194,6 +1197,7 @@ export class CatalogService {
     dto: UpdateProductStatusDto,
     actor: UserPayload,
   ) {
+    assertTenantCommerceWritable();
     const db = await this.db();
     const existing = await db.product.findUnique({
       where: { id },
@@ -1364,6 +1368,7 @@ export class CatalogService {
     dto: AdjustInventoryDto,
     actor: UserPayload,
   ) {
+    assertTenantCommerceWritable();
     const db = await this.db();
     if (dto.quantityDelta === 0) {
       throw new BadRequestException('Inventory adjustment cannot be zero');

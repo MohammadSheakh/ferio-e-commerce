@@ -21,6 +21,12 @@ import { TenantClosureService } from './services/tenant-closure.service';
 import { PlanGateService } from './services/plan-gate.service';
 import { PlatformBillingService } from './services/platform-billing.service';
 import {
+  LocalPostgresProvisioner,
+} from './services/local-postgres-provisioner';
+import {
+  TenantDatabaseProvisioner,
+} from './services/tenant-database-provisioner.interface';
+import {
   PlatformBillingCallbackController,
   PlatformBillingController,
 } from './platform-billing.controller';
@@ -55,7 +61,12 @@ import {
     MigrationOrchestratorService,
     TenantClosureService,
     PlanGateService,
+    LocalPostgresProvisioner,
     PlatformBillingService,
+    {
+      provide: 'TENANT_DB_PROVISIONER',
+      useExisting: LocalPostgresProvisioner,
+    },
     {
       provide: 'ORG_MEMBERS_COUNTER',
       useFactory: (platform: PlatformPrismaService) => ({
@@ -96,7 +107,12 @@ import {
     ProvisioningService,
     TenantClosureService,
     PlanGateService,
+    LocalPostgresProvisioner,
     PlatformBillingService,
+    {
+      provide: 'TENANT_DB_PROVISIONER',
+      useExisting: LocalPostgresProvisioner,
+    },
     {
       provide: 'ORG_MEMBERS_COUNTER',
       useFactory: (platform: PlatformPrismaService) => ({

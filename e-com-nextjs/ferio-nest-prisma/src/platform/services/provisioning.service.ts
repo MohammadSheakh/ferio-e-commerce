@@ -10,6 +10,8 @@ import { OrganizationsService } from './organizations.service';
 import { DomainsService } from './domains.service';
 import { TenantDatabasesService } from './tenant-databases.service';
 import { TenantSchemaBootstrapper } from '../../tenancy/tenant-schema.bootstrapper';
+import { LocalPostgresProvisioner } from './local-postgres-provisioner';
+import type { TenantDatabaseProvisioner } from './tenant-database-provisioner.interface';
 
 /**
  * Pluggable physical infrastructure executor. The orchestration state machine
@@ -45,7 +47,8 @@ export class ProvisioningService {
     private readonly domains: DomainsService,
     private readonly databases: TenantDatabasesService,
     private readonly bootstrapper: TenantSchemaBootstrapper,
-  ) {}
+  
+    @Inject('TENANT_DB_PROVISIONER') private readonly dbProvisioner: TenantDatabaseProvisioner,) {}
 
   /**
    * Idempotent entry point: the idempotencyKey makes replays safe — a repeated
@@ -238,59 +241,13 @@ export class ProvisioningService {
     }
   }
 
-  /** Overridable hook point for infrastructure-specific executors. */
-  protected executor(): ProvisioningExecutor {
-    return defaultExecutor(this.platform);
+  private provisionerRef: TenantDatabaseProvisioner | null = null;
+
+  /** Physical creation boundary (PO-022): replace via DI when managed hosting lands. */
+  private executor(): ProvisioningExecutor {
+    if (!this.dbProvisioner) {
+      this.dbProvisioner = new LocalPostgresProvisioner(this.platform);
+    }
+    return this.dbProvisioner;
   }
-}
-
-type PlatformClient = PlatformPrismaService['client'];
-
-/**
- * Default executor provisions the tenant database on the same PostgreSQL
- * server as the control plane using CREATE DATABASE. Sufficient for internal
- * alpha; replaced wholesale when managed hosting is chosen (owner-blocked).
- */
-function defaultExecutor(platform: PlatformPrismaService): ProvisioningExecutor {
-  return {
-    async createTenantDatabase({ organizationId, slug }) {
-      const url = process.env.PLATFORM_DATABASE_URL;
-      if (!url) throw new ConflictException('PLATFORM_DATABASE_URL_MISSING');
-      const parsed = new URL(url);
-      const dbName = `ferio_tenant_${slug.replace(/-/g, '_')}_${randomBytes(2).toString('hex')}`;
-      const dbPassword = randomBytes(18).toString('base64url');
-
-      // Connect to the server-level maintenance DB to issue CREATE DATABASE.
-      const adminUrl = new URL(url);
-      adminUrl.pathname = '/postgres';
-      const { Pool } = require('pg') as typeof import('pg');
-      const pool = new Pool({ connectionString: adminUrl.toString(), max: 1 });
-      try {
-        const quotedName = `"${dbName.replace(/"/g, '')}"`;
-        await pool.query(`CREATE DATABASE ${quotedName}`);
-        await pool.query(
-          `CREATE ROLE "${`tenant_${organizationId.slice(-8)}`}" LOGIN PASSWORD '${dbPassword.replace(/'/g, "''")}'`,
-        ).catch(async () => {
-          // Role may already exist from a prior partial run — grant instead.
-          await pool.query(
-            `GRANT ALL PRIVILEGES ON DATABASE ${quotedName} TO "${`tenant_${organizationId.slice(-8)}`}"`,
-          );
-        });
-        await pool.query(
-          `GRANT ALL PRIVILEGES ON DATABASE ${quotedName} TO "${`tenant_${organizationId.slice(-8)}`}"`,
-        );
-      } finally {
-        await pool.end().catch(() => undefined);
-      }
-
-      void platform; // platform client untouched here; evidence written by caller
-      return {
-        host: parsed.hostname,
-        port: Number(parsed.port || 5432),
-        databaseName: dbName,
-        username: `tenant_${organizationId.slice(-8)}`,
-        password: dbPassword,
-      };
-    },
-  };
 }
