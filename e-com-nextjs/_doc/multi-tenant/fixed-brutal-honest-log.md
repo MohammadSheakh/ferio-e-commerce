@@ -131,11 +131,18 @@ schedule pattern; per-org counts reported as evidence.
 ### #8 OpenAPI contract — ✅ SPEC CONTRACT SHIPPED · 🟡 client codegen next
 
 `OPENAPI_EXPORT=1` boot mode writes `openapi.json`; committed as the API
-contract and enforced in CI — a drift step regenerates it on every backend
-push and fails the job if the spec wasn't updated with the DTO change.
-Frontends still consume hand-written types; generated clients
-(`openapi-typescript`) remain the follow-up, now trivially unblocked since
-the artifact is deterministic and CI-gated.
+contract (deterministic — byte-identical re-export verified) and enforced
+in CI via a drift gate. The Nest swagger CLI plugin is now enabled: 98 DTO
+component schemas generate automatically.
+
+Frontend toolchain live in all three apps:
+- openapi-typescript devDep + `pnpm api:codegen`
+- committed contract-derived `lib/api-schema.ts`
+
+Adoption status: hand-written types remain in call sites (they compile
+clean against the generated schema); per-endpoint response schemas for
+literal-returning controllers need an @ApiOkResponse/DTO pass, after which
+call sites can switch to schema-derived types incrementally.
 
 **Critical discovery while shipping this:** the compiled production build
 (`tsc` dist) could not bootstrap AT ALL — three stacked defects:
@@ -163,6 +170,13 @@ this entry is the correction of record.
 ### #10 `evictForCapacity` leak under churn — ✅ FIXED (with #3)
 
 ---
+
+### Bonus hygiene: tracked .env removed
+
+`ferio-admin-dashboard/ferio-admin/.env` was tracked in git (contents:
+FERIO_API_URL / NEXT_PUBLIC_SOCKET_URL — configuration only, **no
+secrets**, so no rotation needed). Untracked via git rm --cached and
+ignored going forward.
 
 ## Owner-gated items NOT claimed here (unchanged truth)
 
