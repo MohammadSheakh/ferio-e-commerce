@@ -109,7 +109,18 @@ Proven by new `tenant-membership.pubsub.spec.ts`: targeted invalidation
 clears a peer sharing the bus while untouched identities survive; wildcard
 clears everything; Redis-absent keeps legacy semantics.
 
-### #7 Retention jobs for unbounded tables — 📌 NEXT-UP (design settled)
+### #7 Retention jobs for unbounded tables — ✅ FIXED
+
+`RetentionSweepService` (tenancy) fans out over READY tenant databases and
+prunes by createdAt cutoff: `CommerceMessage` (180d default),
+`StorefrontAnalyticsEvent` (365d), `DeliveryLocationHistory` GPS (90d).
+`AuditLog` retention defaults **OFF** pending the legal decision. All
+thresholds env-tunable. Scheduling mirrors the reconciliation pattern:
+repeatable BullMQ scheduler (`RETENTION_SWEEP_ENABLED`, daily by default)
+plus a processor that fans out per-org; single-org retries supported.
+Operator surface: `POST /platform/maintenance/retention-sweep` (audited,
+returns per-rule deletion counts). Proven by 3 unit tests covering cutoffs,
+AuditLog-off, non-READY refusal, and fleet failure isolation.
 
 Planned: fan-out sweep over READY tenants deleting
 `CommerceMessage` > RETENTION_COMMERCE_MESSAGE_DAYS (180),
@@ -117,12 +128,29 @@ storefront analytics events > 365, GPS waypoints > 90; AuditLog retention
 disabled-by-default pending legal input. Trigger mirrors the reconciliation
 schedule pattern; per-org counts reported as evidence.
 
-### #8 OpenAPI → typed client codegen — 📌 NEXT-UP
+### #8 OpenAPI contract — ✅ SPEC CONTRACT SHIPPED · 🟡 client codegen next
 
-Plan: enable Nest OpenAPI plugin/`@ApiProperty` generation, export
-`openapi.json` in CI, generate typed clients into each frontend
-(`ferio-customer-web/lib/generated`, admin equivalents), replace hand-written
-interfaces incrementally starting with the surfaces touched most.
+`OPENAPI_EXPORT=1` boot mode writes `openapi.json`; committed as the API
+contract and enforced in CI — a drift step regenerates it on every backend
+push and fails the job if the spec wasn't updated with the DTO change.
+Frontends still consume hand-written types; generated clients
+(`openapi-typescript`) remain the follow-up, now trivially unblocked since
+the artifact is deterministic and CI-gated.
+
+**Critical discovery while shipping this:** the compiled production build
+(`tsc` dist) could not bootstrap AT ALL — three stacked defects:
+1. ~19 services injected collaborators via `import type`, erasing
+   `design:paramtypes` (TenantDatabaseManager, PlatformPrismaService across
+   the whole control plane) → converted to value imports;
+2. structural inline-typed ctor params without tokens
+   (`MigrationOrchestratorService.migrationQueue`, `EntitlementsService`
+   UsageReader, controller-level PlatformPrismaService inline-import) →
+   explicit `@Inject(getQueueToken(...))` / `@Inject(USAGE_READER)` +
+   provider registrations;
+3. nest-cli had no assets rule, so the prebuilt platform-client JS never
+   reached `dist` → added assets copy.
+Dev/swc masked all of it. Production Docker images would have crash-looped
+on first boot. Export run is now the standing smoke proof of prod bootstrap.
 
 ### #9 CSV parser OOM risk — ✅ RE-VERIFIED: ALREADY BOUNDED (correction)
 
@@ -149,6 +177,7 @@ metrics stack choice. These gate launch, not code.
 | Gate | Result |
 |---|---|
 | Strict typecheck | ✅ |
-| Unit suites | ✅ 81 suites / 342 tests (+3 pub/sub invalidation proofs) |
-| Integration suites (real PostgreSQL, incl. new trgm migration auto-deploy) | ✅ 11 suites / 44 tests |
+| Unit suites | ✅ 82 suites / 345 tests (+3 retention proofs) |
+| Integration suites (real PostgreSQL) | ✅ 11 suites / 44 tests |
 | Production build | ✅ |
+| **Production bootstrap smoke (node dist/src/main.js OPENAPI_EXPORT=1)** | ✅ boots & exports 249 paths |

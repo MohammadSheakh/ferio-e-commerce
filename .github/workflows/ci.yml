@@ -71,6 +71,12 @@ jobs:
         run: pnpm exec tsc --noEmit -p tsconfig.json
       - name: Production build
         run: pnpm build
+      - name: OpenAPI contract drift check (brutal-audit #8)
+        run: |
+          DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/ferio_ci_test \
+          PLATFORM_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/ferio_ci_test \
+          OPENAPI_EXPORT=1 node dist/src/main.js > /dev/null
+          git diff --exit-code -- openapi.json || (echo '::error::openapi.json is stale — run pnpm openapi:export and commit' && exit 1)
       - name: Unit tests
         run: pnpm test
       - name: Cross-tenant isolation + bootstrap integration tests

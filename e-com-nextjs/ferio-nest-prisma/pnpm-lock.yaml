@@ -47,6 +47,9 @@ importers:
       '@nestjs/websockets':
         specifier: ^11.2.1
         version: 11.2.1(@nestjs/common@11.1.19(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.19)(@nestjs/platform-socket.io@11.1.21)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@prisma/client-runtime-utils':
+        specifier: 7.8.0
+        version: 7.8.0
       '@socket.io/redis-adapter':
         specifier: ^8.3.0
         version: 8.3.0(socket.io-adapter@2.5.6)
