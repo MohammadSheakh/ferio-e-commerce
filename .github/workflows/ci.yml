@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ferio-nest-prisma
+        working-directory: e-com-nextjs/ferio-nest-prisma
 
     # Disposable infrastructure: a fresh PostgreSQL and Redis exist only for
     # this job run. The integration suites create/drop their own scratch
@@ -58,7 +58,7 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
-          cache-dependency-path: ferio-nest-prisma/pnpm-lock.yaml
+          cache-dependency-path: e-com-nextjs/ferio-nest-prisma/pnpm-lock.yaml
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Generate Prisma clients (tenant + platform)
@@ -109,7 +109,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ferio-customer-web
+        working-directory: e-com-nextjs/ferio-customer-web
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -119,7 +119,7 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
-          cache-dependency-path: ferio-customer-web/pnpm-lock.yaml
+          cache-dependency-path: e-com-nextjs/ferio-customer-web/pnpm-lock.yaml
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: TypeScript check
@@ -134,7 +134,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ferio-admin-dashboard/ferio-admin
+        working-directory: e-com-nextjs/ferio-admin-dashboard/ferio-admin
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -144,7 +144,7 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
-          cache-dependency-path: ferio-admin-dashboard/ferio-admin/pnpm-lock.yaml
+          cache-dependency-path: e-com-nextjs/ferio-admin-dashboard/ferio-admin/pnpm-lock.yaml
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: TypeScript check
@@ -157,7 +157,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ferio-platform-admin
+        working-directory: e-com-nextjs/ferio-platform-admin
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -167,7 +167,7 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
-          cache-dependency-path: ferio-platform-admin/pnpm-lock.yaml
+          cache-dependency-path: e-com-nextjs/ferio-platform-admin/pnpm-lock.yaml
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: TypeScript check
