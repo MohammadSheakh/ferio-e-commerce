@@ -98,6 +98,9 @@ export class TransactionalMessagingService {
           eventType: input.eventType,
           templateKey,
           templateVersion: template.version,
+          // Empty plan = "not yet routed"; the dispatcher computes it from
+          // the active routing policy before first delivery attempt.
+          channelPlan: [],
           renderedSubject: template.subjectTemplate
             ? renderMessageTemplate(template.subjectTemplate, payload)
             : null,

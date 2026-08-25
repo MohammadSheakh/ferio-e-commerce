@@ -9,6 +9,9 @@ export interface BootstrapResult {
   schemaVersion: string;
 }
 
+/** Factory store name installed by migration 20260811103000_commerce_settings_foundation. */
+const FACTORY_STORE_NAME = 'Ferio';
+
 /**
  * Applies the canonical tenant migration set to a freshly created tenant
  * database (ADR-0005 §14.1 packaging; MT-4 provisioning step).
@@ -117,9 +120,16 @@ export class TenantSchemaBootstrapper {
       max: 1,
     });
     try {
+      // The explicit organization name wins over migration-chain defaults,
+      // but a re-seed must never clobber an owner-customized store name —
+      // the row is only renamed while it still carries the factory default.
       await pool.query(
-        'INSERT INTO "CommerceSettings" ("id", "storeName", "createdAt", "updatedAt") VALUES ($1, $2, now(), now()) ON CONFLICT ("id") DO UPDATE SET "storeName" = EXCLUDED."storeName"',
-        ['default', connection.organizationName ?? 'My Store'],
+        `INSERT INTO "CommerceSettings" ("id", "storeName", "createdAt", "updatedAt")
+         VALUES ($1, $2, now(), now())
+         ON CONFLICT ("id") DO UPDATE
+         SET "storeName" = EXCLUDED."storeName", "updatedAt" = now()
+         WHERE "CommerceSettings"."storeName" = $3`,
+        ['default', connection.organizationName ?? 'My Store', FACTORY_STORE_NAME],
       );
       await pool.query(
         'INSERT INTO "CodVerificationPolicy" ("id", "mode", "createdAt", "updatedAt") VALUES ($1, $2, now(), now()) ON CONFLICT ("id") DO NOTHING',
