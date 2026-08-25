@@ -2,6 +2,10 @@ import { platformApi } from "@/lib/platform-session";
 import { OrgActions } from "./org-actions";
 import { UsageCard, type UsageMetricRow } from "./usage-card";
 
+// TODO(brutal-audit #8 follow-up): replace with contract-derived type once
+// this endpoint declares an @ApiOkResponse schema.
+type UsageResponse = { organizationId: string; periodKey: string; metrics: UsageMetricRow[] };
+
 interface OrgDetail {
   id: string;
   name: string;
@@ -28,7 +32,7 @@ export default async function OrganizationDetail({ params }: { params: { id: str
     [org, runs, usage] = await Promise.all([
       platformApi<OrgDetail>(`/platform/organizations/${params.id}`),
       platformApi<ProvisioningRun[]>(`/platform/organizations/${params.id}/provisioning-runs`),
-      platformApi<{ organizationId: string; periodKey: string; metrics: UsageMetricRow[] }>(
+      platformApi<UsageResponse>(
         `/platform/organizations/${params.id}/usage`,
       ),
     ]);
