@@ -9,6 +9,9 @@
         "include": "platform/generated/**/*.js",
         "outDir": "dist/src"
       }
+    ],
+    "plugins": [
+      "@nestjs/swagger"
     ]
   },
   "projects": {
