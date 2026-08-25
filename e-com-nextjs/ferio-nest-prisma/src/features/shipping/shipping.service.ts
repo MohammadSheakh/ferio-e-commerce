@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
   UnauthorizedException,
 } from '@nestjs/common';
 import { createHash, randomBytes } from 'crypto';
@@ -11,7 +12,9 @@ import {
   Prisma,
   ShipmentProviderCode,
 } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import { PrismaService } from '@app/database';
+import { TenantDbService } from '../../tenancy/tenant-db.service';
 import type { UserPayload } from '@app/common';
 import type { CourierAdapter } from './adapters/courier-adapter.interface';
 import { PathaoAdapter } from './adapters/pathao.adapter';
@@ -50,8 +53,18 @@ export class ShippingService {
     public readonly courierRouter: CourierRouterService,
     private readonly messages: TransactionalMessagingService,
     private readonly audit: AuditService,
-  ) {}
+  
+    @Optional() private readonly tenantDb?: TenantDbService,) {}
 
+  /**
+   * MT-7/MT-8: inside a tenant-resolved request or worker fan-out this
+   * returns the resolved tenant database client; outside one it explicitly
+   * falls back to the legacy single-tenant DB. Never guesses.
+   */
+  private async db(): Promise<PrismaClient> {
+    const tenant = await this.tenantDb?.tryGet();
+    return tenant ?? (this.prisma as PrismaClient);
+  }
   private adapter(code: ShipmentProviderCode): CourierAdapter {
     switch (code) {
       case 'PATHAO':
@@ -102,7 +115,8 @@ export class ShippingService {
   }
 
   async getProviders() {
-    const providers = await this.prisma.shipmentProvider.findMany({
+    const db = await this.db();
+    const providers = await db.shipmentProvider.findMany({
       orderBy: { name: 'asc' },
     });
     return providers.map((provider) => ({
@@ -112,8 +126,9 @@ export class ShippingService {
     }));
   }
 
-  getShipments() {
-    return this.prisma.shipment.findMany({
+  async getShipments() {
+    const db = await this.db();
+    return db.shipment.findMany({
       take: 100,
       orderBy: { createdAt: 'desc' },
       include: {
@@ -132,8 +147,9 @@ export class ShippingService {
     });
   }
 
-  getWebhookLogs() {
-    return this.prisma.shipmentWebhookLog.findMany({
+  async getWebhookLogs() {
+    const db = await this.db();
+    return db.shipmentWebhookLog.findMany({
       where: { source: 'WEBHOOK' },
       take: 100,
       orderBy: { receivedAt: 'desc' },
@@ -173,6 +189,7 @@ export class ShippingService {
     dto: UpdateShipmentProviderDto,
     actor: UserPayload,
   ) {
+    const db = await this.db();
     if (!Object.values(ShipmentProviderCode).includes(code)) {
       throw new BadRequestException('Unsupported shipment provider');
     }
@@ -181,7 +198,7 @@ export class ShippingService {
         `${code} credentials must be configured before activation`,
       );
     }
-    return this.prisma.$transaction(async (transaction) => {
+    return db.$transaction(async (transaction) => {
       const previous = await transaction.shipmentProvider.findUniqueOrThrow({
         where: { code },
       });
@@ -205,7 +222,8 @@ export class ShippingService {
   }
 
   async getOrderShipment(orderId: string) {
-    return this.prisma.shipment.findUnique({
+    const db = await this.db();
+    return db.shipment.findUnique({
       where: { orderId },
       include: shipmentInclude,
     });
@@ -216,7 +234,8 @@ export class ShippingService {
     dto: CreateShipmentDto,
     actor: UserPayload,
   ) {
-    const order = await this.prisma.order.findUnique({
+    const db = await this.db();
+    const order = await db.order.findUnique({
       where: { id: orderId },
       include: {
         address: true,
@@ -259,7 +278,7 @@ export class ShippingService {
     if (reservedQuantity !== orderedQuantity) {
       throw new ConflictException('A complete active reservation is required');
     }
-    const provider = await this.prisma.shipmentProvider.findUnique({
+    const provider = await db.shipmentProvider.findUnique({
       where: { code: dto.provider },
     });
     if (!provider?.isActive) {
@@ -303,7 +322,7 @@ export class ShippingService {
       note: dto.note?.normalize('NFKC').trim(),
       providerData: dto.providerData,
     };
-    const shipment = await this.prisma.shipment.create({
+    const shipment = await db.shipment.create({
       data: {
         orderId,
         providerId: provider.id,
@@ -315,7 +334,7 @@ export class ShippingService {
     });
     try {
       const result = await adapter.createShipment(request);
-      const createdShipment = await this.prisma.$transaction(
+      const createdShipment = await db.$transaction(
         async (transaction) => {
           await transaction.shipmentEvent.create({
             data: {
@@ -381,7 +400,7 @@ export class ShippingService {
       });
       return createdShipment;
     } catch (error) {
-      await this.prisma.$transaction(async (transaction) => {
+      await db.$transaction(async (transaction) => {
         const failed = await transaction.shipment.update({
           where: { id: shipment.id },
           data: {
@@ -457,6 +476,7 @@ export class ShippingService {
     headers: Record<string, string | string[] | undefined>,
     body: Record<string, unknown>,
   ) {
+    const db = await this.db();
     const provider = rawProvider.trim().toUpperCase() as ShipmentProviderCode;
     if (!Object.values(ShipmentProviderCode).includes(provider)) {
       throw new NotFoundException('Courier provider not found');
@@ -465,7 +485,7 @@ export class ShippingService {
     const authValid = adapter.verifyWebhook(headers);
     if (!authValid) {
       const attemptedAt = new Date();
-      await this.prisma.shipmentWebhookLog.create({
+      await db.shipmentWebhookLog.create({
         data: {
           providerCode: provider,
           deduplicationKey: this.hash(
@@ -485,7 +505,8 @@ export class ShippingService {
   }
 
   async retryWebhookLog(callbackLogId: string) {
-    const log = await this.prisma.shipmentWebhookLog.findUnique({
+    const db = await this.db();
+    const log = await db.shipmentWebhookLog.findUnique({
       where: { id: callbackLogId },
     });
     if (!log) throw new NotFoundException('Courier callback not found');
@@ -507,6 +528,7 @@ export class ShippingService {
     headers?: Record<string, string | string[] | undefined>,
     source: 'WEBHOOK' | 'POLL' = 'WEBHOOK',
   ) {
+    const db = await this.db();
     const adapter = this.adapter(provider);
     const event = adapter.parseWebhook(body);
     const deduplicationKey = this.hash(
@@ -515,10 +537,10 @@ export class ShippingService {
         : `${provider}:${JSON.stringify(body)}`,
     );
     let log = retainedLogId
-      ? await this.prisma.shipmentWebhookLog.findUniqueOrThrow({
+      ? await db.shipmentWebhookLog.findUniqueOrThrow({
           where: { id: retainedLogId },
         })
-      : await this.prisma.shipmentWebhookLog.findUnique({
+      : await db.shipmentWebhookLog.findUnique({
           where: { deduplicationKey },
         });
     if (retainedLogId && log?.deduplicationKey !== deduplicationKey) {
@@ -526,7 +548,7 @@ export class ShippingService {
     }
     if (!log) {
       try {
-        log = await this.prisma.shipmentWebhookLog.create({
+        log = await db.shipmentWebhookLog.create({
           data: {
             providerCode: provider,
             source,
@@ -545,7 +567,7 @@ export class ShippingService {
         ) {
           throw error;
         }
-        log = await this.prisma.shipmentWebhookLog.findUniqueOrThrow({
+        log = await db.shipmentWebhookLog.findUniqueOrThrow({
           where: { deduplicationKey },
         });
       }
@@ -564,7 +586,7 @@ export class ShippingService {
     }
 
     const attemptStartedAt = new Date();
-    const claim = await this.prisma.shipmentWebhookLog.updateMany({
+    const claim = await db.shipmentWebhookLog.updateMany({
       where: {
         id: log.id,
         processed: false,
@@ -606,7 +628,7 @@ export class ShippingService {
           'Courier event has no shipment identifier',
         );
       }
-      const shipment = await this.prisma.shipment.findFirst({
+      const shipment = await db.shipment.findFirst({
         where: {
           provider: { code: provider },
           OR: shipmentMatchers,
@@ -635,7 +657,7 @@ export class ShippingService {
       const applicable =
         !outOfOrder &&
         canApplyShipmentStatus(shipment.status, event.normalizedStatus);
-      await this.prisma.$transaction(async (transaction) => {
+      await db.$transaction(async (transaction) => {
         await transaction.shipmentEvent.create({
           data: {
             shipmentId: shipment.id,
@@ -853,7 +875,7 @@ export class ShippingService {
           : {}),
       };
     } catch (error) {
-      await this.prisma.shipmentWebhookLog.update({
+      await db.shipmentWebhookLog.update({
         where: { id: log.id },
         data: {
           processingStartedAt: null,
@@ -868,8 +890,9 @@ export class ShippingService {
   }
 
   async getScorecard() {
-    const providers = await this.prisma.shipmentProvider.findMany();
-    const shipments = await this.prisma.shipment.findMany({
+    const db = await this.db();
+    const providers = await db.shipmentProvider.findMany();
+    const shipments = await db.shipment.findMany({
       select: {
         providerId: true,
         status: true,

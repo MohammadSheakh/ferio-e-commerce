@@ -287,7 +287,7 @@ export class PlatformBillingService {
       where: { reference, status: 'INITIATED' },
       data: { status: 'FAILED', raw: { failureReason: reason } as never },
     });
-    this.logger.warn('platform_payment_failed', new Error(reason), { reference });
+    this.logger.warn('platform_payment_failed', { reference });
   }
 
   /** Server-to-server validation against SSLCommerz (same API as commerce). */

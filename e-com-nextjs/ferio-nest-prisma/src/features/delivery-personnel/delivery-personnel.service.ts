@@ -3,10 +3,13 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { Prisma } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
 import { PrismaService } from '@app/database';
+import { TenantDbService } from '../../tenancy/tenant-db.service';
 import { AuditService } from '../audit/audit.service';
 import {
   ApplyDeliveryPersonnelDto,
@@ -36,24 +39,34 @@ export class DeliveryPersonnelService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
-  ) {}
+  
+    @Optional() private readonly tenantDb?: TenantDbService,) {}
 
+  /**
+   * MT-7: tenant client inside resolved storefront/worker contexts; explicit
+   * legacy fallback otherwise. Never guesses.
+   */
+  private async db(): Promise<PrismaClient> {
+    const tenant = await this.tenantDb?.tryGet();
+    return tenant ?? (this.prisma as PrismaClient);
+  }
   /**
    * Public Self-Registration for Bangladesh Candidates
    */
   async apply(dto: ApplyDeliveryPersonnelDto) {
+    const db = await this.db();
     const phoneNorm = normalizePhone(dto.phone);
     const emailNorm = dto.email ? dto.email.toLowerCase().trim() : null;
 
     const [existingPhone, existingEmail, conflictingUser] = await Promise.all([
-      this.prisma.deliveryPersonnel.findUnique({
+      db.deliveryPersonnel.findUnique({
         where: { phoneNormalized: phoneNorm },
       }),
       emailNorm
-        ? this.prisma.deliveryPersonnel.findUnique({ where: { email: emailNorm } })
+        ? db.deliveryPersonnel.findUnique({ where: { email: emailNorm } })
         : Promise.resolve(null),
       emailNorm
-        ? this.prisma.user.findUnique({ where: { email: emailNorm } })
+        ? db.user.findUnique({ where: { email: emailNorm } })
         : Promise.resolve(null),
     ]);
     if (existingPhone || existingEmail) {
@@ -69,7 +82,7 @@ export class DeliveryPersonnelService {
       );
     }
 
-    return this.prisma.deliveryPersonnel.create({
+    return db.deliveryPersonnel.create({
       data: {
         name: dto.name.trim(),
         phoneOriginal: dto.phone.trim(),
@@ -89,12 +102,13 @@ export class DeliveryPersonnelService {
    * Direct Creation by Admin
    */
   async createDirectByAdmin(dto: CreateDeliveryPersonnelDto) {
+    const db = await this.db();
     const phoneNorm = normalizePhone(dto.phone);
     const emailNorm = dto.email.toLowerCase().trim();
 
     // An existing platform account must never be silently converted into a
     // rider account (that would reset the victim's password and role).
-    const existingUser = await this.prisma.user.findUnique({
+    const existingUser = await db.user.findUnique({
       where: { email: emailNorm },
     });
     if (existingUser && existingUser.role !== 'delivery_man') {
@@ -112,7 +126,7 @@ export class DeliveryPersonnelService {
         );
       }
       const hashedPassword = await bcrypt.hash(dto.password, 12);
-      const newUser = await this.prisma.user.create({
+      const newUser = await db.user.create({
         data: {
           name: dto.name.trim(),
           email: emailNorm,
@@ -126,14 +140,14 @@ export class DeliveryPersonnelService {
     }
 
     // Check existing delivery personnel profile
-    const existingRider = await this.prisma.deliveryPersonnel.findFirst({
+    const existingRider = await db.deliveryPersonnel.findFirst({
       where: {
         OR: [{ phoneNormalized: phoneNorm }, { email: emailNorm }, { userId }],
       },
     });
 
     if (existingRider) {
-      return this.prisma.deliveryPersonnel.update({
+      return db.deliveryPersonnel.update({
         where: { id: existingRider.id },
         data: {
           name: dto.name.trim(),
@@ -151,7 +165,7 @@ export class DeliveryPersonnelService {
       });
     }
 
-    return this.prisma.deliveryPersonnel.create({
+    return db.deliveryPersonnel.create({
       data: {
         name: dto.name.trim(),
         phoneOriginal: dto.phone.trim(),
@@ -176,7 +190,8 @@ export class DeliveryPersonnelService {
    * would turn one admin click into an account-takeover primitive.
    */
   async updateApproval(id: string, dto: UpdateApprovalDto) {
-    const personnel = await this.prisma.deliveryPersonnel.findUnique({
+    const db = await this.db();
+    const personnel = await db.deliveryPersonnel.findUnique({
       where: { id },
     });
     if (!personnel) {
@@ -191,7 +206,7 @@ export class DeliveryPersonnelService {
           personnel.email ||
           `rider.${personnel.phoneNormalized.replace('+', '')}@ferio.local`;
 
-        const existingUser = await this.prisma.user.findUnique({
+        const existingUser = await db.user.findUnique({
           where: { email },
         });
         if (existingUser && existingUser.role !== 'delivery_man') {
@@ -206,7 +221,7 @@ export class DeliveryPersonnelService {
           );
         }
 
-        userId = await this.prisma.$transaction(async (tx) => {
+        userId = await db.$transaction(async (tx) => {
           let txUserId = existingUser?.id;
           if (txUserId) {
             // Existing rider-linked account (same role): reset credential so a
@@ -234,7 +249,7 @@ export class DeliveryPersonnelService {
         });
       }
 
-      return this.prisma.$transaction(async (tx) => {
+      return db.$transaction(async (tx) => {
         const updated = await tx.deliveryPersonnel.update({
           where: { id },
           data: {
@@ -260,7 +275,7 @@ export class DeliveryPersonnelService {
       });
     }
 
-    return this.prisma.deliveryPersonnel.update({
+    return db.deliveryPersonnel.update({
       where: { id },
       data: {
         status: dto.status as any,
@@ -273,7 +288,8 @@ export class DeliveryPersonnelService {
    * Admin: Full Update Rider Profile & Reset Password
    */
   async updateRiderByAdmin(id: string, dto: UpdateDeliveryPersonnelDto) {
-    const personnel = await this.prisma.deliveryPersonnel.findUnique({
+    const db = await this.db();
+    const personnel = await db.deliveryPersonnel.findUnique({
       where: { id },
       include: { user: true },
     });
@@ -309,7 +325,7 @@ export class DeliveryPersonnelService {
         `rider.${(updateData.phoneNormalized || personnel.phoneNormalized).replace('+', '')}@ferio.local`;
 
       if (userId) {
-        await this.prisma.user.update({
+        await db.user.update({
           where: { id: userId },
           data: {
             password: hashedPassword,
@@ -319,7 +335,7 @@ export class DeliveryPersonnelService {
           },
         });
       } else {
-        const newUser = await this.prisma.user.create({
+        const newUser = await db.user.create({
           data: {
             name: updateData.name || personnel.name,
             email: email,
@@ -333,7 +349,7 @@ export class DeliveryPersonnelService {
         updateData.userId = userId;
       }
     } else if (userId && (updateData.name || updateData.email || updateData.phoneNormalized)) {
-      await this.prisma.user.update({
+      await db.user.update({
         where: { id: userId },
         data: {
           name: updateData.name || personnel.name,
@@ -343,7 +359,7 @@ export class DeliveryPersonnelService {
       });
     }
 
-    return this.prisma.deliveryPersonnel.update({
+    return db.deliveryPersonnel.update({
       where: { id },
       data: updateData,
       include: { user: { select: { id: true, email: true, role: true } } },
@@ -354,6 +370,7 @@ export class DeliveryPersonnelService {
    * List Delivery Personnel for Admin
    */
   async listAll(query: QueryDeliveryPersonnelDto) {
+    const db = await this.db();
     const where: any = {};
 
     if (query.status) {
@@ -376,7 +393,7 @@ export class DeliveryPersonnelService {
     }
 
     const [items, total] = await Promise.all([
-      this.prisma.deliveryPersonnel.findMany({
+      db.deliveryPersonnel.findMany({
         where,
         orderBy: { createdAt: 'desc' },
         include: {
@@ -388,7 +405,7 @@ export class DeliveryPersonnelService {
           },
         },
       }),
-      this.prisma.deliveryPersonnel.count({ where }),
+      db.deliveryPersonnel.count({ where }),
     ]);
 
     return { items, total };
@@ -398,7 +415,8 @@ export class DeliveryPersonnelService {
    * Detail View for Admin
    */
   async findOne(id: string) {
-    const personnel = await this.prisma.deliveryPersonnel.findUnique({
+    const db = await this.db();
+    const personnel = await db.deliveryPersonnel.findUnique({
       where: { id },
       include: {
         user: { select: { id: true, email: true, role: true } },
@@ -428,7 +446,8 @@ export class DeliveryPersonnelService {
    * Admin Assign Order to Delivery Rider
    */
   async assignOrder(dto: AssignOrderDto) {
-    const personnel = await this.prisma.deliveryPersonnel.findUnique({
+    const db = await this.db();
+    const personnel = await db.deliveryPersonnel.findUnique({
       where: { id: dto.deliveryPersonnelId },
     });
     if (!personnel || personnel.status !== 'APPROVED') {
@@ -437,14 +456,14 @@ export class DeliveryPersonnelService {
       );
     }
 
-    const order = await this.prisma.order.findUnique({
+    const order = await db.order.findUnique({
       where: { id: dto.orderId },
     });
     if (!order) {
       throw new NotFoundException('Order not found.');
     }
 
-    return this.prisma.order.update({
+    return db.order.update({
       where: { id: dto.orderId },
       data: {
         assignedDeliveryPersonnelId: personnel.id,
@@ -457,17 +476,18 @@ export class DeliveryPersonnelService {
   }
 
   private async resolveDeliveryPersonnel(userId: string) {
+    const db = await this.db();
     if (!userId) {
       throw new BadRequestException('User ID is missing from authorization token.');
     }
-    let personnel = await this.prisma.deliveryPersonnel.findUnique({
+    let personnel = await db.deliveryPersonnel.findUnique({
       where: { userId },
     });
 
     if (!personnel) {
-      const user = await this.prisma.user.findUnique({ where: { id: userId } });
+      const user = await db.user.findUnique({ where: { id: userId } });
       if (user) {
-        const candidate = await this.prisma.deliveryPersonnel.findFirst({
+        const candidate = await db.deliveryPersonnel.findFirst({
           where: {
             OR: [
               { email: { equals: user.email, mode: 'insensitive' } },
@@ -480,7 +500,7 @@ export class DeliveryPersonnelService {
         if (candidate && candidate.status === 'APPROVED') {
           personnel = candidate;
           if (!personnel.userId) {
-            await this.prisma.deliveryPersonnel.update({
+            await db.deliveryPersonnel.update({
               where: { id: personnel.id },
               data: { userId: user.id },
             });
@@ -508,13 +528,14 @@ export class DeliveryPersonnelService {
    * Toggle Rider Online / Offline Duty Status
    */
   async toggleOnlineStatus(userId: string, isOnline: boolean) {
+    const db = await this.db();
     const personnel = await this.resolveDeliveryPersonnel(userId);
     // If turning online, update lastLocationAt timestamp
     const updateData: any = {};
     if (isOnline) {
       updateData.lastLocationAt = new Date();
     }
-    return this.prisma.deliveryPersonnel.update({
+    return db.deliveryPersonnel.update({
       where: { id: personnel.id },
       data: updateData,
     });
@@ -524,9 +545,10 @@ export class DeliveryPersonnelService {
    * Rider Gets Assigned Orders
    */
   async getMyAssignedOrders(userId: string) {
+    const db = await this.db();
     const personnel = await this.resolveDeliveryPersonnel(userId);
 
-    return this.prisma.order.findMany({
+    return db.order.findMany({
       where: { assignedDeliveryPersonnelId: personnel.id },
       orderBy: { createdAt: 'desc' },
       include: {
@@ -550,6 +572,7 @@ export class DeliveryPersonnelService {
     orderId: string,
     dto: UpdateDeliveryOrderStatusDto,
   ) {
+    const db = await this.db();
     const personnel = await this.resolveDeliveryPersonnel(userId);
 
     const shipmentStatusMap: Record<string, any> = {
@@ -575,7 +598,7 @@ export class DeliveryPersonnelService {
       }
     }
 
-    return this.prisma.$transaction(
+    return db.$transaction(
       async (tx) => {
         const order = await tx.order.findFirst({
           where: { id: orderId, assignedDeliveryPersonnelId: personnel.id },
@@ -731,15 +754,16 @@ export class DeliveryPersonnelService {
    * Rider Pings Location via Browser Geolocation API
    */
   async updateLocation(userId: string, dto: UpdateLocationDto) {
+    const db = await this.db();
     const personnel = await this.resolveDeliveryPersonnel(userId);
 
-    const count = await this.prisma.deliveryLocationHistory.count({
+    const count = await db.deliveryLocationHistory.count({
       where: { deliveryPersonnelId: personnel.id },
     });
 
     const nextSeq = count + 1;
 
-    await this.prisma.deliveryLocationHistory.create({
+    await db.deliveryLocationHistory.create({
       data: {
         deliveryPersonnelId: personnel.id,
         latitude: dto.latitude,
@@ -748,7 +772,7 @@ export class DeliveryPersonnelService {
       },
     });
 
-    return this.prisma.deliveryPersonnel.update({
+    return db.deliveryPersonnel.update({
       where: { id: personnel.id },
       data: {
         currentLat: dto.latitude,
@@ -762,14 +786,15 @@ export class DeliveryPersonnelService {
    * Admin Clears Location Waypoint History for a Rider
    */
   async clearLocationHistory(id: string) {
-    const personnel = await this.prisma.deliveryPersonnel.findUnique({
+    const db = await this.db();
+    const personnel = await db.deliveryPersonnel.findUnique({
       where: { id },
     });
     if (!personnel) {
       throw new NotFoundException('Delivery personnel record not found.');
     }
 
-    await this.prisma.deliveryLocationHistory.deleteMany({
+    await db.deliveryLocationHistory.deleteMany({
       where: { deliveryPersonnelId: id },
     });
 
@@ -780,8 +805,9 @@ export class DeliveryPersonnelService {
    * Admin Map View Data: All Riders with sequence pins & All active orders with lat/lng
    */
   async getDeliveryMapData() {
+    const db = await this.db();
     const [riders, activeOrders] = await Promise.all([
-      this.prisma.deliveryPersonnel.findMany({
+      db.deliveryPersonnel.findMany({
         where: { status: 'APPROVED' },
         select: {
           id: true,
@@ -798,7 +824,7 @@ export class DeliveryPersonnelService {
           },
         },
       }),
-      this.prisma.order.findMany({
+      db.order.findMany({
         orderBy: { createdAt: 'desc' },
         take: 200,
         select: {

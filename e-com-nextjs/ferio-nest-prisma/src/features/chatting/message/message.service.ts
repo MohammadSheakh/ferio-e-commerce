@@ -6,7 +6,7 @@ import { Queue } from 'bullmq';
 
 import type { PrismaClient } from '@prisma/client';
 import { PrismaService } from '@app/database';
-import { TenantDbService } from '../../tenancy/tenant-db.service';
+import { TenantDbService } from '../../../tenancy/tenant-db.service';
 import { SocketGateway } from '../../socket.gateway/socket.gateway';
 import {
   BULLMQ_CONVERSATION_LAST_MESSAGE_QUEUE,
