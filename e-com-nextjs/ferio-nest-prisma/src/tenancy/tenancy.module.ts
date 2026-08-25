@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
-import { RedisModule } from '@app/redis';
+import { RedisModule, RedisService } from '@app/redis';
+import { PlatformPrismaService } from '../platform/platform-prisma.service';
 import { TenancyController } from './tenancy.controller';
 import { TenancyPlanController } from './tenancy-plan.controller';
 import { TenantResolverService, TenantContextMiddleware } from './tenant-resolver.service';
@@ -25,7 +26,15 @@ import { UsageReconciliationService } from './usage-reconciliation.service';
   controllers: [TenancyController, TenancyPlanController],
   providers: [
     TenantResolverService,
-    TenantMembershipService,
+    {
+      provide: TenantMembershipService,
+      useFactory: async (platform: PlatformPrismaService, redis: RedisService) => {
+        const service = new TenantMembershipService(platform.client as never, redis);
+        await service.initCrossInstanceInvalidation();
+        return service;
+      },
+      inject: [PlatformPrismaService, RedisService],
+    },
     TenantMembershipGuard,
     TenantContextMiddleware,
     TenantDatabaseManager,
