@@ -447,13 +447,13 @@ Provisioning should behave as an idempotent state machine, not a controller scri
 
 ## 9.3 SaaS billing
 
-- [ ] Build platform billing adapter interface.
-- [ ] **BLOCKED:** Approve SaaS subscription payment provider(s).
-- [ ] Store platform payment attempts in control plane.
+- [x] Build platform billing adapter interface.
+- [x] Approve SaaS subscription payment provider(s). (PO-006: SSLCOMMERZ first, abstraction preserved)
+- [x] Store platform payment attempts in control plane.
 - [ ] Add invoices/receipts.
-- [ ] Add webhook verification/idempotency.
-- [ ] Add retry/recovery.
-- [ ] Add billing history.
+- [x] Add webhook verification/idempotency. (server-side val_id validation; single-transition INITIATED→SUCCEEDED/FAILED; duplicates absorbed)
+- [ ] **PARTIAL:** Add retry/recovery. (failed sessions recorded with reasons and can be re-initiated as fresh attempts; automated recovery sweep pending)
+- [x] Add billing history.
 - [ ] Add manual/admin adjustment workflow with audit if required.
 - [ ] Never write SaaS subscription payments into tenant `Payment`, `Wallet`, COD, refund, or settlement records.
 

@@ -19,6 +19,11 @@ import { MigrationOrchestratorService } from './services/migration-orchestrator.
 import { TenantMigrationProcessor } from './migration-orchestrator.processor';
 import { TenantClosureService } from './services/tenant-closure.service';
 import { PlanGateService } from './services/plan-gate.service';
+import { PlatformBillingService } from './services/platform-billing.service';
+import {
+  PlatformBillingCallbackController,
+  PlatformBillingController,
+} from './platform-billing.controller';
 
 /**
  * Ferio control plane (MT-1). Owns SaaS metadata exclusively and is fully
@@ -42,7 +47,7 @@ import { PlanGateService } from './services/plan-gate.service';
       },
     ),
   ],
-  controllers: [PlatformAdminController],
+  controllers: [PlatformAdminController, PlatformBillingController, PlatformBillingCallbackController],
   // Tenant migration queue processor registered below with providers.
   providers: [
     PlatformPrismaService,
@@ -50,6 +55,7 @@ import { PlanGateService } from './services/plan-gate.service';
     MigrationOrchestratorService,
     TenantClosureService,
     PlanGateService,
+    PlatformBillingService,
     {
       provide: 'ORG_MEMBERS_COUNTER',
       useFactory: (platform: PlatformPrismaService) => ({
@@ -90,6 +96,7 @@ import { PlanGateService } from './services/plan-gate.service';
     ProvisioningService,
     TenantClosureService,
     PlanGateService,
+    PlatformBillingService,
     {
       provide: 'ORG_MEMBERS_COUNTER',
       useFactory: (platform: PlatformPrismaService) => ({
