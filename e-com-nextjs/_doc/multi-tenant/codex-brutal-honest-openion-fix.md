@@ -461,3 +461,37 @@ the legacy Prisma client, and event-level authorization needs a final sweep.
 can produce a message visible in realtime but absent after reload. Durable chat
 delivery needs persistence-first acknowledgement or an outbox, and the fixed
 guest system identity should be provisioned explicitly to avoid email conflicts.
+
+## 2026-08-26: Tenant-Isolated Live Visitor Statistics
+
+**Finding:** C-4 (visitor-data authorization slice)
+
+**Status:** Fixed for authorization and cross-tenant exposure.
+
+**Changes:**
+
+- Active page-view records now carry the organization authenticated from the
+  socket ticket.
+- Live-stat payloads filter records by organization before counting or exposing
+  visitor details.
+- `request-live-page-stats` now requires a database-verified administrator role;
+  guest/customer sockets receive no visitor payload.
+- Tenant-bound visitor broadcasts target only that organization's admin rooms
+  and no longer include the raw global admin room.
+- Dashboard navigation removes a previously recorded storefront page view so
+  counts do not remain stale within the process.
+- Added tests proving tenant filtering, non-admin denial, and scoped-only admin
+  broadcast behavior.
+
+**Verification:**
+
+- Gateway, socket room/authentication, and Redis collision tests: 31/31 passed
+  across 4 suites.
+- Backend production build passed.
+- `git diff --check` passed before commit.
+
+**Commit:** `fix(realtime): authorize tenant visitor stats`
+
+**Residual risk:** active page views remain process-local, so each backend
+replica reports only its own sockets. Move this state to organization-scoped
+Redis records with heartbeat-based expiry before relying on it operationally.

@@ -50,7 +50,15 @@ export class SocketGateway
   private readonly logger = new Logger(SocketGateway.name);
   private activePageViews = new Map<
     string,
-    { socketId: string; page: string; role: string; userId: string; name?: string; updatedAt: number }
+    {
+      socketId: string;
+      page: string;
+      role: string;
+      userId: string;
+      name?: string;
+      organizationId?: string;
+      updatedAt: number;
+    }
   >();
 
   constructor(
@@ -157,9 +165,10 @@ export class SocketGateway
           role: user.role || 'guest',
           userId: user.userId || client.id,
           name: user.name || 'Guest Visitor',
+          organizationId: user.organizationId,
           updatedAt: Date.now(),
         });
-        this.broadcastLivePageStats();
+        this.broadcastLivePageStats(user.organizationId);
       }
 
       // Emit connection success
@@ -187,7 +196,7 @@ export class SocketGateway
 
     if (this.activePageViews.has(client.id)) {
       this.activePageViews.delete(client.id);
-      this.broadcastLivePageStats();
+      this.broadcastLivePageStats(client.data.user?.organizationId);
     }
 
     if (userId) {
@@ -226,15 +235,18 @@ export class SocketGateway
         socketId: client.id,
         page,
         role: user?.role || 'guest',
-        userId: client.data.userId || client.id,
-        name: user?.name || 'Guest Visitor',
-        updatedAt: Date.now(),
-      });
-      this.broadcastLivePageStats();
+          userId: client.data.userId || client.id,
+          name: user?.name || 'Guest Visitor',
+          organizationId: user?.organizationId,
+          updatedAt: Date.now(),
+        });
+      this.broadcastLivePageStats(user?.organizationId);
+    } else if (this.activePageViews.delete(client.id)) {
+      this.broadcastLivePageStats(user?.organizationId);
     }
   }
 
-  public getLivePageStatsPayload() {
+  public getLivePageStatsPayload(organizationId?: string) {
     const pageCounts: Record<string, number> = {
       '/': 0,
       '/cart': 0,
@@ -248,6 +260,7 @@ export class SocketGateway
     const activeVisitors: Array<{ page: string; role: string; name: string; userId: string }> = [];
 
     for (const [socketId, info] of this.activePageViews.entries()) {
+      if (info.organizationId !== organizationId) continue;
       totalActive++;
       let rawPage = info.page.split('?')[0];
       if (!rawPage || rawPage === '') rawPage = '/';
@@ -292,25 +305,32 @@ export class SocketGateway
    */
   @SubscribeMessage('request-live-page-stats')
   handleRequestLivePageStats(@ConnectedSocket() client: Socket) {
-    const payload = this.getLivePageStatsPayload();
+    const user = client.data.user;
+    if (!user || !this.socketAuthService.isAdmin(user.role)) {
+      return { success: false, message: 'Administrator access required' };
+    }
+    const payload = this.getLivePageStatsPayload(user.organizationId);
     client.emit('live-page-visitors-stats', payload);
-    this.broadcastLivePageStats();
     return { success: true };
   }
 
   /**
    * Broadcast Live Active Page Visitor Metrics to Admin Room
    */
-  public broadcastLivePageStats() {
-    const payload = this.getLivePageStatsPayload();
-    // Tenant-scoped admins receive org-prefixed rooms when the originating
-    // request carries a tenant binding; legacy listeners keep old rooms.
-    const orgId = tryGetTenantContext()?.organizationId;
+  public broadcastLivePageStats(organizationId?: string) {
+    const payload = this.getLivePageStatsPayload(organizationId);
+    if (organizationId) {
+      this.server
+        .to(scopedSocketRoom({ organizationId }, 'role::admin'))
+        .to(scopedSocketRoom({ organizationId }, 'role::super-admin'))
+        .to(scopedSocketRoom({ organizationId }, 'admin-room'))
+        .emit('live-page-visitors-stats', payload);
+      return;
+    }
     this.server
-      .to(scopedSocketRoom({ organizationId: orgId }, 'role::admin'))
-      .to(scopedSocketRoom({ organizationId: orgId }, 'role::super-admin'))
-      .to(scopedSocketRoom({ organizationId: orgId }, 'admin-room'))
       .to('role::admin')
+      .to('role::super-admin')
+      .to('admin-room')
       .emit('live-page-visitors-stats', payload);
   }
 
