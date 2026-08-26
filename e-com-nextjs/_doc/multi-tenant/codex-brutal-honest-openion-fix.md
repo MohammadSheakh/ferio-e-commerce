@@ -231,3 +231,31 @@ sessions must sign in again because legacy tokens have no organization claim.
 
 **Residual risk:** customer/rider legacy records require an explicit migration
 or reprovisioning plan before strict tenancy is enabled on existing data.
+
+## 2026-08-26: Realtime Container Port And URL Wiring
+
+**Finding:** C-4 (deployment slice)
+
+**Status:** Fixed in Docker/Compose configuration.
+
+**Changes:**
+
+- Backend image now exposes REST port 6733 and Socket.IO port 6734.
+- Compose publishes port 6734 and configures `SOCKET_PORT` explicitly.
+- Browser-facing API/socket URLs are configurable public URLs rather than the
+  Docker-only `backend` hostname.
+- Customer and admin server-side BFF calls retain the internal backend URL.
+- Fixed the admin container's previously missing internal `FERIO_API_URL`.
+
+**Verification:**
+
+- Compose file passed YAML parsing.
+- `git diff --check` passed before commit.
+- Docker Compose runtime validation could not run because the host's Snap
+  confinement service rejects the Docker CLI before execution.
+
+**Commit:** `fix(realtime): publish socket gateway in container stack`
+
+**Residual risk:** ingress must route the public socket URL to port 6734, and a
+live Docker smoke test is still required. Tenant-safe socket authentication,
+rooms, Redis keys, and persistence remain open under C-4.
