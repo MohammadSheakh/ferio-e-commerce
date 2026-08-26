@@ -2,6 +2,7 @@ import { Injectable, type OnModuleDestroy } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { StructuredLogger, TenantMetrics } from '@app/common';
 import { decryptSecret } from '../platform/utils/secret-box';
 
@@ -9,6 +10,9 @@ interface CacheEntry {
   client: PrismaClient;
   pool: Pool;
   lastUsedAt: number;
+  externalAccesses: number;
+  transientLeases: number;
+  releaseWhenUnused: boolean;
 }
 
 interface BreakerState {
@@ -34,6 +38,7 @@ export class TenantDatabaseManager implements OnModuleDestroy {
   private readonly cache = new Map<string, CacheEntry>();
   private readonly creations = new Map<string, Promise<PrismaClient>>();
   private readonly breakers = new Map<string, BreakerState>();
+  private readonly transientLease = new AsyncLocalStorage<string>();
   private readonly maxClients: number;
   private readonly idleTtlMs: number;
   private readonly evictionGraceMs: number;
@@ -70,15 +75,17 @@ export class TenantDatabaseManager implements OnModuleDestroy {
 
     const existing = this.cache.get(material.id);
     if (existing) {
-      existing.lastUsedAt = Date.now();
-      // Refresh LRU recency.
-      this.cache.delete(material.id);
-      this.cache.set(material.id, existing);
+      this.touch(material.id, existing);
       return existing.client;
     }
 
     const pending = this.creations.get(material.id);
-    if (pending) return pending;
+    if (pending) {
+      const client = await pending;
+      const entry = this.cache.get(material.id);
+      if (entry) this.touch(material.id, entry);
+      return client;
+    }
 
     const creation = Promise.resolve().then(() => this.createClient(material));
     this.creations.set(material.id, creation);
@@ -120,7 +127,14 @@ export class TenantDatabaseManager implements OnModuleDestroy {
       });
       const client = new PrismaClient({ adapter: new PrismaPg(pool) });
       await client.$connect();
-      const entry = { client, pool, lastUsedAt: Date.now() };
+      const entry = {
+        client,
+        pool,
+        lastUsedAt: Date.now(),
+        externalAccesses: this.inTransientLease(material.id) ? 0 : 1,
+        transientLeases: 0,
+        releaseWhenUnused: false,
+      };
       this.reservedSlots -= 1;
       this.cache.set(material.id, entry);
       this.recordSuccess(material.id);
@@ -140,6 +154,48 @@ export class TenantDatabaseManager implements OnModuleDestroy {
     this.cache.delete(tenantDatabaseId);
     await entry.client.$disconnect().catch(() => undefined);
     await entry.pool.end().catch(() => undefined);
+  }
+
+  /**
+   * Run fleet work with a cold pool that can be released immediately. A pool
+   * already serving requests is never disconnected, and a cold fleet pool is
+   * retained if any external request acquires it while the callback runs.
+   */
+  async runTransient<T>(
+    material: {
+      id: string;
+      host: string;
+      port: number;
+      databaseName: string;
+      username: string;
+      credentialCipher: string;
+    },
+    operation: () => Promise<T>,
+  ): Promise<T> {
+    const ownsColdClient =
+      !this.cache.has(material.id) && !this.creations.has(material.id);
+    return this.transientLease.run(material.id, async () => {
+      await this.getClient(material);
+      const leasedEntry = this.cache.get(material.id);
+      if (!leasedEntry) throw new Error('TENANT_DATABASE_LEASE_UNAVAILABLE');
+      leasedEntry.transientLeases += 1;
+      try {
+        return await operation();
+      } finally {
+        const entry = this.cache.get(material.id);
+        if (entry) {
+          entry.transientLeases = Math.max(entry.transientLeases - 1, 0);
+          if (ownsColdClient) entry.releaseWhenUnused = true;
+          if (
+            entry.releaseWhenUnused &&
+            entry.transientLeases === 0 &&
+            entry.externalAccesses === 0
+          ) {
+            await this.disconnect(material.id);
+          }
+        }
+      }
+    });
   }
 
   metrics() {
@@ -165,7 +221,8 @@ export class TenantDatabaseManager implements OnModuleDestroy {
         const oldest = this.cache.get(oldestKey);
         if (
           oldest &&
-          Date.now() - oldest.lastUsedAt < this.evictionGraceMs
+          (oldest.transientLeases > 0 ||
+            Date.now() - oldest.lastUsedAt < this.evictionGraceMs)
         ) {
           throw new Error('TENANT_DATABASE_CAPACITY_EXHAUSTED');
         }
@@ -181,10 +238,23 @@ export class TenantDatabaseManager implements OnModuleDestroy {
   private async evictIdle(): Promise<void> {
     const cutoff = Date.now() - this.idleTtlMs;
     for (const [id, entry] of this.cache) {
-      if (entry.lastUsedAt < cutoff) {
+      if (entry.transientLeases === 0 && entry.lastUsedAt < cutoff) {
         await this.disconnect(id);
       }
     }
+  }
+
+  private inTransientLease(tenantDatabaseId: string): boolean {
+    return this.transientLease.getStore() === tenantDatabaseId;
+  }
+
+  private touch(tenantDatabaseId: string, entry: CacheEntry): void {
+    if (this.inTransientLease(tenantDatabaseId)) return;
+    entry.lastUsedAt = Date.now();
+    entry.externalAccesses += 1;
+    // Refresh LRU recency only for independent request/worker acquisitions.
+    this.cache.delete(tenantDatabaseId);
+    this.cache.set(tenantDatabaseId, entry);
   }
 
   private assertBreakerClosed(id: string): void {

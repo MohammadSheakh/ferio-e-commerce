@@ -320,3 +320,37 @@ page statistics still require organization-scoped execution/state.
 **Residual risk:** total connection budgets still multiply by backend replica
 count and must be enforced in deployment capacity planning. Queries exceeding
 the configured idle/grace window need database statement timeouts and tracing.
+
+## 2026-08-26: Bounded Tenant Fleet Fan-Out
+
+**Finding:** H-5 (execution and connection-pressure slice)
+
+**Status:** Partially fixed.
+
+**Changes:**
+
+- READY tenant registry enumeration now uses stable cursor pagination instead
+  of loading the full fleet into process memory.
+- Fleet work uses configurable bounded concurrency (`TENANT_FANOUT_CONCURRENCY`,
+  default 4, hard cap 16) instead of serializing every tenant behind one slow
+  database.
+- Added transient tenant-client leases. Cold pools opened only for fleet work
+  are released after the final overlapping operation, preventing large fleets
+  from filling the request-serving client cache.
+- A pool already used by an external request is retained, and transient leases
+  are protected from capacity and idle eviction.
+- Added pagination, concurrency, cold-release, shared-request, and overlapping
+  lease regression coverage.
+
+**Verification:**
+
+- Tenant database manager and fan-out tests: 14/14 passed across 2 suites.
+- Backend production build passed.
+- `git diff --check` passed before commit.
+
+**Commit:** `fix(tenancy): bound tenant fleet fanout`
+
+**Residual risk:** fleet sweeps still execute all tenants within one parent job.
+Durable per-tenant/partition jobs, a distributed non-overlap lease, due-work
+indexes, and per-tenant lag metrics remain required before thousand-tenant
+operation.

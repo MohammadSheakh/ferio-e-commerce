@@ -97,6 +97,65 @@ describe('TenantDatabaseManager (ADR-0003)', () => {
     expect(manager.metrics()).toMatchObject({ activeClients: 0, pendingClients: 0 });
   });
 
+  it('releases a cold transient fleet client after its operation', async () => {
+    const manager = newManager();
+
+    await manager.runTransient(material('tdb-fleet'), async () => {
+      const leased = await manager.getClient(material('tdb-fleet'));
+      expect(leased).toBeDefined();
+      expect(manager.metrics().activeClients).toBe(1);
+    });
+
+    expect(manager.metrics().activeClients).toBe(0);
+    await manager.onModuleDestroy();
+  });
+
+  it('retains a transient client acquired by an external request', async () => {
+    const manager = newManager();
+    let releaseOperation!: () => void;
+    const operationGate = new Promise<void>((resolve) => {
+      releaseOperation = resolve;
+    });
+    const transient = manager.runTransient(material('tdb-shared'), () => operationGate);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    await manager.getClient(material('tdb-shared'));
+    releaseOperation();
+    await transient;
+
+    expect(manager.metrics().activeClients).toBe(1);
+    await manager.onModuleDestroy();
+  });
+
+  it('releases a cold client after overlapping transient leases finish', async () => {
+    const manager = newManager();
+    let releaseFirst!: () => void;
+    let releaseSecond!: () => void;
+    const firstGate = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    const secondGate = new Promise<void>((resolve) => {
+      releaseSecond = resolve;
+    });
+
+    const first = manager.runTransient(material('tdb-overlap'), () => firstGate);
+    await Promise.resolve();
+    await Promise.resolve();
+    const second = manager.runTransient(material('tdb-overlap'), () => secondGate);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    releaseFirst();
+    await first;
+    expect(manager.metrics().activeClients).toBe(1);
+    releaseSecond();
+    await second;
+    expect(manager.metrics().activeClients).toBe(0);
+
+    await manager.onModuleDestroy();
+  });
+
   it('evicts the least-recently-used client when capacity is reached', async () => {
     const manager = newManager();
 

@@ -44,45 +44,48 @@ export class TenantFanoutService {
       return { processed: 1, results: [], failures: [] };
     }
 
-    const registries = await this.platform.client.tenantDatabase.findMany({
-      where: {
-        status: 'READY',
-        organization: { status: 'ACTIVE' },
-      },
-      select: {
-        id: true,
-        organizationId: true,
-        host: true,
-        port: true,
-        databaseName: true,
-        username: true,
-        credentialCipher: true,
-      },
-      orderBy: { id: 'asc' },
-    });
-
     const outcome: FanoutOutcome<void> = { processed: 0, results: [], failures: [] };
 
-    // Sequential by design: bounded connection pressure and fair scheduling;
-    // per-tenant parallelism is an optimization only if measured need arises.
-    for (const registry of registries) {
-      try {
-        await this.manager.getClient(registry);
-        await runWithTenantContext(this.contextFor(registry), fn);
-        outcome.processed += 1;
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        outcome.failures.push({ organizationId: registry.organizationId, error: message });
-        TenantMetrics.increment('queue_tenant_failure', {
-          label: options.label ?? 'unlabeled',
-          organizationId: registry.organizationId,
-        });
-        this.logger.error('tenant_fanout_failure', error instanceof Error ? error : new Error(message), {
-          label: options.label,
-          organizationId: registry.organizationId,
-        });
-      }
-    }
+    let cursor: string | undefined;
+    do {
+      const registries = await this.readyTenantPage(cursor);
+      if (registries.length === 0) break;
+
+      // Bounded workers prevent one slow tenant from serializing the fleet
+      // without opening a pool for every tenant at once.
+      let nextIndex = 0;
+      const worker = async () => {
+        while (nextIndex < registries.length) {
+          const registry = registries[nextIndex];
+          nextIndex += 1;
+          try {
+            await this.manager.runTransient(registry, () =>
+              runWithTenantContext(this.contextFor(registry), fn),
+            );
+            outcome.processed += 1;
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            outcome.failures.push({ organizationId: registry.organizationId, error: message });
+            TenantMetrics.increment('queue_tenant_failure', {
+              label: options.label ?? 'unlabeled',
+              organizationId: registry.organizationId,
+            });
+            this.logger.error('tenant_fanout_failure', error instanceof Error ? error : new Error(message), {
+              label: options.label,
+              organizationId: registry.organizationId,
+            });
+          }
+        }
+      };
+      await Promise.all(
+        Array.from(
+          { length: Math.min(this.concurrency(), registries.length) },
+          () => worker(),
+        ),
+      );
+      cursor = registries.at(-1)?.id;
+      if (registries.length < this.pageSize()) break;
+    } while (cursor);
     return outcome;
   }
 
@@ -125,5 +128,40 @@ export class TenantFanoutService {
       hostname: 'background-worker',
       subscriptionStatus: 'ACTIVE' as const,
     });
+  }
+
+  private readyTenantPage(cursor?: string) {
+    return this.platform.client.tenantDatabase.findMany({
+      where: {
+        status: 'READY',
+        organization: { status: 'ACTIVE' },
+      },
+      select: {
+        id: true,
+        organizationId: true,
+        host: true,
+        port: true,
+        databaseName: true,
+        username: true,
+        credentialCipher: true,
+      },
+      orderBy: { id: 'asc' },
+      take: this.pageSize(),
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+    });
+  }
+
+  private pageSize(): number {
+    const configured = Number(process.env.TENANT_FANOUT_PAGE_SIZE ?? 100);
+    return Number.isSafeInteger(configured) && configured > 0
+      ? Math.min(configured, 500)
+      : 100;
+  }
+
+  private concurrency(): number {
+    const configured = Number(process.env.TENANT_FANOUT_CONCURRENCY ?? 4);
+    return Number.isSafeInteger(configured) && configured > 0
+      ? Math.min(configured, 16)
+      : 4;
   }
 }
