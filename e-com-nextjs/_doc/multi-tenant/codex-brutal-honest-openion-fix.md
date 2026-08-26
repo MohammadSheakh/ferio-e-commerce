@@ -573,3 +573,41 @@ The deployment smoke-test gate should send a spoofed direct request and assert
 evidence and are intentionally excluded from zero-result reporting. H-7 still
 tracks the unbounded order read and Node-side dashboard aggregation; this fix
 corrects truthfulness, not analytics workload scalability.
+
+## 2026-08-26: Bounded Tenant Retention Deletes
+
+**Finding:** H-9 (deletion-safety slice)
+
+**Status:** Partially fixed.
+
+**Changes:**
+
+- Retention rules now select deterministic oldest-first primary-key batches
+  instead of issuing one unbounded cutoff delete.
+- Every delete is limited to the selected IDs and rechecks the cutoff, avoiding
+  accidental deletion when a concurrent update changes record eligibility.
+- Added a configurable batch size (default 500, hard cap 5,000) and per-rule
+  run budget (default 10,000, hard cap 100,000).
+- Reports now include deleted rows, transaction batches, elapsed time, and a
+  backlog flag based on an explicit post-budget existence probe.
+- Confirmed deferred backlog emits a structured warning for operational alerting.
+- Fleet sweeps use transient tenant-client leases so retention work does not
+  fill or churn the request-serving tenant connection cache.
+- Documented the batch and run-budget controls in the backend environment
+  example.
+
+**Verification:**
+
+- Retention service tests: 4/4 passed, including bounded multi-batch deletion,
+  exact completion, disabled rules, and tenant-failure isolation.
+- Backend production build passed.
+- `git diff --check` passed before commit.
+
+**Commit:** `fix(retention): batch tenant data pruning`
+
+**Residual risk:** H-9 remains open for an owner-approved legal and operational
+retention matrix covering callback/webhook logs, delivery attempts,
+notifications, inventory history, carts, and other growth tables. WAL volume,
+autovacuum health, replica lag, and low-traffic scheduling also require
+deployment-level dashboards and runbooks; application batching alone cannot
+prove those controls.

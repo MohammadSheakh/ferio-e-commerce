@@ -1,10 +1,16 @@
 import { RetentionSweepService } from './retention-sweep.service';
 
+interface SelectionArgs {
+  where: { createdAt: { lt: Date } };
+  take: number;
+}
+
 function harness(options: {
   registries: Array<{ organizationId: string; status: string }>;
   counts?: Record<string, number>;
 }) {
   const deleteCalls: Array<{ model: string; where: unknown }> = [];
+  const selectionCalls: Array<{ model: string; args: SelectionArgs }> = [];
   const platform = {
     client: {
       tenantDatabase: {
@@ -22,37 +28,43 @@ function harness(options: {
       organizationMember: { count: jest.fn() },
     },
   };
-  const makeClient = () => ({
-    commerceMessage: {
-      deleteMany: jest.fn().mockImplementation((args) => {
-        deleteCalls.push({ model: 'commerceMessage', where: args });
-        return Promise.resolve({ count: options.counts?.commerceMessage ?? 0 });
-      }),
-    },
-    storefrontAnalyticsEvent: {
-      deleteMany: jest.fn().mockImplementation((args) => {
-        deleteCalls.push({ model: 'storefrontAnalyticsEvent', where: args });
-        return Promise.resolve({ count: options.counts?.storefrontAnalyticsEvent ?? 0 });
-      }),
-    },
-    deliveryLocationHistory: {
-      deleteMany: jest.fn().mockImplementation((args) => {
-        deleteCalls.push({ model: 'deliveryLocationHistory', where: args });
-        return Promise.resolve({ count: options.counts?.deliveryLocationHistory ?? 0 });
-      }),
-    },
-    auditLog: {
-      deleteMany: jest.fn().mockImplementation((args) => {
-        deleteCalls.push({ model: 'auditLog', where: args });
-        return Promise.resolve({ count: options.counts?.auditLog ?? 0 });
-      }),
-    },
-  });
+  const makeClient = () => {
+    const delegate = (model: string) => {
+      let remaining = options.counts?.[model] ?? 0;
+      return {
+        findMany: jest.fn().mockImplementation((args: SelectionArgs) => {
+          selectionCalls.push({ model, args });
+          const count = Math.min(remaining, args.take);
+          return Promise.resolve(
+            Array.from({ length: count }, (_, index) => ({
+              id: `${model}-${remaining - index}`,
+            })),
+          );
+        }),
+        deleteMany: jest.fn().mockImplementation((args) => {
+          deleteCalls.push({ model, where: args });
+          const count = Math.min(args.where.id.in.length, remaining);
+          remaining -= count;
+          return Promise.resolve({ count });
+        }),
+      };
+    };
+    return {
+      commerceMessage: delegate('commerceMessage'),
+      storefrontAnalyticsEvent: delegate('storefrontAnalyticsEvent'),
+      deliveryLocationHistory: delegate('deliveryLocationHistory'),
+      auditLog: delegate('auditLog'),
+    };
+  };
   const clients = new Map<string, ReturnType<typeof makeClient>>();
   const manager = {
     getClient: jest.fn().mockImplementation((material: { id: string }) => {
       if (!clients.has(material.id)) clients.set(material.id, makeClient());
       return Promise.resolve(clients.get(material.id));
+    }),
+    runTransient: jest.fn().mockImplementation(async (material, operation) => {
+      await manager.getClient(material);
+      return operation();
     }),
   };
   const service = new RetentionSweepService(platform as never, manager as never);
@@ -63,6 +75,7 @@ function harness(options: {
       return clients.get(`tdb-${id.slice(-10)}`)!;
     },
     deleteCalls,
+    selectionCalls,
   };
 }
 
@@ -72,9 +85,11 @@ describe('RetentionSweepService (brutal-audit #7 — unbounded growth)', () => {
     process.env.RETENTION_STOREFRONT_ANALYTICS_DAYS = '365';
     process.env.RETENTION_GPS_DAYS = '90';
     process.env.RETENTION_AUDIT_LOG_DAYS = '0'; // explicit OFF in this test
+    process.env.RETENTION_DELETE_BATCH_SIZE = '500';
+    process.env.RETENTION_MAX_ROWS_PER_RULE = '10000';
   });
 
-  it('prunes enabled models at their cutoffs and leaves AuditLog OFF by default', async () => {
+  it('prunes enabled models and honors explicitly disabled AuditLog retention', async () => {
     const h = harness({
       registries: [{ organizationId: 'org-a', status: 'READY' }],
       counts: { commerceMessage: 12, storefrontAnalyticsEvent: 40, deliveryLocationHistory: 7 },
@@ -90,10 +105,31 @@ describe('RetentionSweepService (brutal-audit #7 — unbounded growth)', () => {
       h.deleteCalls.some((call) => call.model === 'auditLog'),
     ).toBe(false);
     // Cutoffs are strictly older-than.
-    for (const call of h.deleteCalls) {
-      const where = (call.where as { where: { createdAt: { lt: Date } } }).where;
+    for (const call of h.selectionCalls) {
+      const where = call.args.where;
       expect(where.createdAt.lt.getTime()).toBeLessThan(Date.now());
     }
+  });
+
+  it('deletes in bounded batches and stops at the per-rule row budget', async () => {
+    process.env.RETENTION_DELETE_BATCH_SIZE = '2';
+    process.env.RETENTION_MAX_ROWS_PER_RULE = '5';
+    const h = harness({
+      registries: [{ organizationId: 'org-a', status: 'READY' }],
+      counts: { commerceMessage: 9 },
+    });
+
+    const report = await h.service.sweepTenant('org-a');
+    const messages = report.results.find((result) => result.model === 'CommerceMessage')!;
+
+    expect(messages).toMatchObject({
+      deleted: 5,
+      batches: 3,
+      truncated: true,
+    });
+    expect(
+      h.deleteCalls.filter(({ model }) => model === 'commerceMessage'),
+    ).toHaveLength(3);
   });
 
   it('isolates a failing tenant without blocking the fleet sweep', async () => {
@@ -118,11 +154,22 @@ describe('RetentionSweepService (brutal-audit #7 — unbounded growth)', () => {
       },
     };
     const manager = {
-      getClient: jest.fn().mockResolvedValue({
-        commerceMessage: { deleteMany: jest.fn().mockResolvedValue({ count: 3 }) },
-        storefrontAnalyticsEvent: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
-        deliveryLocationHistory: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
-        auditLog: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
+      getClient: jest.fn().mockResolvedValue(
+        Object.fromEntries(
+          ['commerceMessage', 'storefrontAnalyticsEvent', 'deliveryLocationHistory', 'auditLog'].map(
+            (model) => [
+              model,
+              {
+                findMany: jest.fn().mockResolvedValue([]),
+                deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+              },
+            ],
+          ),
+        ),
+      ),
+      runTransient: jest.fn().mockImplementation(async (material, operation) => {
+        await manager.getClient(material);
+        return operation();
       }),
     };
     const service = new RetentionSweepService(platform as never, manager as never);
