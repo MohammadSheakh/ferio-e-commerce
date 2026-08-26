@@ -675,3 +675,38 @@ to the cohort size because relation-rich order pages are still scanned. Move
 aggregate families to SQL or daily facts with parity tests, enforce statement
 timeouts, and replace synchronous in-memory CSV output with an asynchronous
 streamed export before broad historical reporting at production scale.
+
+## 2026-08-26: Tenant-Owned Payment Return Origins
+
+**Finding:** H-6 (payment-return routing slice)
+
+**Status:** Partially fixed.
+
+**Changes:**
+
+- Strict-tenancy browser callbacks now resolve their return origin from the
+  control-plane domains owned by the HMAC-verified callback organization.
+- Only `ACTIVE` domains are eligible; the primary domain is preferred with a
+  deterministic oldest-active fallback.
+- Tenant return URLs are forced to clean HTTPS origins and fail closed on
+  missing or malformed control-plane domain data.
+- Payment state is processed before return-domain resolution, so a domain
+  configuration incident cannot suppress callback validation.
+- Provider IPNs remain redirect-free and perform no return-domain lookup.
+- Legacy mode validates `CUSTOMER_WEB_URL` as an HTTP(S) origin and strips any
+  configured path, credentials, query, or fragment before redirect assembly.
+
+**Verification:**
+
+- Payment controller/service and tenant-origin tests: 16/16 passed across 3
+  suites, including signed tenant redirect and IPN behavior.
+- Backend production build passed.
+- `git diff --check` passed before commit.
+
+**Commit:** `fix(payments): return buyers to tenant domains`
+
+**Residual risk:** H-6 remains open for encrypted per-tenant payment and courier
+provider credentials, provider-account ownership, callback reconciliation per
+merchant account, and credential rotation/audit workflows. This fix prevents
+cross-storefront return routing but does not provide independent merchant
+settlement accounts.
