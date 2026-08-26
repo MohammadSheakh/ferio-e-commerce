@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '@app/database';
+import { TenancyModule } from '../../tenancy/tenancy.module';
 import { AuthModule } from '../authentication/auth.module';
 import { CartModule } from '../cart/cart.module';
 import {
@@ -14,7 +15,7 @@ import { CustomerNotificationsModule } from '../customer-notifications/customer-
 import { WalletModule } from '../wallet/wallet.module';
 
 @Module({
-  imports: [
+  imports: [ TenancyModule,
     PrismaModule,
     AuthModule,
     CartModule,

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { withCorrelationId } from "@/lib/correlation";
+import { hostForwardHeadersFromRequest } from "@/lib/host-forward";
 
 export type BackendErrorPayload = {
   success?: boolean;
@@ -13,7 +14,10 @@ export function forwardedHeaders(
   headers?: HeadersInit,
 ): Headers {
   return withCorrelationId(
-    headers,
+    {
+      ...hostForwardHeadersFromRequest(request),
+      ...Object.fromEntries(new Headers(headers).entries()),
+    },
     request.headers.get("x-correlation-id") ??
       request.headers.get("x-request-id") ??
       undefined,

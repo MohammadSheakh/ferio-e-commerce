@@ -31,8 +31,14 @@ export class TransactionalMessageProcessor extends WorkerHost {
       }
       const organizationId = (job.data as { organizationId?: string }).organizationId;
       const messageId = job.data.messageId as string;
-      if (!organizationId) return this.dispatcher.execute(messageId);
-      return this.fanout!.forOrganization(organizationId, () =>
+      if (!organizationId) {
+        if ((process.env.TENANCY_ENABLED || 'false') === 'true') {
+          throw new Error('TRANSACTIONAL_MESSAGE_ORGANIZATION_REQUIRED');
+        }
+        return this.dispatcher.execute(messageId);
+      }
+      if (!this.fanout) throw new Error('TENANT_FANOUT_UNAVAILABLE');
+      return this.fanout.forOrganization(organizationId, () =>
         this.dispatcher.execute(messageId),
       );
     });

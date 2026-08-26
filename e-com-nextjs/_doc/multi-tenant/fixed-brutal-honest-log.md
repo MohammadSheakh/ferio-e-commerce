@@ -109,7 +109,18 @@ Proven by new `tenant-membership.pubsub.spec.ts`: targeted invalidation
 clears a peer sharing the bus while untouched identities survive; wildcard
 clears everything; Redis-absent keeps legacy semantics.
 
-### #7 Retention jobs for unbounded tables — 📌 NEXT-UP (design settled)
+### #7 Retention jobs for unbounded tables — ✅ FIXED
+
+`RetentionSweepService` (tenancy) fans out over READY tenant databases and
+prunes by createdAt cutoff: `CommerceMessage` (180d default),
+`StorefrontAnalyticsEvent` (365d), `DeliveryLocationHistory` GPS (90d).
+`AuditLog` retention defaults **OFF** pending the legal decision. All
+thresholds env-tunable. Scheduling mirrors the reconciliation pattern:
+repeatable BullMQ scheduler (`RETENTION_SWEEP_ENABLED`, daily by default)
+plus a processor that fans out per-org; single-org retries supported.
+Operator surface: `POST /platform/maintenance/retention-sweep` (audited,
+returns per-rule deletion counts). Proven by 3 unit tests covering cutoffs,
+AuditLog-off, non-READY refusal, and fleet failure isolation.
 
 Planned: fan-out sweep over READY tenants deleting
 `CommerceMessage` > RETENTION_COMMERCE_MESSAGE_DAYS (180),
@@ -117,12 +128,36 @@ storefront analytics events > 365, GPS waypoints > 90; AuditLog retention
 disabled-by-default pending legal input. Trigger mirrors the reconciliation
 schedule pattern; per-org counts reported as evidence.
 
-### #8 OpenAPI → typed client codegen — 📌 NEXT-UP
+### #8 OpenAPI contract — ✅ SPEC CONTRACT SHIPPED · 🟡 client codegen next
 
-Plan: enable Nest OpenAPI plugin/`@ApiProperty` generation, export
-`openapi.json` in CI, generate typed clients into each frontend
-(`ferio-customer-web/lib/generated`, admin equivalents), replace hand-written
-interfaces incrementally starting with the surfaces touched most.
+`OPENAPI_EXPORT=1` boot mode writes `openapi.json`; committed as the API
+contract (deterministic — byte-identical re-export verified) and enforced
+in CI via a drift gate. The Nest swagger CLI plugin is now enabled: 98 DTO
+component schemas generate automatically.
+
+Frontend toolchain live in all three apps:
+- openapi-typescript devDep + `pnpm api:codegen`
+- committed contract-derived `lib/api-schema.ts`
+
+Adoption status: hand-written types remain in call sites (they compile
+clean against the generated schema); per-endpoint response schemas for
+literal-returning controllers need an @ApiOkResponse/DTO pass, after which
+call sites can switch to schema-derived types incrementally.
+
+**Critical discovery while shipping this:** the compiled production build
+(`tsc` dist) could not bootstrap AT ALL — three stacked defects:
+1. ~19 services injected collaborators via `import type`, erasing
+   `design:paramtypes` (TenantDatabaseManager, PlatformPrismaService across
+   the whole control plane) → converted to value imports;
+2. structural inline-typed ctor params without tokens
+   (`MigrationOrchestratorService.migrationQueue`, `EntitlementsService`
+   UsageReader, controller-level PlatformPrismaService inline-import) →
+   explicit `@Inject(getQueueToken(...))` / `@Inject(USAGE_READER)` +
+   provider registrations;
+3. nest-cli had no assets rule, so the prebuilt platform-client JS never
+   reached `dist` → added assets copy.
+Dev/swc masked all of it. Production Docker images would have crash-looped
+on first boot. Export run is now the standing smoke proof of prod bootstrap.
 
 ### #9 CSV parser OOM risk — ✅ RE-VERIFIED: ALREADY BOUNDED (correction)
 
@@ -135,6 +170,52 @@ this entry is the correction of record.
 ### #10 `evictForCapacity` leak under churn — ✅ FIXED (with #3)
 
 ---
+
+### Bonus infra wiring (owner decisions applied to real infrastructure)
+
+- **Docker Postgres is now the wired default**: compose remapped host port
+  to 5433 (host 5432 was occupied), and a new `prisma/platform.config.ts`
+  plus generated baseline migration
+  (`platform-migrations/20260826000000_platform_init`) deploy the 21-table
+  control plane to `ferio_platform` via
+  `pnpm prisma:migrate:platform`. Verified end-to-end: both DBs migrate,
+  full prod build boots against them and exports the API contract.
+- **MinIO joins docker compose** as the S3-compatible dev bucket
+  (`ferio-media`, auto-created) mirroring production R2 — same API,
+  different endpoint.
+- **R2Strategy verified E2E** through the compiled build against MinIO:
+  tenant-scoped key (`tenants/org-smoke/products/…`), strategy upload,
+  presigned GET roundtrip, delete. Required two fixes: explicit
+  `R2_ENDPOINT` override + `forcePathStyle` for S3-compatible targets.
+- **New admin surface**: `StorageModule` + `/admin/storage/presign-get|put`
+  (AuthGuard+Roles+Permissions+TenantMembership) exposing presigned access
+  while asserting every key lives inside the caller's own tenant namespace.
+- **Legacy attachments vertical confirmed dead**: Mongo-schema-dependent,
+  syntactically corrupted s3.strategy import, unwired from AppModule —
+  remains build-excluded pending Postgres rewrite (PRD excludes MongoDB).
+
+### Bonus hygiene: tracked .env removed
+
+`ferio-admin-dashboard/ferio-admin/.env` was tracked in git (contents:
+FERIO_API_URL / NEXT_PUBLIC_SOCKET_URL — configuration only, **no
+secrets**, so no rotation needed). Untracked via git rm --cached and
+ignored going forward.
+
+### Bonus: both run modes proven end-to-end (Docker & native)
+
+While wiring owner decisions into real infrastructure, the full-stack
+compose path was found broken in four places (stale context paths, missing
+platform migrations, no storage envs, placeholder secrets rejected by the
+strong-secret validator). All fixed:
+
+- `docker compose up -d --build` now runs the ENTIRE platform: one-shot
+  tenant+platform migrations, MinIO bucket, backend (health 200), and all
+  three UIs. Secrets auto-generate on first boot into a persisted volume.
+- Native mode documented in RUNNING.md with exact env contract, including
+  per-plane database URLs, storage vars for the compose MinIO, and a
+  verification cheatsheet.
+- `ferio-admin/.env` untracked from git (config-only contents; corrected
+  in passing during the audit sweep).
 
 ## Owner-gated items NOT claimed here (unchanged truth)
 
@@ -149,6 +230,7 @@ metrics stack choice. These gate launch, not code.
 | Gate | Result |
 |---|---|
 | Strict typecheck | ✅ |
-| Unit suites | ✅ 81 suites / 342 tests (+3 pub/sub invalidation proofs) |
-| Integration suites (real PostgreSQL, incl. new trgm migration auto-deploy) | ✅ 11 suites / 44 tests |
+| Unit suites | ✅ 82 suites / 345 tests (+3 retention proofs) |
+| Integration suites (real PostgreSQL) | ✅ 11 suites / 44 tests |
 | Production build | ✅ |
+| **Production bootstrap smoke (node dist/src/main.js OPENAPI_EXPORT=1)** | ✅ boots & exports 249 paths |

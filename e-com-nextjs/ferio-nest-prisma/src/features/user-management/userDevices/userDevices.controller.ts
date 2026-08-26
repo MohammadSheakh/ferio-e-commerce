@@ -100,7 +100,11 @@ export class UserDevicesController {
     @Param('deviceId') deviceId: string,
     @Body('enabled') enabled: boolean,
   ) {
-    return await this.userDevicesService.updatePushEnabled(deviceId, enabled);
+    return await this.userDevicesService.updatePushEnabled(
+      user.userId,
+      deviceId,
+      enabled,
+    );
   }
 
   /**

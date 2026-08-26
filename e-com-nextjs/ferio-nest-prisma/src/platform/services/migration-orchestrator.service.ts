@@ -1,11 +1,14 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { getQueueToken } from '@nestjs/bullmq';
+import { QUEUE_NAMES } from '@app/queue';
 import { randomBytes } from 'crypto';
 import { StructuredLogger } from '@app/common';
-import type { PlatformPrismaService } from '../platform-prisma.service';
+import { PlatformPrismaService } from '../platform-prisma.service';
 import { TenantSchemaBootstrapper } from '../../tenancy/tenant-schema.bootstrapper';
 import { TenantDatabasesService } from './tenant-databases.service';
 
@@ -47,6 +50,7 @@ export class MigrationOrchestratorService {
     private readonly platform: PlatformPrismaService,
     private readonly databases: TenantDatabasesService,
     private readonly bootstrapper: TenantSchemaBootstrapper,
+    @Inject(getQueueToken(QUEUE_NAMES.TENANT_MIGRATION))
     private readonly migrationQueue: {
       add: (name: string, data: TenantMigrationJobData, opts?: unknown) => Promise<unknown>;
     },

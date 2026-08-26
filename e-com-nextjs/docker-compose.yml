@@ -4,13 +4,22 @@
 #
 # Quick start:
 #   docker compose up -d --build
-#   # Backend: http://localhost:6733/api/v1
+#   # Backend:  http://localhost:6733/api/v1   (health: /api/v1/health)
 #   # Customer: http://localhost:3000
 #   # Admin:    http://localhost:3001
 #   # Platform: http://localhost:3100
+#   # MinIO:    http://localhost:9001  (dev S3 bucket 'ferio-media')
 #
-# For production: use a reverse proxy (Caddy/Traefik/Nginx) for TLS and
-# set TENANCY_ENABLED=true once DNS wildcard is configured.
+# Secrets (JWT/platform keys) are auto-generated on first backend boot and
+# persisted in the ferio_secrets volume. Override any of them by exporting:
+#   JWT_ACCESS_SECRET / JWT_REFRESH_SECRET / PLATFORM_JWT_SECRET /
+#   PLATFORM_DB_CREDENTIAL_KEY / PLATFORM_CALLBACK_SECRET
+#
+# For production: front everything with a reverse proxy for TLS and set
+# TENANCY_ENABLED=true once the wildcard DNS record exists.
+#
+# NOTE: host port 5433 maps to Postgres 5432 because 5432 is frequently
+# occupied by a local system PostgreSQL.
 
 services:
   # ── Infrastructure ──
@@ -22,7 +31,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ferio}
       POSTGRES_DB: ferio_dev
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - pg_data:/var/lib/postgresql/data
       - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
@@ -43,6 +52,65 @@ services:
       timeout: 3s
       retries: 5
 
+  # ── Object Storage (S3-compatible dev bucket; prod = Cloudflare R2) ──
+  minio:
+    image: minio/minio:latest
+    container_name: ferio-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadmin} &&
+      mc mb --ignore-existing local/ferio-media &&
+      echo 'bucket ready: ferio-media'"
+
+  # ── One-shot migrations (complete before the backend starts) ──
+  tenant-migrate:
+    build:
+      context: .
+      dockerfile: ferio-nest-prisma/Dockerfile
+      target: build
+    command: >
+      sh -c "node_modules/.bin/prisma migrate deploy --schema prisma/schema.prisma"
+    environment:
+      DATABASE_URL: postgresql://ferio:${POSTGRES_PASSWORD:-ferio}@postgres:5432/ferio_dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  platform-migrate:
+    build:
+      context: .
+      dockerfile: ferio-nest-prisma/Dockerfile
+      target: build
+    command: >
+      sh -c "node_modules/.bin/prisma migrate deploy --config prisma/platform.config.ts"
+    environment:
+      PLATFORM_DATABASE_URL: postgresql://ferio:${POSTGRES_PASSWORD:-ferio}@postgres:5432/ferio_platform
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
   # ── Backend ──
   backend:
     build:
@@ -54,6 +122,14 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      minio:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+      tenant-migrate:
+        condition: service_completed_successfully
+      platform-migrate:
+        condition: service_completed_successfully
     ports:
       - "6733:6733"
     environment:
@@ -61,17 +137,21 @@ services:
       PLATFORM_DATABASE_URL: postgresql://ferio:${POSTGRES_PASSWORD:-ferio}@postgres:5432/ferio_platform
       REDIS_HOST: redis
       REDIS_PORT: "6379"
-      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-dev-jwt-secret-change-in-production-at-least-32-chars}
-      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-dev-refresh-secret-change-in-production-at-least-32}
-      PLATFORM_JWT_SECRET: ${PLATFORM_JWT_SECRET:-dev-platform-secret-change-in-production-32ch}
-      PLATFORM_DB_CREDENTIAL_KEY: ${PLATFORM_DB_CREDENTIAL_KEY:-dev-credential-key-change-in-production-32}
-      PLATFORM_CALLBACK_SECRET: ${PLATFORM_CALLBACK_SECRET:-dev-callback-secret-change-in-prod-32}
-      PLATFORM_INITIAL_SUPERADMIN_EMAIL: ${PLATFORM_INITIAL_SUPERADMIN_EMAIL:-owner@ferio.local}
-      PLATFORM_INITIAL_SUPERADMIN_PASSWORD_HASH: ${PLATFORM_INITIAL_SUPERADMIN_PASSWORD_HASH:-}
-      JWT_SECRET: ${JWT_ACCESS_SECRET:-dev-jwt-secret-change-in-production-at-least-32-chars}
       NODE_ENV: development
       TENANCY_ENABLED: ${TENANCY_ENABLED:-false}
       PORT: "6733"
+      PLATFORM_INITIAL_SUPERADMIN_EMAIL: ${PLATFORM_INITIAL_SUPERADMIN_EMAIL:-owner@ferio.local}
+      PLATFORM_INITIAL_SUPERADMIN_PASSWORD_HASH: ${PLATFORM_INITIAL_SUPERADMIN_PASSWORD_HASH:-}
+      JWT_SECRET: ${JWT_ACCESS_SECRET:-}
+      FILE_UPLOAD_STRATEGY: r2
+      R2_ENDPOINT: http://minio:9000
+      R2_BUCKET: ferio-media
+      R2_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
+      R2_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    volumes:
+      - ferio_secrets:/app/.secrets
+    entrypoint: ["/usr/local/bin/docker-entrypoint.sh"]
+    command: ["node", "dist/src/main.js"]
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:6733/api/v1/health || exit 1"]
       interval: 15s
@@ -81,8 +161,8 @@ services:
   # ── Customer Web ──
   customer-web:
     build:
-      context: .
-      dockerfile: ferio-customer-web/Dockerfile
+      context: ./ferio-customer-web
+      dockerfile: Dockerfile
     container_name: ferio-customer-web
     depends_on:
       - backend
@@ -95,8 +175,8 @@ services:
   # ── Admin Web ──
   admin-web:
     build:
-      context: .
-      dockerfile: ferio-admin-dashboard/ferio-admin/Dockerfile
+      context: ./ferio-admin-dashboard/ferio-admin
+      dockerfile: Dockerfile
     container_name: ferio-admin-web
     depends_on:
       - backend
@@ -108,8 +188,8 @@ services:
   # ── Platform Admin ──
   platform-admin:
     build:
-      context: .
-      dockerfile: ferio-platform-admin/Dockerfile
+      context: ./ferio-platform-admin
+      dockerfile: Dockerfile
     container_name: ferio-platform-admin
     depends_on:
       - backend
@@ -120,3 +200,5 @@ services:
 
 volumes:
   pg_data:
+  minio_data:
+  ferio_secrets:

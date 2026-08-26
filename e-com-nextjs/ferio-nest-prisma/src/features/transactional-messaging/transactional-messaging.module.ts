@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '@app/database';
+import { TenancyModule } from '../../tenancy/tenancy.module';
 import { AuthModule } from '../authentication/auth.module';
 import { AuditModule } from '../audit/audit.module';
 import { MessageAdapterRegistry } from './adapters/message-adapter.registry';
@@ -10,7 +11,7 @@ import { TransactionalMessageQueue } from './transactional-message.queue';
 import { TransactionalMessagingService } from './transactional-messaging.service';
 
 @Module({
-  imports: [PrismaModule, AuthModule, AuditModule],
+  imports: [ TenancyModule,PrismaModule, AuthModule, AuditModule],
   controllers: [TransactionalMessagingController],
   providers: [
     TransactionalMessagingService,

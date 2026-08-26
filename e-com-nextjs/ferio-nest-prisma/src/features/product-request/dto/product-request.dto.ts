@@ -1,20 +1,23 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsEnum, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 
 export class CreateProductRequestDto {
   @ApiProperty({ description: 'Product Name & Model description (multiline)' })
   @IsString()
   @MinLength(2)
+  @MaxLength(500)
   productName: string;
 
   @ApiPropertyOptional({ description: 'Requester name' })
   @IsOptional()
   @IsString()
+  @MaxLength(100)
   name?: string;
 
   @ApiPropertyOptional({ description: 'Contact phone number' })
   @IsOptional()
   @IsString()
+  @MaxLength(32)
   phone?: string;
 }
 
@@ -27,6 +30,7 @@ export class UpdateProductRequestStatusDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  @MaxLength(2_000)
   notes?: string;
 }
 

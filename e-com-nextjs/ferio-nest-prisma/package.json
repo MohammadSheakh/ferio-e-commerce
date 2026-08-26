@@ -29,10 +29,13 @@
     "test:integration": "jest --config ./test/jest-integration.json --runInBand",
     "test:queue-smoke": "jest --config ./test/jest-queue-smoke.json --runInBand",
     "prisma:generate:platform": "pnpm prisma generate --schema prisma/platform.prisma",
-    "prisma:migrate:platform": "pnpm prisma migrate deploy --schema prisma/platform.prisma"
+    "prisma:migrate:platform": "pnpm exec prisma migrate deploy --config prisma/platform.config.ts",
+    "openapi:export": "OPENAPI_EXPORT=1 ts-node -r tsconfig-paths/register src/main.ts",
+    "storage:smoke": "node scripts/storage-smoke.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1050.0",
+    "@aws-sdk/s3-request-presigner": "^3",
     "@nestjs/bullmq": "^11.0.4",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.4",
@@ -45,6 +48,7 @@
     "@nestjs/swagger": "^11.4.2",
     "@nestjs/throttler": "^6.5.0",
     "@nestjs/websockets": "^11.2.1",
+    "@prisma/client-runtime-utils": "7.8.0",
     "@socket.io/redis-adapter": "^8.3.0",
     "bcrypt": "^6.0.0",
     "bullmq": "^5.76.8",
@@ -63,16 +67,16 @@
     "redis": "^5.12.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
-    "socket.io": "^4.8.3"
+    "socket.io": "^4.8.3",
+    "@prisma/adapter-pg": "^7.8.0",
+    "@prisma/client": "^7.8.0",
+    "mongoose": "^9.6.2"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
     "@eslint/js": "^9.18.0",
     "@nestjs/cli": "^11.0.0",
     "@nestjs/schematics": "^11.0.0",
-    "@nestjs/testing": "^11.0.1",
-    "@prisma/adapter-pg": "^7.8.0",
-    "@prisma/client": "^7.8.0",
     "@swc/cli": "^0.8.1",
     "@swc/core": "^1.15.33",
     "@types/compression": "^1.8.1",
@@ -87,7 +91,6 @@
     "eslint-plugin-prettier": "^5.2.2",
     "globals": "^17.0.0",
     "jest": "^30.0.0",
-    "mongoose": "^9.6.2",
     "prettier": "^3.4.2",
     "source-map-support": "^0.5.21",
     "supertest": "^7.0.0",
@@ -96,7 +99,8 @@
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.7.3",
-    "typescript-eslint": "^8.20.0"
+    "typescript-eslint": "^8.20.0",
+    "@nestjs/testing": "^11.0.1"
   },
   "jest": {
     "moduleFileExtensions": [

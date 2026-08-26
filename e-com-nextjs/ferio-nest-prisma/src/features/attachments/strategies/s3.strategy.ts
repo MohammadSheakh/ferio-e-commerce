@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import {
 import { tenantObjectKey } from '../../../tenancy/object-keys.util';
+import {
   S3Client,
   PutObjectCommand,
   DeleteObjectCommand,
@@ -30,6 +30,9 @@ export class S3Strategy implements IFileUploadStrategy {
     // Initialize S3 client
     this.s3Client = new S3Client({
       region: process.env.AWS_REGION || 'us-east-1',
+      ...(process.env.AWS_S3_ENDPOINT
+        ? { endpoint: process.env.AWS_S3_ENDPOINT, forcePathStyle: true }
+        : {}),
       credentials: {
         accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
         secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,

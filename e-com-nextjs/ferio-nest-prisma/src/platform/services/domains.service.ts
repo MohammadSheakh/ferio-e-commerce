@@ -1,7 +1,7 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PlatformAuditService } from './platform-audit.service';
 import { invalidateDomainCache } from '../utils/domain-cache-invalidation';
-import type { PlatformPrismaService } from '../platform-prisma.service';
+import { PlatformPrismaService } from '../platform-prisma.service';
 
 /** Hosts that can never be tenant subdomains. */
 export const RESERVED_SUBDOMAINS = new Set([

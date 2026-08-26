@@ -2,6 +2,7 @@ import { Injectable, Inject, Logger } from '@nestjs/common';
 import { IFileUploadStrategy } from './file-upload.strategy.interface';
 import { CloudinaryStrategy } from './cloudinary.strategy';
 import { S3Strategy } from './s3.strategy';
+import { R2Strategy } from './r2.strategy';
 
 /**
  * File Upload Strategy Factory
@@ -24,11 +25,13 @@ export class FileUploadStrategyFactory {
   constructor(
     @Inject('CLOUDINARY_STRATEGY') private cloudinaryStrategy: CloudinaryStrategy,
     @Inject('S3_STRATEGY') private s3Strategy: S3Strategy,
+    @Inject('R2_STRATEGY') private r2Strategy: R2Strategy,
   ) {
     // Register strategies
     FileUploadStrategyFactory.strategies.set('cloudinary', cloudinaryStrategy);
     FileUploadStrategyFactory.strategies.set('s3', s3Strategy);
     FileUploadStrategyFactory.strategies.set('digitalocean', s3Strategy); // DigitalOcean uses S3 strategy
+    FileUploadStrategyFactory.strategies.set('r2', r2Strategy); // Cloudflare R2 (PO-017 / owner #6)
 
     // Set default strategy from environment
     FileUploadStrategyFactory.defaultStrategy =

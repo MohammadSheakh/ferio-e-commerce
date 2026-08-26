@@ -1,6 +1,6 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { OrganizationStatus } from '../generated/platform-client';
-import type { PlatformPrismaService } from '../platform-prisma.service';
+import { PlatformPrismaService } from '../platform-prisma.service';
 import { PlatformAuditService } from './platform-audit.service';
 
 /** Legal transitions of the organization lifecycle state machine. */

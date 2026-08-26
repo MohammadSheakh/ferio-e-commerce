@@ -4,6 +4,7 @@ import { AttachmentService } from './attachment.service';
 import { RedisModule } from '@app/redis';
 import { CloudinaryStrategy } from './strategies/cloudinary.strategy';
 import { S3Strategy } from './strategies/s3.strategy';
+import { R2Strategy } from './strategies/r2.strategy';
 import { FileUploadStrategyFactory } from './strategies/file-upload.strategy.factory';
 import { IFileUploadStrategy } from './strategies/file-upload.strategy.interface';
 
@@ -44,6 +45,10 @@ import { IFileUploadStrategy } from './strategies/file-upload.strategy.interface
     {
       provide: 'S3_STRATEGY',
       useClass: S3Strategy,
+    },
+    {
+      provide: 'R2_STRATEGY',
+      useClass: R2Strategy,
     },
     
     // Strategy factory

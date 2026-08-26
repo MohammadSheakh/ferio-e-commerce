@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { tenantHostHeadersFromRequest } from "@/lib/tenant-host";
 
 const backendApiUrl =
   process.env.FERIO_API_URL ?? "http://localhost:6733/api/v1";
@@ -30,7 +31,10 @@ async function refreshSession(
   try {
     const upstream = await fetch(`${backendApiUrl}/auth/refresh`, {
       method: "POST",
-      headers: { Cookie: `refreshToken=${refreshToken}` },
+      headers: {
+        ...tenantHostHeadersFromRequest(request),
+        Cookie: `refreshToken=${refreshToken}`,
+      },
       cache: "no-store",
     });
     const payload = (await upstream.json()) as {

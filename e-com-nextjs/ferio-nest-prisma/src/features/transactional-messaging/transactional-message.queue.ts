@@ -126,10 +126,22 @@ export class TransactionalMessageQueue implements OnModuleInit {
     const policy = await this.messages.getPolicy();
     if (!policy.enabled) throw new ConflictException('Transactional routing policy is disabled');
     await this.messages.prepareRetry(messageId);
+    const context = tryGetTenantContext();
+    if (
+      (process.env.TENANCY_ENABLED || 'false') === 'true' &&
+      !context?.organizationId
+    ) {
+      throw new Error('TRANSACTIONAL_MESSAGE_ORGANIZATION_REQUIRED');
+    }
+    const organizationId = context?.organizationId;
     const job = await this.queue.add(
       TRANSACTIONAL_MESSAGE_JOB,
-      { messageId },
-      { jobId: `transactional-message-${messageId}-${Date.now()}` },
+      { messageId, ...(organizationId ? { organizationId } : {}) },
+      {
+        jobId: organizationId
+          ? `t:${organizationId}:transactional-message-${messageId}-${Date.now()}`
+          : `transactional-message-${messageId}-${Date.now()}`,
+      },
     );
     await this.audit.record({
       action: 'TRANSACTIONAL_MESSAGE_RETRY_QUEUED',

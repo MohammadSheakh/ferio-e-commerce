@@ -1,12 +1,16 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '@app/database';
 import { AuthModule } from '../authentication/auth.module';
-import { ProductRequestController } from './product-request.controller';
+import { TenancyModule } from '../../tenancy/tenancy.module';
+import {
+  AdminProductRequestController,
+  PublicProductRequestController,
+} from './product-request.controller';
 import { ProductRequestService } from './product-request.service';
 
 @Module({
-  imports: [PrismaModule, AuthModule],
-  controllers: [ProductRequestController],
+  imports: [TenancyModule, PrismaModule, AuthModule],
+  controllers: [PublicProductRequestController, AdminProductRequestController],
   providers: [ProductRequestService],
   exports: [ProductRequestService],
 })

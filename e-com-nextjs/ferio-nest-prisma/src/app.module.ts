@@ -42,6 +42,7 @@ import { StorefrontAnalyticsModule } from './features/storefront-analytics/store
 import { OperationsHealthModule } from './features/operations-health/operations-health.module';
 import { CustomerNotificationsModule } from './features/customer-notifications/customer-notifications.module';
 import { WalletModule } from './features/wallet/wallet.module';
+import { StorageModule } from './features/storage/storage.module';
 
 /**
  * Application Root Module
@@ -63,6 +64,7 @@ import { WalletModule } from './features/wallet/wallet.module';
     SettingsModule,
     CatalogModule,
     CartModule,
+    StorageModule,
     CheckoutModule,
     OrderModule,
     ShippingModule,

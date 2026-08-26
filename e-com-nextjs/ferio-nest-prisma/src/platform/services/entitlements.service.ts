@@ -1,5 +1,5 @@
-import { Injectable } from '@nestjs/common';
-import type { PlatformPrismaService } from '../platform-prisma.service';
+import { Inject, Injectable } from '@nestjs/common';
+import { PlatformPrismaService } from '../platform-prisma.service';
 import { TenantMetrics } from '@app/common';
 
 export interface EntitlementDecision {
@@ -9,6 +9,8 @@ export interface EntitlementDecision {
   limit?: number | null;
   currentUsage?: string;
 }
+
+export const USAGE_READER = 'USAGE_READER';
 
 export interface UsageReader {
   getValue(organizationId: string, metric: string, periodKey?: string): Promise<bigint>;
@@ -23,6 +25,7 @@ export interface UsageReader {
 export class EntitlementsService {
   constructor(
     private readonly platform: PlatformPrismaService,
+    @Inject(USAGE_READER)
     private readonly usage: UsageReader,
   ) {}
 

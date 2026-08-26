@@ -1,12 +1,13 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '@app/database';
+import { TenancyModule } from '../../tenancy/tenancy.module';
 import { AuthModule } from '../authentication/auth.module';
 import { AuditModule } from '../audit/audit.module';
 import { RefundsController } from './refunds.controller';
 import { RefundsService } from './refunds.service';
 
 @Module({
-  imports: [PrismaModule, AuthModule, AuditModule],
+  imports: [ TenancyModule,PrismaModule, AuthModule, AuditModule],
   controllers: [RefundsController],
   providers: [RefundsService],
 })

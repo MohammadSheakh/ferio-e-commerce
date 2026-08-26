@@ -1,16 +1,20 @@
 import { NextResponse } from "next/server";
 import { backendApiUrl } from "@/lib/customer-session";
 import { withCorrelationId } from "@/lib/correlation";
+import { hostForwardHeadersFromRequest } from "@/lib/host-forward";
 
 export async function GET(
-  _req: Request,
+  request: Request,
   { params }: { params: { token: string } },
 ) {
   try {
     const res = await fetch(
       `${backendApiUrl}/cart/saved/share/${params.token}`,
       {
-        headers: withCorrelationId({ Accept: "application/json" }),
+        headers: withCorrelationId({
+          ...hostForwardHeadersFromRequest(request),
+          Accept: "application/json",
+        }),
         cache: "no-store",
       },
     );

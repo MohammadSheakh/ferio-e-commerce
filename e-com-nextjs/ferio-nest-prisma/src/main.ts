@@ -183,6 +183,18 @@ async function bootstrap() {
     });
 
     logger.log(`📚 Swagger docs: http://localhost:${port}/api/docs`);
+
+    // Brutal-audit #8: the OpenAPI spec is a committed contract. Setting
+    // OPENAPI_EXPORT=1 writes openapi.json and exits without listening, so
+    // CI can regenerate and fail on drift between backend DTOs and the
+    // committed contract the frontends integrate against.
+    if (process.env.OPENAPI_EXPORT === '1') {
+      const { writeFileSync } = await import('node:fs');
+      writeFileSync('openapi.json', JSON.stringify(document, null, 2));
+      logger.log('📦 openapi.json exported (no server started)');
+      await app.close();
+      return;
+    }
   }
 
   // ────────────────────────────────────────────────────────────────────────

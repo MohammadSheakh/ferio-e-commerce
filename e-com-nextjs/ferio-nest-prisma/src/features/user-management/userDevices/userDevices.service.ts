@@ -154,9 +154,19 @@ export class UserDevicesService extends GenericService<Prisma.UserDevicesDelegat
   /**
    * Enable/disable push notifications for device
    */
-  async updatePushEnabled(deviceId: string, enabled: boolean): Promise<UserDevices | null> {
+  async updatePushEnabled(
+    userId: string,
+    deviceId: string,
+    enabled: boolean,
+  ): Promise<UserDevices> {
+    const device = await this.prisma.userDevices.findFirst({
+      where: { id: deviceId, userId, isDeleted: false },
+      select: { id: true },
+    });
+    if (!device) throw new NotFoundException('Device not found');
+
     return this.prisma.userDevices.update({
-      where: { id: deviceId },
+      where: { id: device.id },
       data: { pushEnabled: enabled },
     });
   }

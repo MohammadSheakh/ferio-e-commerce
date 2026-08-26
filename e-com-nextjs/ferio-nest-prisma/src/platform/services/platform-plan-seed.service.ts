@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { StructuredLogger } from '@app/common';
-import type { PlatformPrismaService } from '../platform-prisma.service';
+import { PlatformPrismaService } from '../platform-prisma.service';
 
 /**
  * Initial SaaS plan catalog — engineering encoding of PO-001/PO-002.

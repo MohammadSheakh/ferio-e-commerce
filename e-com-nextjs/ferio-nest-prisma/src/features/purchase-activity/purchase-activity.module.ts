@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '@app/database';
+import { TenancyModule } from '../../tenancy/tenancy.module';
 import { AuthModule } from '../authentication/auth.module';
 import {
   AdminPurchaseActivityController,
@@ -8,7 +9,7 @@ import {
 import { PurchaseActivityService } from './purchase-activity.service';
 
 @Module({
-  imports: [PrismaModule, AuthModule],
+  imports: [ TenancyModule,PrismaModule, AuthModule],
   controllers: [PurchaseActivityController, AdminPurchaseActivityController],
   providers: [PurchaseActivityService],
 })

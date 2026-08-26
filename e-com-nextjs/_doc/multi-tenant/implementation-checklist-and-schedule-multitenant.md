@@ -424,7 +424,7 @@ All surfaces live in the ferio-platform-admin console:
 - [x] Define usage limits.
 - [x] Define staff/user limits. (staff_seats 2/10/30/negotiated)
 - [x] Define product/SKU limits if applicable. (products_max 500/5000/25000)
-- [ ] Define order/GMV limits if applicable.
+- [x] Define order/GMV limits if applicable. (Owner: NO GMV/order-volume limit initially — resource/feature limits only, so successful tenants are never penalized for sales; plan seed already ships orders_per_month as unlimited metering)
 - [x] Define custom-domain entitlement.
 - [x] Define advanced reports/CRM/marketing entitlement.
 - [x] Define warehouse entitlement. (warehouses_max 1/3/10 — enforcement lands with multi-warehouse support)
@@ -710,13 +710,13 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 
 ## 11.4 Object/media storage
 
-- [ ] **BLOCKED/PARTIAL:** Select/complete production object storage strategy.
-- [ ] Namespace object keys by tenant.
-- [ ] Keep private evidence private.
-- [ ] Use signed access where required.
-- [ ] Prevent guessed tenant paths from returning objects.
-- [ ] Add lifecycle/retention rules.
-- [ ] Add tenant export/deletion support.
+- [x] Select/complete production object storage strategy. (Owner #6: Cloudflare R2 via S3-compatible API; `R2Strategy` shipped with presigned access; production bucket credentials pending)
+- [x] Namespace object keys by tenant. (every key routes through `tenantObjectKey()` -> `tenants/{organizationId}/…`; org comes from ambient server-side context, never client input)
+- [x] Keep private evidence private. (R2 buckets are private-by-default; no public-read ACL anywhere in the strategy)
+- [x] Use signed access where required. (presigned GET via @aws-sdk/s3-request-presigner, R2_PRESIGN_EXPIRES_SECONDS tunable, default 1h)
+- [x] Prevent guessed tenant paths from returning objects. (org prefix derives from ambient TenantContext; a guessed path cannot name another tenant's namespace and objects are private regardless)
+- [ ] Add lifecycle/retention rules. (bucket-level lifecycle config is an ops task on the R2 account)
+- [ ] Add tenant export/deletion support. (wired to MT-12 closure/export flow)
 - [ ] Add malware/content validation where required by upload type.
 
 ## 11.5 Tenant integrations
@@ -1183,12 +1183,12 @@ The following decisions should be recorded in a dedicated ADR/product decision l
 
 - [x] **RESOLVED** (Plan names/structure resolved (PO-001); prices remain pilot-dependent.) — was: Initial SaaS plan names, prices, billing intervals.
 - [ ] **RESOLVED-DIRECTION** (Resolved: 14-day trial; INTERNAL plan (PO-002).) — was: Trial/free/internal tenant policy.
-- [ ] **BLOCKED:** Exact feature entitlements and quantitative limits.
+- [x] RESOLVED-DIRECTION (limits defined per plan for seats/products/warehouses/features; NO GMV limit per owner #12; prices remain TBD until cost baseline).
 - [ ] **RESOLVED-DIRECTION** (Resolved: 7-day grace; browsable storefront, checkout disabled (PO-004/005).) — was: Subscription grace-period and suspension behavior.
 - [ ] **RESOLVED-DIRECTION** (Resolved direction: provider abstraction, SSLCOMMERZ first (PO-006) — adapter build pending.) — was: SaaS subscription payment provider.
 - [ ] **RESOLVED-DIRECTION** (Resolved: {slug}.{FERIO_PUBLIC_DOMAIN} (PO-007).) — was: Default production tenant hostname/domain.
-- [ ] **BLOCKED:** Wildcard DNS/TLS hosting strategy.
-- [ ] **BLOCKED:** Custom-domain launch release and certificate automation.
+- [x] RESOLVED-DIRECTION (Cloudflare DNS + wildcard subdomains + automated TLS; record creation is ops-on-production-domain).
+- [x] RESOLVED-DIRECTION (automated wildcard TLS preferred; custom domains post-alpha per PO-008).
 - [ ] **RESOLVED-DIRECTION** (Resolved: shared managed cluster initially (PO-009).) — was: PostgreSQL hosting model for database-per-tenant.
 - [ ] **RESOLVED-DIRECTION** (Resolved: AES-256-GCM + external master key (PO-010).) — was: Tenant DB credential storage/KMS strategy.
 - [ ] **RESOLVED-DIRECTION** (Resolved sequencing: bounded LRU now, PgBouncer at scale (PO-011).) — was: PgBouncer/connection-pooling infrastructure.
@@ -1197,13 +1197,13 @@ The following decisions should be recorded in a dedicated ADR/product decision l
 - [ ] **RESOLVED-DIRECTION** (Resolved: 90-day recoverable window (PO-013), implemented in TenantClosureService.) — was: Tenant closure/export/deletion retention.
 - [ ] **RESOLVED-DIRECTION** (Resolved: tenant-local for Release 1 (PO-015).) — was: Customer identity scope across tenants.
 - [ ] **RESOLVED-DIRECTION** (Resolved: yes, global identity + memberships (PO-014); switcher UX later.) — was: Whether one global login may have memberships in multiple tenant businesses.
-- [ ] **BLOCKED:** Platform support-access approval policy.
+- [x] RESOLVED (owner #10: tenant OWNER grants explicitly with reason/expiry/scope/audit; emergency override Super Admin-only + security event).
 - [ ] **RESOLVED-DIRECTION** (Resolved abstraction + keys tenants/{orgId}/… (PO-017); provider selection pending for production tenancy.) — was: Object storage provider and tenant object-key strategy.
 - [ ] **BLOCKED:** Plan treatment of custom domains, advanced CRM, campaigns, integrations, warehouses, staff counts, products/SKUs, and usage.
 - [ ] **RESOLVED-DIRECTION** (Resolved: Platform Admin/sales-assisted initially (PO-018).) — was: Production tenant onboarding model: self-service, sales-assisted, or Platform Admin-only for initial launch.
-- [ ] **BLOCKED:** Whether subscription suspension leaves storefront read-only, hides checkout only, or disables the storefront.
-- [ ] **BLOCKED:** Exact tenant database migration maintenance-window policy.
-- [ ] **BLOCKED:** Data residency/legal requirements for Bangladesh and future markets.
+- [x] RESOLVED (PO-005 stands: storefront browsable, checkout disabled)
+- [x] RESOLVED (owner #14: compatible migrations canary->batch->fleet; destructive/locking require announced window + tested rollback; bootstrapper now enforces lock/statement timeouts + NON_TRANSACTIONAL marker).
+- [ ] **OPEN:** Legal review still pending; engineering posture unchanged.
 
 ---
 

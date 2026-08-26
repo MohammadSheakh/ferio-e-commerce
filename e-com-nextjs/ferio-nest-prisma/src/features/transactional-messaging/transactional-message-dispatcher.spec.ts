@@ -102,4 +102,35 @@ describe('TransactionalMessageDispatcher', () => {
       }),
     );
   });
+
+  it('uses the resolved tenant database in strict mode', async () => {
+    const previous = process.env.TENANCY_ENABLED;
+    process.env.TENANCY_ENABLED = 'true';
+    const { dispatcher, prisma } = setup([{ status: 'ACCEPTED' }]);
+    const tenantDb = { tryGet: jest.fn().mockResolvedValue(prisma) };
+    (dispatcher as unknown as { tenantDb: typeof tenantDb }).tenantDb = tenantDb;
+
+    try {
+      await dispatcher.execute(message.id);
+      expect(tenantDb.tryGet).toHaveBeenCalledTimes(1);
+    } finally {
+      if (previous === undefined) delete process.env.TENANCY_ENABLED;
+      else process.env.TENANCY_ENABLED = previous;
+    }
+  });
+
+  it('fails closed when strict mode has no tenant context', async () => {
+    const previous = process.env.TENANCY_ENABLED;
+    process.env.TENANCY_ENABLED = 'true';
+    const { dispatcher } = setup([]);
+
+    try {
+      await expect(dispatcher.execute(message.id)).rejects.toThrow(
+        'TRANSACTIONAL_MESSAGE_TENANT_CONTEXT_REQUIRED',
+      );
+    } finally {
+      if (previous === undefined) delete process.env.TENANCY_ENABLED;
+      else process.env.TENANCY_ENABLED = previous;
+    }
+  });
 });

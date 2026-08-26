@@ -25,6 +25,7 @@ export const QUEUE_NAMES = {
   NOTIFY_PARTICIPANTS: 'notify-participants-queue-suplify',
   EMAIL: 'emailQueue-rental-app',
   RECONCILIATION: 'reconciliationQueue-ferio',
+  RETENTION: 'retentionQueue-ferio',
   COURIER_CALLBACK: 'courierCallbackQueue-ferio',
   COURIER_POLL: 'courierPollQueue-ferio',
   TRANSACTIONAL_MESSAGE: 'transactionalMessageQueue-ferio',

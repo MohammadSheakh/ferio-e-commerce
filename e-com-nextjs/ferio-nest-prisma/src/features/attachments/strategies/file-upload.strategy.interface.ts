@@ -44,6 +44,13 @@ export interface IFileUploadStrategy {
    * Get strategy name
    */
   getStrategyName(): string;
+
+  /**
+   * Short-lived signed read URL for a private object (owner decision #6:
+   * private buckets + signed access). Strategies without private-object
+   * semantics may omit this.
+   */
+  getSignedUrl?(key: string): Promise<string>;
 }
 
 /**

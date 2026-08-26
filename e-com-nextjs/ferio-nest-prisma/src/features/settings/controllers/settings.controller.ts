@@ -38,6 +38,7 @@ import {
 } from '@app/common';
 import type { UserPayload } from '@app/common';
 import { SETTINGS_RATE_LIMITS } from '../constants/settings.cache.constants';
+import { TenantMembershipGuard } from '../../../tenancy/tenant-membership.guard';
 
 @Controller('settings')
 @ApiTags('Settings')
@@ -48,6 +49,7 @@ export class SettingsController {
   constructor(private readonly settingsService: SettingsService) {}
 
   @Post()
+  @UseGuards(TenantMembershipGuard)
   @ApiOperation({
     summary: 'Create or update settings',
     description: 'Create or update static content (Admin only)',
@@ -97,6 +99,7 @@ export class SettingsController {
   }
 
   @Get('all')
+  @UseGuards(TenantMembershipGuard)
   @ApiOperation({
     summary: 'Get all settings',
     description: 'Get all static content (Admin only)',
@@ -115,6 +118,7 @@ export class SettingsController {
   }
 
   @Get('paginate')
+  @UseGuards(TenantMembershipGuard)
   @ApiOperation({
     summary: 'Get all settings with pagination',
     description: 'Get all static content with pagination (Admin only)',
@@ -149,6 +153,7 @@ export class SettingsController {
   }
 
   @Get('paginate/v2')
+  @UseGuards(TenantMembershipGuard)
   @ApiOperation({
     summary: 'Get all settings with cursor pagination (v2)',
     description:
@@ -185,6 +190,7 @@ export class SettingsController {
   }
 
   @Delete()
+  @UseGuards(TenantMembershipGuard)
   @ApiOperation({
     summary: 'Delete settings',
     description: 'Delete settings by type (Admin only)',
