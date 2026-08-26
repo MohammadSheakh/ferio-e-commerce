@@ -20,6 +20,7 @@ import { OAuthAccountService } from './oauthAccount/oauthAccount.service';
 // import { UserRoleData, UserRoleDataSchema } from './userRoleData/userRoleData.schema';
 
 import { RedisModule } from '@app/redis';
+import { TenancyModule } from '../../tenancy/tenancy.module';
 
 /**
  * User Module
@@ -51,6 +52,7 @@ import { RedisModule } from '@app/redis';
 
     // Prisma Module (primary database access for User service)
     PrismaModule,
+    TenancyModule,
 
     // Auth Module (required for AuthGuard / JwtService)
     AuthModule,

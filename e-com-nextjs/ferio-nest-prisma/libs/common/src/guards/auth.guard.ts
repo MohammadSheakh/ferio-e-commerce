@@ -42,6 +42,7 @@ export class AuthGuard implements CanActivate {
           const payload = await this.jwtService.verifyAsync(token, {
             secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
           });
+          if (!this.matchesResolvedTenant(request, payload)) return true;
           request['user'] = payload;
         } catch {
           // Ignore errors for public routes
@@ -61,6 +62,10 @@ export class AuthGuard implements CanActivate {
         secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
       });
 
+      if (!this.matchesResolvedTenant(request, payload)) {
+        throw new UnauthorizedException('Token is not valid for this tenant');
+      }
+
       // Attach payload
       request['user'] = payload;
     } catch (error) {
@@ -76,5 +81,17 @@ export class AuthGuard implements CanActivate {
   private extractTokenFromHeader(request: Request): string | undefined {
     const [type, token] = request.headers.authorization?.split(' ') ?? [];
     return type?.toLowerCase() === 'bearer' ? token : undefined;
+  }
+
+  private matchesResolvedTenant(request: Request, payload: UserPayload): boolean {
+    if ((process.env.TENANCY_ENABLED || 'false') !== 'true') return true;
+    const resolvedOrganizationId = (
+      request as Request & { tenantOrganizationId?: string }
+    ).tenantOrganizationId;
+    return Boolean(
+      resolvedOrganizationId &&
+        payload.organizationId &&
+        payload.organizationId === resolvedOrganizationId,
+    );
   }
 }

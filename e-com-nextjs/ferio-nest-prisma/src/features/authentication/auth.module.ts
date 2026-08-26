@@ -11,6 +11,7 @@ import { OtpService } from './otp/otp.service';
 import { EmailService } from './email/email.service';
 import { OAuthVerificationService } from './oauth/oauth-verification.service';
 import { TwoFactorService } from './two-factor/two-factor.service';
+import { TenancyModule } from '../../tenancy/tenancy.module';
 
 /**
  * Auth Module
@@ -46,6 +47,7 @@ import { TwoFactorService } from './two-factor/two-factor.service';
     // Redis Module (for OTP and token blacklist)
     RedisModule,
     PrismaModule,
+    TenancyModule,
 
     // Rate Limiting
     ThrottlerModule.forRoot([

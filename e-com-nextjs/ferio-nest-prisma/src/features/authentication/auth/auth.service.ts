@@ -3,12 +3,14 @@ import {
   UnauthorizedException,
   ServiceUnavailableException,
   BadRequestException,
+  Optional,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import {
   OAuthProvider as PrismaOAuthProvider,
   Prisma,
+  PrismaClient,
   UserAuthProvider,
   UserRole,
 } from '@prisma/client';
@@ -26,6 +28,8 @@ import { PrismaService } from '@app/database';
 import { OtpType } from '../otp/interfaces/otp-payload.interface';
 import { StructuredLogger } from '@app/common';
 import { TwoFactorService } from '../two-factor/two-factor.service';
+import { TenantDbService } from '../../../tenancy/tenant-db.service';
+import { tryGetTenantContext } from '../../../tenancy/tenant-context';
 
 const authUserSelect = {
   id: true,
@@ -69,7 +73,17 @@ export class AuthService {
     private readonly redisService: RedisService,
     private readonly configService: ConfigService,
     private readonly twoFactorService: TwoFactorService,
+    @Optional() private readonly tenantDb?: TenantDbService,
   ) {}
+
+  private async db(): Promise<PrismaClient> {
+    const tenant = await this.tenantDb?.tryGet();
+    if (tenant) return tenant;
+    if ((process.env.TENANCY_ENABLED || 'false') === 'true') {
+      throw new ServiceUnavailableException('TENANT_IDENTITY_CONTEXT_REQUIRED');
+    }
+    return this.prisma as PrismaClient;
+  }
 
   /**
    * Login user
@@ -85,10 +99,12 @@ export class AuthService {
   }
 
   async completeAdminTwoFactor(challengeToken: string, code: string) {
+    const db = await this.db();
     let challenge: {
       userId?: string;
       purpose?: string;
       sessionVersion?: number;
+      organizationId?: string;
     };
     try {
       challenge = await this.jwtService.verifyAsync(challengeToken, {
@@ -104,7 +120,14 @@ export class AuthService {
     if (challenge.purpose !== 'ADMIN_TWO_FACTOR' || !challenge.userId) {
       throw new UnauthorizedException('Invalid authentication challenge');
     }
-    const user = await this.prisma.user.findUnique({
+    const organizationId = tryGetTenantContext()?.organizationId;
+    if (
+      (process.env.TENANCY_ENABLED || 'false') === 'true' &&
+      (!organizationId || challenge.organizationId !== organizationId)
+    ) {
+      throw new UnauthorizedException('Invalid authentication challenge');
+    }
+    const user = await db.user.findUnique({
       where: { id: challenge.userId },
       select: authUserSelect,
     });
@@ -154,12 +177,14 @@ export class AuthService {
     }
 
     if (user.twoFactorEnabled) {
+      const organizationId = tryGetTenantContext()?.organizationId;
       const challengeToken = await this.jwtService.signAsync(
         {
           sub: user.id,
           userId: user.id,
           purpose: 'ADMIN_TWO_FACTOR',
           sessionVersion: user.staffSessionVersion,
+          ...(organizationId ? { organizationId } : {}),
         },
         {
           secret: this.configService.getOrThrow<string>(
@@ -183,6 +208,7 @@ export class AuthService {
     loginDto: LoginDto,
     audience: 'CUSTOMER' | 'ADMIN',
   ): Promise<AuthUserRecord> {
+    const db = await this.db();
     const identifier = loginDto.email.trim().toLowerCase();
     const digits = identifier.replace(/\D/g, '');
     const phoneNorm =
@@ -192,7 +218,7 @@ export class AuthService {
           : '+88' + (digits.startsWith('0') ? digits : '0' + digits)
         : null;
 
-    const user = await this.prisma.user.findFirst({
+    const user = await db.user.findFirst({
       where: {
         OR: [
           { email: identifier },
@@ -230,7 +256,7 @@ export class AuthService {
 
     const isValid = await bcrypt.compare(loginDto.password, user.password);
     if (!isValid) {
-      const failedLogin = await this.recordFailedLogin(user);
+      const failedLogin = await this.recordFailedLogin(db, user);
       this.logger.warn('authentication_login_rejected', {
         method: 'PASSWORD',
         audience,
@@ -255,7 +281,7 @@ export class AuthService {
     }
 
     if (user.failedLoginAttempts > 0 || user.lockUntil) {
-      await this.prisma.user.update({
+      await db.user.update({
         where: { id: user.id },
         data: { failedLoginAttempts: 0, lockUntil: null },
       });
@@ -264,14 +290,14 @@ export class AuthService {
     return user;
   }
 
-  private async recordFailedLogin(user: AuthUserRecord) {
+  private async recordFailedLogin(db: PrismaClient, user: AuthUserRecord) {
     const attempts = user.failedLoginAttempts + 1;
     const shouldLock = attempts >= this.MAX_LOGIN_ATTEMPTS;
     const lockUntil = shouldLock
       ? new Date(Date.now() + this.LOGIN_LOCK_MINUTES * 60 * 1000)
       : null;
 
-    await this.prisma.user.update({
+    await db.user.update({
       where: { id: user.id },
       data: {
         failedLoginAttempts: shouldLock ? 0 : attempts,
@@ -297,10 +323,11 @@ export class AuthService {
    * Register new user
    */
   async register(registerDto: RegisterDto) {
+    const db = await this.db();
     const { name, email, password, phoneNumber } = registerDto;
     const normalizedEmail = email.trim().toLowerCase();
 
-    const existingUser = await this.prisma.user.findUnique({
+    const existingUser = await db.user.findUnique({
       where: { email: normalizedEmail },
       select: { id: true },
     });
@@ -316,7 +343,7 @@ export class AuthService {
 
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    const user = await this.prisma.user.create({
+    const user = await db.user.create({
       data: {
         name: name.trim(),
         email: normalizedEmail,
@@ -346,8 +373,9 @@ export class AuthService {
   }
 
   async verifyEmail(email: string, otp: string) {
+    const db = await this.db();
     const normalizedEmail = email.trim().toLowerCase();
-    const existing = await this.prisma.user.findFirst({
+    const existing = await db.user.findFirst({
       where: { email: normalizedEmail, isDeleted: false },
       select: { id: true, isEmailVerified: true },
     });
@@ -359,7 +387,7 @@ export class AuthService {
     }
 
     await this.otpService.verifyOtp(normalizedEmail, otp, OtpType.VERIFY);
-    const user = await this.prisma.user.update({
+    const user = await db.user.update({
       where: { id: existing.id },
       data: { isEmailVerified: true },
       select: authUserSelect,
@@ -369,8 +397,9 @@ export class AuthService {
   }
 
   async resendEmailVerification(email: string) {
+    const db = await this.db();
     const normalizedEmail = email.trim().toLowerCase();
-    const user = await this.prisma.user.findFirst({
+    const user = await db.user.findFirst({
       where: { email: normalizedEmail, isDeleted: false },
       select: { id: true, isEmailVerified: true },
     });
@@ -397,6 +426,7 @@ export class AuthService {
    * Refresh access token
    */
   async refreshToken(refreshToken: string) {
+    const db = await this.db();
     const client = await this.redisService.getClient();
     // Fail closed: without Redis we cannot consult the revocation blacklist,
     // so refresh must be refused rather than risk accepting revoked tokens.
@@ -422,7 +452,11 @@ export class AuthService {
       }
     }
 
-    let payload: { userId?: string; sessionVersion?: number };
+    let payload: {
+      userId?: string;
+      sessionVersion?: number;
+      organizationId?: string;
+    };
     try {
       payload = await this.jwtService.verifyAsync(refreshToken, {
         secret: this.configService.getOrThrow<string>('JWT_REFRESH_SECRET'),
@@ -442,7 +476,20 @@ export class AuthService {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
-    const user = await this.prisma.user.findUnique({
+    const organizationId = tryGetTenantContext()?.organizationId;
+    if (
+      (process.env.TENANCY_ENABLED || 'false') === 'true' &&
+      (!organizationId || payload.organizationId !== organizationId)
+    ) {
+      this.logger.warn('authentication_refresh_rejected', {
+        reason: 'TENANT_MISMATCH',
+        tokenOrganizationId: payload.organizationId,
+        resolvedOrganizationId: organizationId,
+      });
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    const user = await db.user.findUnique({
       where: { id: payload.userId },
       select: authUserSelect,
     });
@@ -485,7 +532,8 @@ export class AuthService {
    * Forgot password
    */
   async forgotPassword(email: string) {
-    const user = await this.prisma.user.findFirst({
+    const db = await this.db();
+    const user = await db.user.findFirst({
       where: { email: email.toLowerCase(), isDeleted: false },
       select: { id: true },
     });
@@ -513,10 +561,11 @@ export class AuthService {
    * Reset password
    */
   async resetPassword(email: string, otp: string, newPassword: string) {
+    const db = await this.db();
     await this.otpService.verifyOtp(email, otp, OtpType.RESET);
     const hashedPassword = await bcrypt.hash(newPassword, 12);
 
-    await this.prisma.user.update({
+    await db.user.update({
       where: { email: email.toLowerCase() },
       data: { password: hashedPassword },
     });
@@ -533,6 +582,13 @@ export class AuthService {
       'id' | 'email' | 'role' | 'staffPermissions' | 'staffSessionVersion'
     >,
   ) {
+    const organizationId = tryGetTenantContext()?.organizationId;
+    if (
+      (process.env.TENANCY_ENABLED || 'false') === 'true' &&
+      !organizationId
+    ) {
+      throw new ServiceUnavailableException('TENANT_IDENTITY_CONTEXT_REQUIRED');
+    }
     const payload = {
       sub: user.id,
       id: user.id,
@@ -541,6 +597,7 @@ export class AuthService {
       role: user.role,
       permissions: user.staffPermissions,
       sessionVersion: user.staffSessionVersion,
+      ...(organizationId ? { organizationId } : {}),
     };
 
     const accessExpiry = this.configService.get<string>(
@@ -598,6 +655,7 @@ export class AuthService {
    * OAuth login
    */
   async oauthLogin(oauthLoginDto: OAuthLoginDto) {
+    const db = await this.db();
     const { provider, idToken } = oauthLoginDto;
     if (provider !== OAuthProvider.GOOGLE) {
       this.logger.warn('authentication_oauth_rejected', {
@@ -616,7 +674,7 @@ export class AuthService {
     const prismaProvider = PrismaOAuthProvider.google;
 
     const normalizedEmail = email.trim().toLowerCase();
-    const user = await this.prisma.$transaction(async (transaction) => {
+    const user = await db.$transaction(async (transaction) => {
       const linkedAccount = await transaction.oAuthAccount.findUnique({
         where: {
           authProvider_providerId: {

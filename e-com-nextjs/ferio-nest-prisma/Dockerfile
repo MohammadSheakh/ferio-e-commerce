@@ -47,7 +47,7 @@ COPY --from=build /app/scripts/docker-entrypoint.sh /usr/local/bin/docker-entryp
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 USER ferio
-EXPOSE 6733
+EXPOSE 6733 6734
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
   CMD wget -qO- http://localhost:6733/api/v1/health || exit 1

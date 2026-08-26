@@ -1,11 +1,12 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Injectable, Logger, Optional, ServiceUnavailableException } from '@nestjs/common';
+import { Prisma, PrismaClient } from '@prisma/client';
 
 import { RedisService } from '@app/redis';
 import { PrismaService } from '@app/database';
 import { scopedRedisKey } from '../../../tenancy/redis-keys.util';
 import { USER_CACHE_CONFIG } from './user.constants';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { TenantDbService } from '../../../tenancy/tenant-db.service';
 
 const publicUserSelect = {
   id: true,
@@ -44,7 +45,17 @@ export class UserService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly redisService: RedisService,
+    @Optional() private readonly tenantDb?: TenantDbService,
   ) {}
+
+  private async db(): Promise<PrismaClient> {
+    const tenant = await this.tenantDb?.tryGet();
+    if (tenant) return tenant;
+    if ((process.env.TENANCY_ENABLED || 'false') === 'true') {
+      throw new ServiceUnavailableException('TENANT_IDENTITY_CONTEXT_REQUIRED');
+    }
+    return this.prisma as PrismaClient;
+  }
 
   private getCacheKey(type: 'profile' | 'stats', id: string): string {
     return type === 'profile'
@@ -53,7 +64,8 @@ export class UserService {
   }
 
   async findById(id: string): Promise<PublicUserRecord | null> {
-    return this.prisma.user.findUnique({
+    const db = await this.db();
+    return db.user.findUnique({
       where: { id, isDeleted: false },
       select: publicUserSelect,
     });
@@ -63,7 +75,8 @@ export class UserService {
     email: string,
     includePassword = false,
   ): Promise<PublicUserRecord | UserWithPasswordRecord | null> {
-    return this.prisma.user.findFirst({
+    const db = await this.db();
+    return db.user.findFirst({
       where: {
         email: email.toLowerCase(),
         isDeleted: false,
@@ -80,6 +93,7 @@ export class UserService {
     userId: string,
     dto: UpdateProfileDto,
   ): Promise<PublicUserRecord | null> {
+    const db = await this.db();
     const { name, phoneNumber, email, ...profileData } = dto as any;
 
     const updateData: Prisma.UserUpdateInput = {};
@@ -96,7 +110,7 @@ export class UserService {
       };
     }
 
-    const updatedUser = await this.prisma.user.update({
+    const updatedUser = await db.user.update({
       where: { id: userId },
       data: updateData,
       select: publicUserSelect,
@@ -128,7 +142,8 @@ export class UserService {
   }
 
   async updatePreferredTime(userId: string, preferredTime: string): Promise<PublicUserRecord | null> {
-    const result = await this.prisma.user.update({
+    const db = await this.db();
+    const result = await db.user.update({
       where: { id: userId },
       data: { preferredTime },
       select: publicUserSelect,
@@ -146,11 +161,12 @@ export class UserService {
   }
 
   private async fetchUserStatistics(userId: string) {
+    const db = await this.db();
     const baseWhere = {
       isDeleted: false,
       OR: [{ accountCreatorId: userId }], 
     };
-    const totalChildren = await this.prisma.user.count({ where: baseWhere });
+    const totalChildren = await db.user.count({ where: baseWhere });
     return { totalChildren };
   }
 }

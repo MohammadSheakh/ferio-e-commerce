@@ -1,4 +1,5 @@
 import { TenantDatabaseManager } from './tenant-database.manager';
+import { PrismaClient } from '@prisma/client';
 import { decryptSecret, encryptSecret } from '../platform/utils/secret-box';
 
 jest.mock('@prisma/client', () => ({
@@ -24,6 +25,7 @@ describe('TenantDatabaseManager (ADR-0003)', () => {
     process.env.PLATFORM_DB_CREDENTIAL_KEY = 'test-credential-key-at-least-32-chars!!';
     process.env.TENANT_DB_MAX_CLIENTS = '3';
     process.env.TENANT_DB_IDLE_TTL_SECONDS = '300';
+    process.env.TENANT_DB_EVICTION_GRACE_MS = '0';
     jest.clearAllMocks();
   });
 
@@ -42,6 +44,114 @@ describe('TenantDatabaseManager (ADR-0003)', () => {
 
     expect(clientB).toBe(clientA);
     expect(manager.metrics()).toMatchObject({ activeClients: 1 });
+
+    await manager.onModuleDestroy();
+  });
+
+  it('single-flights concurrent cold requests for the same tenant', async () => {
+    const manager = newManager();
+
+    const [clientA, clientB, clientC] = await Promise.all([
+      manager.getClient(material('tdb-cold')),
+      manager.getClient(material('tdb-cold')),
+      manager.getClient(material('tdb-cold')),
+    ]);
+
+    expect(clientB).toBe(clientA);
+    expect(clientC).toBe(clientA);
+    expect(PrismaClient).toHaveBeenCalledTimes(1);
+    expect(manager.metrics()).toMatchObject({
+      activeClients: 1,
+      pendingClients: 0,
+    });
+    await manager.onModuleDestroy();
+  });
+
+  it('drains in-flight client creation during shutdown', async () => {
+    let releaseConnect!: () => void;
+    const connectGate = new Promise<void>((resolve) => {
+      releaseConnect = resolve;
+    });
+    const disconnect = jest.fn().mockResolvedValue(undefined);
+    jest.mocked(PrismaClient).mockImplementationOnce(
+      () =>
+        ({
+          $connect: jest.fn().mockReturnValue(connectGate),
+          $disconnect: disconnect,
+        }) as unknown as PrismaClient,
+    );
+    const manager = newManager();
+    const acquisition = manager.getClient(material('tdb-shutdown'));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const shutdown = manager.onModuleDestroy();
+    await expect(manager.getClient(material('tdb-late'))).rejects.toThrow(
+      'TENANT_DATABASE_MANAGER_SHUTTING_DOWN',
+    );
+    releaseConnect();
+    await acquisition;
+    await shutdown;
+
+    expect(disconnect).toHaveBeenCalledTimes(1);
+    expect(manager.metrics()).toMatchObject({ activeClients: 0, pendingClients: 0 });
+  });
+
+  it('releases a cold transient fleet client after its operation', async () => {
+    const manager = newManager();
+
+    await manager.runTransient(material('tdb-fleet'), async () => {
+      const leased = await manager.getClient(material('tdb-fleet'));
+      expect(leased).toBeDefined();
+      expect(manager.metrics().activeClients).toBe(1);
+    });
+
+    expect(manager.metrics().activeClients).toBe(0);
+    await manager.onModuleDestroy();
+  });
+
+  it('retains a transient client acquired by an external request', async () => {
+    const manager = newManager();
+    let releaseOperation!: () => void;
+    const operationGate = new Promise<void>((resolve) => {
+      releaseOperation = resolve;
+    });
+    const transient = manager.runTransient(material('tdb-shared'), () => operationGate);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    await manager.getClient(material('tdb-shared'));
+    releaseOperation();
+    await transient;
+
+    expect(manager.metrics().activeClients).toBe(1);
+    await manager.onModuleDestroy();
+  });
+
+  it('releases a cold client after overlapping transient leases finish', async () => {
+    const manager = newManager();
+    let releaseFirst!: () => void;
+    let releaseSecond!: () => void;
+    const firstGate = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    const secondGate = new Promise<void>((resolve) => {
+      releaseSecond = resolve;
+    });
+
+    const first = manager.runTransient(material('tdb-overlap'), () => firstGate);
+    await Promise.resolve();
+    await Promise.resolve();
+    const second = manager.runTransient(material('tdb-overlap'), () => secondGate);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    releaseFirst();
+    await first;
+    expect(manager.metrics().activeClients).toBe(1);
+    releaseSecond();
+    await second;
+    expect(manager.metrics().activeClients).toBe(0);
 
     await manager.onModuleDestroy();
   });

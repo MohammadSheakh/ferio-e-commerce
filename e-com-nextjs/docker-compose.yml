@@ -132,6 +132,7 @@ services:
         condition: service_completed_successfully
     ports:
       - "6733:6733"
+      - "6734:6734"
     environment:
       DATABASE_URL: postgresql://ferio:${POSTGRES_PASSWORD:-ferio}@postgres:5432/ferio_dev
       PLATFORM_DATABASE_URL: postgresql://ferio:${POSTGRES_PASSWORD:-ferio}@postgres:5432/ferio_platform
@@ -140,6 +141,7 @@ services:
       NODE_ENV: development
       TENANCY_ENABLED: ${TENANCY_ENABLED:-false}
       PORT: "6733"
+      SOCKET_PORT: "6734"
       PLATFORM_INITIAL_SUPERADMIN_EMAIL: ${PLATFORM_INITIAL_SUPERADMIN_EMAIL:-owner@ferio.local}
       PLATFORM_INITIAL_SUPERADMIN_PASSWORD_HASH: ${PLATFORM_INITIAL_SUPERADMIN_PASSWORD_HASH:-}
       JWT_SECRET: ${JWT_ACCESS_SECRET:-}
@@ -169,8 +171,9 @@ services:
     ports:
       - "3000:3000"
     environment:
-      NEXT_PUBLIC_FERIO_API_URL: http://backend:6733/api/v1
+      NEXT_PUBLIC_FERIO_API_URL: ${PUBLIC_FERIO_API_URL:-http://localhost:6733/api/v1}
       FERIO_API_URL: http://backend:6733/api/v1
+      NEXT_PUBLIC_SOCKET_URL: ${PUBLIC_SOCKET_URL:-http://localhost:6734}
 
   # ── Admin Web ──
   admin-web:
@@ -183,7 +186,9 @@ services:
     ports:
       - "3001:3000"
     environment:
-      NEXT_PUBLIC_FERIO_API_URL: http://backend:6733/api/v1
+      NEXT_PUBLIC_FERIO_API_URL: ${PUBLIC_FERIO_API_URL:-http://localhost:6733/api/v1}
+      FERIO_API_URL: http://backend:6733/api/v1
+      NEXT_PUBLIC_SOCKET_URL: ${PUBLIC_SOCKET_URL:-http://localhost:6734}
 
   # ── Platform Admin ──
   platform-admin:

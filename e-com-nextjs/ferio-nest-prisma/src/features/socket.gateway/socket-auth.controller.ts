@@ -35,7 +35,10 @@ export class SocketAuthController {
   @Post('guest-ticket')
   @Public()
   async issueGuestTicket(@Body() dto: GuestSocketTicketDto) {
-    const token = await this.socketAuthService.issueGuestSocketTicket(dto.guestId);
+    const token = await this.socketAuthService.issueGuestSocketTicket(
+      dto.guestId,
+      tryGetTenantContext()?.organizationId,
+    );
     if (!token) throw new BadRequestException('A valid guest chat ID is required');
     return { token, expiresInSeconds: 300 };
   }
