@@ -1,6 +1,6 @@
 import type { Socket } from 'socket.io';
 
-import { SocketAuthService } from './socket-auth.service';
+import { SocketAuthService, socketPresenceKeys } from './socket-auth.service';
 
 const guestId = 'gst_123e4567-e89b-42d3-a456-426614174000';
 
@@ -12,11 +12,23 @@ function socket(auth: Record<string, unknown>): Socket {
 }
 
 describe('SocketAuthService', () => {
+  const originalEnv = { ...process.env };
   const jwtService = {
     verifyAsync: jest.fn(),
     signAsync: jest.fn(),
   };
-  const redis = {};
+  const pipeline = {
+    sadd: jest.fn(),
+    hset: jest.fn(),
+    exec: jest.fn().mockResolvedValue([]),
+  };
+  const redis = {
+    multi: jest.fn(() => pipeline),
+    eval: jest.fn(),
+    sismember: jest.fn(),
+    smembers: jest.fn(),
+    scard: jest.fn(),
+  };
   const prisma = {
     user: { findUnique: jest.fn() },
   };
@@ -25,6 +37,98 @@ describe('SocketAuthService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     service = new SocketAuthService(jwtService as never, redis as never, prisma as never);
+  });
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+  });
+
+  it('uses different presence namespaces for identical IDs in two tenants', () => {
+    const tenantA = socketPresenceKeys('org-a');
+    const tenantB = socketPresenceKeys('org-b');
+
+    expect(tenantA.onlineUsers).not.toBe(tenantB.onlineUsers);
+    expect(tenantA.userSockets('user-1')).not.toBe(
+      tenantB.userSockets('user-1'),
+    );
+  });
+
+  it('tracks multiple sockets without replacing an existing connection', async () => {
+    const user = {
+      userId: 'user-1',
+      role: 'user',
+      name: 'Customer',
+      organizationId: 'org-a',
+    };
+    const secondSocket = { ...socket({}), id: 'socket-2' } as Socket;
+
+    await service.handleUserConnection(socket({}), user);
+    await service.handleUserConnection(secondSocket, user);
+
+    const keys = socketPresenceKeys('org-a');
+    expect(pipeline.sadd).toHaveBeenCalledWith(
+      keys.userSockets('user-1'),
+      'socket-12345678',
+    );
+    expect(pipeline.sadd).toHaveBeenCalledWith(
+      keys.userSockets('user-1'),
+      'socket-2',
+    );
+  });
+
+  it('marks a user offline only after the last socket disconnects', async () => {
+    const user = {
+      userId: 'user-1',
+      role: 'user',
+      name: 'Customer',
+      organizationId: 'org-a',
+    };
+    redis.eval.mockResolvedValueOnce(1).mockResolvedValueOnce(0);
+
+    await expect(service.handleUserDisconnection(socket({}), user)).resolves.toBe(false);
+    await expect(service.handleUserDisconnection(socket({}), user)).resolves.toBe(true);
+  });
+
+  it('rejects organization-free presence reads in strict mode', async () => {
+    process.env.TENANCY_ENABLED = 'true';
+    await expect(service.getAllOnlineUsers()).rejects.toThrow(
+      'SOCKET_ORGANIZATION_REQUIRED',
+    );
+  });
+
+  it('re-enters the signed organization for conversation authorization', async () => {
+    process.env.TENANCY_ENABLED = 'true';
+    const tenantDb = {
+      tryGet: jest.fn().mockResolvedValue({
+        user: { findUnique: jest.fn().mockResolvedValue({ customerId: 'customer-1' }) },
+      }),
+    };
+    const fanout = {
+      forOrganization: jest.fn((_organizationId, operation) => operation()),
+    };
+    const tenantService = new SocketAuthService(
+      jwtService as never,
+      redis as never,
+      prisma as never,
+      tenantDb as never,
+      fanout as never,
+    );
+
+    await expect(
+      tenantService.canAccessConversation(
+        {
+          userId: 'user-1',
+          role: 'user',
+          name: 'Customer',
+          organizationId: 'org-a',
+        },
+        'conv-customer-1',
+      ),
+    ).resolves.toBe(true);
+    expect(fanout.forOrganization).toHaveBeenCalledWith(
+      'org-a',
+      expect.any(Function),
+    );
   });
 
   it('never grants admin access from handshake role fields', async () => {

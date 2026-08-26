@@ -1,4 +1,4 @@
-import { Injectable, Inject, Logger, OnModuleInit, Optional } from '@nestjs/common';
+import { Injectable, Inject, Logger, Optional } from '@nestjs/common';
 import { Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { Redis } from 'ioredis';
@@ -26,11 +26,15 @@ export function scopedSocketRoom(user: { organizationId?: string } | null | unde
 const ADMIN_ROLES = new Set(['admin', 'super_admin', 'super-admin']);
 const GUEST_ID_PATTERN = /^gst_[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-interface UserConnectionInfo {
-  socketId: string;
-  workerId: string;
-  connectedAt: number;
-  userInfo?: any;
+export function socketPresenceKeys(organizationId?: string) {
+  const scope = organizationId ? `org:${organizationId}` : 'legacy';
+  const prefix = `chat:presence:${scope}`;
+  return {
+    onlineUsers: `${prefix}:online-users`,
+    userSockets: (userId: string) => `${prefix}:user:${userId}:sockets`,
+    socketUser: (socketId: string) => `${prefix}:socket:${socketId}`,
+    userStatus: (userId: string) => `${prefix}:user:${userId}:status`,
+  };
 }
 
 /**
@@ -39,14 +43,8 @@ interface UserConnectionInfo {
  * 📚 SOCKET.IO AUTHENTICATION & USER TRACKING
  */
 @Injectable()
-export class SocketAuthService implements OnModuleInit {
+export class SocketAuthService {
   private readonly logger = new Logger(SocketAuthService.name);
-  private readonly KEYS = {
-    ONLINE_USERS: 'chat:online_users',
-    USER_SOCKET_MAP: 'chat:user_socket_map:',
-    SOCKET_USER_MAP: 'chat:socket_user_map:',
-    USER_STATUS: 'chat:user_status:',
-  };
 
   constructor(
     private jwtService: JwtService,
@@ -67,10 +65,6 @@ export class SocketAuthService implements OnModuleInit {
       throw new Error('SOCKET_TENANT_CONTEXT_REQUIRED');
     }
     return this.prisma as unknown as PrismaClient;
-  }
-
-  onModuleInit() {
-    this.startCleanupJob();
   }
 
   /**
@@ -212,23 +206,24 @@ export class SocketAuthService implements OnModuleInit {
   }
 
   async canAccessConversation(user?: SocketUser | null, conversationId?: string): Promise<boolean> {
-    const db = await this.db();
     if (!user || !conversationId) return false;
     if (this.isAdmin(user.role)) return true;
 
-    const allowedIds = new Set([user.userId, `conv-${user.userId}`]);
-    if (user.role !== 'guest' && user.userId) {
-      const account = await db.user.findUnique({
-        where: { id: user.userId },
-        select: { customerId: true },
-      });
-      if (account?.customerId) {
-        allowedIds.add(account.customerId);
-        allowedIds.add(`conv-${account.customerId}`);
+    return this.inOrganization(user.organizationId, async () => {
+      const allowedIds = new Set([user.userId, `conv-${user.userId}`]);
+      if (user.role !== 'guest' && user.userId) {
+        const db = await this.db();
+        const account = await db.user.findUnique({
+          where: { id: user.userId },
+          select: { customerId: true },
+        });
+        if (account?.customerId) {
+          allowedIds.add(account.customerId);
+          allowedIds.add(`conv-${account.customerId}`);
+        }
       }
-    }
-
-    return allowedIds.has(conversationId);
+      return allowedIds.has(conversationId);
+    });
   }
 
   isAdmin(role?: string) {
@@ -243,47 +238,33 @@ export class SocketAuthService implements OnModuleInit {
   /**
    * Handle User Connection
    */
-  async handleUserConnection(socket: Socket, user: { userId: string; role: string }): Promise<string | null> {
+  async handleUserConnection(socket: Socket, user: SocketUser): Promise<void> {
     const userId = user.userId;
     const socketId = socket.id;
     const workerId = process.pid.toString();
-
-    // Check for existing connection
-    const existingInfo = await this.getUserConnectionInfo(userId);
-
-    if (existingInfo && existingInfo.socketId !== socketId) {
-      this.logger.log(
-        `🔄 User ${userId} reconnecting. Old socket: ${existingInfo.socketId}, New socket: ${socketId}`,
-      );
-
-      // Clean up old socket mapping
-      await this.redisClient.del(`${this.KEYS.SOCKET_USER_MAP}${existingInfo.socketId}`);
-
-      // Return old socket ID so caller can disconnect it
-      return existingInfo.socketId;
-    }
 
     // Add new connection
     await this.addOnlineUser(userId, socketId, workerId, user);
 
     this.logger.log(`✅ User ${userId} connected (Socket: ${socketId}, Worker: ${workerId})`);
 
-    return null;
   }
 
   /**
    * Handle User Disconnection
    */
-  async handleUserDisconnection(socket: Socket, userId: string): Promise<void> {
+  async handleUserDisconnection(socket: Socket, user: SocketUser): Promise<boolean> {
+    const userId = user.userId;
     const socketId = socket.id;
 
     this.logger.log(`🔌 User disconnected: ${userId} (Socket: ${socketId})`);
 
     try {
       // Remove from Redis state
-      await this.removeOnlineUser(userId, socketId);
+      return await this.removeOnlineUser(user, socketId);
     } catch (error) {
       this.logger.error(`❌ Error handling user disconnection: ${error.message}`);
+      return false;
     }
   }
 
@@ -304,26 +285,26 @@ export class SocketAuthService implements OnModuleInit {
     workerId: string,
     userInfo?: any,
   ): Promise<void> {
+    const organizationId = (userInfo as SocketUser | undefined)?.organizationId;
+    const keys = this.keysFor(organizationId);
     const pipeline = this.redisClient.multi();
 
     // Add to online users set
-    pipeline.sadd(this.KEYS.ONLINE_USERS, userId);
+    pipeline.sadd(keys.onlineUsers, userId);
 
-    // Store user-socket mapping
-    pipeline.hset(`${this.KEYS.USER_SOCKET_MAP}${userId}`, {
-      socketId,
+    // A user may have multiple tabs/devices in the same organization.
+    pipeline.sadd(keys.userSockets(userId), socketId);
+
+    // Store reverse socket ownership for diagnostics and cleanup.
+    pipeline.hset(keys.socketUser(socketId), {
+      userId,
       workerId,
       connectedAt: Date.now().toString(),
       userInfo: JSON.stringify(userInfo || {}),
     });
 
-    // Store socket-user mapping
-    pipeline.hset(`${this.KEYS.SOCKET_USER_MAP}${socketId}`, {
-      userId,
-    });
-
     // Set user status
-    pipeline.hset(`${this.KEYS.USER_STATUS}${userId}`, {
+    pipeline.hset(keys.userStatus(userId), {
       isOnline: 'true',
       lastSeen: Date.now().toString(),
       workerId,
@@ -337,60 +318,49 @@ export class SocketAuthService implements OnModuleInit {
   /**
    * Remove Online User from Redis
    */
-  private async removeOnlineUser(userId: string, socketId: string): Promise<void> {
-    const pipeline = this.redisClient.multi();
-
-    // Remove from online users set
-    pipeline.srem(this.KEYS.ONLINE_USERS, userId);
-
-    // Remove user-socket mapping
-    pipeline.del(`${this.KEYS.USER_SOCKET_MAP}${userId}`);
-
-    // Remove socket-user mapping
-    pipeline.del(`${this.KEYS.SOCKET_USER_MAP}${socketId}`);
-
-    // Update user status to offline
-    pipeline.hset(`${this.KEYS.USER_STATUS}${userId}`, {
-      isOnline: 'false',
-      lastSeen: Date.now().toString(),
-    });
-
-    await pipeline.exec();
-
-    this.logger.debug(`❌ User ${userId} removed from Redis state`);
-  }
-
-  /**
-   * Get User Connection Info
-   */
-  async getUserConnectionInfo(userId: string): Promise<UserConnectionInfo | null> {
-    const info = await this.redisClient.hgetall(`${this.KEYS.USER_SOCKET_MAP}${userId}`);
-
-    if (!info || Object.keys(info).length === 0) {
-      return null;
-    }
-
-    return {
-      socketId: info.socketId,
-      workerId: info.workerId,
-      connectedAt: parseInt(info.connectedAt, 10),
-      userInfo: info.userInfo ? JSON.parse(info.userInfo) : undefined,
-    };
+  private async removeOnlineUser(user: SocketUser, socketId: string): Promise<boolean> {
+    const keys = this.keysFor(user.organizationId);
+    const remaining = Number(
+      await this.redisClient.eval(
+        `redis.call('SREM', KEYS[1], ARGV[2])
+         redis.call('DEL', KEYS[2])
+         local remaining = redis.call('SCARD', KEYS[1])
+         if remaining == 0 then
+           redis.call('SREM', KEYS[3], ARGV[1])
+           redis.call('HSET', KEYS[4], 'isOnline', 'false', 'lastSeen', ARGV[3])
+         end
+         return remaining`,
+        4,
+        keys.userSockets(user.userId),
+        keys.socketUser(socketId),
+        keys.onlineUsers,
+        keys.userStatus(user.userId),
+        user.userId,
+        socketId,
+        Date.now().toString(),
+      ),
+    );
+    const offline = remaining === 0;
+    this.logger.debug(`User ${user.userId} socket removed; remaining=${remaining}`);
+    return offline;
   }
 
   /**
    * Check if User is Online
    */
-  async isUserOnline(userId: string): Promise<boolean> {
-    const isMember = await this.redisClient.sismember(this.KEYS.ONLINE_USERS, userId);
+  async isUserOnline(userId: string, organizationId?: string): Promise<boolean> {
+    const isMember = await this.redisClient.sismember(
+      this.keysFor(organizationId).onlineUsers,
+      userId,
+    );
     return isMember === 1;
   }
 
   /**
    * Get All Online Users
    */
-  async getAllOnlineUsers(): Promise<string[]> {
-    return await this.redisClient.smembers(this.KEYS.ONLINE_USERS);
+  async getAllOnlineUsers(organizationId?: string): Promise<string[]> {
+    return await this.redisClient.smembers(this.keysFor(organizationId).onlineUsers);
   }
 
   /**
@@ -398,13 +368,15 @@ export class SocketAuthService implements OnModuleInit {
    * 
    * Returns online users that the current user is related to (family or conversations)
    */
-  async getRelatedOnlineUsers(userId: string): Promise<string[]> {
-    const db = await this.db();
+  async getRelatedOnlineUsers(socketUser: SocketUser): Promise<string[]> {
+    const userId = socketUser.userId;
     try {
-      const allOnlineUsers = await this.getAllOnlineUsers();
-      if (allOnlineUsers.length === 0) return [];
+      return await this.inOrganization(socketUser.organizationId, async () => {
+        const db = await this.db();
+        const allOnlineUsers = await this.getAllOnlineUsers(socketUser.organizationId);
+        if (allOnlineUsers.length === 0) return [];
 
-      const relatedUserIds = new Set<string>();
+        const relatedUserIds = new Set<string>();
 
       // 1. Get family-related users from Prisma
       const user = await db.user.findUnique({
@@ -445,7 +417,8 @@ export class SocketAuthService implements OnModuleInit {
         relatedUserIds.has(onlineId) || onlineId === userId
       );
 
-      return relatedOnlineUsers;
+        return relatedOnlineUsers;
+      });
     } catch (error) {
       this.logger.error(`❌ Error getting related online users: ${error.message}`);
       return [];
@@ -455,41 +428,25 @@ export class SocketAuthService implements OnModuleInit {
   /**
    * Get Online Users Count
    */
-  async getOnlineUsersCount(): Promise<number> {
-    return await this.redisClient.scard(this.KEYS.ONLINE_USERS);
+  async getOnlineUsersCount(organizationId?: string): Promise<number> {
+    return await this.redisClient.scard(this.keysFor(organizationId).onlineUsers);
   }
 
   /**
    * Get System Stats
    */
-  async getSystemStats(): Promise<any> {
+  async getSystemStats(organizationId?: string): Promise<any> {
     return {
-      totalOnlineUsers: await this.getOnlineUsersCount(),
-      onlineUsers: await this.getAllOnlineUsers(),
+      totalOnlineUsers: await this.getOnlineUsersCount(organizationId),
+      onlineUsers: await this.getAllOnlineUsers(organizationId),
       timestamp: Date.now(),
     };
   }
 
-  /**
-   * Start Cleanup Job
-   */
-  private startCleanupJob() {
-    setInterval(async () => {
-      try {
-        const onlineUsers = await this.getAllOnlineUsers();
-        const staleThreshold = Date.now() - 5 * 60 * 1000; // 5 minutes
-
-        for (const userId of onlineUsers) {
-          const connectionInfo = await this.getUserConnectionInfo(userId);
-
-          if (connectionInfo && connectionInfo.connectedAt < staleThreshold) {
-            this.logger.warn(`🧹 Cleaning up stale connection for user ${userId}`);
-            await this.removeOnlineUser(userId, connectionInfo.socketId);
-          }
-        }
-      } catch (error) {
-        this.logger.error(`❌ Error in cleanup job: ${error.message}`);
-      }
-    }, 5 * 60 * 1000); // Every 5 minutes
+  private keysFor(organizationId?: string) {
+    if ((process.env.TENANCY_ENABLED || 'false') === 'true' && !organizationId) {
+      throw new Error('SOCKET_ORGANIZATION_REQUIRED');
+    }
+    return socketPresenceKeys(organizationId);
   }
 }

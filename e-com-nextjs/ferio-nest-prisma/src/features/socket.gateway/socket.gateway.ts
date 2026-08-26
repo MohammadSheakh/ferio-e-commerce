@@ -142,7 +142,7 @@ export class SocketGateway
       await this.socketRoomService.autoJoinFamilyRoom(client, user.userId);
 
       // Notify related users about online status
-      await this.notifyRelatedUsersOnlineStatus(user.userId, true);
+      await this.notifyRelatedUsersOnlineStatus(user, true);
 
       // Track initial page view for visitors on storefront / rider portal pages
       const initialPage = (client.handshake.query?.page as string) || '/';
@@ -180,7 +180,8 @@ export class SocketGateway
    * Handle Client Disconnection
    */
   async handleDisconnect(@ConnectedSocket() client: Socket) {
-    const userId = client.data.userId;
+    const user = client.data.user;
+    const userId = user?.userId;
 
     if (this.activePageViews.has(client.id)) {
       this.activePageViews.delete(client.id);
@@ -191,10 +192,15 @@ export class SocketGateway
       this.logger.log(`🔌 User disconnected: ${userId} (Socket: ${client.id})`);
 
       // Handle user disconnection in Redis
-      await this.socketAuthService.handleUserDisconnection(client, userId);
+      const becameOffline = await this.socketAuthService.handleUserDisconnection(
+        client,
+        user,
+      );
 
       // Notify related users about online status
-      await this.notifyRelatedUsersOnlineStatus(userId, false);
+      if (becameOffline) {
+        await this.notifyRelatedUsersOnlineStatus(user, false);
+      }
     }
   }
 
@@ -309,18 +315,23 @@ export class SocketGateway
   /**
    * Notify Related Users about Online Status
    */
-  private async notifyRelatedUsersOnlineStatus(userId: string, isOnline: boolean) {
+  private async notifyRelatedUsersOnlineStatus(
+    user: { userId: string; role: string; name: string; organizationId?: string },
+    isOnline: boolean,
+  ) {
     try {
-      const relatedUsers = await this.socketAuthService.getRelatedOnlineUsers(userId);
+      const relatedUsers = await this.socketAuthService.getRelatedOnlineUsers(user);
 
       for (const relatedUserId of relatedUsers) {
         // Don't notify self
-        if (relatedUserId === userId) continue;
+        if (relatedUserId === user.userId) continue;
 
-        this.server.to(relatedUserId).emit(`related-user-online-status::${relatedUserId}`, {
-          userId,
-          isOnline,
-        });
+        this.server
+          .to(scopedSocketRoom(user, relatedUserId))
+          .emit(`related-user-online-status::${relatedUserId}`, {
+            userId: user.userId,
+            isOnline,
+          });
       }
     } catch (error) {
       this.logger.error(`❌ Failed to notify related users: ${error.message}`);
@@ -396,7 +407,7 @@ export class SocketGateway
       }
 
       // Leave Socket.IO room
-      client.leave(conversationId);
+      client.leave(scopedSocketRoom(client.data?.user, conversationId));
 
       // Update Redis state
       await this.socketRoomService.leaveRoom(userId, conversationId);
@@ -500,26 +511,28 @@ export class SocketGateway
         scopedSocketRoom({ organizationId: senderOrg }, rawConvId),
         scopedSocketRoom({ organizationId: senderOrg }, prefConvId),
       ]);
+      const addRoom = (room: string) =>
+        roomsToEmit.add(scopedSocketRoom({ organizationId: senderOrg }, room));
 
       if (linkedUser) {
         if (linkedUser.id) {
-          roomsToEmit.add(linkedUser.id);
-          roomsToEmit.add(scopedSocketRoom({ organizationId: senderOrg }, `conv-${linkedUser.id}`));
+          addRoom(linkedUser.id);
+          addRoom(`conv-${linkedUser.id}`);
         }
         if (linkedUser.customerId) {
-          roomsToEmit.add(linkedUser.customerId);
-          roomsToEmit.add(scopedSocketRoom({ organizationId: senderOrg }, `conv-${linkedUser.customerId}`));
+          addRoom(linkedUser.customerId);
+          addRoom(`conv-${linkedUser.customerId}`);
         }
       }
 
       if (linkedCustomer) {
         if (linkedCustomer.id) {
-          roomsToEmit.add(linkedCustomer.id);
-          roomsToEmit.add(`conv-${linkedCustomer.id}`);
+          addRoom(linkedCustomer.id);
+          addRoom(`conv-${linkedCustomer.id}`);
         }
         if (linkedCustomer.user?.id) {
-          roomsToEmit.add(linkedCustomer.user.id);
-          roomsToEmit.add(`conv-${linkedCustomer.user.id}`);
+          addRoom(linkedCustomer.user.id);
+          addRoom(`conv-${linkedCustomer.user.id}`);
         }
       }
 
@@ -534,19 +547,19 @@ export class SocketGateway
           }),
         ]);
         if (userByEmail) {
-          roomsToEmit.add(userByEmail.id);
-          roomsToEmit.add(`conv-${userByEmail.id}`);
+          addRoom(userByEmail.id);
+          addRoom(`conv-${userByEmail.id}`);
           if (userByEmail.customerId) {
-            roomsToEmit.add(userByEmail.customerId);
-            roomsToEmit.add(`conv-${userByEmail.customerId}`);
+            addRoom(userByEmail.customerId);
+            addRoom(`conv-${userByEmail.customerId}`);
           }
         }
         if (custByEmail) {
-          roomsToEmit.add(custByEmail.id);
-          roomsToEmit.add(`conv-${custByEmail.id}`);
+          addRoom(custByEmail.id);
+          addRoom(`conv-${custByEmail.id}`);
           if (custByEmail.user?.id) {
-            roomsToEmit.add(custByEmail.user.id);
-            roomsToEmit.add(`conv-${custByEmail.user.id}`);
+            addRoom(custByEmail.user.id);
+            addRoom(`conv-${custByEmail.user.id}`);
           }
         }
       }
@@ -569,12 +582,20 @@ export class SocketGateway
 
       // 3. Direct target emission
       if (payload.senderId) {
-        this.server.to(payload.senderId).emit('new-message-received', payload);
-        this.server.to(`conv-${payload.senderId}`).emit('new-message-received', payload);
+        this.server
+          .to(scopedSocketRoom({ organizationId: senderOrg }, payload.senderId))
+          .emit('new-message-received', payload);
+        this.server
+          .to(scopedSocketRoom({ organizationId: senderOrg }, `conv-${payload.senderId}`))
+          .emit('new-message-received', payload);
       }
       if (payload.guestId) {
-        this.server.to(payload.guestId).emit('new-message-received', payload);
-        this.server.to(`conv-${payload.guestId}`).emit('new-message-received', payload);
+        this.server
+          .to(scopedSocketRoom({ organizationId: senderOrg }, payload.guestId))
+          .emit('new-message-received', payload);
+        this.server
+          .to(scopedSocketRoom({ organizationId: senderOrg }, `conv-${payload.guestId}`))
+          .emit('new-message-received', payload);
       }
 
       // 4. Persist Message & Conversation in Prisma Database
@@ -794,15 +815,17 @@ export class SocketGateway
   @SubscribeMessage('only-related-online-users')
   async handleGetRelatedOnlineUsers(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { userId: string },
+    @MessageBody() _data: { userId?: string },
   ) {
     try {
+      const user = client.data.user;
+      if (!user) return { success: false, message: 'Authentication required' };
       const relatedOnlineUsers = await this.socketAuthService.getRelatedOnlineUsers(
-        data.userId,
+        user,
       );
 
       this.logger.log(
-        `📊 Related online users for ${data.userId}: ${relatedOnlineUsers.length}`,
+        `📊 Related online users for ${user.userId}: ${relatedOnlineUsers.length}`,
       );
 
       return {

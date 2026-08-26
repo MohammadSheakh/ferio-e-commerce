@@ -354,3 +354,41 @@ the configured idle/grace window need database statement timeouts and tracing.
 Durable per-tenant/partition jobs, a distributed non-overlap lease, due-work
 indexes, and per-tenant lag metrics remain required before thousand-tenant
 operation.
+
+## 2026-08-26: Tenant-Scoped Realtime Presence
+
+**Finding:** C-4 (presence and relay-room slice)
+
+**Status:** Partially fixed.
+
+**Changes:**
+
+- Redis online-user, user-socket, socket-user, and status keys now include the
+  signed socket-ticket organization.
+- Presence now stores a set of sockets per user instead of replacing an older
+  tab/device connection.
+- Disconnect cleanup is atomic in Redis and reports offline only when the last
+  socket leaves, preventing one tab from marking all other tabs offline.
+- Removed the incorrect cleanup rule that treated every connection older than
+  five minutes as stale even while it remained healthy.
+- Conversation authorization and related-user lookup re-enter the trusted
+  organization context after socket authentication rather than relying on
+  request-local context that no longer exists.
+- Related-user requests use the authenticated socket identity instead of a
+  caller-supplied user ID.
+- Chat relay targets and conversation leave operations no longer emit to raw
+  global rooms when an organization binding is present.
+
+**Verification:**
+
+- Socket authentication/presence and Redis collision tests: 19/19 passed
+  across 2 suites.
+- Backend production build passed.
+- `git diff --check` passed before commit.
+
+**Commit:** `fix(realtime): isolate tenant presence state`
+
+**Residual risk:** room-membership/activity Redis keys still need complete
+organization scoping. Process-crash stale presence needs heartbeat/TTL cleanup,
+live visitor statistics remain process-local, and gateway chat persistence
+still uses the legacy Prisma client.
