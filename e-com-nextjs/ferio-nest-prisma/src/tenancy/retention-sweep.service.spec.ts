@@ -71,7 +71,7 @@ describe('RetentionSweepService (brutal-audit #7 — unbounded growth)', () => {
     process.env.RETENTION_COMMERCE_MESSAGE_DAYS = '180';
     process.env.RETENTION_STOREFRONT_ANALYTICS_DAYS = '365';
     process.env.RETENTION_GPS_DAYS = '90';
-    delete process.env.RETENTION_AUDIT_LOG_DAYS; // default OFF
+    process.env.RETENTION_AUDIT_LOG_DAYS = '0'; // explicit OFF in this test
   });
 
   it('prunes enabled models at their cutoffs and leaves AuditLog OFF by default', async () => {

@@ -81,8 +81,12 @@ export class RetentionSweepService {
       {
         model: 'auditLog',
         label: 'AuditLog',
-        days: envDays('RETENTION_AUDIT_LOG_DAYS', 0),
-        cutoff: new Date(now.getTime() - 0),
+        // Owner decision #9: security/financial audit records are kept for
+        // 7 years unless a later legal review changes the period.
+        days: envDays('RETENTION_AUDIT_LOG_DAYS', 2_555),
+        cutoff: new Date(
+          now.getTime() - envDays('RETENTION_AUDIT_LOG_DAYS', 2_555) * 86_400_000,
+        ),
       },
     ];
   }
