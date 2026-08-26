@@ -26,6 +26,15 @@ const FACTORY_STORE_NAME = 'Ferio';
 export class TenantSchemaBootstrapper {
   private readonly logger = new StructuredLogger(TenantSchemaBootstrapper.name);
   private readonly migrationsDir = join(process.cwd(), 'prisma', 'migrations');
+  /** Owner decision #14: bounded locks/statements for every tenant migration. */
+  private readonly lockTimeoutMs = Math.max(
+    Number(process.env.TENANT_MIGRATION_LOCK_TIMEOUT_MS ?? 30_000),
+    1000,
+  );
+  private readonly statementTimeoutMs = Math.max(
+    Number(process.env.TENANT_MIGRATION_STATEMENT_TIMEOUT_MS ?? 120_000),
+    1000,
+  );
 
   /** Sorted canonical artifact list — pure for testability. */
   listMigrations(dir = this.migrationsDir): string[] {
@@ -58,8 +67,13 @@ export class TenantSchemaBootstrapper {
       await pool.query(`
         CREATE TABLE IF NOT EXISTS _ferio_tenant_migrations (
           name TEXT PRIMARY KEY,
+          non_transactional BOOLEAN NOT NULL DEFAULT false,
           applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
         )
+      `);
+      // Ledger upgrade for databases created before this column existed.
+      await pool.query(`ALTER TABLE _ferio_tenant_migrations ADD COLUMN IF NOT EXISTS non_transactional BOOLEAN NOT NULL DEFAULT false`);
+      await pool.query(`
       `);
 
       const migrations = this.listMigrations();
@@ -76,13 +90,29 @@ export class TenantSchemaBootstrapper {
         const sql = readFileSync(join(this.migrationsDir, name, 'migration.sql'), 'utf8');
         const client = await pool.connect();
         try {
-          await client.query('BEGIN');
+          // Owner decision #14: bounded blast radius for every migration —
+          // a runaway statement can neither hold locks indefinitely nor run
+          // past its statement budget.
+          await client.query(
+            `SET LOCAL lock_timeout = '${this.lockTimeoutMs}ms'; SET LOCAL statement_timeout = '${this.statementTimeoutMs}ms';`,
+          );
+          // Migrations marked with `-- FERIO: NON_TRANSACTIONAL` (e.g.
+          // CREATE INDEX CONCURRENTLY, which PostgreSQL forbids inside a
+          // transaction) run outside BEGIN/COMMIT and are recorded
+          // separately so a mid-file failure is visible in the ledger.
+          const nonTransactional = sql.startsWith('-- FERIO: NON_TRANSACTIONAL');
+          if (!nonTransactional) await client.query('BEGIN');
           await client.query(sql);
-          await client.query('INSERT INTO _ferio_tenant_migrations (name) VALUES ($1)', [name]);
-          await client.query('COMMIT');
+          await client.query(
+            'INSERT INTO _ferio_tenant_migrations (name, non_transactional) VALUES ($1, $2)',
+            [name, nonTransactional],
+          );
+          if (!nonTransactional) await client.query('COMMIT');
           applied.push(name);
         } catch (error) {
-          await client.query('ROLLBACK').catch(() => undefined);
+          if (!sql.startsWith('-- FERIO: NON_TRANSACTIONAL')) {
+            await client.query('ROLLBACK').catch(() => undefined);
+          }
           const message = error instanceof Error ? error.message : String(error);
           throw new Error(`TENANT_MIGRATION_FAILED:${name}:${message.slice(0, 300)}`);
         } finally {
