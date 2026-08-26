@@ -34,6 +34,8 @@ export const PERMISSIONS = {
   DELIVERY_PERSONNEL_MANAGE: 'delivery-personnel.manage',
   PRODUCT_CONTENT_READ: 'product-content.read',
   PRODUCT_CONTENT_MANAGE: 'product-content.manage',
+  PRODUCT_REQUESTS_READ: 'product-requests.read',
+  PRODUCT_REQUESTS_MANAGE: 'product-requests.manage',
   PURCHASE_ACTIVITY_READ: 'purchase-activity.read',
   RTO_READ: 'rto.read',
   RTO_MANAGE: 'rto.manage',

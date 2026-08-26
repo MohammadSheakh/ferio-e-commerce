@@ -10,7 +10,20 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { AuthGuard, Public, User } from '@app/common';
+import {
+  AuthGuard,
+  GLOBAL_RATE_LIMITS,
+  PERMISSIONS,
+  Permissions,
+  PermissionsGuard,
+  Public,
+  RateLimit,
+  Roles,
+  RolesGuard,
+  SlidingWindowRateLimitGuard,
+  User,
+} from '@app/common';
+import { TenantMembershipGuard } from '../../tenancy/tenant-membership.guard';
 import { ProductRequestService } from './product-request.service';
 import {
   CreateProductRequestDto,
@@ -20,12 +33,13 @@ import {
 
 @ApiTags('Product Requests')
 @Controller('product-requests')
-@UseGuards(AuthGuard)
-export class ProductRequestController {
+export class PublicProductRequestController {
   constructor(private readonly service: ProductRequestService) {}
 
   @Public()
   @Post()
+  @UseGuards(SlidingWindowRateLimitGuard)
+  @RateLimit(GLOBAL_RATE_LIMITS.auth)
   @ApiOperation({ summary: 'Submit a product request' })
   async createRequest(
     @Body() dto: CreateProductRequestDto,
@@ -38,6 +52,16 @@ export class ProductRequestController {
       data: result,
     };
   }
+
+}
+
+@ApiTags('Product Requests')
+@Controller('product-requests')
+@UseGuards(AuthGuard, RolesGuard, PermissionsGuard, TenantMembershipGuard)
+@Roles('admin')
+@Permissions(PERMISSIONS.PRODUCT_REQUESTS_READ)
+export class AdminProductRequestController {
+  constructor(private readonly service: ProductRequestService) {}
 
   @Get()
   @ApiBearerAuth()
@@ -52,6 +76,7 @@ export class ProductRequestController {
   }
 
   @Patch(':id/status')
+  @Permissions(PERMISSIONS.PRODUCT_REQUESTS_MANAGE)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update product request status (Admin)' })
   async updateStatus(
@@ -67,6 +92,7 @@ export class ProductRequestController {
   }
 
   @Delete(':id')
+  @Permissions(PERMISSIONS.PRODUCT_REQUESTS_MANAGE)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete product request (Admin)' })
   async deleteRequest(@Param('id') id: string) {

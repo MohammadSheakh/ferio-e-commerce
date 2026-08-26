@@ -55,3 +55,31 @@ recorded explicitly rather than hidden behind a completed label.
 **Residual risk:** trusted-proxy enforcement (H-1) and native mobile tenant
 bootstrap (C-2) remain open. This fix intentionally does not accept arbitrary
 organization IDs from clients.
+
+## 2026-08-26: Product-Request Authorization
+
+**Finding:** C-6
+
+**Status:** Fixed.
+
+**Changes:**
+
+- Split public submission and administrative operations into separate
+  controllers.
+- Administrative reads require `product-requests.read`, an admin/staff role,
+  authentication, and active tenant membership.
+- Status changes and deletion require `product-requests.manage`.
+- Added bounded requester fields and auth-grade sliding-window rate limiting to
+  public submissions.
+- Added authorization metadata regression tests.
+
+**Verification:**
+
+- Product-request authorization tests: 3/3 passed.
+- Backend production build passed.
+- `git diff --check` passed before commit.
+
+**Commit:** `fix(authz): secure product-request administration`
+
+**Residual risk:** general tenant-membership guard coverage is tracked under
+H-2 and remains open until the centralized guard sweep is completed.
