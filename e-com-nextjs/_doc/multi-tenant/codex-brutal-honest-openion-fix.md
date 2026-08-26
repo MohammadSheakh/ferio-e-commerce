@@ -198,3 +198,36 @@ controllers must continue using the established membership guard pattern.
 **Residual risk:** 2FA management and user/profile/device/OAuth-account services
 still need direct-Prisma removal before C-3 is fully closed. Existing strict-mode
 sessions must sign in again because legacy tokens have no organization claim.
+
+## 2026-08-26: Tenant-Bound Auxiliary Identity Services
+
+**Finding:** C-3 (remaining identity services)
+
+**Status:** Fixed.
+
+**Changes:**
+
+- Migrated 2FA status, enrollment, recovery-code consumption, and disablement to
+  the resolved tenant database.
+- Migrated user lookup/profile mutation/statistics to the tenant database.
+- Migrated user profile, device registration, device cleanup, and linked OAuth
+  account operations to the tenant database.
+- Removed inherited legacy `GenericService` delegates from profile, device, and
+  OAuth-account services so strict-mode callers cannot bypass tenant resolution.
+- Every migrated service fails closed in strict mode and explicitly falls back
+  only when tenancy is disabled.
+- Added `TenancyModule` to the user-management dependency boundary.
+
+**Verification:**
+
+- Authentication and user-management tests: 22/22 passed across 8 suites.
+- Direct-Prisma sweep reports no `this.prisma.*` calls in authentication or
+  user-management services.
+- No user-management service retains a legacy `GenericService` delegate.
+- Backend production build passed.
+- `git diff --check` passed before commit.
+
+**Commit:** `fix(identity): route auxiliary user data through tenant DB`
+
+**Residual risk:** customer/rider legacy records require an explicit migration
+or reprovisioning plan before strict tenancy is enabled on existing data.

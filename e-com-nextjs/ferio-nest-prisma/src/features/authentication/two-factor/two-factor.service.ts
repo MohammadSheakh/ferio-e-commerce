@@ -1,6 +1,8 @@
 import {
   BadRequestException,
   Injectable,
+  Optional,
+  ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -14,6 +16,8 @@ import {
   timingSafeEqual,
 } from 'node:crypto';
 import { PrismaService } from '@app/database';
+import type { PrismaClient } from '@prisma/client';
+import { TenantDbService } from '../../../tenancy/tenant-db.service';
 
 const BASE32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 
@@ -22,10 +26,21 @@ export class TwoFactorService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    @Optional() private readonly tenantDb?: TenantDbService,
   ) {}
 
+  private async db(): Promise<PrismaClient> {
+    const tenant = await this.tenantDb?.tryGet();
+    if (tenant) return tenant;
+    if ((process.env.TENANCY_ENABLED || 'false') === 'true') {
+      throw new ServiceUnavailableException('TENANT_IDENTITY_CONTEXT_REQUIRED');
+    }
+    return this.prisma as PrismaClient;
+  }
+
   async status(userId: string) {
-    const user = await this.prisma.user.findUnique({
+    const db = await this.db();
+    const user = await db.user.findUnique({
       where: { id: userId },
       select: { twoFactorEnabled: true },
     });
@@ -33,8 +48,9 @@ export class TwoFactorService {
   }
 
   async beginEnrollment(userId: string, email: string) {
+    const db = await this.db();
     const secret = this.base32Encode(randomBytes(20));
-    await this.prisma.user.update({
+    await db.user.update({
       where: { id: userId },
       data: { twoFactorPendingEncrypted: this.encrypt(secret) },
     });
@@ -53,7 +69,8 @@ export class TwoFactorService {
   }
 
   async confirmEnrollment(userId: string, code: string) {
-    const user = await this.prisma.user.findUnique({
+    const db = await this.db();
+    const user = await db.user.findUnique({
       where: { id: userId },
       select: { twoFactorPendingEncrypted: true },
     });
@@ -67,7 +84,7 @@ export class TwoFactorService {
     const recoveryCodes = Array.from({ length: 8 }, () =>
       randomBytes(5).toString('hex').toUpperCase(),
     );
-    await this.prisma.user.update({
+    await db.user.update({
       where: { id: userId },
       data: {
         twoFactorEnabled: true,
@@ -90,6 +107,7 @@ export class TwoFactorService {
     },
     code: string,
   ) {
+    const db = await this.db();
     if (!user.twoFactorSecretEncrypted) return false;
     const normalized = code.replace(/[\s-]/g, '').toUpperCase();
     if (
@@ -102,7 +120,7 @@ export class TwoFactorService {
       this.safeEqual(item, hash),
     );
     if (index < 0) return false;
-    await this.prisma.user.update({
+    await db.user.update({
       where: { id: user.id },
       data: {
         twoFactorRecoveryCodeHashes: user.twoFactorRecoveryCodeHashes.filter(
@@ -114,7 +132,8 @@ export class TwoFactorService {
   }
 
   async disable(userId: string, password: string, code: string) {
-    const user = await this.prisma.user.findUnique({
+    const db = await this.db();
+    const user = await db.user.findUnique({
       where: { id: userId },
       select: {
         id: true,
@@ -129,7 +148,7 @@ export class TwoFactorService {
     if (!(await this.verifyUserCode(user, code))) {
       throw new UnauthorizedException('Invalid authentication code');
     }
-    await this.prisma.user.update({
+    await db.user.update({
       where: { id: userId },
       data: {
         twoFactorEnabled: false,

@@ -1,11 +1,17 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
-import { Prisma, UserProfile } from '@prisma/client';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  Optional,
+  ServiceUnavailableException,
+} from '@nestjs/common';
+import { Prisma, PrismaClient, UserProfile } from '@prisma/client';
 
-import { GenericService } from '@app/common';
 import { PrismaService } from '@app/database';
 import { scopedRedisKey } from '../../../tenancy/redis-keys.util';
 import { RedisService } from '@app/redis';
 import { USER_CACHE_CONFIG } from '../user/user.constants';
+import { TenantDbService } from '../../../tenancy/tenant-db.service';
 
 
 const publicUserProfileSelect = {
@@ -24,14 +30,22 @@ type UserProfileRecord = Prisma.UserProfileGetPayload<{
  * UserProfile Service
  */
 @Injectable()
-export class UserProfileService extends GenericService<Prisma.UserProfileDelegate, UserProfileRecord> {
+export class UserProfileService {
   private readonly logger = new Logger(UserProfileService.name);
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly redisService: RedisService,
-  ) {
-    super(prisma.userProfile, publicUserProfileSelect);
+    @Optional() private readonly tenantDb?: TenantDbService,
+  ) {}
+
+  private async db(): Promise<PrismaClient> {
+    const tenant = await this.tenantDb?.tryGet();
+    if (tenant) return tenant;
+    if ((process.env.TENANCY_ENABLED || 'false') === 'true') {
+      throw new ServiceUnavailableException('TENANT_IDENTITY_CONTEXT_REQUIRED');
+    }
+    return this.prisma as PrismaClient;
   }
 
   private getCacheKey(userId: string): string {
@@ -50,7 +64,8 @@ export class UserProfileService extends GenericService<Prisma.UserProfileDelegat
   }
 
   private async fetchProfileByUserId(userId: string) {
-    return this.prisma.userProfile.findFirst({
+    const db = await this.db();
+    return db.userProfile.findFirst({
       where: { userId, isDeleted: false },
     });
   }
@@ -62,7 +77,8 @@ export class UserProfileService extends GenericService<Prisma.UserProfileDelegat
     userId: string,
     data: Prisma.UserProfileUpdateInput,
   ): Promise<UserProfile | null> {
-    const profile = await this.prisma.userProfile.findFirst({
+    const db = await this.db();
+    const profile = await db.userProfile.findFirst({
       where: { userId, isDeleted: false },
     });
 
@@ -70,7 +86,7 @@ export class UserProfileService extends GenericService<Prisma.UserProfileDelegat
       throw new NotFoundException('User profile not found');
     }
 
-    const result = await this.prisma.userProfile.update({
+    const result = await db.userProfile.update({
       where: { userId },
       data,
     });
@@ -112,13 +128,14 @@ export class UserProfileService extends GenericService<Prisma.UserProfileDelegat
    * Get profile with user details
    */
   async getProfileWithUser(userId: string): Promise<any> {
+    const db = await this.db();
     const profile = await this.findByUserIdWithCache(userId);
 
     if (!profile) {
       throw new NotFoundException('User profile not found');
     }
 
-    return await this.prisma.userProfile.findFirst({
+    return await db.userProfile.findFirst({
       where: { userId, isDeleted: false },
       include: {
         user: {

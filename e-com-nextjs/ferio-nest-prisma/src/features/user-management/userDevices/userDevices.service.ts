@@ -1,16 +1,13 @@
-import { Injectable, Inject, NotFoundException } from '@nestjs/common';
-import { Prisma, UserDevices } from '@prisma/client';
-import { GenericService } from '@app/common';
+import {
+  Injectable,
+  NotFoundException,
+  Optional,
+  ServiceUnavailableException,
+} from '@nestjs/common';
+import { PrismaClient, UserDevices } from '@prisma/client';
 import { PrismaService } from '@app/database';
 import { DeviceType } from './enums/TDevice.enum';
-
-const publicUserDeviceSelect = {
-  id: true,
-
-  isDeleted: true,
-  createdAt: true,
-  updatedAt: true,
-} satisfies Prisma.UserDevicesSelect;
+import { TenantDbService } from '../../../tenancy/tenant-db.service';
 
 /**
  * UserDevices Service
@@ -19,11 +16,19 @@ const publicUserDeviceSelect = {
  * Extends GenericService for CRUD operations
  */
 @Injectable()
-export class UserDevicesService extends GenericService<Prisma.UserDevicesDelegate, Partial<UserDevices>> {
+export class UserDevicesService {
   constructor(
     private readonly prisma: PrismaService,
-  ) {
-    super(prisma.userDevices, publicUserDeviceSelect);
+    @Optional() private readonly tenantDb?: TenantDbService,
+  ) {}
+
+  private async db(): Promise<PrismaClient> {
+    const tenant = await this.tenantDb?.tryGet();
+    if (tenant) return tenant;
+    if ((process.env.TENANCY_ENABLED || 'false') === 'true') {
+      throw new ServiceUnavailableException('TENANT_IDENTITY_CONTEXT_REQUIRED');
+    }
+    return this.prisma as PrismaClient;
   }
 
   /**
@@ -35,12 +40,13 @@ export class UserDevicesService extends GenericService<Prisma.UserDevicesDelegat
     deviceType: DeviceType,
     deviceName?: string,
   ): Promise<UserDevices> {
-    const existingDevice = await this.prisma.userDevices.findFirst({
+    const db = await this.db();
+    const existingDevice = await db.userDevices.findFirst({
       where: { fcmToken, userId, isDeleted: false },
     });
 
     if (existingDevice) {
-      return this.prisma.userDevices.update({
+      return db.userDevices.update({
         where: { id: existingDevice.id },
         data: {
           lastActive: new Date(),
@@ -50,7 +56,7 @@ export class UserDevicesService extends GenericService<Prisma.UserDevicesDelegat
       });
     }
 
-    return this.prisma.userDevices.create({
+    return db.userDevices.create({
       data: {
         userId,
         fcmToken,
@@ -65,7 +71,8 @@ export class UserDevicesService extends GenericService<Prisma.UserDevicesDelegat
    * Get all devices for user
    */
   async getUserDevices(userId: string): Promise<UserDevices[]> {
-    return this.prisma.userDevices.findMany({
+    const db = await this.db();
+    return db.userDevices.findMany({
       where: { userId, isDeleted: false },
       orderBy: { lastActive: 'desc' },
     });
@@ -75,7 +82,8 @@ export class UserDevicesService extends GenericService<Prisma.UserDevicesDelegat
    * Get device by FCM token
    */
   async getDeviceByToken(fcmToken: string): Promise<UserDevices | null> {
-    return this.prisma.userDevices.findFirst({
+    const db = await this.db();
+    return db.userDevices.findFirst({
       where: { fcmToken, isDeleted: false },
     });
   }
@@ -84,7 +92,8 @@ export class UserDevicesService extends GenericService<Prisma.UserDevicesDelegat
    * Update last active timestamp
    */
   async updateLastActive(deviceId: string): Promise<UserDevices | null> {
-    return this.prisma.userDevices.update({
+    const db = await this.db();
+    return db.userDevices.update({
       where: { id: deviceId },
       data: { lastActive: new Date() },
     });
@@ -94,7 +103,8 @@ export class UserDevicesService extends GenericService<Prisma.UserDevicesDelegat
    * Remove device (soft delete)
    */
   async removeDevice(userId: string, deviceId: string): Promise<UserDevices | null> {
-    const device = await this.prisma.userDevices.findFirst({
+    const db = await this.db();
+    const device = await db.userDevices.findFirst({
       where: { id: deviceId, userId, isDeleted: false },
     });
 
@@ -102,7 +112,7 @@ export class UserDevicesService extends GenericService<Prisma.UserDevicesDelegat
       throw new NotFoundException('Device not found');
     }
 
-    return this.prisma.userDevices.update({
+    return db.userDevices.update({
       where: { id: deviceId },
       data: {
         isDeleted: true,
@@ -114,7 +124,8 @@ export class UserDevicesService extends GenericService<Prisma.UserDevicesDelegat
    * Remove device by FCM token
    */
   async removeDeviceByToken(userId: string, fcmToken: string): Promise<void> {
-    await this.prisma.userDevices.updateMany({
+    const db = await this.db();
+    await db.userDevices.updateMany({
       where: { fcmToken, userId },
       data: {
         isDeleted: true,
@@ -126,7 +137,8 @@ export class UserDevicesService extends GenericService<Prisma.UserDevicesDelegat
    * Get all active devices for user (for push notifications)
    */
   async getActiveDevices(userId: string): Promise<UserDevices[]> {
-    return this.prisma.userDevices.findMany({
+    const db = await this.db();
+    return db.userDevices.findMany({
       where: { userId, pushEnabled: true, isDeleted: false },
     });
   }
@@ -135,10 +147,11 @@ export class UserDevicesService extends GenericService<Prisma.UserDevicesDelegat
    * Cleanup old inactive devices (older than 1 year)
    */
   async cleanupInactiveDevices(): Promise<number> {
+    const db = await this.db();
     const oneYearAgo = new Date();
     oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
 
-    const result = await this.prisma.userDevices.updateMany({
+    const result = await db.userDevices.updateMany({
       where: {
         lastActive: { lt: oneYearAgo },
         isDeleted: false,
@@ -159,13 +172,14 @@ export class UserDevicesService extends GenericService<Prisma.UserDevicesDelegat
     deviceId: string,
     enabled: boolean,
   ): Promise<UserDevices> {
-    const device = await this.prisma.userDevices.findFirst({
+    const db = await this.db();
+    const device = await db.userDevices.findFirst({
       where: { id: deviceId, userId, isDeleted: false },
       select: { id: true },
     });
     if (!device) throw new NotFoundException('Device not found');
 
-    return this.prisma.userDevices.update({
+    return db.userDevices.update({
       where: { id: device.id },
       data: { pushEnabled: enabled },
     });
