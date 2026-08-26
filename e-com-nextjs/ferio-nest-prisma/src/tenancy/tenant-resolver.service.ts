@@ -242,6 +242,8 @@ export class TenantContextMiddleware implements NestMiddleware {
     this.resolver
       .resolveFromHost(effectiveHost)
       .then((resolved) => {
+        (request as Request & { tenantOrganizationId?: string }).tenantOrganizationId =
+          resolved.organizationId;
         runWithTenantContext(
           {
             organizationId: resolved.organizationId,

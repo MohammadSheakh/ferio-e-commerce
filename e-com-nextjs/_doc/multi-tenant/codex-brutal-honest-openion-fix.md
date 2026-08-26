@@ -167,3 +167,34 @@ H-6 is remediated.
 
 **Residual risk:** tokens still need organization binding under C-3. New admin
 controllers must continue using the established membership guard pattern.
+
+## 2026-08-26: Tenant-Bound Core Authentication
+
+**Finding:** C-3 (core authentication slice)
+
+**Status:** Core auth fixed; auxiliary identity services remain in progress.
+
+**Changes:**
+
+- Login, admin login, registration, verification, refresh, password reset, and
+  OAuth now use the resolved tenant DB in strict mode.
+- Strict mode fails closed instead of falling back to legacy Prisma when tenant
+  identity context is unavailable.
+- Access, refresh, and admin 2FA challenge tokens carry `organizationId`.
+- Refresh rejects token/resolved-tenant mismatch.
+- Tenant middleware exposes the resolved organization to authentication guards.
+- `AuthGuard` rejects cross-tenant tokens on private routes and does not attach
+  them opportunistically on public routes.
+- Legacy mode intentionally preserves legacy token/database behavior.
+
+**Verification:**
+
+- Auth lifecycle and tenant-token binding tests: 8/8 passed across 2 suites.
+- Backend production build passed.
+- `git diff --check` passed before commit.
+
+**Commit:** `fix(auth): bind core identity to resolved tenant`
+
+**Residual risk:** 2FA management and user/profile/device/OAuth-account services
+still need direct-Prisma removal before C-3 is fully closed. Existing strict-mode
+sessions must sign in again because legacy tokens have no organization claim.
