@@ -644,3 +644,34 @@ prove those controls.
 CSV construction, statement-timeout/workload policy, and durable daily fact
 tables or a read replica. This query bounds application memory and network
 transfer, but PostgreSQL still scans and aggregates the selected OLTP period.
+
+## 2026-08-26: Page-Bounded Report Aggregation Memory
+
+**Finding:** H-7 (reports-memory slice)
+
+**Status:** Partially fixed.
+
+**Changes:**
+
+- Replaced four per-order money arrays in the report accumulator with scalar
+  totals, so overview memory no longer grows with the complete selected cohort.
+- The keyset reader remains capped at one 5,000-order page in memory while
+  preserving existing outcome, revenue, refund, RTO, COD, and dimension
+  definitions.
+- Added safe-integer checks to every accumulated monetary field instead of
+  silently returning precision-corrupted financial totals.
+- Added regression coverage across the 5,000-row pagination boundary.
+
+**Verification:**
+
+- Reports service/utility tests: 9/9 passed across 2 suites.
+- Backend production build passed.
+- `git diff --check` passed before commit.
+
+**Commit:** `fix(reports): bound overview aggregation memory`
+
+**Residual risk:** report database work and application CPU remain proportional
+to the cohort size because relation-rich order pages are still scanned. Move
+aggregate families to SQL or daily facts with parity tests, enforce statement
+timeouts, and replace synchronous in-memory CSV output with an asynchronous
+streamed export before broad historical reporting at production scale.

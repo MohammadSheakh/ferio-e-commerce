@@ -9,7 +9,7 @@ import { PrismaService } from '@app/database';
 import { TenantDbService } from '../../tenancy/tenant-db.service';
 import { randomUUID } from 'node:crypto';
 import { ReportQueryDto } from './dto/report-query.dto';
-import { csvCell, maskExportName, reportPeriod, sumMoney } from './report.util';
+import { csvCell, maskExportName, reportPeriod } from './report.util';
 import { maskCustomerPhone } from '../customers/customers.util';
 import { AuditService } from '../audit/audit.service';
 
@@ -76,10 +76,10 @@ type ReportOrderAcc = {
   returnCases: number;
   rto: number;
   rtoCost: number;
-  grossTotals: number[];
-  grossConfirmedTotals: number[];
-  grossDeliveredTotals: number[];
-  knownCollectedTotals: number[];
+  grossPlaced: number;
+  grossConfirmed: number;
+  grossDelivered: number;
+  knownCollected: number;
   codExpectedAmount: number;
   codSettlementAmount: number;
   codCollectionVariance: number;
@@ -102,6 +102,14 @@ function bump(counts: Map<string, number>, key: string): void {
   counts.set(key, (counts.get(key) ?? 0) + 1);
 }
 
+function addMoney(current: number, amount: number): number {
+  const total = current + amount;
+  if (!Number.isSafeInteger(total)) {
+    throw new Error('REPORT_MONEY_TOTAL_OUT_OF_RANGE');
+  }
+  return total;
+}
+
 /**
  * §16.3 bounded aggregation: per-order fold replacing whole-period
  * findMany+JS-reduce. Field-by-field port of the previous summarize() so
@@ -121,10 +129,10 @@ function createReportAccumulator(): ReportOrderAcc & {
     returnCases: 0,
     rto: 0,
     rtoCost: 0,
-    grossTotals: [],
-    grossConfirmedTotals: [],
-    grossDeliveredTotals: [],
-    knownCollectedTotals: [],
+    grossPlaced: 0,
+    grossConfirmed: 0,
+    grossDelivered: 0,
+    knownCollected: 0,
     codExpectedAmount: 0,
     codSettlementAmount: 0,
     codCollectionVariance: 0,
@@ -156,13 +164,13 @@ function createReportAccumulator(): ReportOrderAcc & {
       this.placed += 1;
       if (isConfirmed(order)) {
         this.confirmed += 1;
-        this.grossConfirmedTotals.push(order.total);
+        this.grossConfirmed = addMoney(this.grossConfirmed, order.total);
       }
       if (isShipped(order)) this.shipped += 1;
       const delivered = isDelivered(order);
       if (delivered) {
         this.delivered += 1;
-        this.grossDeliveredTotals.push(order.total);
+        this.grossDelivered = addMoney(this.grossDelivered, order.total);
       }
       if (order.cancelledAt !== null || order.status === 'CANCELLED') {
         this.cancelled += 1;
@@ -175,20 +183,27 @@ function createReportAccumulator(): ReportOrderAcc & {
         order.rtoCases.length > 0;
       if (orderIsRto) this.rto += 1;
       for (const rtoCase of order.rtoCases) {
-        this.rtoCost += rtoCase.totalCost;
+        this.rtoCost = addMoney(this.rtoCost, rtoCase.totalCost);
       }
 
-      this.grossTotals.push(order.total);
+      this.grossPlaced = addMoney(this.grossPlaced, order.total);
       if (order.paymentStatus === 'PAID') {
-        this.knownCollectedTotals.push(order.total);
+        this.knownCollected = addMoney(this.knownCollected, order.total);
       }
 
       if (order.codCollection) {
-        this.codExpectedAmount += order.codCollection.expectedAmount ?? 0;
-        this.codSettlementAmount +=
-          order.codCollection.collectedAmount ?? 0;
-        this.codCollectionVariance +=
-          order.codCollection.collectionVariance ?? 0;
+        this.codExpectedAmount = addMoney(
+          this.codExpectedAmount,
+          order.codCollection.expectedAmount ?? 0,
+        );
+        this.codSettlementAmount = addMoney(
+          this.codSettlementAmount,
+          order.codCollection.collectedAmount ?? 0,
+        );
+        this.codCollectionVariance = addMoney(
+          this.codCollectionVariance,
+          order.codCollection.collectionVariance ?? 0,
+        );
       }
       if (order.codCollection?.status === 'EXPECTED') {
         this.unresolvedCodCollections += 1;
@@ -204,8 +219,16 @@ function createReportAccumulator(): ReportOrderAcc & {
       }
       for (const refund of order.refunds) {
         if (refund.status === 'SUCCEEDED') {
-          this.succeededRefundAmount += refund.amount;
-          if (delivered) this.deliveredRefundAmount += refund.amount;
+          this.succeededRefundAmount = addMoney(
+            this.succeededRefundAmount,
+            refund.amount,
+          );
+          if (delivered) {
+            this.deliveredRefundAmount = addMoney(
+              this.deliveredRefundAmount,
+              refund.amount,
+            );
+          }
         }
       }
 
@@ -510,12 +533,11 @@ export class ReportsService {
       },
       revenue: {
         currency: acc.currency ?? 'BDT',
-        grossPlaced: sumMoney(acc.grossTotals),
-        grossConfirmed: sumMoney(acc.grossConfirmedTotals),
-        grossDelivered: sumMoney(acc.grossDeliveredTotals),
-        knownCollected: sumMoney(acc.knownCollectedTotals),
-        netOfRefund:
-          sumMoney(acc.grossDeliveredTotals) - acc.deliveredRefundAmount,
+        grossPlaced: acc.grossPlaced,
+        grossConfirmed: acc.grossConfirmed,
+        grossDelivered: acc.grossDelivered,
+        knownCollected: acc.knownCollected,
+        netOfRefund: acc.grossDelivered - acc.deliveredRefundAmount,
         definitions: {
           grossPlaced: 'Order total for every order in the cohort.',
           grossConfirmed:
