@@ -11,6 +11,7 @@ import { MessageService } from './message/message.service';
 
 import { SocketModule } from '../socket.gateway/socket.module';
 import { RedisModule } from '@app/redis';
+import { TenancyModule } from '../../tenancy/tenancy.module';
 import {
   BULLMQ_CONVERSATION_LAST_MESSAGE_QUEUE,
   BULLMQ_NOTIFY_PARTICIPANTS_QUEUE,
@@ -31,6 +32,7 @@ import {
 
     // Database Module
     PrismaModule,
+    TenancyModule,
 
     // Redis Module (for state management)
     RedisModule,

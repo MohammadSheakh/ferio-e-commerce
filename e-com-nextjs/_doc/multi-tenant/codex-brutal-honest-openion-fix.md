@@ -137,3 +137,33 @@ tenant-bound identity remediation for C-3 is complete.
 **Residual risk:** order-to-message creation is still post-commit rather than
 an atomic transactional outbox. Provider credentials also remain global until
 H-6 is remediated.
+
+## 2026-08-26: Tenant-Admin Membership Guard Coverage
+
+**Finding:** H-2
+
+**Status:** Fixed for the current controller surface.
+
+**Changes:**
+
+- Audited every feature controller containing an admin role declaration.
+- Added active tenant-membership enforcement to admin conversation listing,
+  all private settings operations, and all delivery-personnel admin methods.
+- Kept public settings, customer chat, rider, and application endpoints outside
+  the staff-membership guard.
+- Imported `TenancyModule` into legacy mixed-route modules.
+- Added method-level regression coverage for all 14 previously unguarded admin
+  operations.
+
+**Verification:**
+
+- Tenant-admin guard coverage tests: 14/14 passed.
+- Static controller sweep reports no admin-role controller file without
+  `TenantMembershipGuard`.
+- Backend production build passed.
+- `git diff --check` passed before commit.
+
+**Commit:** `fix(tenancy): enforce membership on legacy admin routes`
+
+**Residual risk:** tokens still need organization binding under C-3. New admin
+controllers must continue using the established membership guard pattern.

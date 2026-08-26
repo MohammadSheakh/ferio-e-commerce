@@ -35,6 +35,7 @@ import {
   StructuredLogger,
   User,
 } from '@app/common';
+import { TenantMembershipGuard } from '../../../tenancy/tenant-membership.guard';
 
 /**
  * Conversation Controller
@@ -62,6 +63,7 @@ export class ConversationController {
   constructor(private readonly conversationService: ConversationService) {}
 
   @Get('all')
+  @UseGuards(TenantMembershipGuard)
   @Roles('admin')
   @Permissions(PERMISSIONS.CHAT_READ)
   @ApiOperation({ summary: 'Get all conversations for admin dashboard' })

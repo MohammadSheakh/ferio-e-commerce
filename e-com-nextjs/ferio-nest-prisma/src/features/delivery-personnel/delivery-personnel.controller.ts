@@ -32,6 +32,7 @@ import {
   UpdateLocationDto,
 } from './delivery-personnel.dto';
 import { DeliveryPersonnelService } from './delivery-personnel.service';
+import { TenantMembershipGuard } from '../../tenancy/tenant-membership.guard';
 
 @Controller('delivery-personnel')
 export class DeliveryPersonnelController {
@@ -51,7 +52,7 @@ export class DeliveryPersonnelController {
    * Admin: List all riders & applicants
    */
   @Get('admin/list')
-  @UseGuards(AuthGuard, RolesGuard, PermissionsGuard)
+  @UseGuards(AuthGuard, RolesGuard, PermissionsGuard, TenantMembershipGuard)
   @Roles('admin')
   @Permissions(PERMISSIONS.DELIVERY_PERSONNEL_READ)
   listAll(@Query() query: QueryDeliveryPersonnelDto) {
@@ -62,7 +63,7 @@ export class DeliveryPersonnelController {
    * Admin: Direct create & activate rider account
    */
   @Post('admin/create')
-  @UseGuards(AuthGuard, RolesGuard, PermissionsGuard)
+  @UseGuards(AuthGuard, RolesGuard, PermissionsGuard, TenantMembershipGuard)
   @Roles('admin')
   @Permissions(PERMISSIONS.DELIVERY_PERSONNEL_MANAGE)
   createDirectByAdmin(@Body() dto: CreateDeliveryPersonnelDto) {
@@ -73,7 +74,7 @@ export class DeliveryPersonnelController {
    * Admin: Get visual OpenStreetMap data (riders path sequence & active order locations)
    */
   @Get('admin/map-data')
-  @UseGuards(AuthGuard, RolesGuard, PermissionsGuard)
+  @UseGuards(AuthGuard, RolesGuard, PermissionsGuard, TenantMembershipGuard)
   @Roles('admin')
   @Permissions(PERMISSIONS.DELIVERY_PERSONNEL_READ)
   getDeliveryMapData() {
@@ -84,7 +85,7 @@ export class DeliveryPersonnelController {
    * Admin: Clear rider location waypoint history (removes 1, 2, 3 path sequence, keeps last current location)
    */
   @Delete('admin/:id/location-history')
-  @UseGuards(AuthGuard, RolesGuard, PermissionsGuard)
+  @UseGuards(AuthGuard, RolesGuard, PermissionsGuard, TenantMembershipGuard)
   @Roles('admin')
   @Permissions(PERMISSIONS.DELIVERY_PERSONNEL_MANAGE)
   clearLocationHistory(@Param('id') id: string) {
@@ -95,7 +96,7 @@ export class DeliveryPersonnelController {
    * Admin: Approve or Reject applicant
    */
   @Patch('admin/:id/approval')
-  @UseGuards(AuthGuard, RolesGuard, PermissionsGuard)
+  @UseGuards(AuthGuard, RolesGuard, PermissionsGuard, TenantMembershipGuard)
   @Roles('admin')
   @Permissions(PERMISSIONS.DELIVERY_PERSONNEL_MANAGE)
   updateApproval(@Param('id') id: string, @Body() dto: UpdateApprovalDto) {
@@ -106,7 +107,7 @@ export class DeliveryPersonnelController {
    * Admin: Update rider profile information (including reset password)
    */
   @Patch('admin/:id')
-  @UseGuards(AuthGuard, RolesGuard, PermissionsGuard)
+  @UseGuards(AuthGuard, RolesGuard, PermissionsGuard, TenantMembershipGuard)
   @Roles('admin')
   @Permissions(PERMISSIONS.DELIVERY_PERSONNEL_MANAGE)
   updateRiderByAdmin(
@@ -120,7 +121,7 @@ export class DeliveryPersonnelController {
    * Admin: Get single rider detail
    */
   @Get('admin/:id')
-  @UseGuards(AuthGuard, RolesGuard, PermissionsGuard)
+  @UseGuards(AuthGuard, RolesGuard, PermissionsGuard, TenantMembershipGuard)
   @Roles('admin')
   @Permissions(PERMISSIONS.DELIVERY_PERSONNEL_READ)
   findOne(@Param('id') id: string) {
@@ -131,7 +132,7 @@ export class DeliveryPersonnelController {
    * Admin: Assign order to rider
    */
   @Patch('admin/assign-order')
-  @UseGuards(AuthGuard, RolesGuard, PermissionsGuard)
+  @UseGuards(AuthGuard, RolesGuard, PermissionsGuard, TenantMembershipGuard)
   @Roles('admin')
   @Permissions(PERMISSIONS.DELIVERY_PERSONNEL_MANAGE)
   assignOrder(@Body() dto: AssignOrderDto) {
