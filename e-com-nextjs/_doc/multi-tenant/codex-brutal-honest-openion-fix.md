@@ -83,3 +83,28 @@ organization IDs from clients.
 
 **Residual risk:** general tenant-membership guard coverage is tracked under
 H-2 and remains open until the centralized guard sweep is completed.
+
+## 2026-08-26: Device Push-Setting Ownership
+
+**Finding:** H-3
+
+**Status:** Fixed.
+
+**Changes:**
+
+- The controller now passes the authenticated user ID to the update operation.
+- The service verifies active device ownership before changing push settings.
+- Missing, deleted, and another user's devices all return the same not-found
+  boundary without performing an update.
+- Added service-level ownership regression tests.
+
+**Verification:**
+
+- Device ownership tests: 2/2 passed.
+- Backend production build passed.
+- `git diff --check` passed before commit.
+
+**Commit:** `fix(authz): enforce device setting ownership`
+
+**Residual risk:** user-device storage remains on legacy Prisma until the
+tenant-bound identity remediation for C-3 is complete.
