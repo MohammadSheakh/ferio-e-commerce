@@ -392,3 +392,37 @@ operation.
 organization scoping. Process-crash stale presence needs heartbeat/TTL cleanup,
 live visitor statistics remain process-local, and gateway chat persistence
 still uses the legacy Prisma client.
+
+## 2026-08-26: Tenant-Scoped Realtime Room State
+
+**Finding:** C-4 (Redis room-state slice)
+
+**Status:** Fixed.
+
+**Changes:**
+
+- Conversation, task, family/group, and activity-feed Redis keys now include
+  the resolved organization in strict tenancy mode.
+- Every room-state method fails closed when strict mode has neither an explicit
+  organization nor an ambient trusted tenant context.
+- Gateway conversation/task joins, leaves, and membership reads pass the
+  organization authenticated from the socket ticket.
+- Family auto-join re-enters `TenantFanoutService.forOrganization` before its
+  user lookup, removing the legacy Prisma fallback from strict socket startup.
+- Family Socket.IO rooms use the same organization-prefixed naming contract as
+  conversation and task rooms.
+- Added collision coverage for identical conversation, task, group, activity,
+  user, and family identifiers across two organizations.
+
+**Verification:**
+
+- Socket room/authentication and Redis collision tests: 23/23 passed across 3
+  suites.
+- Backend production build passed.
+- `git diff --check` passed before commit.
+
+**Commit:** `fix(realtime): scope tenant room state`
+
+**Residual risk:** gateway visitor statistics and stale-presence recovery still
+need Redis-backed replica-safe state. Chat message lookup/persistence remains on
+the legacy Prisma client, and event-level authorization needs a final sweep.

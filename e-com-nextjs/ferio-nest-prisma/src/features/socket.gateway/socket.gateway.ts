@@ -139,7 +139,11 @@ export class SocketGateway
       }
 
       // Auto-join family room (if applicable)
-      await this.socketRoomService.autoJoinFamilyRoom(client, user.userId);
+      await this.socketRoomService.autoJoinFamilyRoom(
+        client,
+        user.userId,
+        user.organizationId,
+      );
 
       // Notify related users about online status
       await this.notifyRelatedUsersOnlineStatus(user, true);
@@ -362,10 +366,17 @@ export class SocketGateway
       client.join(scopedSocketRoom(client.data?.user, conversationId));
 
       // Update Redis state
-      await this.socketRoomService.joinRoom(userId, conversationId);
+      await this.socketRoomService.joinRoom(
+        userId,
+        conversationId,
+        client.data.user?.organizationId,
+      );
 
       // Get room users
-      const roomUsers = await this.socketRoomService.getRoomUsers(conversationId);
+      const roomUsers = await this.socketRoomService.getRoomUsers(
+        conversationId,
+        client.data.user?.organizationId,
+      );
 
       this.logger.log(
         `👥 Room ${conversationId} has ${roomUsers.length} users: ${roomUsers.join(', ')}`,
@@ -410,7 +421,11 @@ export class SocketGateway
       client.leave(scopedSocketRoom(client.data?.user, conversationId));
 
       // Update Redis state
-      await this.socketRoomService.leaveRoom(userId, conversationId);
+      await this.socketRoomService.leaveRoom(
+        userId,
+        conversationId,
+        client.data.user?.organizationId,
+      );
 
       // Notify others
       client.to(scopedSocketRoom(client.data?.user, conversationId)).emit('user-left-chat', {
@@ -747,10 +762,17 @@ export class SocketGateway
       client.join(taskRoom);
 
       // Update Redis state
-      await this.socketRoomService.joinTaskRoom(userId, taskRoom);
+      await this.socketRoomService.joinTaskRoom(
+        userId,
+        taskRoom,
+        client.data.user?.organizationId,
+      );
 
       // Get task room users
-      const roomUsers = await this.socketRoomService.getTaskRoomUsers(taskRoom);
+      const roomUsers = await this.socketRoomService.getTaskRoomUsers(
+        taskRoom,
+        client.data.user?.organizationId,
+      );
 
       this.logger.log(
         `📋 Task room ${taskRoom} has ${roomUsers.length} users`,
@@ -793,7 +815,11 @@ export class SocketGateway
       client.leave(taskRoom);
 
       // Update Redis state
-      await this.socketRoomService.leaveTaskRoom(userId, taskRoom);
+      await this.socketRoomService.leaveTaskRoom(
+        userId,
+        taskRoom,
+        client.data.user?.organizationId,
+      );
 
       // Notify others
       client.to(taskRoom).emit('user-left-task', {
@@ -854,6 +880,7 @@ export class SocketGateway
       const activities = await this.socketRoomService.getActivityFeed(
         data.businessUserId,
         limit,
+        client.data.user?.organizationId,
       );
 
       return {
