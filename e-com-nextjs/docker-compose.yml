@@ -140,6 +140,9 @@ services:
       REDIS_PORT: "6379"
       NODE_ENV: development
       TENANCY_ENABLED: ${TENANCY_ENABLED:-false}
+      # Only Docker-network BFF/ingress peers may supply x-forwarded-host.
+      # Production environments with a narrower subnet should override this.
+      TENANT_TRUSTED_PROXY_CIDRS: ${TENANT_TRUSTED_PROXY_CIDRS:-172.16.0.0/12}
       PORT: "6733"
       SOCKET_PORT: "6734"
       PLATFORM_INITIAL_SUPERADMIN_EMAIL: ${PLATFORM_INITIAL_SUPERADMIN_EMAIL:-owner@ferio.local}

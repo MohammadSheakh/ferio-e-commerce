@@ -43,6 +43,7 @@ export class TenancyController {
     const effectiveHost = this.resolver.effectiveHostFrom({
       headers: request.headers as Record<string, string | string[] | undefined>,
       hostname: request.hostname,
+      remoteAddress: request.socket?.remoteAddress,
     });
 
     try {

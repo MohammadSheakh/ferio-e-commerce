@@ -495,3 +495,41 @@ guest system identity should be provisioned explicitly to avoid email conflicts.
 **Residual risk:** active page views remain process-local, so each backend
 replica reports only its own sockets. Move this state to organization-scoped
 Redis records with heartbeat-based expiry before relying on it operationally.
+
+## 2026-08-26: Trusted Proxy Tenant Resolution
+
+**Finding:** H-1
+
+**Status:** Fixed at the application boundary and documented for deployment.
+
+**Changes:**
+
+- Tenant resolution accepts `x-forwarded-host` only when the direct TCP peer
+  (`request.socket.remoteAddress`) belongs to `TENANT_TRUSTED_PROXY_CIDRS`.
+- Production has no implicit trusted proxies; an omitted allowlist fails closed.
+- Development/test defaults trust loopback only.
+- Rejects comma-appended forwarded-host chains and multi-value headers instead
+  of selecting an attacker-controlled first value.
+- IPv4, IPv4-mapped IPv6, exact IPv4 addresses, and exact IPv6 ingress addresses
+  are supported by the allowlist parser.
+- Both global tenant middleware and the public tenancy-status endpoint use the
+  same resolver-owned host-selection policy.
+- Added a stable `TENANT_FORWARDED_HOST_UNTRUSTED` response code.
+- Docker Compose configures its private container network as the development
+  proxy boundary; `.env.example` documents the production override requirement.
+
+**Verification:**
+
+- Tenant resolver/controller tests: 29/29 passed across 2 suites, including
+  untrusted-client spoofing, ambiguous chains, mapped addresses, and production
+  fail-closed behavior.
+- Backend production build passed.
+- Compose file passed YAML parsing.
+- `git diff --check` passed before commit.
+
+**Commit:** `fix(tenancy): enforce trusted proxy host forwarding`
+
+**Residual risk:** production ingress must strip and overwrite forwarding
+headers and configure a narrower CIDR than the broad Docker development range.
+The deployment smoke-test gate should send a spoofed direct request and assert
+`TENANT_FORWARDED_HOST_UNTRUSTED` before enabling strict tenancy.
