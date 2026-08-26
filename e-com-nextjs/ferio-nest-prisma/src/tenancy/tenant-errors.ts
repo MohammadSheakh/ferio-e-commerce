@@ -3,6 +3,7 @@ import { HttpException, HttpStatus } from '@nestjs/common';
 /** Stable machine codes for every tenant-plane failure mode (MT-0 §3.3). */
 export type TenantErrorCode =
   | 'TENANT_HOST_INVALID'
+  | 'TENANT_FORWARDED_HOST_UNTRUSTED'
   | 'TENANT_RESOLUTION_FAILED'
   | 'TENANT_UNAVAILABLE'
   | 'TENANT_SUSPENDED'
@@ -25,6 +26,7 @@ export class TenantResolutionException extends HttpException {
 
 const TENANT_ERROR_MESSAGES: Record<TenantErrorCode, string> = {
   TENANT_HOST_INVALID: 'This store address is not valid.',
+  TENANT_FORWARDED_HOST_UNTRUSTED: 'This store address was not received from a trusted proxy.',
   TENANT_RESOLUTION_FAILED: 'No store exists at this address.',
   TENANT_UNAVAILABLE: 'This store is temporarily unavailable. Please try again later.',
   TENANT_SUSPENDED: 'This store is currently unavailable.',

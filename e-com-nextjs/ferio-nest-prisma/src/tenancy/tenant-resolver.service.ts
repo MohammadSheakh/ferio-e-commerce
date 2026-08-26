@@ -1,4 +1,5 @@
-import { Injectable, type NestMiddleware, type OnModuleInit } from '@nestjs/common';
+import { HttpStatus, Injectable, type NestMiddleware, type OnModuleInit } from '@nestjs/common';
+import { isIP } from 'node:net';
 import type { NextFunction, Request, Response } from 'express';
 import { RedisService } from '@app/redis';
 import { PlatformPrismaService } from '../platform/platform-prisma.service';
@@ -40,15 +41,52 @@ export class TenantResolverService implements OnModuleInit {
     setDomainCacheInvalidator((hostname) => this.invalidate(hostname));
   }
 
-  /** Effective host for proxied requests: x-forwarded-host wins over Host. */
+  /**
+   * Select a host without trusting client-supplied forwarding metadata.
+   * Forwarded hosts are accepted only from the configured ingress/BFF CIDRs.
+   */
   effectiveHostFrom(headersOrRequest: {
     headers?: Record<string, string | string[] | undefined>;
     hostname?: string;
+    remoteAddress?: string;
   }): string | undefined {
     const headers = headersOrRequest.headers;
     const forwarded = headers?.['x-forwarded-host'];
-    if (forwarded) return Array.isArray(forwarded) ? forwarded[0] : forwarded;
+    if (forwarded !== undefined) {
+      const forwardedHost = this.singleForwardedHost(forwarded);
+      if (!this.isTrustedProxy(headersOrRequest.remoteAddress)) {
+        throw new TenantResolutionException(
+          'TENANT_FORWARDED_HOST_UNTRUSTED',
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+      return forwardedHost;
+    }
     return headersOrRequest.hostname;
+  }
+
+  private singleForwardedHost(value: string | string[]): string {
+    if (Array.isArray(value) && value.length !== 1) {
+      throw new TenantResolutionException('TENANT_HOST_INVALID', HttpStatus.BAD_REQUEST);
+    }
+    const host = Array.isArray(value) ? value[0] : value;
+    // Forwarded chains are ambiguous for tenant selection. The trusted edge
+    // must overwrite, never append, this header.
+    if (!host || host.includes(',')) {
+      throw new TenantResolutionException('TENANT_HOST_INVALID', HttpStatus.BAD_REQUEST);
+    }
+    return host;
+  }
+
+  private isTrustedProxy(remoteAddress: string | undefined): boolean {
+    if (!remoteAddress) return false;
+    const configured = process.env.TENANT_TRUSTED_PROXY_CIDRS?.trim();
+    const ranges = configured
+      ? configured.split(',').map((value) => value.trim()).filter(Boolean)
+      : process.env.NODE_ENV === 'production'
+        ? []
+        : ['127.0.0.1/32', '::1/128'];
+    return ranges.some((range) => addressInCidr(remoteAddress, range));
   }
 
   async resolveFromHost(rawHost: string | undefined): Promise<ResolvedTenant> {
@@ -235,10 +273,13 @@ export class TenantContextMiddleware implements NestMiddleware {
       next();
       return;
     }
-    // Storefront traffic is proxied through the Next.js BFF: trust the
-    // forwarding layer's original host above the proxy-local hostname.
-    const forwarded = request.headers?.['x-forwarded-host'];
-    const effectiveHost = Array.isArray(forwarded) ? forwarded[0] : forwarded || request.hostname;
+    const effectiveHost = this.resolver.effectiveHostFrom({
+      headers: request.headers as Record<string, string | string[] | undefined>,
+      hostname: request.hostname,
+      // Read the TCP peer directly. Express trust-proxy settings must never
+      // influence the decision about whether forwarding headers are trusted.
+      remoteAddress: request.socket?.remoteAddress,
+    });
     this.resolver
       .resolveFromHost(effectiveHost)
       .then((resolved) => {
@@ -258,4 +299,41 @@ export class TenantContextMiddleware implements NestMiddleware {
       })
       .catch(next);
   }
+}
+
+function addressInCidr(rawAddress: string, rawRange: string): boolean {
+  const address = rawAddress.startsWith('::ffff:')
+    ? rawAddress.slice('::ffff:'.length)
+    : rawAddress;
+  const [network, prefixText] = rawRange.split('/');
+  const addressVersion = isIP(address);
+  const networkVersion = isIP(network);
+  if (!addressVersion || addressVersion !== networkVersion) return false;
+
+  if (addressVersion === 6) {
+    const prefix = prefixText === undefined ? 128 : Number(prefixText);
+    // Exact IPv6 entries cover loopback and fixed ingress addresses. Broader
+    // IPv6 proxy networks should be terminated at an IPv4/private edge until
+    // a full IPv6 CIDR library is deliberately introduced.
+    return prefix === 128 && address.toLowerCase() === network.toLowerCase();
+  }
+
+  const prefix = prefixText === undefined ? 32 : Number(prefixText);
+  if (!Number.isInteger(prefix) || prefix < 0 || prefix > 32) return false;
+  const addressInt = ipv4ToInt(address);
+  const networkInt = ipv4ToInt(network);
+  if (addressInt === null || networkInt === null) return false;
+  const mask = prefix === 0 ? 0 : (0xffffffff << (32 - prefix)) >>> 0;
+  return (addressInt & mask) === (networkInt & mask);
+}
+
+function ipv4ToInt(value: string): number | null {
+  const octets = value.split('.').map(Number);
+  if (
+    octets.length !== 4 ||
+    octets.some((octet) => !Number.isInteger(octet) || octet < 0 || octet > 255)
+  ) {
+    return null;
+  }
+  return octets.reduce((result, octet) => ((result << 8) | octet) >>> 0, 0);
 }

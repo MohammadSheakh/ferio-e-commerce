@@ -5,6 +5,9 @@ import { REDIS_CLIENT } from '@app/redis';
 import { PrismaService } from '@app/database';
 import { TenantDbService } from '../../../tenancy/tenant-db.service';
 import type { PrismaClient } from '@prisma/client';
+import { tryGetTenantContext } from '../../../tenancy/tenant-context';
+import { TenantFanoutService } from '../../../tenancy/tenant-fanout.service';
+import { scopedSocketRoom } from './socket-auth.service';
 
 /**
  * Socket Room Service
@@ -35,6 +38,7 @@ export class SocketRoomService {
     @Inject(REDIS_CLIENT) private redisClient: Redis,
     private prisma: PrismaService,
     @Optional() private readonly tenantDb?: TenantDbService,
+    @Optional() private readonly fanout?: TenantFanoutService,
   ) {}
 
   /**
@@ -43,60 +47,71 @@ export class SocketRoomService {
    */
   private async db(): Promise<PrismaClient> {
     const tenant = await this.tenantDb?.tryGet();
-    return tenant ?? (this.prisma as unknown as PrismaClient);
+    if (tenant) return tenant;
+    if ((process.env.TENANCY_ENABLED || 'false') === 'true') {
+      throw new Error('SOCKET_TENANT_CONTEXT_REQUIRED');
+    }
+    return this.prisma as unknown as PrismaClient;
   }
 
   // =============================================
   // Conversation Room Management
   // =============================================
 
-  async joinRoom(userId: string, roomId: string): Promise<void> {
+  async joinRoom(userId: string, roomId: string, organizationId?: string): Promise<void> {
     const pipeline = this.redisClient.multi();
 
-    pipeline.sadd(`${this.KEYS.USER_ROOMS}${userId}`, roomId);
-    pipeline.sadd(`${this.KEYS.ROOM_USERS}${roomId}`, userId);
+    pipeline.sadd(this.key(this.KEYS.USER_ROOMS, userId, organizationId), roomId);
+    pipeline.sadd(this.key(this.KEYS.ROOM_USERS, roomId, organizationId), userId);
 
     await pipeline.exec();
 
     this.logger.log(`👥 User ${userId} joined room ${roomId}`);
   }
 
-  async leaveRoom(userId: string, roomId: string): Promise<void> {
+  async leaveRoom(userId: string, roomId: string, organizationId?: string): Promise<void> {
     const pipeline = this.redisClient.multi();
 
-    pipeline.srem(`${this.KEYS.USER_ROOMS}${userId}`, roomId);
-    pipeline.srem(`${this.KEYS.ROOM_USERS}${roomId}`, userId);
+    pipeline.srem(this.key(this.KEYS.USER_ROOMS, userId, organizationId), roomId);
+    pipeline.srem(this.key(this.KEYS.ROOM_USERS, roomId, organizationId), userId);
 
     await pipeline.exec();
 
     this.logger.log(`👥 User ${userId} left room ${roomId}`);
   }
 
-  async getRoomUsers(roomId: string): Promise<string[]> {
-    return await this.redisClient.smembers(`${this.KEYS.ROOM_USERS}${roomId}`);
+  async getRoomUsers(roomId: string, organizationId?: string): Promise<string[]> {
+    return await this.redisClient.smembers(
+      this.key(this.KEYS.ROOM_USERS, roomId, organizationId),
+    );
   }
 
-  async isUserInRoom(userId: string, roomId: string): Promise<boolean> {
-    const isMember = await this.redisClient.sismember(`${this.KEYS.ROOM_USERS}${roomId}`, userId);
+  async isUserInRoom(userId: string, roomId: string, organizationId?: string): Promise<boolean> {
+    const isMember = await this.redisClient.sismember(
+      this.key(this.KEYS.ROOM_USERS, roomId, organizationId),
+      userId,
+    );
     return isMember === 1;
   }
 
-  async getUserRooms(userId: string): Promise<string[]> {
-    return await this.redisClient.smembers(`${this.KEYS.USER_ROOMS}${userId}`);
+  async getUserRooms(userId: string, organizationId?: string): Promise<string[]> {
+    return await this.redisClient.smembers(
+      this.key(this.KEYS.USER_ROOMS, userId, organizationId),
+    );
   }
 
-  async removeUserFromAllRooms(userId: string): Promise<void> {
-    const userRooms = await this.getUserRooms(userId);
+  async removeUserFromAllRooms(userId: string, organizationId?: string): Promise<void> {
+    const userRooms = await this.getUserRooms(userId, organizationId);
 
     if (userRooms.length === 0) return;
 
     const pipeline = this.redisClient.multi();
 
     for (const roomId of userRooms) {
-      pipeline.srem(`${this.KEYS.ROOM_USERS}${roomId}`, userId);
+      pipeline.srem(this.key(this.KEYS.ROOM_USERS, roomId, organizationId), userId);
     }
 
-    pipeline.del(`${this.KEYS.USER_ROOMS}${userId}`);
+    pipeline.del(this.key(this.KEYS.USER_ROOMS, userId, organizationId));
 
     await pipeline.exec();
 
@@ -107,53 +122,60 @@ export class SocketRoomService {
   // Task Room Management
   // =============================================
 
-  async joinTaskRoom(userId: string, taskId: string): Promise<void> {
+  async joinTaskRoom(userId: string, taskId: string, organizationId?: string): Promise<void> {
     const pipeline = this.redisClient.multi();
 
-    pipeline.sadd(`${this.KEYS.USER_TASKS}${userId}`, taskId);
-    pipeline.sadd(`${this.KEYS.TASK_ROOMS}${taskId}`, userId);
+    pipeline.sadd(this.key(this.KEYS.USER_TASKS, userId, organizationId), taskId);
+    pipeline.sadd(this.key(this.KEYS.TASK_ROOMS, taskId, organizationId), userId);
 
     await pipeline.exec();
 
     this.logger.log(`📋 User ${userId} joined task room ${taskId}`);
   }
 
-  async leaveTaskRoom(userId: string, taskId: string): Promise<void> {
+  async leaveTaskRoom(userId: string, taskId: string, organizationId?: string): Promise<void> {
     const pipeline = this.redisClient.multi();
 
-    pipeline.srem(`${this.KEYS.USER_TASKS}${userId}`, taskId);
-    pipeline.srem(`${this.KEYS.TASK_ROOMS}${taskId}`, userId);
+    pipeline.srem(this.key(this.KEYS.USER_TASKS, userId, organizationId), taskId);
+    pipeline.srem(this.key(this.KEYS.TASK_ROOMS, taskId, organizationId), userId);
 
     await pipeline.exec();
 
     this.logger.log(`📋 User ${userId} left task room ${taskId}`);
   }
 
-  async getTaskRoomUsers(taskId: string): Promise<string[]> {
-    return await this.redisClient.smembers(`${this.KEYS.TASK_ROOMS}${taskId}`);
+  async getTaskRoomUsers(taskId: string, organizationId?: string): Promise<string[]> {
+    return await this.redisClient.smembers(
+      this.key(this.KEYS.TASK_ROOMS, taskId, organizationId),
+    );
   }
 
-  async isUserInTaskRoom(userId: string, taskId: string): Promise<boolean> {
-    const isMember = await this.redisClient.sismember(`${this.KEYS.USER_TASKS}${userId}`, taskId);
+  async isUserInTaskRoom(userId: string, taskId: string, organizationId?: string): Promise<boolean> {
+    const isMember = await this.redisClient.sismember(
+      this.key(this.KEYS.USER_TASKS, userId, organizationId),
+      taskId,
+    );
     return isMember === 1;
   }
 
-  async getUserTaskRooms(userId: string): Promise<string[]> {
-    return await this.redisClient.smembers(`${this.KEYS.USER_TASKS}${userId}`);
+  async getUserTaskRooms(userId: string, organizationId?: string): Promise<string[]> {
+    return await this.redisClient.smembers(
+      this.key(this.KEYS.USER_TASKS, userId, organizationId),
+    );
   }
 
-  async removeUserFromAllTaskRooms(userId: string): Promise<void> {
-    const userTaskRooms = await this.getUserTaskRooms(userId);
+  async removeUserFromAllTaskRooms(userId: string, organizationId?: string): Promise<void> {
+    const userTaskRooms = await this.getUserTaskRooms(userId, organizationId);
 
     if (userTaskRooms.length === 0) return;
 
     const pipeline = this.redisClient.multi();
 
     for (const taskId of userTaskRooms) {
-      pipeline.srem(`${this.KEYS.TASK_ROOMS}${taskId}`, userId);
+      pipeline.srem(this.key(this.KEYS.TASK_ROOMS, taskId, organizationId), userId);
     }
 
-    pipeline.del(`${this.KEYS.USER_TASKS}${userId}`);
+    pipeline.del(this.key(this.KEYS.USER_TASKS, userId, organizationId));
 
     await pipeline.exec();
 
@@ -164,53 +186,60 @@ export class SocketRoomService {
   // Group/Family Room Management
   // =============================================
 
-  async joinGroupRoom(userId: string, groupId: string): Promise<void> {
+  async joinGroupRoom(userId: string, groupId: string, organizationId?: string): Promise<void> {
     const pipeline = this.redisClient.multi();
 
-    pipeline.sadd(`${this.KEYS.USER_GROUPS}${userId}`, groupId);
-    pipeline.sadd(`${this.KEYS.GROUP_ROOMS}${groupId}`, userId);
+    pipeline.sadd(this.key(this.KEYS.USER_GROUPS, userId, organizationId), groupId);
+    pipeline.sadd(this.key(this.KEYS.GROUP_ROOMS, groupId, organizationId), userId);
 
     await pipeline.exec();
 
     this.logger.log(`👨‍👩‍👧‍👦 User ${userId} joined group room ${groupId}`);
   }
 
-  async leaveGroupRoom(userId: string, groupId: string): Promise<void> {
+  async leaveGroupRoom(userId: string, groupId: string, organizationId?: string): Promise<void> {
     const pipeline = this.redisClient.multi();
 
-    pipeline.srem(`${this.KEYS.USER_GROUPS}${userId}`, groupId);
-    pipeline.srem(`${this.KEYS.GROUP_ROOMS}${groupId}`, userId);
+    pipeline.srem(this.key(this.KEYS.USER_GROUPS, userId, organizationId), groupId);
+    pipeline.srem(this.key(this.KEYS.GROUP_ROOMS, groupId, organizationId), userId);
 
     await pipeline.exec();
 
     this.logger.log(`👨‍👩‍👧‍👦 User ${userId} left group room ${groupId}`);
   }
 
-  async getGroupRoomUsers(groupId: string): Promise<string[]> {
-    return await this.redisClient.smembers(`${this.KEYS.GROUP_ROOMS}${groupId}`);
+  async getGroupRoomUsers(groupId: string, organizationId?: string): Promise<string[]> {
+    return await this.redisClient.smembers(
+      this.key(this.KEYS.GROUP_ROOMS, groupId, organizationId),
+    );
   }
 
-  async isUserInGroupRoom(userId: string, groupId: string): Promise<boolean> {
-    const isMember = await this.redisClient.sismember(`${this.KEYS.USER_GROUPS}${userId}`, groupId);
+  async isUserInGroupRoom(userId: string, groupId: string, organizationId?: string): Promise<boolean> {
+    const isMember = await this.redisClient.sismember(
+      this.key(this.KEYS.USER_GROUPS, userId, organizationId),
+      groupId,
+    );
     return isMember === 1;
   }
 
-  async getUserGroupRooms(userId: string): Promise<string[]> {
-    return await this.redisClient.smembers(`${this.KEYS.USER_GROUPS}${userId}`);
+  async getUserGroupRooms(userId: string, organizationId?: string): Promise<string[]> {
+    return await this.redisClient.smembers(
+      this.key(this.KEYS.USER_GROUPS, userId, organizationId),
+    );
   }
 
-  async removeUserFromAllGroupRooms(userId: string): Promise<void> {
-    const userGroupRooms = await this.getUserGroupRooms(userId);
+  async removeUserFromAllGroupRooms(userId: string, organizationId?: string): Promise<void> {
+    const userGroupRooms = await this.getUserGroupRooms(userId, organizationId);
 
     if (userGroupRooms.length === 0) return;
 
     const pipeline = this.redisClient.multi();
 
     for (const groupId of userGroupRooms) {
-      pipeline.srem(`${this.KEYS.GROUP_ROOMS}${groupId}`, userId);
+      pipeline.srem(this.key(this.KEYS.GROUP_ROOMS, groupId, organizationId), userId);
     }
 
-    pipeline.del(`${this.KEYS.USER_GROUPS}${userId}`);
+    pipeline.del(this.key(this.KEYS.USER_GROUPS, userId, organizationId));
 
     await pipeline.exec();
 
@@ -220,7 +249,21 @@ export class SocketRoomService {
   /**
    * Auto-join Family Room
    */
-  async autoJoinFamilyRoom(socket: any, userId: string): Promise<void> {
+  async autoJoinFamilyRoom(
+    socket: any,
+    userId: string,
+    organizationId?: string,
+  ): Promise<void> {
+    return this.inOrganization(organizationId, () =>
+      this.autoJoinFamilyRoomInContext(socket, userId, organizationId),
+    );
+  }
+
+  private async autoJoinFamilyRoomInContext(
+    socket: any,
+    userId: string,
+    organizationId?: string,
+  ): Promise<void> {
     const db = await this.db();
     try {
       const user = await db.user.findUnique({
@@ -241,8 +284,8 @@ export class SocketRoomService {
       }
 
       if (familyRoomId) {
-        await this.joinGroupRoom(userId, familyRoomId);
-        socket.join(familyRoomId);
+        await this.joinGroupRoom(userId, familyRoomId, organizationId);
+        socket.join(scopedSocketRoom({ organizationId }, familyRoomId));
         this.logger.log(`✅ User ${userId} auto-joined family room ${familyRoomId}`);
       }
     } catch (error) {
@@ -254,8 +297,13 @@ export class SocketRoomService {
   // Activity Feed Management
   // =============================================
 
-  async addActivityToFeed(groupId: string, activity: any, maxActivities: number = 50): Promise<void> {
-    const activityKey = `${this.KEYS.ACTIVITY_FEED}${groupId}`;
+  async addActivityToFeed(
+    groupId: string,
+    activity: any,
+    maxActivities: number = 50,
+    organizationId?: string,
+  ): Promise<void> {
+    const activityKey = this.key(this.KEYS.ACTIVITY_FEED, groupId, organizationId);
 
     await this.redisClient.lpush(activityKey, JSON.stringify(activity));
     await this.redisClient.ltrim(activityKey, 0, maxActivities - 1);
@@ -264,15 +312,43 @@ export class SocketRoomService {
     this.logger.log(`📢 Added activity to group ${groupId} feed`);
   }
 
-  async getActivityFeed(groupId: string, limit: number = 10): Promise<any[]> {
-    const activityKey = `${this.KEYS.ACTIVITY_FEED}${groupId}`;
+  async getActivityFeed(
+    groupId: string,
+    limit: number = 10,
+    organizationId?: string,
+  ): Promise<any[]> {
+    const activityKey = this.key(this.KEYS.ACTIVITY_FEED, groupId, organizationId);
     const activities = await this.redisClient.lrange(activityKey, 0, limit - 1);
     return activities.map(activity => JSON.parse(activity));
   }
 
-  async clearActivityFeed(groupId: string): Promise<void> {
-    const activityKey = `${this.KEYS.ACTIVITY_FEED}${groupId}`;
+  async clearActivityFeed(groupId: string, organizationId?: string): Promise<void> {
+    const activityKey = this.key(this.KEYS.ACTIVITY_FEED, groupId, organizationId);
     await this.redisClient.del(activityKey);
     this.logger.log(`🧹 Cleared activity feed for group ${groupId}`);
+  }
+
+  private key(base: string, id: string, organizationId?: string): string {
+    const resolvedOrganizationId =
+      organizationId ?? tryGetTenantContext()?.organizationId;
+    if (
+      (process.env.TENANCY_ENABLED || 'false') === 'true' &&
+      !resolvedOrganizationId
+    ) {
+      throw new Error('SOCKET_ORGANIZATION_REQUIRED');
+    }
+    return resolvedOrganizationId
+      ? `org:${resolvedOrganizationId}:${base}${id}`
+      : `${base}${id}`;
+  }
+
+  private inOrganization<T>(
+    organizationId: string | undefined,
+    operation: () => Promise<T>,
+  ): Promise<T> {
+    if ((process.env.TENANCY_ENABLED || 'false') !== 'true') return operation();
+    if (!organizationId) throw new Error('SOCKET_ORGANIZATION_REQUIRED');
+    if (!this.fanout) throw new Error('TENANT_FANOUT_UNAVAILABLE');
+    return this.fanout.forOrganization(organizationId, operation);
   }
 }

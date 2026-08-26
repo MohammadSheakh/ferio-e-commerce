@@ -20,7 +20,6 @@ import { SocketRoomService } from './services/socket-room.service';
 import { WsJwtGuard } from './guards/ws-jwt.guard';
 import { REDIS_PUB_CLIENT, REDIS_SUB_CLIENT } from '@app/redis';
 import { FirebaseService } from '@app/notification';
-import { PrismaService } from '@app/database';
 
 const socketAllowedOrigins = [
   process.env.CUSTOMER_WEB_URL || 'http://localhost:3000',
@@ -51,7 +50,15 @@ export class SocketGateway
   private readonly logger = new Logger(SocketGateway.name);
   private activePageViews = new Map<
     string,
-    { socketId: string; page: string; role: string; userId: string; name?: string; updatedAt: number }
+    {
+      socketId: string;
+      page: string;
+      role: string;
+      userId: string;
+      name?: string;
+      organizationId?: string;
+      updatedAt: number;
+    }
   >();
 
   constructor(
@@ -59,7 +66,6 @@ export class SocketGateway
     private socketAuthService: SocketAuthService,
     private socketRoomService: SocketRoomService,
     private firebaseService: FirebaseService,
-    private prisma: PrismaService,
     @Inject(REDIS_PUB_CLIENT) private redisPubClient: Redis,
     @Inject(REDIS_SUB_CLIENT) private redisSubClient: Redis,
   ) {}
@@ -139,10 +145,14 @@ export class SocketGateway
       }
 
       // Auto-join family room (if applicable)
-      await this.socketRoomService.autoJoinFamilyRoom(client, user.userId);
+      await this.socketRoomService.autoJoinFamilyRoom(
+        client,
+        user.userId,
+        user.organizationId,
+      );
 
       // Notify related users about online status
-      await this.notifyRelatedUsersOnlineStatus(user.userId, true);
+      await this.notifyRelatedUsersOnlineStatus(user, true);
 
       // Track initial page view for visitors on storefront / rider portal pages
       const initialPage = (client.handshake.query?.page as string) || '/';
@@ -155,9 +165,10 @@ export class SocketGateway
           role: user.role || 'guest',
           userId: user.userId || client.id,
           name: user.name || 'Guest Visitor',
+          organizationId: user.organizationId,
           updatedAt: Date.now(),
         });
-        this.broadcastLivePageStats();
+        this.broadcastLivePageStats(user.organizationId);
       }
 
       // Emit connection success
@@ -180,21 +191,27 @@ export class SocketGateway
    * Handle Client Disconnection
    */
   async handleDisconnect(@ConnectedSocket() client: Socket) {
-    const userId = client.data.userId;
+    const user = client.data.user;
+    const userId = user?.userId;
 
     if (this.activePageViews.has(client.id)) {
       this.activePageViews.delete(client.id);
-      this.broadcastLivePageStats();
+      this.broadcastLivePageStats(client.data.user?.organizationId);
     }
 
     if (userId) {
       this.logger.log(`🔌 User disconnected: ${userId} (Socket: ${client.id})`);
 
       // Handle user disconnection in Redis
-      await this.socketAuthService.handleUserDisconnection(client, userId);
+      const becameOffline = await this.socketAuthService.handleUserDisconnection(
+        client,
+        user,
+      );
 
       // Notify related users about online status
-      await this.notifyRelatedUsersOnlineStatus(userId, false);
+      if (becameOffline) {
+        await this.notifyRelatedUsersOnlineStatus(user, false);
+      }
     }
   }
 
@@ -218,15 +235,18 @@ export class SocketGateway
         socketId: client.id,
         page,
         role: user?.role || 'guest',
-        userId: client.data.userId || client.id,
-        name: user?.name || 'Guest Visitor',
-        updatedAt: Date.now(),
-      });
-      this.broadcastLivePageStats();
+          userId: client.data.userId || client.id,
+          name: user?.name || 'Guest Visitor',
+          organizationId: user?.organizationId,
+          updatedAt: Date.now(),
+        });
+      this.broadcastLivePageStats(user?.organizationId);
+    } else if (this.activePageViews.delete(client.id)) {
+      this.broadcastLivePageStats(user?.organizationId);
     }
   }
 
-  public getLivePageStatsPayload() {
+  public getLivePageStatsPayload(organizationId?: string) {
     const pageCounts: Record<string, number> = {
       '/': 0,
       '/cart': 0,
@@ -240,6 +260,7 @@ export class SocketGateway
     const activeVisitors: Array<{ page: string; role: string; name: string; userId: string }> = [];
 
     for (const [socketId, info] of this.activePageViews.entries()) {
+      if (info.organizationId !== organizationId) continue;
       totalActive++;
       let rawPage = info.page.split('?')[0];
       if (!rawPage || rawPage === '') rawPage = '/';
@@ -284,43 +305,55 @@ export class SocketGateway
    */
   @SubscribeMessage('request-live-page-stats')
   handleRequestLivePageStats(@ConnectedSocket() client: Socket) {
-    const payload = this.getLivePageStatsPayload();
+    const user = client.data.user;
+    if (!user || !this.socketAuthService.isAdmin(user.role)) {
+      return { success: false, message: 'Administrator access required' };
+    }
+    const payload = this.getLivePageStatsPayload(user.organizationId);
     client.emit('live-page-visitors-stats', payload);
-    this.broadcastLivePageStats();
     return { success: true };
   }
 
   /**
    * Broadcast Live Active Page Visitor Metrics to Admin Room
    */
-  public broadcastLivePageStats() {
-    const payload = this.getLivePageStatsPayload();
-    // Tenant-scoped admins receive org-prefixed rooms when the originating
-    // request carries a tenant binding; legacy listeners keep old rooms.
-    const orgId = tryGetTenantContext()?.organizationId;
+  public broadcastLivePageStats(organizationId?: string) {
+    const payload = this.getLivePageStatsPayload(organizationId);
+    if (organizationId) {
+      this.server
+        .to(scopedSocketRoom({ organizationId }, 'role::admin'))
+        .to(scopedSocketRoom({ organizationId }, 'role::super-admin'))
+        .to(scopedSocketRoom({ organizationId }, 'admin-room'))
+        .emit('live-page-visitors-stats', payload);
+      return;
+    }
     this.server
-      .to(scopedSocketRoom({ organizationId: orgId }, 'role::admin'))
-      .to(scopedSocketRoom({ organizationId: orgId }, 'role::super-admin'))
-      .to(scopedSocketRoom({ organizationId: orgId }, 'admin-room'))
       .to('role::admin')
+      .to('role::super-admin')
+      .to('admin-room')
       .emit('live-page-visitors-stats', payload);
   }
 
   /**
    * Notify Related Users about Online Status
    */
-  private async notifyRelatedUsersOnlineStatus(userId: string, isOnline: boolean) {
+  private async notifyRelatedUsersOnlineStatus(
+    user: { userId: string; role: string; name: string; organizationId?: string },
+    isOnline: boolean,
+  ) {
     try {
-      const relatedUsers = await this.socketAuthService.getRelatedOnlineUsers(userId);
+      const relatedUsers = await this.socketAuthService.getRelatedOnlineUsers(user);
 
       for (const relatedUserId of relatedUsers) {
         // Don't notify self
-        if (relatedUserId === userId) continue;
+        if (relatedUserId === user.userId) continue;
 
-        this.server.to(relatedUserId).emit(`related-user-online-status::${relatedUserId}`, {
-          userId,
-          isOnline,
-        });
+        this.server
+          .to(scopedSocketRoom(user, relatedUserId))
+          .emit(`related-user-online-status::${relatedUserId}`, {
+            userId: user.userId,
+            isOnline,
+          });
       }
     } catch (error) {
       this.logger.error(`❌ Failed to notify related users: ${error.message}`);
@@ -351,10 +384,17 @@ export class SocketGateway
       client.join(scopedSocketRoom(client.data?.user, conversationId));
 
       // Update Redis state
-      await this.socketRoomService.joinRoom(userId, conversationId);
+      await this.socketRoomService.joinRoom(
+        userId,
+        conversationId,
+        client.data.user?.organizationId,
+      );
 
       // Get room users
-      const roomUsers = await this.socketRoomService.getRoomUsers(conversationId);
+      const roomUsers = await this.socketRoomService.getRoomUsers(
+        conversationId,
+        client.data.user?.organizationId,
+      );
 
       this.logger.log(
         `👥 Room ${conversationId} has ${roomUsers.length} users: ${roomUsers.join(', ')}`,
@@ -396,10 +436,14 @@ export class SocketGateway
       }
 
       // Leave Socket.IO room
-      client.leave(conversationId);
+      client.leave(scopedSocketRoom(client.data?.user, conversationId));
 
       // Update Redis state
-      await this.socketRoomService.leaveRoom(userId, conversationId);
+      await this.socketRoomService.leaveRoom(
+        userId,
+        conversationId,
+        client.data.user?.organizationId,
+      );
 
       // Notify others
       client.to(scopedSocketRoom(client.data?.user, conversationId)).emit('user-left-chat', {
@@ -433,6 +477,7 @@ export class SocketGateway
       if (!userId || !text || !(await this.socketAuthService.canAccessConversation(user, targetConvId))) {
         return { success: false, message: 'Conversation access denied' };
       }
+      const db = await this.socketAuthService.databaseForSocket(user);
 
       const isAdmin = this.socketAuthService.isAdmin(user.role);
       const isGuest = user.role === 'guest';
@@ -470,7 +515,7 @@ export class SocketGateway
       // Lookup target user and customer links to emit to all related rooms (Customer ID & User ID & Email)
       const targetIdToSearch = rawConvId;
       const [linkedUser, linkedCustomer] = await Promise.all([
-        this.prisma.user.findFirst({
+        db.user.findFirst({
           where: {
             isDeleted: false,
             OR: [
@@ -482,7 +527,7 @@ export class SocketGateway
           },
           select: { id: true, customerId: true, email: true },
         }),
-        this.prisma.customer.findFirst({
+        db.customer.findFirst({
           where: {
             OR: [
               { id: targetIdToSearch },
@@ -500,26 +545,28 @@ export class SocketGateway
         scopedSocketRoom({ organizationId: senderOrg }, rawConvId),
         scopedSocketRoom({ organizationId: senderOrg }, prefConvId),
       ]);
+      const addRoom = (room: string) =>
+        roomsToEmit.add(scopedSocketRoom({ organizationId: senderOrg }, room));
 
       if (linkedUser) {
         if (linkedUser.id) {
-          roomsToEmit.add(linkedUser.id);
-          roomsToEmit.add(scopedSocketRoom({ organizationId: senderOrg }, `conv-${linkedUser.id}`));
+          addRoom(linkedUser.id);
+          addRoom(`conv-${linkedUser.id}`);
         }
         if (linkedUser.customerId) {
-          roomsToEmit.add(linkedUser.customerId);
-          roomsToEmit.add(scopedSocketRoom({ organizationId: senderOrg }, `conv-${linkedUser.customerId}`));
+          addRoom(linkedUser.customerId);
+          addRoom(`conv-${linkedUser.customerId}`);
         }
       }
 
       if (linkedCustomer) {
         if (linkedCustomer.id) {
-          roomsToEmit.add(linkedCustomer.id);
-          roomsToEmit.add(`conv-${linkedCustomer.id}`);
+          addRoom(linkedCustomer.id);
+          addRoom(`conv-${linkedCustomer.id}`);
         }
         if (linkedCustomer.user?.id) {
-          roomsToEmit.add(linkedCustomer.user.id);
-          roomsToEmit.add(`conv-${linkedCustomer.user.id}`);
+          addRoom(linkedCustomer.user.id);
+          addRoom(`conv-${linkedCustomer.user.id}`);
         }
       }
 
@@ -527,26 +574,26 @@ export class SocketGateway
       const searchEmail = linkedUser?.email || linkedCustomer?.email;
       if (searchEmail) {
         const [userByEmail, custByEmail] = await Promise.all([
-          this.prisma.user.findFirst({ where: { email: searchEmail } }),
-          this.prisma.customer.findFirst({
+          db.user.findFirst({ where: { email: searchEmail } }),
+          db.customer.findFirst({
             where: { email: searchEmail },
             include: { user: true },
           }),
         ]);
         if (userByEmail) {
-          roomsToEmit.add(userByEmail.id);
-          roomsToEmit.add(`conv-${userByEmail.id}`);
+          addRoom(userByEmail.id);
+          addRoom(`conv-${userByEmail.id}`);
           if (userByEmail.customerId) {
-            roomsToEmit.add(userByEmail.customerId);
-            roomsToEmit.add(`conv-${userByEmail.customerId}`);
+            addRoom(userByEmail.customerId);
+            addRoom(`conv-${userByEmail.customerId}`);
           }
         }
         if (custByEmail) {
-          roomsToEmit.add(custByEmail.id);
-          roomsToEmit.add(`conv-${custByEmail.id}`);
+          addRoom(custByEmail.id);
+          addRoom(`conv-${custByEmail.id}`);
           if (custByEmail.user?.id) {
-            roomsToEmit.add(custByEmail.user.id);
-            roomsToEmit.add(`conv-${custByEmail.user.id}`);
+            addRoom(custByEmail.user.id);
+            addRoom(`conv-${custByEmail.user.id}`);
           }
         }
       }
@@ -569,12 +616,20 @@ export class SocketGateway
 
       // 3. Direct target emission
       if (payload.senderId) {
-        this.server.to(payload.senderId).emit('new-message-received', payload);
-        this.server.to(`conv-${payload.senderId}`).emit('new-message-received', payload);
+        this.server
+          .to(scopedSocketRoom({ organizationId: senderOrg }, payload.senderId))
+          .emit('new-message-received', payload);
+        this.server
+          .to(scopedSocketRoom({ organizationId: senderOrg }, `conv-${payload.senderId}`))
+          .emit('new-message-received', payload);
       }
       if (payload.guestId) {
-        this.server.to(payload.guestId).emit('new-message-received', payload);
-        this.server.to(`conv-${payload.guestId}`).emit('new-message-received', payload);
+        this.server
+          .to(scopedSocketRoom({ organizationId: senderOrg }, payload.guestId))
+          .emit('new-message-received', payload);
+        this.server
+          .to(scopedSocketRoom({ organizationId: senderOrg }, `conv-${payload.guestId}`))
+          .emit('new-message-received', payload);
       }
 
       // 4. Persist Message & Conversation in Prisma Database
@@ -585,60 +640,26 @@ export class SocketGateway
 
         let validSenderUser: any = null;
 
-        if (payload.isAdmin) {
-          validSenderUser = await this.prisma.user.findFirst({
-            where: { id: payload.senderId, role: 'admin', isDeleted: false },
-          });
-        } else {
-          validSenderUser = await this.prisma.user.findFirst({
-            where: {
+        if (payload.isGuest) {
+          validSenderUser = await db.user.upsert({
+            where: { id: 'system_guest_chat_user' },
+            update: {},
+            create: {
+              id: 'system_guest_chat_user',
+              name: 'Guest Visitor',
+              email: 'guest@ferio.local',
+              role: 'user',
               isDeleted: false,
-              role: { not: 'admin' },
-              OR: [
-                { id: payload.senderId },
-                { customerId: payload.senderId },
-                { customerId: rawConvId },
-              ],
             },
           });
-          if (!validSenderUser) {
-            validSenderUser = await this.prisma.user.findFirst({
-              where: {
-                isDeleted: false,
-                OR: [
-                  { id: payload.senderId },
-                  { customerId: payload.senderId },
-                  { customerId: rawConvId },
-                ],
-              },
-            });
-          }
-          if (!validSenderUser) {
-            validSenderUser = await this.prisma.user.findFirst({
-              where: { role: 'user', isDeleted: false },
-            });
-          }
-          if (!validSenderUser) {
-            try {
-              validSenderUser = await this.prisma.user.upsert({
-                where: { id: 'system_guest_chat_user' },
-                update: {},
-                create: {
-                  id: 'system_guest_chat_user',
-                  name: 'Guest Visitor',
-                  email: 'guest@ferio.local',
-                  role: 'user',
-                  isDeleted: false,
-                },
-              });
-            } catch {
-              validSenderUser = await this.prisma.user.findFirst({ where: { isDeleted: false } });
-            }
-          }
+        } else {
+          validSenderUser = await db.user.findFirst({
+            where: { id: payload.senderId, isDeleted: false },
+          });
         }
 
         if (validSenderUser) {
-          let conversation = await this.prisma.conversation.findFirst({
+          let conversation = await db.conversation.findFirst({
             where: {
               isDeleted: false,
               id: { in: [targetConvId, rawConvId, prefConvId] },
@@ -646,7 +667,7 @@ export class SocketGateway
           });
 
           if (!conversation) {
-            conversation = await this.prisma.conversation.create({
+            conversation = await db.conversation.create({
               data: {
                 id: canonicalConvId,
                 creatorId: validSenderUser.id,
@@ -656,7 +677,7 @@ export class SocketGateway
               },
             });
           } else {
-            await this.prisma.conversation.update({
+            await db.conversation.update({
               where: { id: conversation.id },
               data: {
                 lastMessageText: payload.text,
@@ -666,12 +687,12 @@ export class SocketGateway
           }
 
           // Check if message was already created to prevent duplicates
-          const existingMsg = await this.prisma.message.findUnique({
+          const existingMsg = await db.message.findUnique({
             where: { id: payload._messageId },
           });
 
           if (!existingMsg) {
-            await this.prisma.message.create({
+            await db.message.create({
               data: {
                 id: payload._messageId,
                 text: payload.text,
@@ -726,10 +747,17 @@ export class SocketGateway
       client.join(taskRoom);
 
       // Update Redis state
-      await this.socketRoomService.joinTaskRoom(userId, taskRoom);
+      await this.socketRoomService.joinTaskRoom(
+        userId,
+        taskRoom,
+        client.data.user?.organizationId,
+      );
 
       // Get task room users
-      const roomUsers = await this.socketRoomService.getTaskRoomUsers(taskRoom);
+      const roomUsers = await this.socketRoomService.getTaskRoomUsers(
+        taskRoom,
+        client.data.user?.organizationId,
+      );
 
       this.logger.log(
         `📋 Task room ${taskRoom} has ${roomUsers.length} users`,
@@ -772,7 +800,11 @@ export class SocketGateway
       client.leave(taskRoom);
 
       // Update Redis state
-      await this.socketRoomService.leaveTaskRoom(userId, taskRoom);
+      await this.socketRoomService.leaveTaskRoom(
+        userId,
+        taskRoom,
+        client.data.user?.organizationId,
+      );
 
       // Notify others
       client.to(taskRoom).emit('user-left-task', {
@@ -794,15 +826,17 @@ export class SocketGateway
   @SubscribeMessage('only-related-online-users')
   async handleGetRelatedOnlineUsers(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { userId: string },
+    @MessageBody() _data: { userId?: string },
   ) {
     try {
+      const user = client.data.user;
+      if (!user) return { success: false, message: 'Authentication required' };
       const relatedOnlineUsers = await this.socketAuthService.getRelatedOnlineUsers(
-        data.userId,
+        user,
       );
 
       this.logger.log(
-        `📊 Related online users for ${data.userId}: ${relatedOnlineUsers.length}`,
+        `📊 Related online users for ${user.userId}: ${relatedOnlineUsers.length}`,
       );
 
       return {
@@ -831,6 +865,7 @@ export class SocketGateway
       const activities = await this.socketRoomService.getActivityFeed(
         data.businessUserId,
         limit,
+        client.data.user?.organizationId,
       );
 
       return {

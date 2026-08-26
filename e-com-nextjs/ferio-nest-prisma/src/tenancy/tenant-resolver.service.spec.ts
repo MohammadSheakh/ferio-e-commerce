@@ -26,6 +26,7 @@ describe('normalizeTenantHost (ADR-0002 security boundary)', () => {
 });
 
 describe('TenantResolverService fail-closed resolution (MT-2 gate)', () => {
+  const originalEnv = { ...process.env };
   let service: any;
   let platform: { client: any };
   const redis = { getClient: jest.fn().mockResolvedValue(null) };
@@ -36,6 +37,86 @@ describe('TenantResolverService fail-closed resolution (MT-2 gate)', () => {
     const { TenantResolverService } = require('./tenant-resolver.service');
     service = new TenantResolverService(platform as never, redis as never);
     jest.spyOn(service, 'writeCache').mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+  });
+
+  it('uses Host when no forwarding header is supplied', () => {
+    expect(
+      service.effectiveHostFrom({
+        headers: {},
+        hostname: 'store.example.com',
+        remoteAddress: '203.0.113.10',
+      }),
+    ).toBe('store.example.com');
+  });
+
+  it('accepts one forwarded host from a configured proxy CIDR', () => {
+    process.env.NODE_ENV = 'production';
+    process.env.TENANT_TRUSTED_PROXY_CIDRS = '172.16.0.0/12,10.20.30.40/32';
+
+    expect(
+      service.effectiveHostFrom({
+        headers: { 'x-forwarded-host': 'store.example.com' },
+        hostname: 'backend.internal',
+        remoteAddress: '::ffff:172.22.0.8',
+      }),
+    ).toBe('store.example.com');
+  });
+
+  it('rejects a forwarded host from an untrusted direct client', () => {
+    process.env.NODE_ENV = 'production';
+    process.env.TENANT_TRUSTED_PROXY_CIDRS = '172.16.0.0/12';
+
+    expect(() =>
+      service.effectiveHostFrom({
+        headers: { 'x-forwarded-host': 'victim.example.com' },
+        hostname: 'attacker.example.com',
+        remoteAddress: '203.0.113.10',
+      }),
+    ).toThrow(
+      expect.objectContaining({ code: 'TENANT_FORWARDED_HOST_UNTRUSTED' }),
+    );
+  });
+
+  it('fails closed on ambiguous forwarded-host chains', () => {
+    process.env.TENANT_TRUSTED_PROXY_CIDRS = '127.0.0.1/32';
+
+    expect(() =>
+      service.effectiveHostFrom({
+        headers: {
+          'x-forwarded-host': 'attacker.example.com, store.example.com',
+        },
+        hostname: 'backend.internal',
+        remoteAddress: '127.0.0.1',
+      }),
+    ).toThrow(expect.objectContaining({ code: 'TENANT_HOST_INVALID' }));
+    expect(() =>
+      service.effectiveHostFrom({
+        headers: {
+          'x-forwarded-host': ['attacker.example.com', 'store.example.com'],
+        },
+        hostname: 'backend.internal',
+        remoteAddress: '127.0.0.1',
+      }),
+    ).toThrow(expect.objectContaining({ code: 'TENANT_HOST_INVALID' }));
+  });
+
+  it('trusts no forwarded proxy by default in production', () => {
+    process.env.NODE_ENV = 'production';
+    delete process.env.TENANT_TRUSTED_PROXY_CIDRS;
+
+    expect(() =>
+      service.effectiveHostFrom({
+        headers: { 'x-forwarded-host': 'store.example.com' },
+        hostname: 'backend.internal',
+        remoteAddress: '127.0.0.1',
+      }),
+    ).toThrow(
+      expect.objectContaining({ code: 'TENANT_FORWARDED_HOST_UNTRUSTED' }),
+    );
   });
 
   it('fails closed when the hostname is unknown — never falls back to legacy DB', async () => {

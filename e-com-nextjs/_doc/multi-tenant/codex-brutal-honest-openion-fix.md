@@ -354,3 +354,182 @@ the configured idle/grace window need database statement timeouts and tracing.
 Durable per-tenant/partition jobs, a distributed non-overlap lease, due-work
 indexes, and per-tenant lag metrics remain required before thousand-tenant
 operation.
+
+## 2026-08-26: Tenant-Scoped Realtime Presence
+
+**Finding:** C-4 (presence and relay-room slice)
+
+**Status:** Partially fixed.
+
+**Changes:**
+
+- Redis online-user, user-socket, socket-user, and status keys now include the
+  signed socket-ticket organization.
+- Presence now stores a set of sockets per user instead of replacing an older
+  tab/device connection.
+- Disconnect cleanup is atomic in Redis and reports offline only when the last
+  socket leaves, preventing one tab from marking all other tabs offline.
+- Removed the incorrect cleanup rule that treated every connection older than
+  five minutes as stale even while it remained healthy.
+- Conversation authorization and related-user lookup re-enter the trusted
+  organization context after socket authentication rather than relying on
+  request-local context that no longer exists.
+- Related-user requests use the authenticated socket identity instead of a
+  caller-supplied user ID.
+- Chat relay targets and conversation leave operations no longer emit to raw
+  global rooms when an organization binding is present.
+
+**Verification:**
+
+- Socket authentication/presence and Redis collision tests: 19/19 passed
+  across 2 suites.
+- Backend production build passed.
+- `git diff --check` passed before commit.
+
+**Commit:** `fix(realtime): isolate tenant presence state`
+
+**Residual risk:** room-membership/activity Redis keys still need complete
+organization scoping. Process-crash stale presence needs heartbeat/TTL cleanup,
+live visitor statistics remain process-local, and gateway chat persistence
+still uses the legacy Prisma client.
+
+## 2026-08-26: Tenant-Scoped Realtime Room State
+
+**Finding:** C-4 (Redis room-state slice)
+
+**Status:** Fixed.
+
+**Changes:**
+
+- Conversation, task, family/group, and activity-feed Redis keys now include
+  the resolved organization in strict tenancy mode.
+- Every room-state method fails closed when strict mode has neither an explicit
+  organization nor an ambient trusted tenant context.
+- Gateway conversation/task joins, leaves, and membership reads pass the
+  organization authenticated from the socket ticket.
+- Family auto-join re-enters `TenantFanoutService.forOrganization` before its
+  user lookup, removing the legacy Prisma fallback from strict socket startup.
+- Family Socket.IO rooms use the same organization-prefixed naming contract as
+  conversation and task rooms.
+- Added collision coverage for identical conversation, task, group, activity,
+  user, and family identifiers across two organizations.
+
+**Verification:**
+
+- Socket room/authentication and Redis collision tests: 23/23 passed across 3
+  suites.
+- Backend production build passed.
+- `git diff --check` passed before commit.
+
+**Commit:** `fix(realtime): scope tenant room state`
+
+**Residual risk:** gateway visitor statistics and stale-presence recovery still
+need Redis-backed replica-safe state. Chat message lookup/persistence remains on
+the legacy Prisma client, and event-level authorization needs a final sweep.
+
+## 2026-08-26: Tenant-Bound Socket Chat Persistence
+
+**Finding:** C-4 (chat database slice)
+
+**Status:** Fixed for database selection and sender attribution.
+
+**Changes:**
+
+- `SocketAuthService.databaseForSocket` resolves the Prisma client only through
+  the organization signed into the verified socket ticket.
+- Removed the legacy `PrismaService` dependency and every direct Prisma call
+  from `SocketGateway`.
+- User/customer target lookup, cross-lookup, conversation mutation, dedupe, and
+  message creation now all execute on the resolved tenant client.
+- Authenticated message persistence requires the exact authenticated user ID.
+- Removed fallback logic that could attribute a message to the first available
+  user in the database.
+- Guests use only the tenant-local system guest identity; they cannot fall back
+  to an unrelated tenant user.
+
+**Verification:**
+
+- Socket room/authentication and Redis collision tests: 24/24 passed across 3
+  suites.
+- Static sweep found no `this.prisma` calls in `SocketGateway`.
+- Backend production build passed.
+- `git diff --check` passed before commit.
+
+**Commit:** `fix(realtime): persist chat in tenant database`
+
+**Residual risk:** the gateway emits before persistence, so a database failure
+can produce a message visible in realtime but absent after reload. Durable chat
+delivery needs persistence-first acknowledgement or an outbox, and the fixed
+guest system identity should be provisioned explicitly to avoid email conflicts.
+
+## 2026-08-26: Tenant-Isolated Live Visitor Statistics
+
+**Finding:** C-4 (visitor-data authorization slice)
+
+**Status:** Fixed for authorization and cross-tenant exposure.
+
+**Changes:**
+
+- Active page-view records now carry the organization authenticated from the
+  socket ticket.
+- Live-stat payloads filter records by organization before counting or exposing
+  visitor details.
+- `request-live-page-stats` now requires a database-verified administrator role;
+  guest/customer sockets receive no visitor payload.
+- Tenant-bound visitor broadcasts target only that organization's admin rooms
+  and no longer include the raw global admin room.
+- Dashboard navigation removes a previously recorded storefront page view so
+  counts do not remain stale within the process.
+- Added tests proving tenant filtering, non-admin denial, and scoped-only admin
+  broadcast behavior.
+
+**Verification:**
+
+- Gateway, socket room/authentication, and Redis collision tests: 31/31 passed
+  across 4 suites.
+- Backend production build passed.
+- `git diff --check` passed before commit.
+
+**Commit:** `fix(realtime): authorize tenant visitor stats`
+
+**Residual risk:** active page views remain process-local, so each backend
+replica reports only its own sockets. Move this state to organization-scoped
+Redis records with heartbeat-based expiry before relying on it operationally.
+
+## 2026-08-26: Trusted Proxy Tenant Resolution
+
+**Finding:** H-1
+
+**Status:** Fixed at the application boundary and documented for deployment.
+
+**Changes:**
+
+- Tenant resolution accepts `x-forwarded-host` only when the direct TCP peer
+  (`request.socket.remoteAddress`) belongs to `TENANT_TRUSTED_PROXY_CIDRS`.
+- Production has no implicit trusted proxies; an omitted allowlist fails closed.
+- Development/test defaults trust loopback only.
+- Rejects comma-appended forwarded-host chains and multi-value headers instead
+  of selecting an attacker-controlled first value.
+- IPv4, IPv4-mapped IPv6, exact IPv4 addresses, and exact IPv6 ingress addresses
+  are supported by the allowlist parser.
+- Both global tenant middleware and the public tenancy-status endpoint use the
+  same resolver-owned host-selection policy.
+- Added a stable `TENANT_FORWARDED_HOST_UNTRUSTED` response code.
+- Docker Compose configures its private container network as the development
+  proxy boundary; `.env.example` documents the production override requirement.
+
+**Verification:**
+
+- Tenant resolver/controller tests: 29/29 passed across 2 suites, including
+  untrusted-client spoofing, ambiguous chains, mapped addresses, and production
+  fail-closed behavior.
+- Backend production build passed.
+- Compose file passed YAML parsing.
+- `git diff --check` passed before commit.
+
+**Commit:** `fix(tenancy): enforce trusted proxy host forwarding`
+
+**Residual risk:** production ingress must strip and overwrite forwarding
+headers and configure a narrower CIDR than the broad Docker development range.
+The deployment smoke-test gate should send a spoofed direct request and assert
+`TENANT_FORWARDED_HOST_UNTRUSTED` before enabling strict tenancy.
