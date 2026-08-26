@@ -6,6 +6,7 @@ import { REDIS_CLIENT } from '@app/redis';
 import { PrismaService } from '@app/database';
 import { TenantDbService } from '../../../tenancy/tenant-db.service';
 import type { PrismaClient } from '@prisma/client';
+import { TenantFanoutService } from '../../../tenancy/tenant-fanout.service';
 
 export interface SocketUser {
   userId: string;
@@ -52,6 +53,7 @@ export class SocketAuthService implements OnModuleInit {
     @Inject(REDIS_CLIENT) private redisClient: Redis,
     private prisma: PrismaService,
     @Optional() private readonly tenantDb?: TenantDbService,
+    @Optional() private readonly fanout?: TenantFanoutService,
   ) {}
 
   /**
@@ -60,7 +62,11 @@ export class SocketAuthService implements OnModuleInit {
    */
   private async db(): Promise<PrismaClient> {
     const tenant = await this.tenantDb?.tryGet();
-    return tenant ?? (this.prisma as unknown as PrismaClient);
+    if (tenant) return tenant;
+    if ((process.env.TENANCY_ENABLED || 'false') === 'true') {
+      throw new Error('SOCKET_TENANT_CONTEXT_REQUIRED');
+    }
+    return this.prisma as unknown as PrismaClient;
   }
 
   onModuleInit() {
@@ -71,12 +77,12 @@ export class SocketAuthService implements OnModuleInit {
    * Authenticate Socket Connection
    */
   async authenticateSocket(socket: Socket): Promise<SocketUser | null> {
-    const db = await this.db();
     try {
       const token = socket.handshake.auth?.token || (socket.handshake.headers?.token as string);
       const guestId = socket.handshake.auth?.guestId || (socket.handshake.query?.guestId as string);
 
       if (!token) {
+        if ((process.env.TENANCY_ENABLED || 'false') === 'true') return null;
         return {
           userId: this.normalizeGuestId(guestId) || `guest_${socket.id.slice(0, 8)}`,
           role: 'guest',
@@ -90,51 +96,55 @@ export class SocketAuthService implements OnModuleInit {
           secret: process.env.JWT_ACCESS_SECRET as string,
         });
 
+        const organizationId = String(payload?.organizationId || '');
+        if (
+          (process.env.TENANCY_ENABLED || 'false') === 'true' &&
+          (!organizationId || payload?.purpose !== 'chat_socket')
+        ) {
+          return null;
+        }
+
         if (payload?.purpose === 'chat_socket' && payload.userId && payload.role === 'guest') {
           const normalizedGuestId = this.normalizeGuestId(payload.userId);
           return {
             userId: normalizedGuestId || `guest_${socket.id.slice(0, 8)}`,
             role: 'guest',
             name: 'Guest Visitor',
-            organizationId: payload.organizationId,
+            organizationId: organizationId || undefined,
           };
         }
 
         const targetId = payload?.userId || payload?.sub || payload?.id;
 
         if (targetId) {
-          const user = await db.user.findUnique({
-            where: { id: targetId },
-            select: { id: true, role: true, name: true },
-          });
+          return this.inOrganization(organizationId || undefined, async () => {
+            const db = await this.db();
+            const user = await db.user.findUnique({
+              where: { id: targetId },
+              select: { id: true, role: true, name: true },
+            });
 
-          if (user) {
-            return {
-              userId: user.id,
-              role: user.role,
-              name: user.name,
-              organizationId: payload.organizationId,
-            };
-          }
+            if (user) {
+              return {
+                userId: user.id,
+                role: user.role,
+                name: user.name,
+                organizationId: organizationId || undefined,
+              };
+            }
 
-          // Check DeliveryPersonnel table for rider tokens
-          const rider = await db.deliveryPersonnel.findUnique({
-            where: { id: targetId },
-            select: { id: true, name: true },
-          });
-
-          if (rider) {
+            const rider = await db.deliveryPersonnel.findUnique({
+              where: { id: targetId },
+              select: { id: true, name: true },
+            });
+            if (!rider) return null;
             return {
               userId: rider.id,
               role: 'delivery_man',
               name: rider.name || 'Delivery Rider',
-              organizationId: payload.organizationId,
+              organizationId: organizationId || undefined,
             };
-          }
-
-          // Valid token for an account that no longer resolves (deleted user,
-          // stale rider): reject instead of trusting claim-derived roles.
-          return null;
+          });
         }
       } catch {
         // A supplied-but-invalid token must never silently downgrade into a
@@ -150,12 +160,18 @@ export class SocketAuthService implements OnModuleInit {
       };
     } catch (error) {
       this.logger.warn(`⚠️ Socket authentication failed: ${error.message}`);
-      return {
-        userId: `guest_${socket.id.slice(0, 8)}`,
-        role: 'guest',
-        name: 'Guest Visitor',
-      };
+      return null;
     }
+  }
+
+  private inOrganization<T>(
+    organizationId: string | undefined,
+    operation: () => Promise<T>,
+  ): Promise<T> {
+    if ((process.env.TENANCY_ENABLED || 'false') !== 'true') return operation();
+    if (!organizationId) throw new Error('SOCKET_ORGANIZATION_REQUIRED');
+    if (!this.fanout) throw new Error('TENANT_FANOUT_UNAVAILABLE');
+    return this.fanout.forOrganization(organizationId, operation);
   }
 
   issueSocketTicket(user: {
@@ -164,6 +180,12 @@ export class SocketAuthService implements OnModuleInit {
     role: string;
     organizationId?: string;
   }) {
+    if (
+      (process.env.TENANCY_ENABLED || 'false') === 'true' &&
+      !user.organizationId
+    ) {
+      throw new Error('SOCKET_ORGANIZATION_REQUIRED');
+    }
     return this.jwtService.signAsync(
       {
         userId: user.userId,
@@ -179,10 +201,14 @@ export class SocketAuthService implements OnModuleInit {
     );
   }
 
-  issueGuestSocketTicket(guestId: string) {
+  issueGuestSocketTicket(guestId: string, organizationId?: string) {
     const normalizedGuestId = this.normalizeGuestId(guestId);
     if (!normalizedGuestId) return null;
-    return this.issueSocketTicket({ userId: normalizedGuestId, role: 'guest' });
+    return this.issueSocketTicket({
+      userId: normalizedGuestId,
+      role: 'guest',
+      organizationId,
+    });
   }
 
   async canAccessConversation(user?: SocketUser | null, conversationId?: string): Promise<boolean> {

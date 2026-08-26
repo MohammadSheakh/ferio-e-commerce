@@ -90,4 +90,22 @@ describe('SocketAuthService', () => {
       service.canAccessConversation(user, `conv-${guestId}`),
     ).resolves.toBe(true);
   });
+
+  it('rejects organization-free tickets in strict mode', async () => {
+    const previous = process.env.TENANCY_ENABLED;
+    process.env.TENANCY_ENABLED = 'true';
+    jwtService.verifyAsync.mockResolvedValue({
+      purpose: 'chat_socket',
+      userId: 'user-1',
+      role: 'user',
+    });
+    try {
+      await expect(
+        service.authenticateSocket(socket({ token: 'signed-token' })),
+      ).resolves.toBeNull();
+    } finally {
+      if (previous === undefined) delete process.env.TENANCY_ENABLED;
+      else process.env.TENANCY_ENABLED = previous;
+    }
+  });
 });

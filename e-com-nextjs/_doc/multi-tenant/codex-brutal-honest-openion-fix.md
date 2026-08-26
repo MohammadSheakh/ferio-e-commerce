@@ -259,3 +259,32 @@ or reprovisioning plan before strict tenancy is enabled on existing data.
 **Residual risk:** ingress must route the public socket URL to port 6734, and a
 live Docker smoke test is still required. Tenant-safe socket authentication,
 rooms, Redis keys, and persistence remain open under C-4.
+
+## 2026-08-26: Organization-Bound Socket Authentication
+
+**Finding:** C-4 (authentication slice)
+
+**Status:** Fixed.
+
+**Changes:**
+
+- Socket authentication verifies signed ticket organization before DB access.
+- Strict mode accepts only organization-bound `chat_socket` tickets.
+- Authenticated user/rider lookup executes inside the trusted control-plane
+  organization context.
+- Guest ticket issuance includes the HTTP-resolved organization.
+- Strict-mode connections without a ticket are rejected.
+- Invalid tickets, tenant-resolution failures, and DB errors now reject the
+  socket instead of silently downgrading to guest.
+- Ticket issuance fails closed when strict mode lacks organization context.
+
+**Verification:**
+
+- Socket-auth tests: 7/7 passed.
+- Backend production build passed.
+- `git diff --check` passed before commit.
+
+**Commit:** `fix(realtime): bind socket authentication to tenant`
+
+**Residual risk:** gateway chat persistence, presence/room Redis keys, and live
+page statistics still require organization-scoped execution/state.
