@@ -108,3 +108,32 @@ H-2 and remains open until the centralized guard sweep is completed.
 
 **Residual risk:** user-device storage remains on legacy Prisma until the
 tenant-bound identity remediation for C-3 is complete.
+
+## 2026-08-26: Tenant-Aware Transactional Dispatch
+
+**Finding:** C-7
+
+**Status:** Fixed.
+
+**Changes:**
+
+- The dispatcher resolves one tenant database client and uses it for message
+  claiming, policy reads, attempt writes, and terminal message updates.
+- Strict mode fails closed when dispatcher tenant context is absent.
+- Strict-mode worker jobs fail when organization identity is absent instead of
+  falling back to legacy Prisma.
+- Manual retry jobs now carry organization identity and organization-prefixed
+  job IDs.
+- Added strict-mode tenant-context regression coverage.
+
+**Verification:**
+
+- Transactional-messaging tests: 12/12 passed across 3 suites.
+- Backend production build passed.
+- `git diff --check` passed before commit.
+
+**Commit:** `fix(messaging): dispatch through resolved tenant database`
+
+**Residual risk:** order-to-message creation is still post-commit rather than
+an atomic transactional outbox. Provider credentials also remain global until
+H-6 is remediated.

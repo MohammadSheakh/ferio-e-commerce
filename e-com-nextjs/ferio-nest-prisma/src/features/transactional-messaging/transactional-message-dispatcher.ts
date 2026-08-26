@@ -1,38 +1,42 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import {
   CommerceMessageAttemptStatus,
   CommerceMessageChannel,
   Prisma,
+  PrismaClient,
 } from '@prisma/client';
 import { PrismaService } from '@app/database';
 import { MessageAdapterRegistry } from './adapters/message-adapter.registry';
+import { TenantDbService } from '../../tenancy/tenant-db.service';
 
 @Injectable()
 export class TransactionalMessageDispatcher {
   constructor(
     private readonly prisma: PrismaService,
     private readonly adapters: MessageAdapterRegistry,
+    @Optional() private readonly tenantDb?: TenantDbService,
   ) {}
 
   async execute(messageId: string) {
-    const claimed = await this.prisma.commerceMessage.updateMany({
+    const db = await this.db();
+    const claimed = await db.commerceMessage.updateMany({
       where: { id: messageId, status: 'QUEUED', lockedAt: null },
       data: { status: 'PROCESSING', lockedAt: new Date(), lastError: null },
     });
     if (claimed.count === 0) return { messageId, skipped: true };
 
     const [message, policy] = await Promise.all([
-      this.prisma.commerceMessage.findUniqueOrThrow({
+      db.commerceMessage.findUniqueOrThrow({
         where: { id: messageId },
         include: { attempts: { orderBy: { attemptNumber: 'asc' } } },
       }),
-      this.prisma.commerceMessagingPolicy.findUnique({
+      db.commerceMessagingPolicy.findUnique({
         where: { id: 'transactional-default' },
       }),
     ]);
 
     if (!policy?.enabled || policy.channelPriority.length === 0) {
-      return this.block(messageId, 'Transactional routing policy is disabled');
+      return this.block(db, messageId, 'Transactional routing policy is disabled');
     }
 
     const channelPlan =
@@ -40,7 +44,7 @@ export class TransactionalMessageDispatcher {
         ? message.channelPlan
         : policy.channelPriority;
     if (message.channelPlan.length === 0) {
-      await this.prisma.commerceMessage.update({
+      await db.commerceMessage.update({
         where: { id: messageId },
         data: { channelPlan, routingPolicyVersion: policy.version },
       });
@@ -50,7 +54,7 @@ export class TransactionalMessageDispatcher {
     for (let index = 0; index < channelPlan.length; index += 1) {
       const channel = channelPlan[index];
       const attemptNumber = message.attempts.length + index + 1;
-      const attempt = await this.prisma.commerceMessageAttempt.create({
+      const attempt = await db.commerceMessageAttempt.create({
         data: {
           messageId,
           attemptNumber,
@@ -89,7 +93,7 @@ export class TransactionalMessageDispatcher {
       }
 
       const attemptStatus = result.status as CommerceMessageAttemptStatus;
-      await this.prisma.commerceMessageAttempt.update({
+      await db.commerceMessageAttempt.update({
         where: { id: attempt.id },
         data: {
           status: attemptStatus,
@@ -102,7 +106,7 @@ export class TransactionalMessageDispatcher {
       });
 
       if (result.status === 'ACCEPTED' || result.status === 'DELIVERED') {
-        return this.prisma.commerceMessage.update({
+        return db.commerceMessage.update({
           where: { id: messageId },
           data: {
             selectedChannel: channel,
@@ -118,6 +122,7 @@ export class TransactionalMessageDispatcher {
 
       if (result.status === 'UNKNOWN') {
         return this.block(
+          db,
           messageId,
           'Provider outcome is uncertain; automatic fallback stopped to avoid duplicate delivery',
         );
@@ -126,22 +131,32 @@ export class TransactionalMessageDispatcher {
       fallbackReason = `${channel}:${result.errorCode ?? 'DEFINITIVE_FAILURE'}`;
       const hasNext = index + 1 < channelPlan.length;
       if (!policy.fallbackOnDefinitiveFailure || !hasNext) {
-        return this.fail(messageId, fallbackReason);
+        return this.fail(db, messageId, fallbackReason);
       }
-      await this.prisma.commerceMessage.update({
+      await db.commerceMessage.update({
         where: { id: messageId },
         data: { fallbackReason },
       });
     }
 
     return this.fail(
+      db,
       messageId,
       fallbackReason ?? 'No channel could accept the message',
     );
   }
 
-  private block(messageId: string, reason: string) {
-    return this.prisma.commerceMessage.update({
+  private async db(): Promise<PrismaClient> {
+    const tenant = await this.tenantDb?.tryGet();
+    if (tenant) return tenant;
+    if ((process.env.TENANCY_ENABLED || 'false') === 'true') {
+      throw new Error('TRANSACTIONAL_MESSAGE_TENANT_CONTEXT_REQUIRED');
+    }
+    return this.prisma as PrismaClient;
+  }
+
+  private block(db: PrismaClient, messageId: string, reason: string) {
+    return db.commerceMessage.update({
       where: { id: messageId },
       data: {
         status: 'BLOCKED',
@@ -153,8 +168,8 @@ export class TransactionalMessageDispatcher {
     });
   }
 
-  private fail(messageId: string, reason: string) {
-    return this.prisma.commerceMessage.update({
+  private fail(db: PrismaClient, messageId: string, reason: string) {
+    return db.commerceMessage.update({
       where: { id: messageId },
       data: {
         status: 'FAILED',
