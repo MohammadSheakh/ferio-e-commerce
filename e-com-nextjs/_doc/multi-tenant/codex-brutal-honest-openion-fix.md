@@ -426,3 +426,38 @@ still uses the legacy Prisma client.
 **Residual risk:** gateway visitor statistics and stale-presence recovery still
 need Redis-backed replica-safe state. Chat message lookup/persistence remains on
 the legacy Prisma client, and event-level authorization needs a final sweep.
+
+## 2026-08-26: Tenant-Bound Socket Chat Persistence
+
+**Finding:** C-4 (chat database slice)
+
+**Status:** Fixed for database selection and sender attribution.
+
+**Changes:**
+
+- `SocketAuthService.databaseForSocket` resolves the Prisma client only through
+  the organization signed into the verified socket ticket.
+- Removed the legacy `PrismaService` dependency and every direct Prisma call
+  from `SocketGateway`.
+- User/customer target lookup, cross-lookup, conversation mutation, dedupe, and
+  message creation now all execute on the resolved tenant client.
+- Authenticated message persistence requires the exact authenticated user ID.
+- Removed fallback logic that could attribute a message to the first available
+  user in the database.
+- Guests use only the tenant-local system guest identity; they cannot fall back
+  to an unrelated tenant user.
+
+**Verification:**
+
+- Socket room/authentication and Redis collision tests: 24/24 passed across 3
+  suites.
+- Static sweep found no `this.prisma` calls in `SocketGateway`.
+- Backend production build passed.
+- `git diff --check` passed before commit.
+
+**Commit:** `fix(realtime): persist chat in tenant database`
+
+**Residual risk:** the gateway emits before persistence, so a database failure
+can produce a message visible in realtime but absent after reload. Durable chat
+delivery needs persistence-first acknowledgement or an outbox, and the fixed
+guest system identity should be provisioned explicitly to avoid email conflicts.

@@ -276,6 +276,11 @@ export class SocketAuthService {
     });
   }
 
+  /** Resolve a Prisma client only from the organization signed into the ticket. */
+  async databaseForSocket(user: SocketUser): Promise<PrismaClient> {
+    return this.inOrganization(user.organizationId, () => this.db());
+  }
+
   /**
    * Add Online User to Redis
    */

@@ -131,6 +131,35 @@ describe('SocketAuthService', () => {
     );
   });
 
+  it('resolves the gateway database from the signed socket organization', async () => {
+    process.env.TENANCY_ENABLED = 'true';
+    const tenantClient = { user: { findUnique: jest.fn() } };
+    const tenantDb = { tryGet: jest.fn().mockResolvedValue(tenantClient) };
+    const fanout = {
+      forOrganization: jest.fn((_organizationId, operation) => operation()),
+    };
+    const tenantService = new SocketAuthService(
+      jwtService as never,
+      redis as never,
+      prisma as never,
+      tenantDb as never,
+      fanout as never,
+    );
+
+    await expect(
+      tenantService.databaseForSocket({
+        userId: 'user-1',
+        role: 'user',
+        name: 'Customer',
+        organizationId: 'org-a',
+      }),
+    ).resolves.toBe(tenantClient);
+    expect(fanout.forOrganization).toHaveBeenCalledWith(
+      'org-a',
+      expect.any(Function),
+    );
+  });
+
   it('never grants admin access from handshake role fields', async () => {
     const result = await service.authenticateSocket(
       socket({ role: 'admin', guestId }),

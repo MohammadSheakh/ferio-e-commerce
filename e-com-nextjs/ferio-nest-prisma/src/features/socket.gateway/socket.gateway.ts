@@ -20,7 +20,6 @@ import { SocketRoomService } from './services/socket-room.service';
 import { WsJwtGuard } from './guards/ws-jwt.guard';
 import { REDIS_PUB_CLIENT, REDIS_SUB_CLIENT } from '@app/redis';
 import { FirebaseService } from '@app/notification';
-import { PrismaService } from '@app/database';
 
 const socketAllowedOrigins = [
   process.env.CUSTOMER_WEB_URL || 'http://localhost:3000',
@@ -59,7 +58,6 @@ export class SocketGateway
     private socketAuthService: SocketAuthService,
     private socketRoomService: SocketRoomService,
     private firebaseService: FirebaseService,
-    private prisma: PrismaService,
     @Inject(REDIS_PUB_CLIENT) private redisPubClient: Redis,
     @Inject(REDIS_SUB_CLIENT) private redisSubClient: Redis,
   ) {}
@@ -459,6 +457,7 @@ export class SocketGateway
       if (!userId || !text || !(await this.socketAuthService.canAccessConversation(user, targetConvId))) {
         return { success: false, message: 'Conversation access denied' };
       }
+      const db = await this.socketAuthService.databaseForSocket(user);
 
       const isAdmin = this.socketAuthService.isAdmin(user.role);
       const isGuest = user.role === 'guest';
@@ -496,7 +495,7 @@ export class SocketGateway
       // Lookup target user and customer links to emit to all related rooms (Customer ID & User ID & Email)
       const targetIdToSearch = rawConvId;
       const [linkedUser, linkedCustomer] = await Promise.all([
-        this.prisma.user.findFirst({
+        db.user.findFirst({
           where: {
             isDeleted: false,
             OR: [
@@ -508,7 +507,7 @@ export class SocketGateway
           },
           select: { id: true, customerId: true, email: true },
         }),
-        this.prisma.customer.findFirst({
+        db.customer.findFirst({
           where: {
             OR: [
               { id: targetIdToSearch },
@@ -555,8 +554,8 @@ export class SocketGateway
       const searchEmail = linkedUser?.email || linkedCustomer?.email;
       if (searchEmail) {
         const [userByEmail, custByEmail] = await Promise.all([
-          this.prisma.user.findFirst({ where: { email: searchEmail } }),
-          this.prisma.customer.findFirst({
+          db.user.findFirst({ where: { email: searchEmail } }),
+          db.customer.findFirst({
             where: { email: searchEmail },
             include: { user: true },
           }),
@@ -621,60 +620,26 @@ export class SocketGateway
 
         let validSenderUser: any = null;
 
-        if (payload.isAdmin) {
-          validSenderUser = await this.prisma.user.findFirst({
-            where: { id: payload.senderId, role: 'admin', isDeleted: false },
-          });
-        } else {
-          validSenderUser = await this.prisma.user.findFirst({
-            where: {
+        if (payload.isGuest) {
+          validSenderUser = await db.user.upsert({
+            where: { id: 'system_guest_chat_user' },
+            update: {},
+            create: {
+              id: 'system_guest_chat_user',
+              name: 'Guest Visitor',
+              email: 'guest@ferio.local',
+              role: 'user',
               isDeleted: false,
-              role: { not: 'admin' },
-              OR: [
-                { id: payload.senderId },
-                { customerId: payload.senderId },
-                { customerId: rawConvId },
-              ],
             },
           });
-          if (!validSenderUser) {
-            validSenderUser = await this.prisma.user.findFirst({
-              where: {
-                isDeleted: false,
-                OR: [
-                  { id: payload.senderId },
-                  { customerId: payload.senderId },
-                  { customerId: rawConvId },
-                ],
-              },
-            });
-          }
-          if (!validSenderUser) {
-            validSenderUser = await this.prisma.user.findFirst({
-              where: { role: 'user', isDeleted: false },
-            });
-          }
-          if (!validSenderUser) {
-            try {
-              validSenderUser = await this.prisma.user.upsert({
-                where: { id: 'system_guest_chat_user' },
-                update: {},
-                create: {
-                  id: 'system_guest_chat_user',
-                  name: 'Guest Visitor',
-                  email: 'guest@ferio.local',
-                  role: 'user',
-                  isDeleted: false,
-                },
-              });
-            } catch {
-              validSenderUser = await this.prisma.user.findFirst({ where: { isDeleted: false } });
-            }
-          }
+        } else {
+          validSenderUser = await db.user.findFirst({
+            where: { id: payload.senderId, isDeleted: false },
+          });
         }
 
         if (validSenderUser) {
-          let conversation = await this.prisma.conversation.findFirst({
+          let conversation = await db.conversation.findFirst({
             where: {
               isDeleted: false,
               id: { in: [targetConvId, rawConvId, prefConvId] },
@@ -682,7 +647,7 @@ export class SocketGateway
           });
 
           if (!conversation) {
-            conversation = await this.prisma.conversation.create({
+            conversation = await db.conversation.create({
               data: {
                 id: canonicalConvId,
                 creatorId: validSenderUser.id,
@@ -692,7 +657,7 @@ export class SocketGateway
               },
             });
           } else {
-            await this.prisma.conversation.update({
+            await db.conversation.update({
               where: { id: conversation.id },
               data: {
                 lastMessageText: payload.text,
@@ -702,12 +667,12 @@ export class SocketGateway
           }
 
           // Check if message was already created to prevent duplicates
-          const existingMsg = await this.prisma.message.findUnique({
+          const existingMsg = await db.message.findUnique({
             where: { id: payload._messageId },
           });
 
           if (!existingMsg) {
-            await this.prisma.message.create({
+            await db.message.create({
               data: {
                 id: payload._messageId,
                 text: payload.text,
