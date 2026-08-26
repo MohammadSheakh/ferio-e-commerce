@@ -8,6 +8,7 @@ describe('StorefrontAnalyticsService measured metrics', () => {
   };
   const db = {
     storefrontAnalyticsEvent: analyticsEvent,
+    $queryRaw: jest.fn(),
     order: { findMany: jest.fn() },
   };
   const settings = {
@@ -94,7 +95,7 @@ describe('StorefrontAnalyticsService measured metrics', () => {
         _count: { type: 3 },
       },
     ]);
-    db.order.findMany.mockResolvedValue([]);
+    db.$queryRaw.mockResolvedValue([]);
     const analytics = service();
     jest.spyOn(analytics, 'getTopSearches').mockResolvedValue([]);
     jest.spyOn(analytics, 'getZeroResultSearches').mockResolvedValue([]);
@@ -108,5 +109,33 @@ describe('StorefrontAnalyticsService measured metrics', () => {
       checkoutBegin: 3,
       purchased: 0,
     });
+    expect(db.order.findMany).not.toHaveBeenCalled();
+  });
+
+  it('builds revenue and order totals from bounded daily database aggregates', async () => {
+    analyticsEvent.groupBy.mockResolvedValue([]);
+    db.$queryRaw.mockResolvedValue([
+      {
+        date: new Date().toISOString().slice(0, 10),
+        orders: 4n,
+        revenue: 12_500n,
+      },
+    ]);
+    const analytics = service();
+    jest.spyOn(analytics, 'getTopSearches').mockResolvedValue([]);
+    jest.spyOn(analytics, 'getZeroResultSearches').mockResolvedValue([]);
+    jest.spyOn(analytics, 'getViewedButNotPurchased').mockResolvedValue([]);
+
+    const overview = await analytics.getAnalyticsOverview(1);
+
+    expect(overview.summary).toMatchObject({
+      totalRevenue: 12_500,
+      totalOrders: 4,
+    });
+    expect(overview.dailyTrend).toEqual([
+      expect.objectContaining({ revenue: 12_500, orders: 4 }),
+    ]);
+    expect(db.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(db.order.findMany).not.toHaveBeenCalled();
   });
 });

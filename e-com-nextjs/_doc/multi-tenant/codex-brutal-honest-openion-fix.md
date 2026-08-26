@@ -611,3 +611,36 @@ notifications, inventory history, carts, and other growth tables. WAL volume,
 autovacuum health, replica lag, and low-traffic scheduling also require
 deployment-level dashboards and runbooks; application batching alone cannot
 prove those controls.
+
+## 2026-08-26: Bounded Storefront Order Analytics
+
+**Finding:** H-7 (storefront-analytics slice)
+
+**Status:** Partially fixed.
+
+**Changes:**
+
+- Replaced the analytics dashboard's unbounded `order.findMany` and Node-side
+  fold with one parameterized PostgreSQL daily aggregate.
+- The order result transferred to the application is now bounded to one row per
+  requested UTC day, with a service-enforced maximum of 365 rows, independent
+  of the number of matching orders.
+- Revenue remains represented in integer minor units; database `bigint` values
+  are normalized only after a safe-integer range check.
+- Preserved the existing zero-filled daily trend and measured checkout-funnel
+  response contract.
+- Added regression coverage proving the dashboard no longer invokes order
+  `findMany` and correctly derives totals from database aggregate rows.
+
+**Verification:**
+
+- Storefront analytics service tests: 5/5 passed.
+- Backend production build passed.
+- `git diff --check` passed before commit.
+
+**Commit:** `fix(analytics): aggregate order trends in database`
+
+**Residual risk:** H-7 remains open for the richer reports overview, synchronous
+CSV construction, statement-timeout/workload policy, and durable daily fact
+tables or a read replica. This query bounds application memory and network
+transfer, but PostgreSQL still scans and aggregates the selected OLTP period.
