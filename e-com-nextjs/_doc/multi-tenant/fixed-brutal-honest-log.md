@@ -171,6 +171,29 @@ this entry is the correction of record.
 
 ---
 
+### Bonus infra wiring (owner decisions applied to real infrastructure)
+
+- **Docker Postgres is now the wired default**: compose remapped host port
+  to 5433 (host 5432 was occupied), and a new `prisma/platform.config.ts`
+  plus generated baseline migration
+  (`platform-migrations/20260826000000_platform_init`) deploy the 21-table
+  control plane to `ferio_platform` via
+  `pnpm prisma:migrate:platform`. Verified end-to-end: both DBs migrate,
+  full prod build boots against them and exports the API contract.
+- **MinIO joins docker compose** as the S3-compatible dev bucket
+  (`ferio-media`, auto-created) mirroring production R2 — same API,
+  different endpoint.
+- **R2Strategy verified E2E** through the compiled build against MinIO:
+  tenant-scoped key (`tenants/org-smoke/products/…`), strategy upload,
+  presigned GET roundtrip, delete. Required two fixes: explicit
+  `R2_ENDPOINT` override + `forcePathStyle` for S3-compatible targets.
+- **New admin surface**: `StorageModule` + `/admin/storage/presign-get|put`
+  (AuthGuard+Roles+Permissions+TenantMembership) exposing presigned access
+  while asserting every key lives inside the caller's own tenant namespace.
+- **Legacy attachments vertical confirmed dead**: Mongo-schema-dependent,
+  syntactically corrupted s3.strategy import, unwired from AppModule —
+  remains build-excluded pending Postgres rewrite (PRD excludes MongoDB).
+
 ### Bonus hygiene: tracked .env removed
 
 `ferio-admin-dashboard/ferio-admin/.env` was tracked in git (contents:
