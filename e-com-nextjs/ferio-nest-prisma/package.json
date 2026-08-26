@@ -29,8 +29,9 @@
     "test:integration": "jest --config ./test/jest-integration.json --runInBand",
     "test:queue-smoke": "jest --config ./test/jest-queue-smoke.json --runInBand",
     "prisma:generate:platform": "pnpm prisma generate --schema prisma/platform.prisma",
-    "prisma:migrate:platform": "pnpm prisma migrate deploy --schema prisma/platform.prisma",
-    "openapi:export": "OPENAPI_EXPORT=1 ts-node -r tsconfig-paths/register src/main.ts"
+    "prisma:migrate:platform": "pnpm exec prisma migrate deploy --config prisma/platform.config.ts",
+    "openapi:export": "OPENAPI_EXPORT=1 ts-node -r tsconfig-paths/register src/main.ts",
+    "storage:smoke": "node scripts/storage-smoke.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1050.0",
