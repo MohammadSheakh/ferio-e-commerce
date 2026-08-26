@@ -201,6 +201,22 @@ FERIO_API_URL / NEXT_PUBLIC_SOCKET_URL — configuration only, **no
 secrets**, so no rotation needed). Untracked via git rm --cached and
 ignored going forward.
 
+### Bonus: both run modes proven end-to-end (Docker & native)
+
+While wiring owner decisions into real infrastructure, the full-stack
+compose path was found broken in four places (stale context paths, missing
+platform migrations, no storage envs, placeholder secrets rejected by the
+strong-secret validator). All fixed:
+
+- `docker compose up -d --build` now runs the ENTIRE platform: one-shot
+  tenant+platform migrations, MinIO bucket, backend (health 200), and all
+  three UIs. Secrets auto-generate on first boot into a persisted volume.
+- Native mode documented in RUNNING.md with exact env contract, including
+  per-plane database URLs, storage vars for the compose MinIO, and a
+  verification cheatsheet.
+- `ferio-admin/.env` untracked from git (config-only contents; corrected
+  in passing during the audit sweep).
+
 ## Owner-gated items NOT claimed here (unchanged truth)
 
 #1 provider selection · wildcard DNS/TLS record · SSLCommerz merchant

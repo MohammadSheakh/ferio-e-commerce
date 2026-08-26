@@ -1,117 +1,107 @@
-# Running Ferio Commerce SaaS
+# Running Ferio — Docker & Native Modes
 
-Two supported modes: **native** (no Docker, fastest dev loop) and **full-stack Docker** (reproducible, demo/alpha-ready).
-
----
-
-## Mode 1 — Native (no Docker)
-
-### Prerequisites
-- Node.js 20 + pnpm 9 (`corepack enable && corepack prepare pnpm@9 --activate`)
-- PostgreSQL 14+ running locally (any user with CREATEDB)
-- Redis 7 running locally
-
-### Setup
-
-```bash
-# 1. Install dependencies (all apps)
-cd e-com-nextjs/ferio-nest-prisma && pnpm install
-cd ../ferio-customer-web && pnpm install
-cd ../ferio-admin-dashboard/ferio-admin && pnpm install
-cd ../../ferio-platform-admin && pnpm install
-
-# 2. Generate Prisma clients (both)
-cd ../ferio-nest-prisma
-pnpm prisma:generate
-
-# 3. Configure environment (copy example, edit values)
-cp .env.example .env
-# Edit .env: set DATABASE_URL, PLATFORM_DATABASE_URL,
-#            JWT_ACCESS_SECRET, JWT_REFRESH_SECRET,
-#            PLATFORM_JWT_SECRET, PLATFORM_DB_CREDENTIAL_KEY
-
-# 4. Create databases (if they don't exist)
-createdb ferio_dev
-createdb ferio_platform
-
-# 5. Apply migrations
-DATABASE_URL="postgresql://your_user:your_pass@localhost:5432/ferio_dev" \
-  pnpm prisma migrate deploy
-PLATFORM_DATABASE_URL="postgresql://your_user:your_pass@localhost:5432/ferio_platform" \
-  pnpm prisma migrate deploy --schema prisma/platform.prisma
-```
-
-### Run
-
-```bash
-# Terminal 1: Backend
-pnpm start:dev   # http://localhost:6733
-
-# Terminal 2: Customer Web
-cd ../ferio-customer-web && pnpm dev   # http://localhost:3000
-
-# Terminal 3: Admin Web
-cd ../ferio-admin-dashboard/ferio-admin && pnpm dev   # http://localhost:3001
-
-# Terminal 4: Platform Admin
-cd ../ferio-platform-admin && pnpm dev   # http://localhost:3100
-```
-
-### Tests
-
-```bash
-cd ferio-nest-prisma
-
-# Unit tests (no database needed)
-pnpm test
-
-# Integration tests (needs disposable PostgreSQL with CREATE DATABASE)
-TEST_DATABASE_URL="postgresql://user:pass@localhost:5432/some_test_db" \
-  pnpm test:integration
-```
+Two supported ways to run the platform. Both use the same env contract and
+the same code; pick per workflow.
 
 ---
 
-## Mode 2 — Docker Compose
-
-### Quick start (full stack)
+## Mode A — Full stack in Docker (demo / alpha / single server)
 
 ```bash
+cd e-com-nextjs
 docker compose up -d --build
-
-# Services:
-#   Backend:        http://localhost:6733
-#   Customer Web:   http://localhost:3000
-#   Admin Web:      http://localhost:3001
-#   Platform Admin: http://localhost:3100
 ```
 
-### Infra only (run apps natively against containers)
+First boot automatically:
+1. creates `ferio_dev` + `ferio_platform` databases (init-db.sql);
+2. runs **tenant** migrations (canonical chain) and **platform** migrations
+   (control plane) as one-shot services — the backend waits for both;
+3. starts MinIO with bucket `ferio-media` (S3-compatible stand-in for R2);
+4. generates strong secrets (JWT access/refresh, platform keys, credential
+   encryption key) into the `ferio_secrets` volume — restarts reuse them;
+   explicit env values always win;
+5. boots the backend (`/api/v1/health` returns 200) and the three UIs.
+
+| Surface | URL |
+|---|---|
+| Backend API | http://localhost:6733/api/v1 |
+| Customer Web | http://localhost:3000 |
+| Tenant Admin | http://localhost:3001 |
+| Platform Admin | http://localhost:3100 (login: owner@ferio.local) |
+| MinIO console | http://localhost:9001 |
+
+Useful:
+```bash
+docker compose logs -f backend          # follow API logs
+docker compose down                     # stop (keep data)
+docker compose down -v                  # stop and wipe volumes
+```
+
+## Mode B — Native dev (no app containers)
+
+Run only infrastructure in Docker, apps with pnpm/hot reload:
 
 ```bash
 docker compose -f docker-compose.infra.yml up -d
-# PostgreSQL on :5432, Redis on :6379
 ```
+
+Then in `ferio-nest-prisma/.env` (see `.env.example`):
+
+```env
+DATABASE_URL=postgresql://ferio:ferio@localhost:5433/ferio_dev
+PLATFORM_DATABASE_URL=postgresql://ferio:ferio@localhost:5433/ferio_platform
+REDIS_HOST=localhost
+REDIS_PORT=6379
+FILE_UPLOAD_STRATEGY=r2
+R2_ENDPOINT=http://localhost:9000
+R2_BUCKET=ferio-media
+R2_ACCESS_KEY_ID=minioadmin
+R2_SECRET_ACCESS_KEY=minioadmin
+JWT_ACCESS_SECRET=<openssl rand -hex 48>
+JWT_REFRESH_SECRET=<openssl rand -hex 48>
+PLATFORM_JWT_SECRET=<openssl rand -hex 48>
+PLATFORM_DB_CREDENTIAL_KEY=<openssl rand -hex 32>
+PLATFORM_CALLBACK_SECRET=<openssl rand -hex 32>
+TENANCY_ENABLED=false        # flip true when a tenant domain resolves
+```
+
+One-time + after pulls:
+
+```bash
+pnpm install
+pnpm prisma:generate                       # tenant + platform clients
+DATABASE_URL=… pnpm prisma:migrate:deploy  # tenant chain
+pnpm prisma:migrate:platform               # control-plane chain
+pnpm storage:smoke                         # optional: verify bucket roundtrip
+```
+
+Run apps:
+
+```bash
+pnpm start:dev            # backend :6733
+cd ../ferio-customer-web && pnpm dev   # :3000
+cd ../ferio-admin-dashboard/ferio-admin && pnpm dev  # :3001
+cd ../ferio-platform-admin && pnpm dev              # :3100
+```
+
+## Mode C — No Docker at all
+
+Any reachable PostgreSQL 16 + Redis work. Point the two `*_DATABASE_URL`s at
+your instances (both planes may share one server but MUST be separate
+databases), skip MinIO (`FILE_UPLOAD_STRATEGY` unset → uploads disabled),
+generate secrets yourself. Everything else identical to Mode B.
 
 ---
 
-## Environment Variables Reference
+## Verification cheatsheet
 
-| Variable | Used by | Purpose |
-|---|---|---|
-| `DATABASE_URL` | backend | Tenant commerce database |
-| `PLATFORM_DATABASE_URL` | backend | Control-plane metadata database |
-| `REDIS_HOST` / `REDIS_PORT` | backend | Cache + job queue |
-| `JWT_ACCESS_SECRET` | backend | Tenant/admin auth tokens |
-| `JWT_REFRESH_SECRET` | backend | Refresh token signing |
-| `PLATFORM_JWT_SECRET` | backend | Platform admin realm tokens |
-| `PLATFORM_DB_CREDENTIAL_KEY` | backend | AES key for tenant DB credentials |
-| `PLATFORM_CALLBACK_SECRET` | backend | HMAC for payment callback binding |
-| `TENANCY_ENABLED` | backend | `false`=legacy mode; `true`=strict tenant resolution |
-| `NEXT_PUBLIC_FERIO_API_URL` | web apps | Backend API URL |
+```bash
+pnpm exec tsc --noEmit -p tsconfig.json   # strict typecheck incl specs
+pnpm test                                  # unit suites
+TEST_DATABASE_URL=… pnpm test:integration  # real-PostgreSQL integration
+pnpm build                                 # production build
+# prod-bootstrap smoke (boots compiled app, exports contract):
+OPENAPI_EXPORT=1 node dist/src/main.js && cat openapi.json | head
+```
 
-## Multi-Tenancy Staged Rollout
-
-1. Default: `TENANCY_ENABLED=false` → all requests pass through without tenant context (current behavior preserved)
-2. When ready: set `TENANCY_ENABLED=true` → strict fail-closed resolution per host
-3. Unknown domains return stable error codes → Customer Web renders full-page state
+CI runs all of these plus an OpenAPI drift gate.
