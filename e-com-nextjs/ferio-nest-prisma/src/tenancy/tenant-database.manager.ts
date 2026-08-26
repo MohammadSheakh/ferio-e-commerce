@@ -32,14 +32,23 @@ const BREAKER_COOLDOWN_MS = 30_000;
 export class TenantDatabaseManager implements OnModuleDestroy {
   private readonly logger = new StructuredLogger(TenantDatabaseManager.name);
   private readonly cache = new Map<string, CacheEntry>();
+  private readonly creations = new Map<string, Promise<PrismaClient>>();
   private readonly breakers = new Map<string, BreakerState>();
   private readonly maxClients: number;
   private readonly idleTtlMs: number;
+  private readonly evictionGraceMs: number;
+  private reservedSlots = 0;
+  private capacityQueue: Promise<void> = Promise.resolve();
+  private shuttingDown = false;
   private sweepTimer: NodeJS.Timeout;
 
   constructor() {
     this.maxClients = Math.max(Number(process.env.TENANT_DB_MAX_CLIENTS ?? 25), 2);
     this.idleTtlMs = Number(process.env.TENANT_DB_IDLE_TTL_SECONDS ?? 300) * 1000;
+    this.evictionGraceMs = Math.max(
+      Number(process.env.TENANT_DB_EVICTION_GRACE_MS ?? this.idleTtlMs),
+      0,
+    );
     this.sweepTimer = setInterval(() => void this.evictIdle(), Math.min(this.idleTtlMs / 2, 60_000));
     // Never hold the process open for the sweeper.
     this.sweepTimer.unref?.();
@@ -54,6 +63,9 @@ export class TenantDatabaseManager implements OnModuleDestroy {
     username: string;
     credentialCipher: string;
   }): Promise<PrismaClient> {
+    if (this.shuttingDown) {
+      throw new Error('TENANT_DATABASE_MANAGER_SHUTTING_DOWN');
+    }
     this.assertBreakerClosed(material.id);
 
     const existing = this.cache.get(material.id);
@@ -65,15 +77,37 @@ export class TenantDatabaseManager implements OnModuleDestroy {
       return existing.client;
     }
 
-    await this.evictForCapacity();
+    const pending = this.creations.get(material.id);
+    if (pending) return pending;
 
-    let entry: CacheEntry | undefined;
+    const creation = Promise.resolve().then(() => this.createClient(material));
+    this.creations.set(material.id, creation);
+    try {
+      return await creation;
+    } finally {
+      if (this.creations.get(material.id) === creation) {
+        this.creations.delete(material.id);
+      }
+    }
+  }
+
+  private async createClient(material: {
+    id: string;
+    host: string;
+    port: number;
+    databaseName: string;
+    username: string;
+    credentialCipher: string;
+  }): Promise<PrismaClient> {
+    await this.reserveCapacity();
+
+    let pool: Pool | undefined;
     try {
       const password = decryptSecret(
         material.credentialCipher,
         process.env.PLATFORM_DB_CREDENTIAL_KEY,
       );
-      const pool = new Pool({
+      pool = new Pool({
         host: material.host,
         port: material.port,
         database: material.databaseName,
@@ -86,14 +120,16 @@ export class TenantDatabaseManager implements OnModuleDestroy {
       });
       const client = new PrismaClient({ adapter: new PrismaPg(pool) });
       await client.$connect();
-      entry = { client, pool, lastUsedAt: Date.now() };
+      const entry = { client, pool, lastUsedAt: Date.now() };
+      this.reservedSlots -= 1;
       this.cache.set(material.id, entry);
       this.recordSuccess(material.id);
       return client;
     } catch (error) {
+      this.reservedSlots = Math.max(this.reservedSlots - 1, 0);
       this.recordFailure(material.id);
       // Ensure no half-built pool leaks on failure.
-      entry?.pool.end().catch(() => undefined);
+      await pool?.end().catch(() => undefined);
       throw error;
     }
   }
@@ -109,18 +145,36 @@ export class TenantDatabaseManager implements OnModuleDestroy {
   metrics() {
     return {
       activeClients: this.cache.size,
+      pendingClients: this.creations.size,
       maxClients: this.maxClients,
       openBreakers: [...this.breakers.entries()].filter(([, b]) => b.openedAt !== null).length,
     };
   }
 
-  private async evictForCapacity(): Promise<void> {
-    while (this.cache.size >= this.maxClients) {
-      const oldestKey = this.cache.keys().next().value as string | undefined;
-      if (!oldestKey) break;
-      // Awaited so burst churn can never transiently exceed the configured
-      // client budget or leak pools that are mid-teardown.
-      await this.disconnect(oldestKey);
+  private async reserveCapacity(): Promise<void> {
+    let release!: () => void;
+    const previous = this.capacityQueue;
+    this.capacityQueue = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await previous;
+    try {
+      while (this.cache.size + this.reservedSlots >= this.maxClients) {
+        const oldestKey = this.cache.keys().next().value as string | undefined;
+        if (!oldestKey) throw new Error('TENANT_DATABASE_CAPACITY_EXHAUSTED');
+        const oldest = this.cache.get(oldestKey);
+        if (
+          oldest &&
+          Date.now() - oldest.lastUsedAt < this.evictionGraceMs
+        ) {
+          throw new Error('TENANT_DATABASE_CAPACITY_EXHAUSTED');
+        }
+        // Never disconnect a recently acquired client that may still be in use.
+        await this.disconnect(oldestKey);
+      }
+      this.reservedSlots += 1;
+    } finally {
+      release();
     }
   }
 
@@ -163,7 +217,9 @@ export class TenantDatabaseManager implements OnModuleDestroy {
   }
 
   async onModuleDestroy(): Promise<void> {
+    this.shuttingDown = true;
     clearInterval(this.sweepTimer);
+    await Promise.allSettled([...this.creations.values()]);
     await Promise.allSettled([...this.cache.keys()].map((id) => this.disconnect(id)));
   }
 }

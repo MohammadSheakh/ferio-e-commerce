@@ -288,3 +288,35 @@ rooms, Redis keys, and persistence remain open under C-4.
 
 **Residual risk:** gateway chat persistence, presence/room Redis keys, and live
 page statistics still require organization-scoped execution/state.
+
+## 2026-08-26: Tenant Database Pool Concurrency
+
+**Finding:** H-4
+
+**Status:** Fixed for cold-client creation and bounded-capacity eviction.
+
+**Changes:**
+
+- Added per-tenant single-flight creation so concurrent cold requests share one
+  Prisma client/pool.
+- Added serialized slot reservation so different concurrent cold tenants cannot
+  oversubscribe the configured client budget.
+- Added pending-client metrics.
+- Capacity pressure now fails closed instead of disconnecting a client used
+  within the eviction grace window; the safe default is the full idle TTL.
+- Half-created PostgreSQL pools are closed when connection setup fails.
+- Shutdown rejects new acquisitions, drains in-flight creations, and then closes
+  every resulting client and pool.
+- Added concurrent cold-acquisition regression coverage.
+
+**Verification:**
+
+- Tenant database manager tests: 6/6 passed.
+- Backend production build passed.
+- `git diff --check` passed before commit.
+
+**Commit:** `fix(tenancy): serialize tenant database pool creation`
+
+**Residual risk:** total connection budgets still multiply by backend replica
+count and must be enforced in deployment capacity planning. Queries exceeding
+the configured idle/grace window need database statement timeouts and tracing.

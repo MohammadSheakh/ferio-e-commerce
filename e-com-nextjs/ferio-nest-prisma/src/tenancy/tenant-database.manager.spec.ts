@@ -1,4 +1,5 @@
 import { TenantDatabaseManager } from './tenant-database.manager';
+import { PrismaClient } from '@prisma/client';
 import { decryptSecret, encryptSecret } from '../platform/utils/secret-box';
 
 jest.mock('@prisma/client', () => ({
@@ -24,6 +25,7 @@ describe('TenantDatabaseManager (ADR-0003)', () => {
     process.env.PLATFORM_DB_CREDENTIAL_KEY = 'test-credential-key-at-least-32-chars!!';
     process.env.TENANT_DB_MAX_CLIENTS = '3';
     process.env.TENANT_DB_IDLE_TTL_SECONDS = '300';
+    process.env.TENANT_DB_EVICTION_GRACE_MS = '0';
     jest.clearAllMocks();
   });
 
@@ -44,6 +46,55 @@ describe('TenantDatabaseManager (ADR-0003)', () => {
     expect(manager.metrics()).toMatchObject({ activeClients: 1 });
 
     await manager.onModuleDestroy();
+  });
+
+  it('single-flights concurrent cold requests for the same tenant', async () => {
+    const manager = newManager();
+
+    const [clientA, clientB, clientC] = await Promise.all([
+      manager.getClient(material('tdb-cold')),
+      manager.getClient(material('tdb-cold')),
+      manager.getClient(material('tdb-cold')),
+    ]);
+
+    expect(clientB).toBe(clientA);
+    expect(clientC).toBe(clientA);
+    expect(PrismaClient).toHaveBeenCalledTimes(1);
+    expect(manager.metrics()).toMatchObject({
+      activeClients: 1,
+      pendingClients: 0,
+    });
+    await manager.onModuleDestroy();
+  });
+
+  it('drains in-flight client creation during shutdown', async () => {
+    let releaseConnect!: () => void;
+    const connectGate = new Promise<void>((resolve) => {
+      releaseConnect = resolve;
+    });
+    const disconnect = jest.fn().mockResolvedValue(undefined);
+    jest.mocked(PrismaClient).mockImplementationOnce(
+      () =>
+        ({
+          $connect: jest.fn().mockReturnValue(connectGate),
+          $disconnect: disconnect,
+        }) as unknown as PrismaClient,
+    );
+    const manager = newManager();
+    const acquisition = manager.getClient(material('tdb-shutdown'));
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const shutdown = manager.onModuleDestroy();
+    await expect(manager.getClient(material('tdb-late'))).rejects.toThrow(
+      'TENANT_DATABASE_MANAGER_SHUTTING_DOWN',
+    );
+    releaseConnect();
+    await acquisition;
+    await shutdown;
+
+    expect(disconnect).toHaveBeenCalledTimes(1);
+    expect(manager.metrics()).toMatchObject({ activeClients: 0, pendingClients: 0 });
   });
 
   it('evicts the least-recently-used client when capacity is reached', async () => {
