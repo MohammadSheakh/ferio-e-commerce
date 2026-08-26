@@ -47,12 +47,13 @@ export class StorefrontAnalyticsService {
         data: {
           eventId: dto.eventId,
           type: dto.type,
-          eventVersion: 1,
+          eventVersion: 2,
           source: 'CUSTOMER_WEB',
           visitorHash: this.hashVisitor(dto.anonymousId),
           productId: dto.productId,
           variantId: dto.variantId,
           searchTerm,
+          searchResultCount: dto.searchResultCount,
           filters: filters as Prisma.InputJsonValue | undefined,
           quantity: dto.quantity,
           path: sanitizeAnalyticsPath(dto.path),
@@ -78,6 +79,14 @@ export class StorefrontAnalyticsService {
     const db = await this.db();
     if (dto.type === StorefrontAnalyticsEventType.SEARCH && !searchTerm) {
       throw new BadRequestException('A search event requires a search term.');
+    }
+    if (
+      dto.type !== StorefrontAnalyticsEventType.SEARCH &&
+      dto.searchResultCount !== undefined
+    ) {
+      throw new BadRequestException(
+        'A search result count is valid only for search events.',
+      );
     }
     if (dto.type === StorefrontAnalyticsEventType.FILTER && !filters) {
       throw new BadRequestException(
@@ -143,17 +152,12 @@ export class StorefrontAnalyticsService {
         type: StorefrontAnalyticsEventType.SEARCH,
         searchTerm: { not: null },
         createdAt: { gte: startDate },
-        path: { contains: 'results=0' },
+        searchResultCount: 0,
       },
       _count: { searchTerm: true },
       orderBy: { _count: { searchTerm: 'desc' } },
       take: limit,
     });
-
-    if (zeroSearches.length === 0) {
-      const allSearches = await this.getTopSearches(days, limit);
-      return allSearches.slice(0, 5).map((s) => ({ ...s, isZeroResult: true }));
-    }
 
     return zeroSearches.map((s) => ({
       query: s.searchTerm ?? '',
@@ -247,6 +251,8 @@ export class StorefrontAnalyticsService {
     const productViews = countMap.get(StorefrontAnalyticsEventType.PRODUCT_VIEW) ?? 0;
     const searchCount = countMap.get(StorefrontAnalyticsEventType.SEARCH) ?? 0;
     const addToCartCount = countMap.get(StorefrontAnalyticsEventType.ADD_TO_CART) ?? 0;
+    const checkoutBeginCount =
+      countMap.get(StorefrontAnalyticsEventType.CHECKOUT_BEGIN) ?? 0;
 
     const orders = await db.order.findMany({
       where: {
@@ -299,7 +305,7 @@ export class StorefrontAnalyticsService {
       funnel: {
         productViews,
         addToCart: addToCartCount,
-        checkoutBegin: Math.round(addToCartCount * 0.65),
+        checkoutBegin: checkoutBeginCount,
         purchased: totalOrders,
       },
     };

@@ -83,7 +83,11 @@ export default async function ProductsPage({
 
   return (
     <main className="mx-auto max-w-6xl px-6 py-14">
-      <ProductListingAnalytics search={search} filters={analyticsFilters} />
+      <ProductListingAnalytics
+        search={search}
+        resultCount={products.total}
+        filters={analyticsFilters}
+      />
       <h1 className="text-[28px] font-semibold tracking-tight text-ink">Shop all</h1>
       <p className="mt-1.5 text-[13px] text-ink2">{products.total} products</p>
 

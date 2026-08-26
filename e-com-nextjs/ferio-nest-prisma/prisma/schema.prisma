@@ -374,6 +374,7 @@ enum StorefrontAnalyticsEventType {
   SEARCH
   FILTER
   ADD_TO_CART
+  CHECKOUT_BEGIN
 }
 
 model StorefrontAnalyticsEvent {
@@ -386,6 +387,7 @@ model StorefrontAnalyticsEvent {
   productId   String?
   variantId   String?
   searchTerm  String?
+  searchResultCount Int?
   filters     Json?
   quantity    Int?
   path        String?
@@ -393,6 +395,7 @@ model StorefrontAnalyticsEvent {
 
   @@index([type, createdAt])
   @@index([productId, type, createdAt])
+  @@index([type, searchResultCount, createdAt])
   @@index([visitorHash, createdAt])
 }
 

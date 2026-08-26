@@ -9,6 +9,7 @@ export type StorefrontAnalyticsEvent =
   | {
       type: 'SEARCH';
       searchTerm: string;
+      searchResultCount?: number;
       path?: string;
     }
   | {
@@ -21,6 +22,10 @@ export type StorefrontAnalyticsEvent =
       productId: string;
       variantId: string;
       quantity: number;
+      path?: string;
+    }
+  | {
+      type: 'CHECKOUT_BEGIN';
       path?: string;
     };
 
@@ -63,6 +68,10 @@ export function trackStorefrontEvent(
         window.gtag('event', 'add_to_cart', {
           item_id: event.productId,
           quantity: event.quantity,
+          page_path: event.path || window.location.pathname,
+        });
+      } else if (event.type === 'CHECKOUT_BEGIN') {
+        window.gtag('event', 'begin_checkout', {
           page_path: event.path || window.location.pathname,
         });
       }

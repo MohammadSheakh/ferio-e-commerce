@@ -533,3 +533,43 @@ Redis records with heartbeat-based expiry before relying on it operationally.
 headers and configure a narrower CIDR than the broad Docker development range.
 The deployment smoke-test gate should send a spoofed direct request and assert
 `TENANT_FORWARDED_HOST_UNTRUSTED` before enabling strict tenancy.
+
+## 2026-08-26: Measured Storefront Analytics
+
+**Finding:** H-8
+
+**Status:** Fixed.
+
+**Changes:**
+
+- Added a tenant-schema migration for the measured `CHECKOUT_BEGIN` event and
+  structured nullable `searchResultCount` evidence.
+- Search ingestion stores result counts as bounded non-negative integers and
+  event-version 2 records.
+- The tenant migration enforces the same result-count range at the database
+  layer, and non-search events cannot carry search-result evidence.
+- Zero-result reporting now queries only `searchResultCount = 0`; when there is
+  no measured evidence it returns an empty list instead of relabeling popular
+  searches as failures.
+- Funnel checkout starts now count persisted `CHECKOUT_BEGIN` events instead of
+  multiplying add-to-cart events by an invented 65 percent factor.
+- Product search pages emit their actual server-returned result count.
+- Checkout emits a session-deduplicated begin event and mirrors it to GA4.
+- Updated Prisma source/canonical schemas, migration, DTO validation, Swagger
+  contract metadata, and the committed OpenAPI event contract.
+
+**Verification:**
+
+- Analytics service/sanitization tests: 7/7 passed across 2 suites.
+- Regression coverage proves structured evidence persistence, honest empty
+  zero-result output, and measured checkout-funnel counts.
+- Prisma schema synchronization and validation passed.
+- Backend and customer-web production builds passed.
+- `git diff --check` passed before commit.
+
+**Commit:** `fix(analytics): replace invented metrics with measured events`
+
+**Residual risk:** events produced before this migration have no result-count
+evidence and are intentionally excluded from zero-result reporting. H-7 still
+tracks the unbounded order read and Node-side dashboard aggregation; this fix
+corrects truthfulness, not analytics workload scalability.

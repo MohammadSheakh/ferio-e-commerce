@@ -12779,7 +12779,14 @@
             "format": "uuid"
           },
           "type": {
-            "type": "object"
+            "type": "string",
+            "enum": [
+              "PRODUCT_VIEW",
+              "SEARCH",
+              "FILTER",
+              "ADD_TO_CART",
+              "CHECKOUT_BEGIN"
+            ]
           },
           "productId": {
             "type": "string",
@@ -12792,6 +12799,11 @@
           "searchTerm": {
             "type": "string",
             "maxLength": 120
+          },
+          "searchResultCount": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000000
           },
           "filters": {
             "type": "object"
