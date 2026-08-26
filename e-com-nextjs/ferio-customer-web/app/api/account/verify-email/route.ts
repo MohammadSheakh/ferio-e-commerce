@@ -17,5 +17,5 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
-  return proxyCustomerSession("/auth/verify-email", body);
+  return proxyCustomerSession(request, "/auth/verify-email", body);
 }

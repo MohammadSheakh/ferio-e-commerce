@@ -2,9 +2,10 @@ import { NextResponse } from "next/server";
 import { backendApiUrl } from "@/lib/customer-session";
 import { cookies } from "next/headers";
 import { withCorrelationId } from "@/lib/correlation";
+import { hostForwardHeadersFromRequest } from "@/lib/host-forward";
 
 export async function POST(
-  _req: Request,
+  request: Request,
   { params }: { params: { token: string } },
 ) {
   try {
@@ -14,6 +15,7 @@ export async function POST(
       {
         method: "POST",
         headers: withCorrelationId({
+          ...hostForwardHeadersFromRequest(request),
           "Content-Type": "application/json",
           ...(cartToken ? { "X-Cart-Token": cartToken } : {}),
         }),

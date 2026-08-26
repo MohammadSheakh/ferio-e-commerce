@@ -11,5 +11,5 @@ export async function POST(request: Request) {
   if (!credentials.email || !credentials.password) {
     return NextResponse.json({ message: "Email and password are required." }, { status: 400 });
   }
-  return proxyCustomerSession("/auth/login", credentials);
+  return proxyCustomerSession(request, "/auth/login", credentials);
 }

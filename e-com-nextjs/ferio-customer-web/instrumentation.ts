@@ -6,12 +6,14 @@
  */
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
-    const { setHostHeaderProvider } = await import("./lib/host-forward");
+    const { normalizeForwardedTenantHost, setHostHeaderProvider } =
+      await import("./lib/host-forward");
     const { headers } = await import("next/headers");
     setHostHeaderProvider(async (): Promise<Record<string, string>> => {
       const headerList = headers();
-      const host =
-        headerList.get("x-forwarded-host") ?? headerList.get("host");
+      const host = normalizeForwardedTenantHost(
+        headerList.get("x-forwarded-host") ?? headerList.get("host"),
+      );
       if (!host) return {};
       return { "x-forwarded-host": host };
     });

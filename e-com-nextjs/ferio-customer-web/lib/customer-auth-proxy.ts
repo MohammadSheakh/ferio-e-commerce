@@ -6,6 +6,7 @@ import {
 } from "@/lib/customer-session";
 import { withCorrelationId } from "@/lib/correlation";
 import { cookies } from "next/headers";
+import { hostForwardHeadersFromRequest } from "@/lib/host-forward";
 
 type BackendAuthPayload = {
   data?: { accessToken?: string; user?: unknown };
@@ -24,13 +25,18 @@ export function backendMessage(
 }
 
 export async function proxyCustomerSession(
+  request: Request,
   path: string,
   body: Record<string, unknown>,
 ) {
   try {
+    const tenantHeaders = hostForwardHeadersFromRequest(request);
     const upstream = await fetch(`${backendApiUrl}${path}`, {
       method: "POST",
-      headers: withCorrelationId({ "Content-Type": "application/json" }),
+      headers: withCorrelationId({
+        ...tenantHeaders,
+        "Content-Type": "application/json",
+      }),
       body: JSON.stringify(body),
       cache: "no-store",
     });
@@ -63,6 +69,7 @@ export async function proxyCustomerSession(
         const merge = await fetch(`${backendApiUrl}/cart/merge`, {
           method: "POST",
           headers: withCorrelationId({
+            ...tenantHeaders,
             Authorization: `Bearer ${payload.data.accessToken}`,
             "X-Cart-Token": cartToken,
           }),

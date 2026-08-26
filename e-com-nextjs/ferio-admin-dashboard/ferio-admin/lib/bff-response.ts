@@ -2,13 +2,17 @@ import { NextResponse } from "next/server";
 import type { ApiEnvelope } from "@/lib/backend";
 import { withCorrelationId } from "@/lib/correlation";
 import { AdminApiError } from "@/lib/admin-api";
+import { tenantHostHeadersFromRequest } from "@/lib/tenant-host";
 
 export function forwardedHeaders(
   request: Request,
   headers?: HeadersInit,
 ): Headers {
   return withCorrelationId(
-    headers,
+    {
+      ...tenantHostHeadersFromRequest(request),
+      ...Object.fromEntries(new Headers(headers).entries()),
+    },
     request.headers.get("x-correlation-id") ??
       request.headers.get("x-request-id") ??
       undefined,

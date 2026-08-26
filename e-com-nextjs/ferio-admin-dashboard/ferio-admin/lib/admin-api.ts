@@ -1,6 +1,15 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { ApiEnvelope, getApiMessage, getBackendUrl } from "@/lib/backend";
 import { withCorrelationId } from "@/lib/correlation";
+import { normalizeForwardedTenantHost } from "@/lib/tenant-host";
+
+function tenantHostHeaders(): Record<string, string> {
+  const incoming = headers();
+  const host = normalizeForwardedTenantHost(
+    incoming.get("x-forwarded-host") ?? incoming.get("host"),
+  );
+  return host ? { "x-forwarded-host": host } : {};
+}
 
 export class AdminApiError extends Error {
   constructor(
@@ -25,7 +34,10 @@ async function refreshAdminSession(): Promise<string | null> {
   try {
     const response = await fetch(getBackendUrl("/auth/refresh"), {
       method: "POST",
-      headers: withCorrelationId({ Cookie: `refreshToken=${refreshToken}` }),
+      headers: withCorrelationId({
+        ...tenantHostHeaders(),
+        Cookie: `refreshToken=${refreshToken}`,
+      }),
       cache: "no-store",
     });
     const payload = (await response.json()) as ApiEnvelope<{
@@ -74,6 +86,7 @@ async function callAdminApi(
     ...init,
     headers: withCorrelationId({
       Accept: "application/json",
+      ...tenantHostHeaders(),
       Authorization: `Bearer ${token}`,
       ...init?.headers,
     }),

@@ -26,3 +26,32 @@ recorded explicitly rather than hidden behind a completed label.
 - Build baseline: backend, tenant admin, customer web, and platform admin pass.
 - Mobile baseline: TypeScript check passes.
 - Remediation status: started; no audit finding is closed by this baseline entry.
+
+## 2026-08-26: Tenant Host Propagation
+
+**Findings:** C-1 and C-5
+
+**Status:** Fixed at the tenant-admin and customer-web application boundaries.
+
+**Changes:**
+
+- Added strict single-host normalization before relaying `x-forwarded-host`.
+- Tenant admin now forwards tenant host for login, 2FA, refresh middleware,
+  server-side refresh, authenticated API calls, and direct BFF routes.
+- Customer BFF request helpers now forward tenant host consistently.
+- Customer authentication and post-login cart merge preserve tenant host.
+- Guest saved-cart calls preserve tenant host.
+- Storefront analytics now uses the canonical `/api/v1` backend URL instead of
+  the customer Next.js server and preserves tenant host.
+
+**Verification:**
+
+- Tenant-admin Next.js production build passed.
+- Customer-web Next.js production build passed.
+- `git diff --check` passed before commit.
+
+**Commit:** `fix(tenancy): propagate tenant host across web BFFs`
+
+**Residual risk:** trusted-proxy enforcement (H-1) and native mobile tenant
+bootstrap (C-2) remain open. This fix intentionally does not accept arbitrary
+organization IDs from clients.

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { customerSessionFetch, backendApiUrl } from "@/lib/customer-session";
 import { cookies } from "next/headers";
 import { withCorrelationId } from "@/lib/correlation";
+import { hostForwardHeadersFromRequest } from "@/lib/host-forward";
 
 export async function POST(req: Request) {
   try {
@@ -26,6 +27,7 @@ export async function POST(req: Request) {
     const res = await fetch(`${backendApiUrl}/cart/save`, {
       method: "POST",
       headers: withCorrelationId({
+        ...hostForwardHeadersFromRequest(req),
         "Content-Type": "application/json",
         ...(cartToken ? { "X-Cart-Token": cartToken } : {}),
       }),

@@ -18,7 +18,7 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
-  return proxyCustomerSession("/auth/oauth", {
+  return proxyCustomerSession(request, "/auth/oauth", {
     provider: "google",
     idToken,
   });
