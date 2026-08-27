@@ -116,6 +116,29 @@ describe('ReportsService', () => {
     expect(report.outcomes.shipped).toBe(0);
   });
 
+  it('accumulates totals across keyset pages without retaining total arrays', async () => {
+    prisma.order.findMany
+      .mockResolvedValueOnce(
+        Array.from({ length: 5_000 }, (_, index) => ({
+          ...baseOrder,
+          id: `order-${index}`,
+          total: 100,
+        })),
+      )
+      .mockResolvedValueOnce([
+        { ...baseOrder, id: 'order-tail', total: 250 },
+      ]);
+
+    const report = await service.overview({
+      dateFrom: '2026-08-01',
+      dateTo: '2026-08-11',
+    });
+
+    expect(report.outcomes.placed).toBe(5_001);
+    expect(report.revenue.grossPlaced).toBe(500_250);
+    expect(prisma.order.findMany).toHaveBeenCalledTimes(2);
+  });
+
   it('masks customer fields when a report reader lacks customer permission', async () => {
     prisma.order.findMany.mockResolvedValue([
       {

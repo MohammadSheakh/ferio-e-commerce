@@ -38,6 +38,7 @@ import { PaymentRecoveryQueue } from './payment-recovery.queue';
 import { verifyCallbackToken } from '../../tenancy/callback-tenant.util';
 import { TenantCallbackRunner } from '../../tenancy/tenant-callback.runner';
 import { PaymentLedgerQueryDto } from './dto/payment-ledger.dto';
+import { TenantReturnOriginService } from '../../tenancy/tenant-return-origin.service';
 
 @ApiTags('Payments')
 @Controller('payments')
@@ -45,6 +46,7 @@ export class PublicCommercePaymentsController {
   constructor(
     private readonly payments: CommercePaymentsService,
     private readonly callbackRunner: TenantCallbackRunner,
+    private readonly returnOrigins: TenantReturnOriginService,
   ) {}
 
   @Get('providers')
@@ -106,7 +108,11 @@ export class PublicCommercePaymentsController {
             ...payload,
           }),
       );
-      return this.respond(eventType, result, response);
+      const returnOrigin =
+        eventType === 'ipn'
+          ? undefined
+          : await this.returnOrigins.forOrganization(organizationId);
+      return this.respond(eventType, result, response, returnOrigin);
     }
 
     // Process callback & validate with SSLCommerz server API
@@ -114,7 +120,12 @@ export class PublicCommercePaymentsController {
       ...query,
       ...payload,
     });
-    return this.respond(eventType, result, response);
+    return this.respond(
+      eventType,
+      result,
+      response,
+      eventType === 'ipn' ? undefined : this.legacyReturnOrigin(),
+    );
   }
 
   private async respond(
@@ -127,13 +138,16 @@ export class PublicCommercePaymentsController {
       status?: string;
     },
     response: Response,
+    customerOrigin?: string,
   ) {
 
     // IPN background notifications do not redirect browser
     if (eventType === 'ipn') return response.status(200).json(result);
 
     // Redirect browser to customer web app corresponding page
-    const customerUrl = process.env.CUSTOMER_WEB_URL || 'http://localhost:3000';
+    if (!customerOrigin) {
+      throw new BadRequestException('PAYMENT_RETURN_ORIGIN_UNAVAILABLE');
+    }
     const context = await this.payments.returnContext(result.orderId);
     const redirectQuery = new URLSearchParams({
       payment: result.paid ? 'success' : eventType,
@@ -153,8 +167,25 @@ export class PublicCommercePaymentsController {
 
     return response.redirect(
       303,
-      `${customerUrl}${targetPath}?${redirectQuery}`,
+      `${customerOrigin}${targetPath}?${redirectQuery}`,
     );
+  }
+
+  private legacyReturnOrigin(): string {
+    const raw = process.env.CUSTOMER_WEB_URL || 'http://localhost:3000';
+    try {
+      const url = new URL(raw);
+      if (
+        !['http:', 'https:'].includes(url.protocol) ||
+        url.username ||
+        url.password
+      ) {
+        throw new Error('invalid origin');
+      }
+      return url.origin;
+    } catch {
+      throw new BadRequestException('PAYMENT_RETURN_ORIGIN_INVALID');
+    }
   }
 }
 

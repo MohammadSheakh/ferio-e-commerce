@@ -1,4 +1,5 @@
 import { StorefrontAnalyticsEventType } from '@prisma/client';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsEnum,
   IsInt,
@@ -20,6 +21,7 @@ export class CreateStorefrontAnalyticsEventDto {
   anonymousId!: string;
 
   @IsEnum(StorefrontAnalyticsEventType)
+  @ApiProperty({ enum: StorefrontAnalyticsEventType })
   type!: StorefrontAnalyticsEventType;
 
   @IsOptional()
@@ -36,6 +38,13 @@ export class CreateStorefrontAnalyticsEventDto {
   @IsString()
   @MaxLength(120)
   searchTerm?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(1_000_000)
+  @ApiPropertyOptional({ minimum: 0, maximum: 1_000_000 })
+  searchResultCount?: number;
 
   @IsOptional()
   @IsObject()

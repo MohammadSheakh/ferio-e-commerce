@@ -59,11 +59,12 @@ export function trackEvent(eventName: string, params: AnalyticsEventParams = {})
     const eventId = `evt_${createBrowserUuid()}`;
     const path = window.location.pathname;
 
-    let backendType: "PRODUCT_VIEW" | "SEARCH" | "ADD_TO_CART" | "FILTER" | null = null;
+    let backendType: "PRODUCT_VIEW" | "SEARCH" | "ADD_TO_CART" | "FILTER" | "CHECKOUT_BEGIN" | null = null;
     if (eventName === "view_item") backendType = "PRODUCT_VIEW";
     else if (eventName === "search") backendType = "SEARCH";
     else if (eventName === "add_to_cart") backendType = "ADD_TO_CART";
     else if (eventName === "filter") backendType = "FILTER";
+    else if (eventName === "begin_checkout") backendType = "CHECKOUT_BEGIN";
 
     if (backendType) {
       void fetch("/api/storefront-analytics/events", {
@@ -76,6 +77,10 @@ export function trackEvent(eventName: string, params: AnalyticsEventParams = {})
           path,
           productId: params.item_id || undefined,
           searchTerm: params.search_term || undefined,
+          searchResultCount:
+            typeof params.search_result_count === "number"
+              ? params.search_result_count
+              : undefined,
           quantity: params.quantity || 1,
         }),
       }).catch(() => {

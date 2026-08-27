@@ -5,16 +5,22 @@ import { trackStorefrontEvent } from '@/lib/storefront-analytics';
 
 type Props = {
   search: string;
+  resultCount: number;
   filters: Record<string, boolean | number | string>;
 };
 
-export default function ProductListingAnalytics({ search, filters }: Props) {
+export default function ProductListingAnalytics({ search, resultCount, filters }: Props) {
   const filtersKey = JSON.stringify(filters);
 
   useEffect(() => {
     if (search) {
       trackStorefrontEvent(
-        { type: 'SEARCH', searchTerm: search, path: '/products' },
+        {
+          type: 'SEARCH',
+          searchTerm: search,
+          searchResultCount: resultCount,
+          path: '/products',
+        },
         `search:${search.normalize('NFKC').trim()}`,
       );
     }
@@ -24,7 +30,7 @@ export default function ProductListingAnalytics({ search, filters }: Props) {
         `filter:${filtersKey}`,
       );
     }
-  }, [filters, filtersKey, search]);
+  }, [filters, filtersKey, resultCount, search]);
 
   return null;
 }

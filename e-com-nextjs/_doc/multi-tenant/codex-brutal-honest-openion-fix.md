@@ -533,3 +533,180 @@ Redis records with heartbeat-based expiry before relying on it operationally.
 headers and configure a narrower CIDR than the broad Docker development range.
 The deployment smoke-test gate should send a spoofed direct request and assert
 `TENANT_FORWARDED_HOST_UNTRUSTED` before enabling strict tenancy.
+
+## 2026-08-26: Measured Storefront Analytics
+
+**Finding:** H-8
+
+**Status:** Fixed.
+
+**Changes:**
+
+- Added a tenant-schema migration for the measured `CHECKOUT_BEGIN` event and
+  structured nullable `searchResultCount` evidence.
+- Search ingestion stores result counts as bounded non-negative integers and
+  event-version 2 records.
+- The tenant migration enforces the same result-count range at the database
+  layer, and non-search events cannot carry search-result evidence.
+- Zero-result reporting now queries only `searchResultCount = 0`; when there is
+  no measured evidence it returns an empty list instead of relabeling popular
+  searches as failures.
+- Funnel checkout starts now count persisted `CHECKOUT_BEGIN` events instead of
+  multiplying add-to-cart events by an invented 65 percent factor.
+- Product search pages emit their actual server-returned result count.
+- Checkout emits a session-deduplicated begin event and mirrors it to GA4.
+- Updated Prisma source/canonical schemas, migration, DTO validation, Swagger
+  contract metadata, and the committed OpenAPI event contract.
+
+**Verification:**
+
+- Analytics service/sanitization tests: 7/7 passed across 2 suites.
+- Regression coverage proves structured evidence persistence, honest empty
+  zero-result output, and measured checkout-funnel counts.
+- Prisma schema synchronization and validation passed.
+- Backend and customer-web production builds passed.
+- `git diff --check` passed before commit.
+
+**Commit:** `fix(analytics): replace invented metrics with measured events`
+
+**Residual risk:** events produced before this migration have no result-count
+evidence and are intentionally excluded from zero-result reporting. H-7 still
+tracks the unbounded order read and Node-side dashboard aggregation; this fix
+corrects truthfulness, not analytics workload scalability.
+
+## 2026-08-26: Bounded Tenant Retention Deletes
+
+**Finding:** H-9 (deletion-safety slice)
+
+**Status:** Partially fixed.
+
+**Changes:**
+
+- Retention rules now select deterministic oldest-first primary-key batches
+  instead of issuing one unbounded cutoff delete.
+- Every delete is limited to the selected IDs and rechecks the cutoff, avoiding
+  accidental deletion when a concurrent update changes record eligibility.
+- Added a configurable batch size (default 500, hard cap 5,000) and per-rule
+  run budget (default 10,000, hard cap 100,000).
+- Reports now include deleted rows, transaction batches, elapsed time, and a
+  backlog flag based on an explicit post-budget existence probe.
+- Confirmed deferred backlog emits a structured warning for operational alerting.
+- Fleet sweeps use transient tenant-client leases so retention work does not
+  fill or churn the request-serving tenant connection cache.
+- Documented the batch and run-budget controls in the backend environment
+  example.
+
+**Verification:**
+
+- Retention service tests: 4/4 passed, including bounded multi-batch deletion,
+  exact completion, disabled rules, and tenant-failure isolation.
+- Backend production build passed.
+- `git diff --check` passed before commit.
+
+**Commit:** `fix(retention): batch tenant data pruning`
+
+**Residual risk:** H-9 remains open for an owner-approved legal and operational
+retention matrix covering callback/webhook logs, delivery attempts,
+notifications, inventory history, carts, and other growth tables. WAL volume,
+autovacuum health, replica lag, and low-traffic scheduling also require
+deployment-level dashboards and runbooks; application batching alone cannot
+prove those controls.
+
+## 2026-08-26: Bounded Storefront Order Analytics
+
+**Finding:** H-7 (storefront-analytics slice)
+
+**Status:** Partially fixed.
+
+**Changes:**
+
+- Replaced the analytics dashboard's unbounded `order.findMany` and Node-side
+  fold with one parameterized PostgreSQL daily aggregate.
+- The order result transferred to the application is now bounded to one row per
+  requested UTC day, with a service-enforced maximum of 365 rows, independent
+  of the number of matching orders.
+- Revenue remains represented in integer minor units; database `bigint` values
+  are normalized only after a safe-integer range check.
+- Preserved the existing zero-filled daily trend and measured checkout-funnel
+  response contract.
+- Added regression coverage proving the dashboard no longer invokes order
+  `findMany` and correctly derives totals from database aggregate rows.
+
+**Verification:**
+
+- Storefront analytics service tests: 5/5 passed.
+- Backend production build passed.
+- `git diff --check` passed before commit.
+
+**Commit:** `fix(analytics): aggregate order trends in database`
+
+**Residual risk:** H-7 remains open for the richer reports overview, synchronous
+CSV construction, statement-timeout/workload policy, and durable daily fact
+tables or a read replica. This query bounds application memory and network
+transfer, but PostgreSQL still scans and aggregates the selected OLTP period.
+
+## 2026-08-26: Page-Bounded Report Aggregation Memory
+
+**Finding:** H-7 (reports-memory slice)
+
+**Status:** Partially fixed.
+
+**Changes:**
+
+- Replaced four per-order money arrays in the report accumulator with scalar
+  totals, so overview memory no longer grows with the complete selected cohort.
+- The keyset reader remains capped at one 5,000-order page in memory while
+  preserving existing outcome, revenue, refund, RTO, COD, and dimension
+  definitions.
+- Added safe-integer checks to every accumulated monetary field instead of
+  silently returning precision-corrupted financial totals.
+- Added regression coverage across the 5,000-row pagination boundary.
+
+**Verification:**
+
+- Reports service/utility tests: 9/9 passed across 2 suites.
+- Backend production build passed.
+- `git diff --check` passed before commit.
+
+**Commit:** `fix(reports): bound overview aggregation memory`
+
+**Residual risk:** report database work and application CPU remain proportional
+to the cohort size because relation-rich order pages are still scanned. Move
+aggregate families to SQL or daily facts with parity tests, enforce statement
+timeouts, and replace synchronous in-memory CSV output with an asynchronous
+streamed export before broad historical reporting at production scale.
+
+## 2026-08-26: Tenant-Owned Payment Return Origins
+
+**Finding:** H-6 (payment-return routing slice)
+
+**Status:** Partially fixed.
+
+**Changes:**
+
+- Strict-tenancy browser callbacks now resolve their return origin from the
+  control-plane domains owned by the HMAC-verified callback organization.
+- Only `ACTIVE` domains are eligible; the primary domain is preferred with a
+  deterministic oldest-active fallback.
+- Tenant return URLs are forced to clean HTTPS origins and fail closed on
+  missing or malformed control-plane domain data.
+- Payment state is processed before return-domain resolution, so a domain
+  configuration incident cannot suppress callback validation.
+- Provider IPNs remain redirect-free and perform no return-domain lookup.
+- Legacy mode validates `CUSTOMER_WEB_URL` as an HTTP(S) origin and strips any
+  configured path, credentials, query, or fragment before redirect assembly.
+
+**Verification:**
+
+- Payment controller/service and tenant-origin tests: 16/16 passed across 3
+  suites, including signed tenant redirect and IPN behavior.
+- Backend production build passed.
+- `git diff --check` passed before commit.
+
+**Commit:** `fix(payments): return buyers to tenant domains`
+
+**Residual risk:** H-6 remains open for encrypted per-tenant payment and courier
+provider credentials, provider-account ownership, callback reconciliation per
+merchant account, and credential rotation/audit workflows. This fix prevents
+cross-storefront return routing but does not provide independent merchant
+settlement accounts.

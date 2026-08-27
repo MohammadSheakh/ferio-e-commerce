@@ -16,6 +16,20 @@ import {
   sanitizeSearchTerm,
 } from './storefront-analytics.util';
 
+interface DailyOrderAggregate {
+  date: string;
+  orders: number | bigint;
+  revenue: number | bigint;
+}
+
+function databaseNumber(value: number | bigint): number {
+  const normalized = Number(value);
+  if (!Number.isSafeInteger(normalized)) {
+    throw new Error('ANALYTICS_AGGREGATE_OUT_OF_RANGE');
+  }
+  return normalized;
+}
+
 @Injectable()
 export class StorefrontAnalyticsService {
   constructor(
@@ -47,12 +61,13 @@ export class StorefrontAnalyticsService {
         data: {
           eventId: dto.eventId,
           type: dto.type,
-          eventVersion: 1,
+          eventVersion: 2,
           source: 'CUSTOMER_WEB',
           visitorHash: this.hashVisitor(dto.anonymousId),
           productId: dto.productId,
           variantId: dto.variantId,
           searchTerm,
+          searchResultCount: dto.searchResultCount,
           filters: filters as Prisma.InputJsonValue | undefined,
           quantity: dto.quantity,
           path: sanitizeAnalyticsPath(dto.path),
@@ -78,6 +93,14 @@ export class StorefrontAnalyticsService {
     const db = await this.db();
     if (dto.type === StorefrontAnalyticsEventType.SEARCH && !searchTerm) {
       throw new BadRequestException('A search event requires a search term.');
+    }
+    if (
+      dto.type !== StorefrontAnalyticsEventType.SEARCH &&
+      dto.searchResultCount !== undefined
+    ) {
+      throw new BadRequestException(
+        'A search result count is valid only for search events.',
+      );
     }
     if (dto.type === StorefrontAnalyticsEventType.FILTER && !filters) {
       throw new BadRequestException(
@@ -143,17 +166,12 @@ export class StorefrontAnalyticsService {
         type: StorefrontAnalyticsEventType.SEARCH,
         searchTerm: { not: null },
         createdAt: { gte: startDate },
-        path: { contains: 'results=0' },
+        searchResultCount: 0,
       },
       _count: { searchTerm: true },
       orderBy: { _count: { searchTerm: 'desc' } },
       take: limit,
     });
-
-    if (zeroSearches.length === 0) {
-      const allSearches = await this.getTopSearches(days, limit);
-      return allSearches.slice(0, 5).map((s) => ({ ...s, isZeroResult: true }));
-    }
 
     return zeroSearches.map((s) => ({
       query: s.searchTerm ?? '',
@@ -235,7 +253,14 @@ export class StorefrontAnalyticsService {
 
   async getAnalyticsOverview(days = 30) {
     const db = await this.db();
-    const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const boundedDays = Number.isInteger(days)
+      ? Math.max(1, Math.min(365, days))
+      : 30;
+    const now = new Date();
+    const startDate = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) -
+        (boundedDays - 1) * 86_400_000,
+    );
 
     const eventCounts = await db.storefrontAnalyticsEvent.groupBy({
       by: ['type'],
@@ -247,42 +272,50 @@ export class StorefrontAnalyticsService {
     const productViews = countMap.get(StorefrontAnalyticsEventType.PRODUCT_VIEW) ?? 0;
     const searchCount = countMap.get(StorefrontAnalyticsEventType.SEARCH) ?? 0;
     const addToCartCount = countMap.get(StorefrontAnalyticsEventType.ADD_TO_CART) ?? 0;
+    const checkoutBeginCount =
+      countMap.get(StorefrontAnalyticsEventType.CHECKOUT_BEGIN) ?? 0;
 
-    const orders = await db.order.findMany({
-      where: {
-        createdAt: { gte: startDate },
-        status: { notIn: ['CANCELLED'] },
-      },
-      select: {
-        id: true,
-        total: true,
-        createdAt: true,
-      },
-    });
-
-    const totalRevenue = orders.reduce((sum, o) => sum + (o.total ?? 0), 0);
-    const totalOrders = orders.length;
+    // Return at most one row per requested day. Pulling every order into Node
+    // made dashboard memory and network cost proportional to order history.
+    const orderTrend = await db.$queryRaw<DailyOrderAggregate[]>(Prisma.sql`
+      SELECT
+        TO_CHAR("createdAt", 'YYYY-MM-DD') AS "date",
+        COUNT(*)::bigint AS "orders",
+        COALESCE(SUM("total"), 0)::bigint AS "revenue"
+      FROM "Order"
+      WHERE "createdAt" >= ${startDate}
+        AND "status" <> 'CANCELLED'
+      GROUP BY TO_CHAR("createdAt", 'YYYY-MM-DD')
+      ORDER BY "date" ASC
+    `);
 
     const dailyMap = new Map<string, { date: string; revenue: number; orders: number }>();
-    for (let i = days - 1; i >= 0; i--) {
-      const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
+    for (let i = boundedDays - 1; i >= 0; i--) {
+      const d = new Date(
+        Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) -
+          i * 86_400_000,
+      );
       const dateStr = d.toISOString().split('T')[0];
       dailyMap.set(dateStr, { date: dateStr, revenue: 0, orders: 0 });
     }
 
-    orders.forEach((o) => {
-      const dateStr = new Date(o.createdAt).toISOString().split('T')[0];
-      const existing = dailyMap.get(dateStr);
+    for (const row of orderTrend) {
+      const existing = dailyMap.get(row.date);
       if (existing) {
-        existing.revenue += o.total ?? 0;
-        existing.orders += 1;
+        existing.revenue = databaseNumber(row.revenue);
+        existing.orders = databaseNumber(row.orders);
       }
-    });
+    }
 
     const dailyTrend = Array.from(dailyMap.values());
-    const topSearches = await this.getTopSearches(days, 10);
-    const zeroResultSearches = await this.getZeroResultSearches(days, 10);
-    const viewedButNotPurchased = await this.getViewedButNotPurchased(days, 10);
+    const totalRevenue = dailyTrend.reduce((sum, row) => sum + row.revenue, 0);
+    const totalOrders = dailyTrend.reduce((sum, row) => sum + row.orders, 0);
+    const topSearches = await this.getTopSearches(boundedDays, 10);
+    const zeroResultSearches = await this.getZeroResultSearches(boundedDays, 10);
+    const viewedButNotPurchased = await this.getViewedButNotPurchased(
+      boundedDays,
+      10,
+    );
 
     return {
       summary: {
@@ -299,7 +332,7 @@ export class StorefrontAnalyticsService {
       funnel: {
         productViews,
         addToCart: addToCartCount,
-        checkoutBegin: Math.round(addToCartCount * 0.65),
+        checkoutBegin: checkoutBeginCount,
         purchased: totalOrders,
       },
     };

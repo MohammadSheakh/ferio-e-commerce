@@ -14,6 +14,7 @@ import { formatTaka } from "@/lib/catalog";
 import type { PublicStoreConfig } from "@/lib/store";
 import { createBrowserIdempotencyKey } from "@/lib/browser-identifiers";
 import LocationPickerModal from "@/components/LocationPickerModal";
+import { trackStorefrontEvent } from "@/lib/storefront-analytics";
 
 type CheckoutForm = {
   name: string;
@@ -117,6 +118,13 @@ export default function CheckoutPage() {
   const [userLoggedIn, setUserLoggedIn] = useState(false);
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const [publicStores, setPublicStores] = useState<any[]>([]);
+
+  useEffect(() => {
+    trackStorefrontEvent(
+      { type: "CHECKOUT_BEGIN", path: "/checkout" },
+      "checkout-begin",
+    );
+  }, []);
 
   useEffect(() => {
     if (!loading && (lines.length === 0 || !cart.isValid)) {
