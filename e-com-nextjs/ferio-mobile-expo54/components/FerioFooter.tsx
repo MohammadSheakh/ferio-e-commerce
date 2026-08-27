@@ -1,0 +1,4 @@
+import { StyleSheet, Text, View } from 'react-native';
+import { colors } from '@/lib/theme';
+export function FerioFooter() { return <View style={styles.footer}><Text style={styles.brand}>f e r i o</Text><Text style={styles.copy}>Current products, clear checkout totals, and order tracking in one place.</Text><Text style={styles.legal}>© 2026 Ferio. All rights reserved.</Text></View>; }
+const styles = StyleSheet.create({ footer: { marginTop: 58, backgroundColor: colors.ink, paddingHorizontal: 18, paddingTop: 32, paddingBottom: 22, overflow: 'hidden' }, brand: { color: '#fff', fontSize: 46, fontWeight: '600', letterSpacing: -2.5 }, copy: { marginTop: 8, maxWidth: 330, color: 'rgba(255,255,255,0.68)', fontSize: 12, lineHeight: 18 }, legal: { marginTop: 24, color: 'rgba(255,255,255,0.55)', fontSize: 10 } });

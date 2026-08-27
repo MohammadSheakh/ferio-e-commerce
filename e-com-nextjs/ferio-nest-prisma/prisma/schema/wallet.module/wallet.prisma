@@ -1,0 +1,35 @@
+enum TWalletStatus {
+    active 
+    frozen 
+    suspended
+}
+
+enum TCurrency {
+    bdt
+}
+
+
+model Wallet{
+
+    id String @id @default(cuid())
+
+    // for back reference .. 
+    // userId String   @unique
+    user User? //@relation(fields:[userId], references: [id])
+
+    amount Int @default(0)
+    totalBalance Int @default(0)
+    currency TCurrency @default(bdt)
+    status TWalletStatus @default(active)
+    
+    isDeleted Boolean @default(false)
+    createdAt     DateTime @default(now())
+    updatedAt     DateTime @updatedAt
+
+
+    //== back-relation
+    withdrawalRequests WithdrawalRequest[]
+    walletTransactionHistories WalletTransactionHistory[]
+    topUps WalletTopUp[]
+
+}

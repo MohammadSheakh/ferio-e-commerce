@@ -1,0 +1,141 @@
+enum PaymentGateway {
+  stripe
+  paypal
+  sslcommerz
+  revenuecat
+  none
+}
+
+enum PaymentStatus {
+  pending
+  processing
+  completed
+  failed
+  refunded
+  cancelled
+  partially_refunded
+  disputed
+}
+
+enum PaymentCurrency {
+  usd
+  bdt
+  eur
+  gbp
+}
+
+enum TransactionType {
+  userSubscription
+  purchasedJourney
+  purchasedAdminCapsule
+}
+
+enum PaymentEnvironment {
+  production
+  sandbox
+}
+
+enum PaymentPlatform {
+  ios
+  android
+  web
+}
+
+model PaymentTransaction {
+  id                    String              @id @default(cuid())
+
+  // 🔗 One user can have many payment transactions.
+  userId                String
+  user                  User                @relation(fields: [userId], references: [id])
+
+  // 🔗 Polymorphic payment target, such as userSubscription or purchase.
+  referenceFor          TransactionType
+  referenceId           String
+  paymentGateway        PaymentGateway
+  transactionId         String?
+  paymentIntent         String?
+  amount                Int
+  currency              PaymentCurrency
+  paymentStatus         PaymentStatus       @default(pending)
+  gatewayResponse       Json?
+  revenueCatOrderId     String?
+  revenueCatEnvironment PaymentEnvironment?
+  platform              PaymentPlatform?
+  isDeleted             Boolean             @default(false)
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+
+  @@index([userId, paymentStatus, isDeleted])
+  @@index([referenceFor, referenceId, isDeleted])
+  @@index([paymentGateway, transactionId])
+  @@index([revenueCatOrderId, isDeleted])
+  @@index([createdAt, isDeleted])
+  @@index([paymentStatus, createdAt, isDeleted])
+}
+
+enum CommercePaymentAttemptStatus {
+  CREATED
+  INITIATING
+  PENDING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+  EXPIRED
+  UNKNOWN
+}
+
+enum CommercePaymentCallbackStatus {
+  RECEIVED
+  VALIDATED
+  REJECTED
+  DUPLICATE
+  FAILED
+}
+
+model CommercePaymentAttempt {
+  id                    String                       @id @default(cuid())
+  merchantTransactionId String                       @unique
+  provider              CommercePaymentProvider
+  status                CommercePaymentAttemptStatus @default(CREATED)
+  amount                Int
+  currency              String                       @default("BDT")
+  providerSessionId     String?
+  providerTransactionId String?
+  providerValidationId  String?
+  redirectUrl           String?
+  initiationRequest     Json?
+  initiationResponse    Json?
+  validatedResponse     Json?
+  failureCode           String?
+  failureMessage        String?
+  expiresAt             DateTime?
+  initiatedAt           DateTime?
+  completedAt           DateTime?
+  orderId               String
+  order                 Order                        @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  callbacks             CommercePaymentCallback[]
+  createdAt             DateTime                     @default(now())
+  updatedAt             DateTime                     @updatedAt
+
+  @@index([orderId, createdAt])
+  @@index([provider, status, createdAt])
+  @@index([providerTransactionId])
+}
+
+model CommercePaymentCallback {
+  id              String                        @id @default(cuid())
+  deduplicationKey String                        @unique
+  provider        CommercePaymentProvider
+  status          CommercePaymentCallbackStatus @default(RECEIVED)
+  eventType       String
+  payload         Json
+  errorMessage    String?
+  processedAt     DateTime?
+  attemptId       String?
+  attempt         CommercePaymentAttempt?       @relation(fields: [attemptId], references: [id], onDelete: SetNull)
+  createdAt       DateTime                      @default(now())
+
+  @@index([provider, createdAt])
+  @@index([attemptId, createdAt])
+  @@index([status, createdAt])
+}

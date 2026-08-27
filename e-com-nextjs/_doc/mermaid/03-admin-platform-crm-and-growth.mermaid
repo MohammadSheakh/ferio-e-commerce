@@ -1,0 +1,199 @@
+flowchart TB
+  %% Ferio diagram 3 of 3: admin platform, notifications, reporting, CRM, and growth
+
+  subgraph LEGEND["Status legend"]
+    direction LR
+    L1["Implemented"]:::done
+    L2["Partial"]:::partial
+    L3["Planned"]:::planned
+    L4["Blocked"]:::blocked
+    L5["External"]:::external
+  end
+
+  OWNER(["Owner / administrator"])
+  CATALOG_USER(["Catalog and inventory operator"])
+  ORDER_USER(["Order operations agent"])
+  SUPPORT_USER(["Support agent"])
+  FINANCE_USER(["Finance operator"])
+  MARKETING_USER(["CRM and marketing operator"])
+  MESSAGE_PROVIDER(["SMS / WhatsApp / email provider"]):::external
+  META_GOOGLE(["Meta / Google integrations"]):::external
+
+  subgraph ACCESS["1. Staff access and permissions"]
+    direction TB
+    LOGIN["Staff login with rate limiting"]:::done
+    SESSION["Expiring access and refresh session; logout and revocation"]:::done
+    ROLE_CHECK{"Server role and permission allow action?"}:::partial
+    DENIED["Deny protected operation"]:::done
+    STAFF_ADMIN["Invite, deactivate, reset, and optional 2FA"]:::planned
+  end
+
+  OWNER --> LOGIN
+  CATALOG_USER --> LOGIN
+  ORDER_USER --> LOGIN
+  SUPPORT_USER --> LOGIN
+  FINANCE_USER --> LOGIN
+  MARKETING_USER --> LOGIN
+  LOGIN --> SESSION --> ROLE_CHECK
+  ROLE_CHECK -- "No" --> DENIED
+  OWNER -.-> STAFF_ADMIN
+
+  subgraph CATALOG_ADMIN["2. Catalog and inventory administration"]
+    direction TB
+    CATEGORY["Create and organize categories and subcategories"]:::done
+    PRODUCT["Product details, media URL, SEO, status, and ordering"]:::done
+    VARIANT["Variants: SKU, attributes, price, weight, and stock"]:::done
+    PUBLISH["Draft, publish, unpublish, or archive"]:::done
+    INVENTORY["Stock, thresholds, movements, and discrepancies"]:::done
+    ADJUST["Manual stock adjustment with permission, actor, and reason"]:::done
+    STORAGE["Managed object storage upload and safe delivery URL"]:::planned
+    CATALOG_AUDIT["Audit publication and price changes"]:::done
+    PUBLIC_CATALOG[["Handoff to diagram 01\nPublished catalog appears on Customer Web"]]:::handoff
+  end
+
+  ROLE_CHECK -- "Catalog permission" --> CATEGORY --> PRODUCT --> VARIANT --> PUBLISH --> PUBLIC_CATALOG
+  VARIANT --> INVENTORY --> ADJUST
+  PRODUCT -.-> STORAGE
+  PUBLISH -.-> CATALOG_AUDIT
+
+  HANDOFF_EVENTS[["From diagrams 01 and 02\nCommitted commerce and lifecycle events"]]:::handoff
+
+  subgraph NOTIFICATIONS["3. Transactional notification lifecycle"]
+    direction TB
+    BUSINESS_EVENT["Committed order, payment, shipment, return, or refund event"]:::partial
+    OUTBOX["Queue message only after business transaction commits"]:::done
+    PURPOSE["Keep transactional purpose separate from promotional consent"]:::done
+    CHANNEL_POLICY["Approved channel priority, fallback, quiet hours, and suppression"]:::blocked
+    ATTEMPT["Record channel, template, recipient, purpose, provider ID, state, and timestamps"]:::partial
+    SEND["Dispatch without blocking commerce"]:::planned
+    RESULT{"Provider outcome"}:::decision
+    DELIVERED["Record delivered outcome"]:::planned
+    RETRY["Idempotent retry without duplicate customer message"]:::planned
+    FAILED["Retain failure for operations; commerce remains successful"]:::planned
+  end
+
+  HANDOFF_EVENTS --> BUSINESS_EVENT --> OUTBOX --> PURPOSE --> CHANNEL_POLICY --> ATTEMPT --> MESSAGE_PROVIDER
+  MESSAGE_PROVIDER --> SEND --> RESULT
+  RESULT -- "Delivered" --> DELIVERED
+  RESULT -- "Retryable / uncertain" --> RETRY --> ATTEMPT
+  RESULT -- "Failed" --> FAILED
+
+  subgraph OPERATIONS["4. Admin operations, settings, and audit"]
+    direction TB
+    ORDER_QUEUE["Order queue filters and search"]:::done
+    ORDER_DETAIL["Unified order, reservation, fulfillment, shipment, return, and history context"]:::partial
+    SUPPORT_CONTEXT["Customer and order context for support"]:::planned
+    EXCEPTIONS["Operational exception queue with severity, age, owner, and action"]:::planned
+    SETTINGS["Store, COD, delivery, return, payment, notification, and policy settings"]:::partial
+    AUDIT["Append-only sensitive-action audit log"]:::done
+    EXPORT["Permission-aware exports with sensitive-data masking"]:::planned
+  end
+
+  ROLE_CHECK -- "Order permission" --> ORDER_QUEUE --> ORDER_DETAIL
+  ROLE_CHECK -- "Support permission" --> SUPPORT_CONTEXT --> ORDER_DETAIL
+  FAILED --> EXCEPTIONS
+  ORDER_DETAIL --> EXCEPTIONS
+  OWNER --> SETTINGS
+  ORDER_DETAIL -.-> AUDIT
+  SETTINGS -.-> AUDIT
+  CATALOG_AUDIT --> AUDIT
+  AUDIT --> EXPORT
+
+  subgraph REPORTING["5. Finance, reconciliation, and reporting"]
+    direction TB
+    RECONCILE["Reconcile stock, reservations, payments, COD settlements, courier fees, refunds, and returns"]:::planned
+    VARIANCE{"Variance found?"}:::decision
+    FINANCE_EXCEPTION["Create aged finance exception"]:::planned
+    REPORTS["Placed, confirmed, delivered, cancelled, returned, and RTO reports"]:::planned
+    MONEY_REPORTS["Revenue, collection, refund, fee, and settlement views"]:::planned
+    CONTRIBUTION["Delivered contribution after approved cost inputs"]:::blocked
+    DASHBOARDS["Owner, operations, and finance dashboards linked to detail"]:::planned
+  end
+
+  FINANCE_USER --> RECONCILE --> VARIANCE
+  VARIANCE -- "Yes" --> FINANCE_EXCEPTION --> EXCEPTIONS
+  VARIANCE -- "No" --> REPORTS --> MONEY_REPORTS --> CONTRIBUTION --> DASHBOARDS
+  EXPORT --> DASHBOARDS
+
+  subgraph CRM["6. Release 2 customer retention and CRM"]
+    direction TB
+    CUSTOMER_360["Customer 360: delivered, cancelled, returned, spend, source, risk, and timeline"]:::planned
+    IDENTITY["Reviewed duplicate-profile merge and identity links"]:::planned
+    CONSENT["Channel consent evidence, revocation, suppression, quiet hours, and frequency caps"]:::planned
+    SEGMENT["Deterministic segment with explainable membership preview"]:::planned
+    CAMPAIGN["Approved campaign or lifecycle automation"]:::planned
+    CHANNEL["Choose one permitted channel with controlled fallback"]:::planned
+    ATTRIBUTED_LINK["Send attributed campaign link"]:::planned
+    OUTCOME["Measure delivered, cancelled, returned, and contribution outcome"]:::planned
+    WISHLIST["Wishlist, restock, and price-drop eligibility"]:::planned
+    REVIEWS["Reviewed ratings and product feedback"]:::planned
+    CUSTOMER_RETURN[["Handoff to diagram 01\nCustomer returns through attributed link"]]:::handoff
+  end
+
+  MARKETING_USER --> CUSTOMER_360 --> IDENTITY --> CONSENT --> SEGMENT --> CAMPAIGN --> CHANNEL --> ATTRIBUTED_LINK --> CUSTOMER_RETURN
+  HANDOFF_EVENTS --> CUSTOMER_360
+  CAMPAIGN --> OUTCOME --> REPORTS
+  WISHLIST --> SEGMENT
+  REVIEWS --> CUSTOMER_360
+
+  subgraph GROWTH["7. Release 2 integrations and Release 3 optimization"]
+    direction TB
+    ANALYTICS_EVENTS["Product, checkout, order, delivery, return, and campaign events"]:::planned
+    PIXEL_CAPI["Meta Pixel / CAPI with deduplication and privacy controls"]:::planned
+    LEAD_ADS["Meta Lead Ads ingestion, identity matching, consent, and source"]:::planned
+    AD_REPORTING["Ad and UTM outcome dashboard"]:::planned
+    PERSONALIZATION["Personalized recommendations"]:::planned
+    AI_CATALOG["AI-assisted descriptions, SEO, and category suggestions"]:::planned
+    AI_REVIEWS["Review summarization and image moderation"]:::planned
+    CHATBOT["Support chatbot and translation assistance"]:::planned
+    SEARCH_SCALE["Dedicated search infrastructure after measured trigger"]:::planned
+    MULTI_COURIER["Advanced multi-courier optimization"]:::planned
+  end
+
+  HANDOFF_EVENTS --> ANALYTICS_EVENTS --> PIXEL_CAPI --> META_GOOGLE
+  META_GOOGLE --> LEAD_ADS --> CUSTOMER_360
+  ANALYTICS_EVENTS --> AD_REPORTING --> OUTCOME
+  CUSTOMER_360 -. "Measured trigger" .-> PERSONALIZATION
+  PRODUCT -. "Approved AI assistance" .-> AI_CATALOG
+  REVIEWS -.-> AI_REVIEWS
+  SUPPORT_CONTEXT -.-> CHATBOT
+  PUBLIC_CATALOG -.-> SEARCH_SCALE
+  ORDER_DETAIL -.-> MULTI_COURIER
+
+  subgraph PLATFORM["8. Cross-cutting platform controls"]
+    direction TB
+    API["NestJS modular monolith, DTO validation, and stable API envelopes"]:::partial
+    DB["PostgreSQL and Prisma constraints, transactions, and migrations"]:::partial
+    QUEUE["Redis and BullMQ jobs, retries, schedules, and outbox dispatch"]:::partial
+    SECURITY["RBAC, rate limiting, secret isolation, webhook verification, and masking"]:::partial
+    OBSERVABILITY["Correlation IDs, structured logs, metrics, alerts, and provider diagnostics"]:::planned
+    BACKUP["Automated backups, protected object storage, and restore exercise"]:::planned
+    FLAGS["Feature flags for risky staged rollouts"]:::planned
+    HARDENING["Unit, integration, concurrency, E2E, accessibility, performance, and security validation"]:::partial
+    RELEASE{"Release exit criteria pass?"}:::decision
+    ALPHA["Internal alpha"]:::planned
+    BETA["Controlled beta: one warehouse, one courier, COD, approved prepaid policy"]:::blocked
+    LAUNCH["General launch"]:::planned
+  end
+
+  OPERATIONS -.-> API
+  CATALOG_ADMIN -.-> API
+  NOTIFICATIONS -.-> API
+  CRM -.-> API
+  API --> DB
+  API --> QUEUE
+  API --> SECURITY
+  API --> OBSERVABILITY
+  DB --> BACKUP
+  API --> FLAGS
+  OBSERVABILITY --> HARDENING --> RELEASE
+  RELEASE -- "No" --> HARDENING
+  RELEASE -- "Yes" --> ALPHA --> BETA --> LAUNCH
+
+  classDef done fill:#111114,color:#fff,stroke:#111114;
+  classDef partial fill:#f2f2f2,color:#111114,stroke:#777;
+  classDef planned fill:#fff,color:#55555c,stroke:#b9b9bd,stroke-dasharray:5 4;
+  classDef blocked fill:#fff4e5,color:#7a4b00,stroke:#c88719,stroke-dasharray:4 3;
+  classDef external fill:#f5f2ff,color:#33205f,stroke:#7c5cff;
+  classDef decision fill:#fff,color:#111114,stroke:#111114,stroke-width:1.5px;
+  classDef handoff fill:#eef6ff,color:#12385f,stroke:#4c88c7,stroke-width:1.5px;

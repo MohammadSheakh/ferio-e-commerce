@@ -1,0 +1,44 @@
+import {
+  bffErrorResponse,
+  forwardedHeaders,
+  proxyBackendResponse,
+} from "@/lib/bff-response";
+
+export async function PATCH(
+  request: Request,
+  { params }: { params: { id: string } },
+) {
+  try {
+    const authHeader = request.headers.get("authorization");
+    if (!authHeader) {
+      return bffErrorResponse(
+        "Unauthorized.",
+        401,
+        "AUTHENTICATION_REQUIRED",
+      );
+    }
+
+    const body = await request.json();
+    const backendUrl =
+      process.env.NEXT_PUBLIC_FERIO_API_URL ?? "http://localhost:6733/api/v1";
+    const res = await fetch(
+      `${backendUrl}/delivery-personnel/my-orders/${params.id}/status`,
+      {
+        method: "PATCH",
+        headers: forwardedHeaders(request, {
+          Authorization: authHeader,
+          "Content-Type": "application/json",
+        }),
+        body: JSON.stringify(body),
+      },
+    );
+
+    return proxyBackendResponse(res, "Unable to update delivery status.");
+  } catch {
+    return bffErrorResponse(
+      "Unable to update delivery status.",
+      503,
+      "SERVICE_UNAVAILABLE",
+    );
+  }
+}

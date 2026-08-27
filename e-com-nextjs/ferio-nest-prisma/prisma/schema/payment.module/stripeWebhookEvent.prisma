@@ -1,0 +1,27 @@
+enum WebhookProcessingStatus {
+  pending
+  processing
+  completed
+  failed
+}
+
+model StripeWebhookEvent {
+  id               String                  @id @default(cuid())
+  eventId          String                  @unique
+  eventType        String
+  accountId        String?
+  paymentIntentId  String?
+  customerId       String?
+  amount           Int?
+  currency         String?
+  eventData        Json
+  processingStatus WebhookProcessingStatus @default(pending)
+  errorMessage     String?
+  attempts         Int                     @default(0)
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+
+  @@index([eventType, createdAt])
+  @@index([paymentIntentId, createdAt])
+  @@index([processingStatus, attempts])
+}

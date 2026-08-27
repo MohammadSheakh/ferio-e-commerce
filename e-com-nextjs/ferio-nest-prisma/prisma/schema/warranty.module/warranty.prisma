@@ -1,0 +1,72 @@
+enum WarrantyClaimStatus {
+  SUBMITTED
+  PRODUCT_RECEIVED
+  UNDER_DIAGNOSIS
+  SENT_TO_BRAND
+  RECEIVED_FROM_BRAND
+  REPAIRED
+  RESOLVED
+  REJECTED
+}
+
+model WarrantyClaim {
+  id        String              @id @default(cuid())
+  reference String              @unique
+  status    WarrantyClaimStatus @default(SUBMITTED)
+  issueDescription String
+  rejectionReason String?
+  adminNote String?
+
+  orderReferenceSnapshot String
+  productNameSnapshot String
+  variantNameSnapshot String
+  skuSnapshot String
+
+  submittedById String
+  submittedBy User @relation("WarrantyClaimSubmitter", fields: [submittedById], references: [id], onDelete: Restrict)
+  handledById String?
+  handledBy User? @relation("WarrantyClaimHandler", fields: [handledById], references: [id], onDelete: SetNull)
+
+  orderItemId String
+  orderItem OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
+
+  evidence WarrantyEvidence[]
+  history WarrantyClaimHistory[]
+
+  resolvedAt DateTime?
+  rejectedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([submittedById, createdAt])
+  @@index([orderItemId, createdAt])
+}
+
+model WarrantyEvidence {
+  id       String @id @default(cuid())
+  imageUrl String
+  publicId String?
+
+  claimId String
+  claim WarrantyClaim @relation(fields: [claimId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  @@index([claimId, createdAt])
+}
+
+model WarrantyClaimHistory {
+  id        String              @id @default(cuid())
+  oldStatus WarrantyClaimStatus?
+  newStatus WarrantyClaimStatus
+  actorId   String
+  source    OrderHistorySource
+  note      String?
+
+  claimId String
+  claim WarrantyClaim @relation(fields: [claimId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  @@index([claimId, createdAt])
+  @@index([actorId, createdAt])
+}

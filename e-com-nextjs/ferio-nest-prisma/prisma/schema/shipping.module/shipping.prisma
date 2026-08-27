@@ -1,0 +1,150 @@
+enum ShipmentProviderCode {
+  PATHAO
+  STEADFAST
+  REDX
+  ECOURIER
+  PAPERFLY
+  CARRYBEE
+}
+
+enum ShipmentProviderEvidenceSource {
+  WEBHOOK
+  POLL
+}
+
+enum ShipmentPollAttemptStatus {
+  QUEUED
+  PROCESSING
+  SUCCEEDED
+  FAILED
+  SKIPPED
+}
+
+model ShipmentProvider {
+  id       String               @id @default(cuid())
+  code     ShipmentProviderCode @unique
+  name     String
+  baseUrl  String
+  isActive Boolean              @default(false)
+
+  shipments Shipment[]
+  settlements CourierSettlement[]
+  settlementImports CourierSettlementImport[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, name])
+}
+
+model Shipment {
+  id                 String              @id @default(cuid())
+  status             OrderShipmentStatus @default(READY)
+  externalShipmentId String?
+  trackingNumber     String?
+  trackingUrl        String?
+  labelUrl           String?
+  weightGrams        Int
+  codAmount          Int
+  shippingCharge     Int?
+  requestPayload     Json
+  responsePayload    Json?
+  lastRawStatus      String?
+  exceptionReason    String?
+  createdByActorId   String
+  pickedUpAt         DateTime?
+  deliveredAt        DateTime?
+  returnedAt         DateTime?
+  cancelledAt        DateTime?
+  lastPolledAt       DateTime?
+  nextPollAt         DateTime?
+  pollingFailureCount Int                 @default(0)
+  pollingError       String?
+
+  orderId String @unique
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  providerId String
+  provider   ShipmentProvider @relation(fields: [providerId], references: [id], onDelete: Restrict)
+
+  events ShipmentEvent[]
+  rtoCase RtoCase?
+  codCollection CodCollection?
+  settlementItem CourierSettlementItem?
+  pollAttempts ShipmentPollAttempt[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([providerId, status, createdAt])
+  @@index([nextPollAt, status])
+  @@index([trackingNumber])
+  @@index([externalShipmentId])
+}
+
+model ShipmentEvent {
+  id               String              @id @default(cuid())
+  deduplicationKey String              @unique
+  providerEventId  String?
+  rawStatus        String
+  normalizedStatus OrderShipmentStatus
+  payload          Json
+  occurredAt       DateTime
+  isOutOfOrder     Boolean             @default(false)
+  ignoredReason    String?
+
+  shipmentId String
+  shipment   Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([shipmentId, occurredAt])
+  @@index([normalizedStatus, occurredAt])
+}
+
+model ShipmentWebhookLog {
+  id               String               @id @default(cuid())
+  providerCode     ShipmentProviderCode
+  source           ShipmentProviderEvidenceSource @default(WEBHOOK)
+  deduplicationKey String               @unique
+  headers          Json
+  body             Json
+  authValid        Boolean
+  processed        Boolean              @default(false)
+  attemptCount     Int                  @default(0)
+  processingStartedAt DateTime?
+  lastAttemptAt    DateTime?
+  processingError  String?
+  receivedAt       DateTime             @default(now())
+  processedAt      DateTime?
+
+  @@index([providerCode, receivedAt])
+  @@index([processed, receivedAt])
+  @@index([processingStartedAt])
+  @@index([source, receivedAt])
+}
+
+model ShipmentPollAttempt {
+  id                 String                    @id @default(cuid())
+  correlationId      String                    @unique
+  status             ShipmentPollAttemptStatus @default(QUEUED)
+  requestedByActorId String?
+  queueJobId         String?
+  rawResponse         Json?
+  normalizedStatus   OrderShipmentStatus?
+  errorCode           String?
+  errorMessage        String?
+  startedAt           DateTime?
+  finishedAt          DateTime?
+
+  shipmentId String
+  shipment   Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  evidenceLogId String? @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([shipmentId, createdAt])
+}

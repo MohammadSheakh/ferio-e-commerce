@@ -1,0 +1,44 @@
+enum WalletTopUpProvider {
+  BKASH
+  NAGAD
+  ROCKET
+  BANK_TRANSFER
+}
+
+enum WalletTopUpStatus {
+  PENDING_REVIEW
+  COMPLETED
+  REJECTED
+  CANCELLED
+}
+
+model WalletTopUp {
+  id                String            @id @default(cuid())
+  provider          WalletTopUpProvider
+  amount            Int
+  currency          TCurrency         @default(bdt)
+  status            WalletTopUpStatus @default(PENDING_REVIEW)
+  customerReference String
+  customerNote      String?
+  reviewNote        String?
+  reviewedById      String?
+  idempotencyKey    String            @unique
+  completedAt       DateTime?
+  reviewedAt        DateTime?
+
+  userId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  walletId String
+  wallet   Wallet @relation(fields: [walletId], references: [id], onDelete: Restrict)
+
+  transactions WalletTransactionHistory[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([walletId, createdAt])
+  @@index([status, createdAt])
+  @@index([provider, customerReference])
+}

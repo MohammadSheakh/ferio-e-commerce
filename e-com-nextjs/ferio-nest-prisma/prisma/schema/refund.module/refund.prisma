@@ -1,0 +1,87 @@
+enum CommerceRefundStatus {
+  PENDING
+  PROCESSING
+  REQUIRES_ACTION
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+enum CommerceRefundMethod {
+  ORIGINAL_PAYMENT
+  BANK_TRANSFER
+  BKASH
+  NAGAD
+  ROCKET
+  CASH
+  OTHER
+}
+
+enum RefundExecutionMode {
+  MANUAL
+  PROVIDER
+}
+
+enum RefundAttemptOutcome {
+  SUCCEEDED
+  FAILED
+}
+
+model CommerceRefund {
+  id                     String               @id @default(cuid())
+  reference              String               @unique
+  idempotencyKeyHash     String               @unique
+  status                 CommerceRefundStatus @default(PENDING)
+  method                 CommerceRefundMethod
+  amount                 Int
+  currency               String               @default("BDT")
+  reason                 String
+  sourcePaymentReference String?
+  provider               String?
+  providerRefundId       String?
+  providerResult         Json?
+  failureReason          String?
+  createdByActorId       String
+  completedByActorId     String?
+  processedAt            DateTime?
+  completedAt            DateTime?
+
+  orderId String
+  order   Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  returnCaseId String
+  returnCase   ReturnCase @relation(fields: [returnCaseId], references: [id], onDelete: Restrict)
+
+  attempts RefundAttempt[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orderId, status, createdAt])
+  @@index([returnCaseId, status, createdAt])
+  @@index([status, createdAt])
+  @@index([createdByActorId, createdAt])
+}
+
+model RefundAttempt {
+  id                String               @id @default(cuid())
+  attemptNumber     Int
+  deduplicationHash String               @unique
+  executionMode     RefundExecutionMode
+  outcome           RefundAttemptOutcome
+  provider          String?
+  externalReference String?
+  result            Json?
+  failureReason     String?
+  actorId           String
+
+  refundId String
+  refund   CommerceRefund @relation(fields: [refundId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+
+  @@unique([refundId, attemptNumber])
+  @@index([refundId, createdAt])
+  @@index([outcome, createdAt])
+  @@index([actorId, createdAt])
+}

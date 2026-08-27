@@ -1,0 +1,88 @@
+enum ServiceOfferingStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum ServiceBookingStatus {
+  REQUESTED
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  REJECTED
+}
+
+model ServiceOffering {
+  id          String                @id @default(cuid())
+  name        String
+  slug        String                @unique
+  description String
+  status      ServiceOfferingStatus @default(DRAFT)
+  price       Int
+  durationMinutes Int
+  leadTimeHours   Int               @default(24)
+  serviceAreaNote String?
+  requirements    String?
+  imageUrl        String?
+
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  bookings   ServiceBooking[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([categoryId, status, createdAt])
+}
+
+model ServiceBooking {
+  id        String               @id @default(cuid())
+  reference String               @unique
+  status    ServiceBookingStatus @default(REQUESTED)
+
+  customerName  String
+  phoneOriginal String
+  phoneNormalized String
+  email         String?
+  preferredAt   DateTime
+  address       String?
+  customerNote  String?
+
+  serviceNameSnapshot String
+  priceSnapshot       Int
+  durationMinutesSnapshot Int
+
+  adminNote   String?
+  handledById String?
+  confirmedAt DateTime?
+  completedAt DateTime?
+  cancelledAt DateTime?
+
+  serviceId String
+  service   ServiceOffering @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  history   ServiceBookingHistory[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, preferredAt])
+  @@index([phoneNormalized, createdAt])
+  @@index([serviceId, createdAt])
+}
+
+model ServiceBookingHistory {
+  id        String               @id @default(cuid())
+  oldStatus ServiceBookingStatus?
+  newStatus ServiceBookingStatus
+  actorId   String?
+  source    OrderHistorySource
+  note      String?
+
+  bookingId String
+  booking   ServiceBooking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([bookingId, createdAt])
+}

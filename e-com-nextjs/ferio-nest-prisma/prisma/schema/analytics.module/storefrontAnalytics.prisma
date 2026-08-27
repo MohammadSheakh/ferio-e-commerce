@@ -1,0 +1,26 @@
+enum StorefrontAnalyticsEventType {
+  PRODUCT_VIEW
+  SEARCH
+  FILTER
+  ADD_TO_CART
+}
+
+model StorefrontAnalyticsEvent {
+  id          String                       @id @default(cuid())
+  eventId     String                       @unique
+  type        StorefrontAnalyticsEventType
+  eventVersion Int                         @default(1)
+  source      String                       @default("CUSTOMER_WEB")
+  visitorHash String
+  productId   String?
+  variantId   String?
+  searchTerm  String?
+  filters     Json?
+  quantity    Int?
+  path        String?
+  createdAt   DateTime                     @default(now())
+
+  @@index([type, createdAt])
+  @@index([productId, type, createdAt])
+  @@index([visitorHash, createdAt])
+}

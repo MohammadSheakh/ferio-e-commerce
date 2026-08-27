@@ -1,0 +1,92 @@
+enum InventoryMovementType {
+  INITIAL_STOCK
+  RECEIVE
+  MANUAL_ADJUSTMENT
+  RESERVE
+  RELEASE
+  SALE
+  RETURN
+  DAMAGE
+  CORRECTION
+}
+
+enum InventoryAdjustmentReason {
+  STOCK_COUNT_CORRECTION
+  PURCHASE_RECEIPT
+  CUSTOMER_RETURN
+  DAMAGE_WRITE_OFF
+  OTHER
+}
+
+model Warehouse {
+  id                 String  @id @default(cuid())
+  code               String  @unique
+  name               String
+  isActive           Boolean @default(true)
+  isStore            Boolean @default(false)
+  phone              String?
+  email              String?
+  district           String?
+  area               String?
+  address            String?
+  latitude           Float?
+  longitude          Float?
+  operatingHours     String?
+  operatingDays      String?
+  pickupInstructions String?
+
+  inventory      InventoryStock[]
+  checkoutDrafts CheckoutDraft[]
+  orders         Order[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, isStore, name])
+}
+
+model InventoryStock {
+  id                String @id @default(cuid())
+  onHand            Int    @default(0)
+  reserved          Int    @default(0)
+  damaged           Int    @default(0)
+  incoming          Int    @default(0)
+  lowStockThreshold Int    @default(5)
+
+  warehouseId String
+  warehouse   Warehouse      @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  variantId   String
+  variant     ProductVariant @relation(fields: [variantId], references: [id], onDelete: Restrict)
+  movements   InventoryMovement[]
+  reservations InventoryReservation[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([warehouseId, variantId])
+  @@index([variantId])
+  @@index([warehouseId, onHand, reserved])
+}
+
+model InventoryMovement {
+  id            String                @id @default(cuid())
+  type          InventoryMovementType
+  quantityDelta Int
+  reason        String
+  referenceType String?
+  referenceId   String?
+  adjustmentReason InventoryAdjustmentReason?
+  unitCost      Int?
+  evidenceUrl   String?
+  effectiveAt   DateTime?
+  actorId       String?
+
+  inventoryId String
+  inventory   InventoryStock @relation(fields: [inventoryId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+
+  @@index([inventoryId, createdAt])
+  @@index([referenceType, referenceId])
+  @@index([actorId, createdAt])
+}

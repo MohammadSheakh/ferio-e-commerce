@@ -1,0 +1,19 @@
+model RevenueCatWebhookEvent {
+  id               String                  @id @default(cuid())
+  eventId          String                  @unique
+  eventType        String
+  appId            String?
+  userId           String?
+  productId        String?
+  environment      PaymentEnvironment?
+  eventData        Json
+  processingStatus WebhookProcessingStatus @default(pending)
+  errorMessage     String?
+  attempts         Int                     @default(0)
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+
+  @@index([eventType, createdAt])
+  @@index([userId, createdAt])
+  @@index([processingStatus, attempts])
+}

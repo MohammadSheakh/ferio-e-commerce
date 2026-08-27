@@ -1,0 +1,19 @@
+
+
+model BankInfo{
+    id        String    @id @default(cuid())
+    
+    // for back reference .. 
+    userId String     //🔗  one user can have many bank Info
+    user User @relation(fields: [userId], references: [id])
+    
+    bankAccountNumber String
+    bankRoutingNumber String
+    bankAccountHolderName String
+    bankAccountType TBankAccount
+    bankBranch String
+    bankName String
+
+    isActive Boolean
+    isDeleted Boolean
+}

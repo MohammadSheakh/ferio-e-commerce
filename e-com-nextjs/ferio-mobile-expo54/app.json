@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "Ferio",
+    "slug": "ferio-mobile",
+    "scheme": "ferio",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "plugins": [
+      "expo-router",
+      "expo-web-browser"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "android": {
+      "package": "com.ferio.mobile"
+    },
+    "ios": {
+      "bundleIdentifier": "com.ferio.mobile"
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "1c20dc46-d174-4a55-9db8-4b04ed515c12"
+      }
+    }
+  }
+}

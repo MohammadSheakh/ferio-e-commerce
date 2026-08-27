@@ -1,0 +1,14 @@
+model StripeAccount {
+  id          String   @id @default(cuid())
+
+  // 🔗 One user can have many Stripe account records over time.
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  accountId   String
+  isCompleted Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId, isCompleted])
+  @@index([accountId])
+}

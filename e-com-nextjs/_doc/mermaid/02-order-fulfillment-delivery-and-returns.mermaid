@@ -1,0 +1,182 @@
+flowchart TB
+  %% Ferio diagram 2 of 3: order operations, fulfillment, delivery, and returns
+
+  subgraph LEGEND["Status legend"]
+    direction LR
+    L1["Implemented"]:::done
+    L2["Partial"]:::partial
+    L3["Planned"]:::planned
+    L4["Blocked"]:::blocked
+    L5["External"]:::external
+  end
+
+  ORDER_AGENT(["Order operations agent"])
+  WAREHOUSE(["Warehouse operator"])
+  SUPPORT(["Support agent"])
+  FINANCE(["Finance operator"])
+  CUSTOMER(["Customer"])
+  COURIER(["Pathao / Steadfast"]):::external
+
+  HANDOFF_PURCHASE[["From diagram 01\nConfirmed order with stock reservation"]]:::handoff
+
+  subgraph ORDER_QUEUE["1. Order operations and inventory reservation"]
+    direction TB
+    ORDER_SEARCH["Filter by reference, customer, phone, status, payment, fulfillment, courier, tracking, and date"]:::done
+    ORDER_DETAIL["Customer, address, snapshots, totals, lifecycle, reservation, and histories"]:::partial
+    RESERVE["Create reservation and immutable RESERVE movement"]:::done
+    RESERVATION_VALID{"Complete active reservation?"}:::decision
+    INVENTORY_EXCEPTION["Expose stock or reservation inconsistency"]:::partial
+    CANCEL["Cancel with required reason"]:::done
+    RELEASE["Release reservation and write RELEASE movement"]:::done
+  end
+
+  HANDOFF_PURCHASE --> RESERVE --> ORDER_SEARCH --> ORDER_DETAIL --> RESERVATION_VALID
+  ORDER_AGENT --> ORDER_SEARCH
+  RESERVATION_VALID -- "No" --> INVENTORY_EXCEPTION
+  ORDER_DETAIL -- "Cancellation allowed" --> CANCEL --> RELEASE
+
+  subgraph FULFILLMENT["2. Warehouse fulfillment"]
+    direction TB
+    QUEUE["Confirmed-order fulfillment queue"]:::done
+    PICKING["Start picking\nREADY_FOR_FULFILLMENT → PICKING"]:::done
+    PICK_LIST["Read SKU, quantity, and warehouse reservation"]:::done
+    PICK_OK{"All required items picked?"}:::decision
+    EXCEPTION["Record shortage, substitution, or other exception"]:::done
+    RESOLVE["Resolve with explicit operational note"]:::done
+    OPEN_EXCEPTION{"Any open exceptions?"}:::decision
+    PACK["Confirm packed\nPICKING → PACKED"]:::done
+    QUALITY["Quality approval\nPACKED → QUALITY_CHECKED"]:::done
+    READY["Mark ready\nQUALITY_CHECKED → READY_FOR_HANDOVER"]:::done
+  end
+
+  RESERVATION_VALID -- "Yes" --> QUEUE --> PICKING --> PICK_LIST --> PICK_OK
+  WAREHOUSE --> PICKING
+  PICK_OK -- "No" --> EXCEPTION --> RESOLVE --> OPEN_EXCEPTION
+  OPEN_EXCEPTION -- "Yes" --> RESOLVE
+  OPEN_EXCEPTION -- "No" --> PACK
+  PICK_OK -- "Yes" --> PACK --> QUALITY --> READY
+
+  subgraph SHIPMENT["3. Courier booking and handover"]
+    direction TB
+    PROVIDER_READY{"Approved courier active and configured?"}:::decision
+    PROVIDER_BLOCK["Await credentials, contract, and service-area approval"]:::blocked
+    CREATE_SHIPMENT["Create provider-neutral shipment after quality approval"]:::done
+    REQUEST["Send address, COD, weight, quantity, and location data"]:::done
+    RESPONSE["Store request, response, consignment, tracking, charge, and label reference"]:::done
+    CREATED["Shipment CREATED"]:::done
+    HANDOVER["Record handover\nREADY_FOR_HANDOVER → HANDED_OVER"]:::done
+  end
+
+  READY --> PROVIDER_READY
+  PROVIDER_READY -- "No" --> PROVIDER_BLOCK
+  PROVIDER_READY -- "Yes" --> CREATE_SHIPMENT --> REQUEST --> COURIER
+  COURIER --> RESPONSE --> CREATED --> HANDOVER
+  ORDER_AGENT --> CREATE_SHIPMENT
+  WAREHOUSE --> HANDOVER
+
+  subgraph COURIER_EVENTS["4. Courier events and delivery outcomes"]
+    direction TB
+    UPDATE["Authenticated webhook or polling update"]:::partial
+    DEDUPE["Retain raw callback; authenticate and deduplicate"]:::done
+    NORMALIZE["Map provider status to normalized internal state"]:::done
+    EVENT_VALID{"Known, current, and non-regressive?"}:::decision
+    EVENT_REVIEW["Retain unknown or out-of-order event for review"]:::done
+    OUTCOME{"Shipment outcome"}:::decision
+    MOVING["PICKED_UP / IN_TRANSIT / AT_HUB"]:::done
+    OUT_FOR_DELIVERY["OUT_FOR_DELIVERY"]:::done
+    FAILED["DELIVERY_FAILED"]:::done
+    RETRY_OR_RETURN{"Retry delivery or return?"}:::decision
+    CANCELLED["Shipment CANCELLED"]:::done
+    RTO["RETURN_IN_PROGRESS / RTO / RETURNED"]:::partial
+    DELIVERED["Shipment DELIVERED"]:::done
+    POLLING["Polling fallback and retry queue"]:::planned
+  end
+
+  COURIER --> UPDATE --> DEDUPE --> NORMALIZE --> EVENT_VALID
+  UPDATE -. "Webhook incomplete" .-> POLLING --> NORMALIZE
+  EVENT_VALID -- "No" --> EVENT_REVIEW
+  EVENT_VALID -- "Yes" --> OUTCOME
+  OUTCOME -- "Moving" --> MOVING --> OUT_FOR_DELIVERY
+  OUTCOME -- "Failed attempt" --> FAILED --> RETRY_OR_RETURN
+  RETRY_OR_RETURN -- "Retry" --> OUT_FOR_DELIVERY
+  RETRY_OR_RETURN -- "Return" --> RTO
+  OUTCOME -- "Cancelled" --> CANCELLED
+  OUTCOME -- "Returned" --> RTO
+  OUTCOME -- "Delivered" --> DELIVERED
+  OUT_FOR_DELIVERY --> DELIVERED
+
+  subgraph COMPLETION["5. Delivery and order completion"]
+    direction TB
+    CONSUME["Consume reservation, deduct on-hand, and write SALE movement"]:::done
+    ORDER_DELIVERED["Order DELIVERED\nFulfillment FULFILLED"]:::done
+    RETURN_WINDOW["Start configurable return window"]:::planned
+    RETURN_REQUESTED{"Return requested in time?"}:::decision
+    COMPLETE_JOB["Scheduled completion job after window"]:::planned
+    COMPLETED["Order COMPLETED"]:::planned
+    CUSTOMER_VALUE["Update delivered count, spend, loyalty, and retention eligibility"]:::planned
+  end
+
+  DELIVERED --> CONSUME --> ORDER_DELIVERED --> RETURN_WINDOW --> RETURN_REQUESTED
+  RETURN_REQUESTED -- "No" --> COMPLETE_JOB --> COMPLETED --> CUSTOMER_VALUE
+
+  subgraph RETURNS["6. Return, replacement, refund, and RTO"]
+    direction TB
+    RETURN_INTAKE["Customer or support creates return request"]:::planned
+    DETAILS["Item, quantity, reason, evidence, resolution, and channel"]:::planned
+    ELIGIBILITY["Evaluate approved return and category policy"]:::blocked
+    ELIGIBLE{"Eligible?"}:::decision
+    REJECT["Reject with reason and customer-safe explanation"]:::planned
+    APPROVE["Approve and issue instructions or RMA"]:::planned
+    RECEIVE["Receive returned item"]:::planned
+    INSPECT["Inspect quantity, condition, and evidence"]:::planned
+    DECISION{"Inspection decision"}:::decision
+    RESTOCK["Sellable: stock RETURN movement"]:::planned
+    DAMAGE["Damaged, quarantined, or lost disposition"]:::planned
+    REPLACEMENT["Traceable replacement order"]:::planned
+    REFUND["Refund linked to payment, return, reason, amount, method, and actor"]:::planned
+    REFUND_RESULT{"Refund outcome"}:::decision
+    REFUND_DONE["REFUNDED or PARTIALLY_REFUNDED"]:::planned
+    REFUND_FAIL["Failed refund exception"]:::planned
+    RTO_INSPECTION["Receive RTO; record stock disposition and courier cost"]:::planned
+  end
+
+  RETURN_REQUESTED -- "Yes" --> RETURN_INTAKE
+  CUSTOMER --> RETURN_INTAKE
+  SUPPORT --> RETURN_INTAKE
+  RETURN_INTAKE --> DETAILS --> ELIGIBILITY --> ELIGIBLE
+  ELIGIBLE -- "No" --> REJECT
+  ELIGIBLE -- "Yes" --> APPROVE --> RECEIVE --> INSPECT --> DECISION
+  DECISION -- "Sellable" --> RESTOCK
+  DECISION -- "Damaged / quarantine / lost" --> DAMAGE
+  DECISION -- "Replacement" --> REPLACEMENT --> QUEUE
+  DECISION -- "Refund" --> REFUND --> REFUND_RESULT
+  REFUND_RESULT -- "Success" --> REFUND_DONE
+  REFUND_RESULT -- "Failure" --> REFUND_FAIL
+  RTO --> RTO_INSPECTION --> RELEASE
+
+  subgraph EXCEPTIONS_RECONCILIATION["7. Exceptions and reconciliation"]
+    direction TB
+    EXCEPTION_QUEUE["Severity, age, owner, context, and action queue"]:::planned
+    RECONCILE["Reconcile stock, reservations, payment, COD settlement, courier fee, return, and refund"]:::planned
+    SETTLEMENT["Courier COD settlement and variance review"]:::planned
+    RESOLVE_EXCEPTION["Resolve or escalate with audit history"]:::planned
+  end
+
+  INVENTORY_EXCEPTION --> EXCEPTION_QUEUE
+  EVENT_REVIEW --> EXCEPTION_QUEUE
+  REFUND_FAIL --> EXCEPTION_QUEUE
+  FINANCE --> RECONCILE --> SETTLEMENT --> EXCEPTION_QUEUE --> RESOLVE_EXCEPTION
+
+  HANDOFF_PLATFORM[["Handoff to diagram 03\nEvents, notifications, reports, CRM, and governance"]]:::handoff
+  COD_EVENTS["Order / fulfillment / shipment / return / refund events"]:::partial
+  ORDER_DELIVERED --> COD_EVENTS --> HANDOFF_PLATFORM
+  COMPLETED --> HANDOFF_PLATFORM
+  CUSTOMER_VALUE --> HANDOFF_PLATFORM
+
+  classDef done fill:#111114,color:#fff,stroke:#111114;
+  classDef partial fill:#f2f2f2,color:#111114,stroke:#777;
+  classDef planned fill:#fff,color:#55555c,stroke:#b9b9bd,stroke-dasharray:5 4;
+  classDef blocked fill:#fff4e5,color:#7a4b00,stroke:#c88719,stroke-dasharray:4 3;
+  classDef external fill:#f5f2ff,color:#33205f,stroke:#7c5cff;
+  classDef decision fill:#fff,color:#111114,stroke:#111114,stroke-width:1.5px;
+  classDef handoff fill:#eef6ff,color:#12385f,stroke:#4c88c7,stroke-width:1.5px;
