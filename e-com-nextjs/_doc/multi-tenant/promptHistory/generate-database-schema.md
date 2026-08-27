@@ -1,0 +1,1 @@
+below each table .. there should be short description about that table .. also .. for each one to one .. one to many relation .. there should be short description as well... relationships should be perfect .. field position should match with arrow position .. now generate again accurately
