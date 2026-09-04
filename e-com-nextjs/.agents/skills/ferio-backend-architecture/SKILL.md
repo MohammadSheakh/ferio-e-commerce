@@ -1,0 +1,143 @@
+---
+name: ferio-backend-architecture
+description: Design, implement, or review Ferio NestJS backend modules using the project's multi-tenant Prisma architecture, security boundaries, operational conventions, and scalability standards.
+---
+
+# Ferio Backend Architecture
+
+Use this skill for backend work in `ferio-nest-prisma`, especially when creating a new module, extending an existing domain, reviewing a backend change, or assessing readiness for high-scale multi-tenant traffic.
+
+## Operating Standard
+
+- Work as a senior solution architect and senior NestJS engineer.
+- Inspect the existing codebase before proposing or editing code. Follow the established architecture where it is sound; do not copy legacy patterns merely because they exist.
+- Be brutally honest about defects, security risks, tenancy leaks, scalability limits, missing tests, and operational gaps. Findings must be specific, actionable, and tied to files and lines.
+- Do not claim support for a million concurrent users from static code inspection. Separate architectural readiness from proven capacity, and require load tests, database limits, queue capacity, cache behavior, observability, and failure testing before making that claim.
+- Preserve unrelated user changes. Do not change documentation, environment files, generated clients, migrations, or deployment configuration unless the task requires it.
+
+## Architecture Boundaries
+
+Ferio has two database planes:
+
+- The platform/control-plane PostgreSQL database is accessed through `PlatformPrismaService` and platform services.
+- Each tenant commerce database is resolved from trusted tenant context and accessed through `TenantDbService`.
+
+Never select a tenant database from a request body, query parameter, route parameter, or caller-supplied connection string. Tenant identity must come from the trusted host/domain resolution and immutable `TenantContext`.
+
+For tenant-scoped modules:
+
+- Import `PrismaModule`, `TenancyModule`, and the required authentication/authorization modules explicitly.
+- Use `const db = await this.tenantDb.get()` for tenant-only code. This must fail loudly outside a resolved tenant request.
+- Use `tryGet()` only for an explicitly documented migration or legacy compatibility path. Never allow an undocumented silent fallback to the base `PrismaService`.
+- Ensure every module that injects `TenantDbService` imports `TenancyModule`; optional injection must not hide missing dependency wiring.
+- Keep platform services on `PlatformPrismaService`; never mix platform records with tenant commerce records.
+
+## Module Shape
+
+New modules should normally contain:
+
+- `module.ts` with explicit, clean dependency imports
+- One or more focused controllers
+- One domain service per cohesive responsibility
+- DTOs under `dto/` with strict validation
+- Unit tests for the service and high-risk authorization/data paths
+- Queue processors, policies, repositories, or utilities only when the domain needs them
+
+Keep controllers thin. Controllers handle routing, DTO input, guards, and response intent. Services enforce domain rules, ownership, tenant scope, transactions, idempotency, and audit behavior.
+
+Prefer focused services over a single god service. Extract query/read services, mutation services, policy checks, integrations, and queue orchestration when their responsibilities or scaling characteristics differ.
+
+## Request Security
+
+- Apply `AuthGuard` to authenticated routes.
+- Apply `RolesGuard`, `PermissionsGuard`, and `TenantMembershipGuard` according to the existing route conventions.
+- Use explicit permission constants rather than string literals where the project provides them.
+- Enforce ownership in the service even when a controller is guarded.
+- Treat every identifier as untrusted. Scope every lookup and mutation through the resolved tenant database and ownership rules.
+- Validate and normalize input with DTOs. Keep `whitelist`, `forbidNonWhitelisted`, and transformation behavior compatible with the global validation pipe.
+- Verify webhook signatures, callback authenticity, replay/idempotency rules, and tenant binding before processing external events.
+- Do not log passwords, tokens, connection strings, decrypted credentials, payment secrets, or unnecessary personal data.
+
+## Commerce Mutation Rules
+
+For tenant commerce mutations, call `assertTenantCommerceWritable()` at the mutation entry point when the domain is covered by the suspended-subscription policy. At minimum, review product, inventory, cart, order, campaign, booking, store-location, and other commerce-changing operations for this requirement.
+
+Use transactions for multi-record state transitions. Within a transaction:
+
+- Update the domain state and its history/audit record atomically when possible.
+- Re-check mutable state inside the transaction to prevent race conditions.
+- Use database constraints for uniqueness and invariants; translate expected Prisma errors into stable API errors.
+- Make retries safe with idempotency keys or deterministic deduplication.
+- Avoid holding transactions across network calls, file uploads, payment providers, or courier APIs.
+
+## Data Access And Performance
+
+- Select only fields needed by the endpoint; avoid accidental large relation graphs.
+- Bound every page size, export, search, and `take` value. Use cursor pagination for large or frequently changing datasets.
+- Add and verify indexes for tenant keys, ownership keys, status/time queries, idempotency keys, and queue/outbox lookup patterns.
+- Avoid N+1 queries. Use appropriate joins/includes, batched queries, or bounded parallelism.
+- Treat counts, reports, analytics, and health probes as potentially expensive workloads. Use aggregation tables, materialized views, read models, caching, or asynchronous computation when justified.
+- Keep tenant database pools bounded. Never create an unbounded Prisma client or connection pool per request.
+- Use Redis for coordination/cache only with explicit TTL, invalidation, failure behavior, and stampede protection.
+- Queue slow, retryable, or fan-out work. Jobs must carry tenant/organization identity, be idempotent, have bounded retries, and expose failures through metrics and logs.
+
+## Realtime And Workers
+
+- Socket authentication must bind tickets, rooms, and events to the resolved organization.
+- Room names and cache keys must be tenant-prefixed; never broadcast a tenant event to a global room accidentally.
+- Worker jobs must not depend on request-local state. Reconstruct tenant context from a trusted organization/database envelope and validate that the tenant is still active.
+- Do not add old Mongoose processors or legacy queue conventions to new Prisma modules.
+- Isolate or remove stale infrastructure rather than allowing two competing implementations to become the default.
+
+## Auditing And Operations
+
+- Record security-sensitive and business-critical mutations with actor, source, entity, previous state, new state, and safe metadata.
+- Pass the transaction client to audit writes when the audit record must be atomic with the mutation.
+- Ensure audit reads use the correct plane and tenant database; a tenant-admin endpoint must not silently read the legacy/global database.
+- Add structured logs, metrics, correlation/request IDs, and useful error classifications for external integrations and background jobs.
+- Health endpoints must distinguish control-plane health, tenant-database health, Redis, queues, external providers, backups, and application readiness. Do not report global legacy data as a tenant's health evidence.
+
+## Testing Requirements
+
+Before declaring a module complete, test the highest-risk behavior, not only happy paths:
+
+- DTO rejection and normalization
+- authentication, role, permission, and tenant-membership enforcement
+- tenant database selection and cross-tenant access rejection
+- ownership checks
+- suspended-subscription mutation rejection where applicable
+- transaction rollback and concurrency-sensitive transitions
+- idempotent retries and duplicate webhook/queue delivery
+- pagination bounds and expensive query behavior
+- worker tenant context and retry behavior
+- audit event creation and correct database placement
+
+Run the narrowest relevant tests first, then the full suite, type-check/build, and lint without auto-fixing unrelated files. If generated Prisma clients are required, make generation an explicit reproducible prerequisite and report failures honestly.
+
+## Review Method
+
+For a review:
+
+1. Map application bootstrap, modules, providers, database clients, tenancy middleware, guards, queues, and configuration.
+2. Trace every controller route to its service, database client, authorization checks, transaction boundaries, and external calls.
+3. Compare the module with the strongest current project examples, especially catalog, cart, order, payments, reconciliation, and tenancy infrastructure.
+4. Search for direct base-Prisma access, optional tenant injection, unbounded queries, missing write gates, missing audit records, legacy imports, and unsafe background context.
+5. Report findings first, ordered by severity, with file/line references and concrete impact. Separate confirmed bugs from architectural debt and residual testing gaps.
+
+Do not soften a material finding because the code is almost correct. Also do not call an intentional migration fallback a vulnerability without tracing whether the request can reach it and what data it can affect.
+
+## Implementation Completion Gate
+
+Before declaring a new module complete, confirm:
+
+- Its database plane and tenant boundary are explicit.
+- Its module dependency graph provides every injected provider.
+- Its routes have the correct guards and permissions.
+- Its service enforces ownership and domain invariants independently of the controller.
+- Its mutations handle suspension, transactions, idempotency, and audit requirements.
+- Its reads are bounded and indexed for expected tenant scale.
+- Its queues/realtime paths preserve tenant identity.
+- Its tests cover the security and failure paths above.
+- Build, generated Prisma clients, type-check, lint, and relevant tests have been verified or their failures are clearly reported.
+
+This skill guides engineering decisions; it does not replace production load testing, capacity planning, threat modeling, database migration review, or incident-readiness work.
