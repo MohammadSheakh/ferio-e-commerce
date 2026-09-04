@@ -1,7 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { AuditSource, Prisma } from '@prisma/client';
 import type { UserPayload } from '@app/common';
 import { PrismaService } from '@app/database';
+import { TenantDbService } from '../../tenancy/tenant-db.service';
 import { AuditLogQueryDto } from './dto/audit.dto';
 import { safeAuditJson } from './audit.util';
 
@@ -20,10 +21,14 @@ export type RecordAuditInput = {
 
 @Injectable()
 export class AuditService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly tenantDb?: TenantDbService,
+  ) {}
 
-  record(input: RecordAuditInput, client: AuditClient = this.prisma) {
-    return client.auditLog.create({
+  async record(input: RecordAuditInput, client?: AuditClient) {
+    const db = client ?? (await this.tenantDb?.tryGet()) ?? this.prisma;
+    return db.auditLog.create({
       data: {
         action: input.action,
         entityType: input.entityType,
@@ -39,6 +44,7 @@ export class AuditService {
   }
 
   async getAuditLogs(query: AuditLogQueryDto) {
+    const db = (await this.tenantDb?.tryGet()) ?? this.prisma;
     const where: Prisma.AuditLogWhereInput = {
       action: query.action
         ? { contains: query.action.normalize('NFKC').trim(), mode: 'insensitive' }
@@ -53,13 +59,13 @@ export class AuditService {
       source: query.source,
     };
     const [items, total] = await Promise.all([
-      this.prisma.auditLog.findMany({
+      db.auditLog.findMany({
         where,
         skip: (query.page - 1) * query.limit,
         take: query.limit,
         orderBy: { createdAt: 'desc' },
       }),
-      this.prisma.auditLog.count({ where }),
+      db.auditLog.count({ where }),
     ]);
     const totalPages = Math.ceil(total / query.limit) || 1;
     return {

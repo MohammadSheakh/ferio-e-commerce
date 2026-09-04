@@ -8,12 +8,12 @@ import { ConversationService } from './conversation/conversation.service';
 
 import { MessageController } from './message/message.controller';
 import { MessageService } from './message/message.service';
+import { ChatNotificationProcessor } from './chat-notification.processor';
 
 import { SocketModule } from '../socket.gateway/socket.module';
 import { RedisModule } from '@app/redis';
 import { TenancyModule } from '../../tenancy/tenancy.module';
 import {
-  BULLMQ_CONVERSATION_LAST_MESSAGE_QUEUE,
   BULLMQ_NOTIFY_PARTICIPANTS_QUEUE,
   QUEUE_NAMES,
 } from '@app/queue';
@@ -43,13 +43,6 @@ import {
     // BullMQ Queues
     BullModule.registerQueue(
       {
-        name: QUEUE_NAMES.CONVERSATION_LAST_MESSAGE,
-        connection: {
-          host: process.env.REDIS_HOST || 'localhost',
-          port: parseInt(process.env.REDIS_PORT || '6379'),
-        },
-      },
-      {
         name: QUEUE_NAMES.NOTIFY_PARTICIPANTS,
         connection: {
           host: process.env.REDIS_HOST || 'localhost',
@@ -65,13 +58,9 @@ import {
   providers: [
     ConversationService,
     MessageService,
+    ChatNotificationProcessor,
 
     // BullMQ Queue Providers
-    {
-      provide: BULLMQ_CONVERSATION_LAST_MESSAGE_QUEUE,
-      useFactory: (queue: any) => queue,
-      inject: [getQueueToken(QUEUE_NAMES.CONVERSATION_LAST_MESSAGE)],
-    },
     {
       provide: BULLMQ_NOTIFY_PARTICIPANTS_QUEUE,
       useFactory: (queue: any) => queue,

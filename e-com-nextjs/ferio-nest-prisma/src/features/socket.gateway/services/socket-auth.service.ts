@@ -59,7 +59,7 @@ export class SocketAuthService {
    * fallback outside resolved requests. Never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    const tenant = await this.tenantDb?.tryGet();
+    const tenant = await this.tenantDb?.tryGet?.();
     if (tenant) return tenant;
     if ((process.env.TENANCY_ENABLED || 'false') === 'true') {
       throw new Error('SOCKET_TENANT_CONTEXT_REQUIRED');
@@ -222,7 +222,13 @@ export class SocketAuthService {
           allowedIds.add(`conv-${account.customerId}`);
         }
       }
-      return allowedIds.has(conversationId);
+      if (allowedIds.has(conversationId)) return true;
+      const db = await this.db();
+      const participant = await db.conversationParticipents?.findFirst?.({
+        where: { conversationId, userId: user.userId, isDeleted: false },
+        select: { id: true },
+      });
+      return !!participant;
     });
   }
 

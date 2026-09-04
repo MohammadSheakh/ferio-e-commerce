@@ -7,7 +7,7 @@ import { SettingsController } from '../features/settings/controllers/settings.co
 function methodGuards(controller: object, method: string): unknown[] {
   return Reflect.getMetadata(
     GUARDS_METADATA,
-    (controller as Record<string, unknown>)[method],
+    (controller as Record<string, object>)[method],
   ) ?? [];
 }
 

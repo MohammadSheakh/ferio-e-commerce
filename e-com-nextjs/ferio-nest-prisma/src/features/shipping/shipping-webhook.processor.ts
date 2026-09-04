@@ -39,6 +39,9 @@ export class ShippingWebhookProcessor extends WorkerHost {
       }
       const organizationId = (job.data as { organizationId?: string })
         .organizationId;
+      if (!organizationId && (process.env.TENANCY_ENABLED || 'false') === 'true') {
+        throw new Error('TENANT_CONTEXT_REQUIRED_FOR_COURIER_CALLBACK');
+      }
       if (!organizationId)
         return this.shipping.retryWebhookLog(job.data.callbackLogId);
       const callbackLogId = job.data.callbackLogId as string;

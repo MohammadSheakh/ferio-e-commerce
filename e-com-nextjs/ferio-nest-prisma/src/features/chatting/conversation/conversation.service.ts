@@ -8,17 +8,18 @@ import {
 } from '@nestjs/common';
 import { Queue } from 'bullmq';
 
-import type { PrismaClient } from '@prisma/client';
+import type { Prisma, PrismaClient } from '@prisma/client';
 import { PrismaService } from '@app/database';
 import { TenantDbService } from '../../../tenancy/tenant-db.service';
 import { SocketGateway } from '../../socket.gateway/socket.gateway';
 import { SocketRoomService } from '../../socket.gateway/services/socket-room.service';
 import {
-  BULLMQ_CONVERSATION_LAST_MESSAGE_QUEUE,
   BULLMQ_NOTIFY_PARTICIPANTS_QUEUE,
 } from '@app/queue';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { ConversationType, ParticipantRole } from './conversation.constant';
+import { tryGetTenantContext } from '../../../tenancy/tenant-context';
+type ChatDb = PrismaClient | Prisma.TransactionClient;
 
 @Injectable()
 export class ConversationService {
@@ -28,19 +29,18 @@ export class ConversationService {
     private readonly prisma: PrismaService,
     private readonly socketGateway: SocketGateway,
     private readonly socketRoomService: SocketRoomService,
-    @Inject(BULLMQ_CONVERSATION_LAST_MESSAGE_QUEUE)
-    private conversationLastMessageQueue: Queue,
     @Inject(BULLMQ_NOTIFY_PARTICIPANTS_QUEUE)
     private notifyParticipantsQueue: Queue,
   
-    @Optional() private readonly tenantDb?: TenantDbService,) {}
+    @Optional() private readonly tenantDb?: TenantDbService,
+  ) {}
 
   /**
    * MT-7: inside a tenant-resolved request this returns the resolved tenant
    * database client; outside one it explicitly falls back to the legacy DB.
    */
   private async db(): Promise<PrismaClient> {
-    const tenant = await this.tenantDb?.tryGet();
+    const tenant = await this.tenantDb?.tryGet?.();
     return tenant ?? (this.prisma as PrismaClient);
   }
   /**
@@ -60,47 +60,46 @@ export class ConversationService {
         ? ConversationType.GROUP
         : ConversationType.DIRECT;
 
-    let existingConversation: any = null;
-    if (type === ConversationType.DIRECT) {
-      existingConversation =
-        await this.findExistingDirectConversation(allParticipants);
-    }
-
-    if (!existingConversation) {
-      const conversation = await db.conversation.create({
-        data: {
-          creatorId,
-          type: type === ConversationType.GROUP ? 'group' : 'direct',
-          groupName,
-          groupProfilePicture,
-        },
-      });
-
-      await this.addParticipantsToConversation(
-        conversation.id,
-        allParticipants,
-        creatorId,
-      );
-
-      if (message) {
-        await this.sendMessage(conversation.id, creatorId, message);
+    const directKey = [...allParticipants].sort().join(':');
+    const result = await db.$transaction(async (tx) => {
+      // Serialize direct-conversation creation across API instances without
+      // adding a second denormalized participant key to the schema.
+      if (type === ConversationType.DIRECT) {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${directKey}))`;
       }
+      const existingConversation = type === ConversationType.DIRECT
+        ? await this.findExistingDirectConversation(tx, allParticipants)
+        : null;
+      if (existingConversation) return { conversation: existingConversation, created: false, message: null };
 
-      return { conversation, created: true };
-    }
-
-    if (message) {
-      await this.sendMessage(existingConversation.id, creatorId, message);
-    }
-
-    return { conversation: existingConversation, created: false };
+      const conversation = await tx.conversation.create({
+        data: { creatorId, type: type === ConversationType.GROUP ? 'group' : 'direct', groupName, groupProfilePicture },
+      });
+      for (const userId of allParticipants) {
+        const user = await tx.user.findUnique({ where: { id: userId }, select: { name: true } });
+        await tx.conversationParticipents.create({
+          data: { conversationId: conversation.id, userId, userName: user?.name || 'User', role: userId === creatorId ? ParticipantRole.ADMIN : ParticipantRole.MEMBER },
+        });
+      }
+      const initialMessage = message
+        ? await tx.message.create({
+            data: { conversationId: conversation.id, senderId: creatorId, text: message },
+            include: { sender: { select: { name: true, profileImageUrl: true, role: true } } },
+          })
+        : null;
+      if (initialMessage) {
+        await tx.conversation.update({ where: { id: conversation.id }, data: { lastMessageId: initialMessage.id, lastMessageText: message, lastMessageCreatedAt: initialMessage.createdAt } });
+      }
+      return { conversation, created: true, message: initialMessage };
+    });
+    if (result.message) await this.notifyParticipantsInConversation(result.conversation.id, result.message);
+    return { conversation: result.conversation, created: result.created };
   }
 
   /**
    * Find existing direct conversation
    */
-  private async findExistingDirectConversation(participantIds: string[]) {
-    const db = await this.db();
+  private async findExistingDirectConversation(db: ChatDb, participantIds: string[]) {
     const conversations = await db.conversation.findMany({
       where: {
         type: 'direct',
@@ -112,6 +111,7 @@ export class ConversationService {
       include: {
         participants: { select: { userId: true } },
       },
+      take: 100,
     });
 
     return (
@@ -178,31 +178,17 @@ export class ConversationService {
    */
   async sendMessage(conversationId: string, senderId: string, text: string) {
     const db = await this.db();
-    const message = await db.message.create({
-      data: { conversationId, senderId, text },
-      include: {
-        sender: { select: { name: true, profileImageUrl: true, role: true } },
-      },
+    const message = await db.$transaction(async (tx) => {
+      const created = await tx.message.create({
+        data: { conversationId, senderId, text },
+        include: { sender: { select: { name: true, profileImageUrl: true, role: true } } },
+      });
+      await tx.conversation.update({
+        where: { id: conversationId },
+        data: { lastMessageId: created.id, lastMessageText: text, lastMessageCreatedAt: created.createdAt },
+      });
+      return created;
     });
-
-    await db.conversation.update({
-      where: { id: conversationId },
-      data: {
-        lastMessageId: message.id,
-        lastMessageText: text,
-        lastMessageCreatedAt: message.createdAt,
-      },
-    });
-
-    await this.conversationLastMessageQueue.add(
-      'update-conversation-last-message',
-      {
-        conversationId,
-        lastMessageId: message.id,
-        lastMessage: text,
-      },
-      { removeOnComplete: true },
-    );
 
     await this.notifyParticipantsInConversation(conversationId, message);
 
@@ -238,6 +224,7 @@ export class ConversationService {
           role: sender?.role || 'user',
         },
         participantIds,
+        organizationId: tryGetTenantContext()?.organizationId,
       },
       { removeOnComplete: true },
     );
@@ -253,6 +240,8 @@ export class ConversationService {
     search: string = '',
   ) {
     const db = await this.db();
+    page = Math.max(1, Number(page) || 1);
+    limit = Math.min(100, Math.max(1, Number(limit) || 10));
     const skip = (page - 1) * limit;
 
     const participants = await db.conversationParticipents.findMany({
@@ -365,6 +354,8 @@ export class ConversationService {
    */
   async getAllConversations(page: number = 1, limit: number = 50) {
     const db = await this.db();
+    page = Math.max(1, Number(page) || 1);
+    limit = Math.min(100, Math.max(1, Number(limit) || 50));
     const skip = (page - 1) * limit;
 
     const conversations = await db.conversation.findMany({

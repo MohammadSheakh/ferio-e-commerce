@@ -77,6 +77,7 @@ describe('OperationsHealthService', () => {
       queue,
       queue,
       queue,
+      undefined,
     );
 
     const health = await service.getHealth();
@@ -134,6 +135,7 @@ describe('OperationsHealthService', () => {
       failingQueue,
       failingQueue,
       failingQueue,
+      undefined,
     );
 
     const health = await service.getHealth();

@@ -38,6 +38,9 @@ export class ShippingPollingProcessor extends WorkerHost {
         throw new Error(`Unsupported courier polling job: ${job.name}`);
       }
       const organizationId = (job.data as { organizationId?: string }).organizationId;
+      if (!organizationId && (process.env.TENANCY_ENABLED || 'false') === 'true') {
+        throw new Error('TENANT_CONTEXT_REQUIRED_FOR_COURIER_POLL');
+      }
       if (!organizationId) return this.polling.execute(job.data.pollAttemptId);
       const pollAttemptId = job.data.pollAttemptId as string;
       return this.fanout!.forOrganization(organizationId, () =>
