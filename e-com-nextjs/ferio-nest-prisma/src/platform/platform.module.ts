@@ -18,17 +18,14 @@ import { SupportAccessService } from './services/support-access.service';
 import { ProvisioningService } from './services/provisioning.service';
 import { PlatformAdminController } from './platform.controller';
 import { PlatformAuthService } from './services/platform-auth.service';
+import { PlatformPlanSeedService } from './services/platform-plan-seed.service';
 import { MigrationOrchestratorService } from './services/migration-orchestrator.service';
 import { TenantMigrationProcessor } from './migration-orchestrator.processor';
 import { TenantClosureService } from './services/tenant-closure.service';
 import { PlanGateService } from './services/plan-gate.service';
 import { PlatformBillingService } from './services/platform-billing.service';
-import {
-  LocalPostgresProvisioner,
-} from './services/local-postgres-provisioner';
-import {
-  TenantDatabaseProvisioner,
-} from './services/tenant-database-provisioner.interface';
+import { LocalPostgresProvisioner } from './services/local-postgres-provisioner';
+import { TenantDatabaseProvisioner } from './services/tenant-database-provisioner.interface';
 import {
   PlatformBillingCallbackController,
   PlatformBillingController,
@@ -54,21 +51,24 @@ import {
       secret: process.env.PLATFORM_JWT_SECRET,
       signOptions: { expiresIn: '8h' },
     }),
-    BullModule.registerQueue(
-      {
-        name: QUEUE_NAMES.TENANT_MIGRATION,
-        connection: {
-          host: process.env.REDIS_HOST || 'localhost',
-          port: parseInt(process.env.REDIS_PORT || '6379'),
-        },
+    BullModule.registerQueue({
+      name: QUEUE_NAMES.TENANT_MIGRATION,
+      connection: {
+        host: process.env.REDIS_HOST || 'localhost',
+        port: parseInt(process.env.REDIS_PORT || '6379'),
       },
-    ),
+    }),
   ],
-  controllers: [PlatformAdminController, PlatformBillingController, PlatformBillingCallbackController],
+  controllers: [
+    PlatformAdminController,
+    PlatformBillingController,
+    PlatformBillingCallbackController,
+  ],
   // Tenant migration queue processor registered below with providers.
   providers: [
     PlatformPrismaService,
     PlatformAuthService,
+    PlatformPlanSeedService,
     MigrationOrchestratorService,
     TenantClosureService,
     PlanGateService,

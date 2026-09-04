@@ -9,13 +9,14 @@ import { platformApi } from "@/lib/platform-session";
 async function handle(request: Request, method: "GET" | "POST" | "PATCH") {
   const url = new URL(request.url);
   const path = url.pathname.replace(/^\/api\/platform/, "");
+  const backendPath = `/platform${path}`;
   try {
     let body: string | undefined;
     if (method !== "GET") {
       body = await request.text();
     }
     const query = url.search;
-    const data = await platformApi(`${path}${query}`, {
+    const data = await platformApi(`${backendPath}${query}`, {
       method,
       ...(body ? { body, headers: { "Content-Type": "application/json" } } : {}),
     });

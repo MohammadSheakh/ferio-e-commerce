@@ -19,16 +19,20 @@ export async function POST(request: Request) {
   });
   const data = (await res.json().catch(() => ({}))) as {
     accessToken?: string;
+    data?: {
+      accessToken?: string;
+    };
     message?: string;
   };
-  if (!res.ok || !data.accessToken) {
+  const accessToken = data.accessToken ?? data.data?.accessToken;
+  if (!res.ok || !accessToken) {
     return NextResponse.json(
       { message: data.message || "Platform sign-in failed." },
-      { status: res.status || 401 },
+      { status: res.ok ? 401 : res.status || 401 },
     );
   }
   const response = NextResponse.json({ ok: true });
-  response.cookies.set(PLATFORM_TOKEN_COOKIE, data.accessToken, {
+  response.cookies.set(PLATFORM_TOKEN_COOKIE, accessToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",

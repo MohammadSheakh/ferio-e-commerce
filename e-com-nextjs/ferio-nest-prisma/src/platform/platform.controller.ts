@@ -2,7 +2,10 @@ import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from
 import { OrganizationsService } from './services/organizations.service';
 import { DomainsService } from './services/domains.service';
 import { PlansService } from './services/plans.service';
-import type { CreatePlanInput } from './services/plans.service';
+import type {
+  CreatePlanInput,
+  UpdatePlanInput,
+} from './services/plans.service';
 import { SubscriptionsService } from './services/subscriptions.service';
 import { ProvisioningService } from './services/provisioning.service';
 import { MigrationOrchestratorService } from './services/migration-orchestrator.service';
@@ -309,6 +312,19 @@ export class PlatformAdminController {
   @PlatformPermissions('subscription:write')
   createPlan(@Body() body: CreatePlanInput, @Req() request: any) {
     return this.plans.create({ ...body, actorId: request.platformPrincipal?.platformUserId });
+  }
+
+  @Patch('plans/:id')
+  @PlatformPermissions('subscription:write')
+  updatePlan(
+    @Param('id') id: string,
+    @Body() body: UpdatePlanInput,
+    @Req() request: any,
+  ) {
+    return this.plans.update(id, {
+      ...body,
+      actorId: request.platformPrincipal?.platformUserId,
+    });
   }
 
   @Get('plans')

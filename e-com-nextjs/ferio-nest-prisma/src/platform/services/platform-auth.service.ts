@@ -31,12 +31,25 @@ export class PlatformAuthService implements OnModuleInit {
   }
 
   async ensureInitialSuperadmin(): Promise<void> {
-    const email = process.env.PLATFORM_INITIAL_SUPERADMIN_EMAIL?.trim().toLowerCase();
-    const passwordHash = process.env.PLATFORM_INITIAL_SUPERADMIN_PASSWORD_HASH;
-    if (!email || !passwordHash) return; // seeding optional in dev
+    const email =
+      process.env.PLATFORM_INITIAL_SUPERADMIN_EMAIL?.trim().toLowerCase();
+    const password = process.env.PLATFORM_INITIAL_SUPERADMIN_PASSWORD;
+    const configuredPasswordHash =
+      process.env.PLATFORM_INITIAL_SUPERADMIN_PASSWORD_HASH?.trim() ||
+      undefined;
+    if (!email || (!password && !configuredPasswordHash)) {
+      return; // seeding optional in dev
+    }
 
     const existing = await this.platform.client.platformUser.count();
     if (existing > 0) return;
+
+    // Prefer a precomputed hash for deployments that already use one, while
+    // allowing local development to provide only a plaintext secret.
+    const passwordHash =
+      configuredPasswordHash ??
+      (password ? await bcrypt.hash(password, 12) : undefined);
+    if (!passwordHash) return;
 
     await this.platform.client.platformUser.create({
       data: {

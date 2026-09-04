@@ -72,6 +72,15 @@ export class PlatformAuthGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
+    const requestPath = String(request.path ?? request.url ?? '').split('?')[0];
+    // Platform login is the credential-exchange endpoint and therefore cannot
+    // require the platform bearer token it is responsible for issuing.
+    if (
+      request.method === 'POST' &&
+      requestPath.endsWith('/platform/auth/login')
+    ) {
+      return true;
+    }
     const header: string | undefined = request.headers?.authorization;
     if (!header?.startsWith('Bearer ')) {
       throw new UnauthorizedException('PLATFORM_AUTH_REQUIRED');
@@ -101,7 +110,8 @@ export class PlatformAuthGuard implements CanActivate {
     if (!required?.length) return true;
     const granted = permissionsFor(principal);
     const ok =
-      granted.has('*') || required.every((permission) => granted.has(permission));
+      granted.has('*') ||
+      required.every((permission) => granted.has(permission));
     if (!ok) throw new ForbiddenException('PLATFORM_PERMISSION_DENIED');
     return true;
   }
