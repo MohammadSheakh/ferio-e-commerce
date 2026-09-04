@@ -30,20 +30,39 @@ unchanged.
 | 11 | Active chat queue processors are missing | Fixed | `ChatNotificationProcessor` is registered in `ChattingModule`; last-message snapshots are updated transactionally instead of relying on the legacy queue. |
 | 12 | Product review submission masks all database errors | Fixed | Only Prisma `P2002` is translated to a duplicate conflict; other errors are rethrown. |
 
-## Scope Remaining
+## Follow-Up Status
 
-The fixes above address the confirmed findings from the second audit. The
-following audit recommendations remain separate scale-readiness work and are
-not claimed as solved by commit `df5a8b8`:
+### Fixed In `2e5a8cd`
 
-- PgBouncer or an equivalent connection-pooling architecture and capacity plan.
-- Read replicas/read models for analytics and reporting workloads.
-- Asynchronous exports and large report generation.
-- Outbox/event delivery guarantees for integrations and notifications.
-- Redis cluster and WebSocket adapter capacity planning.
-- Load, stress, failure-mode, and disaster-recovery testing at realistic tenant distributions.
-- Metrics and operational thresholds for p95/p99 latency, pool saturation, queue lag, and tenant failures.
-- Review and retirement plan for stale Mongoose and duplicate infrastructure implementations.
+- PostgreSQL pool sizing, idle timeouts, acquisition timeouts, connection
+  recycling, and graceful shutdown are now explicit for the control-plane and
+  tenant pools. Docker and `.env.example` expose the same bounded settings.
+- Operations health now exposes control-plane pool pressure and tenant-client
+  cache metrics.
+- Transactional messaging now detects stale worker leases per tenant during
+  the scheduled sweep and marks them `BLOCKED` for operator review. It does
+  not blindly retry because the external provider may already have accepted
+  the request.
+
+### Still Requires Infrastructure Or Operational Work
+
+These are intentionally not marked as application-code fixes:
+
+- PgBouncer or an equivalent deployment-level pooling strategy and a measured
+  PostgreSQL connection budget across API, worker, and tenant pools.
+- Read replicas or dedicated read models for analytics and reporting.
+- Asynchronous report exports for workloads larger than the current bounded
+  5,000-row synchronous export.
+- Redis cluster and WebSocket adapter capacity planning, including failover
+  and key/cardinality testing.
+- Load, stress, failure-mode, and disaster-recovery restore testing at
+  realistic tenant distributions.
+- Exporting request/queue/database metrics to a durable metrics backend with
+  alert thresholds. The application currently exposes bounded in-process
+  p95/request, queue, tenant, and pool signals.
+- Review and retirement plan for stale Mongoose source and duplicate queue
+  implementations. The active application path is Prisma/BullMQ, but the
+  legacy source remains for an explicit migration decision.
 
 ## Review Rule
 
