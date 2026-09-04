@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Redis } from 'ioredis';
 import { REDIS_CLIENT } from './redis.constants';
+import { errorMessage } from '@app/common';
 
 @Injectable()
 export class RedisService {
@@ -31,7 +32,7 @@ export class RedisService {
         return JSON.parse(cached) as T;
       }
     } catch (err) {
-      this.logger.error(`Redis get error for key ${key}: ${err.message}`);
+      this.logger.error(`Redis get error for key ${key}: ${errorMessage(err)}`);
     }
 
     const data = await fetchFn();
@@ -40,7 +41,9 @@ export class RedisService {
       try {
         await this.redisClient.set(key, JSON.stringify(data), 'EX', ttl);
       } catch (err) {
-        this.logger.error(`Redis set error for key ${key}: ${err.message}`);
+        this.logger.error(
+          `Redis set error for key ${key}: ${errorMessage(err)}`,
+        );
       }
     }
 
@@ -53,7 +56,7 @@ export class RedisService {
       const keys = Array.isArray(key) ? key : [key];
       await this.redisClient.del(...keys);
     } catch (err) {
-      this.logger.error(`Redis invalidate error: ${err.message}`);
+      this.logger.error(`Redis invalidate error: ${errorMessage(err)}`);
     }
   }
 

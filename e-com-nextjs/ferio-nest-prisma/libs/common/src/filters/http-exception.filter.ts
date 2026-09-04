@@ -11,6 +11,16 @@ import { getCorrelationId } from '../utils/request-context';
 import { resolveErrorCode } from '../utils/error-code';
 import { StructuredLogger } from '../utils/structured-logger';
 
+interface ExceptionResponseBody {
+  message?: string | string[];
+  error?: string;
+  code?: unknown;
+}
+
+interface AuthenticatedRequest extends Request {
+  user?: { userId?: string };
+}
+
 /**
  * HTTP Exception Filter
  *
@@ -62,15 +72,13 @@ export class HttpExceptionFilter implements ExceptionFilter {
       typeof exceptionResponse === 'object' &&
       exceptionResponse !== null
     ) {
-      const responseObj = exceptionResponse as any;
-      message = responseObj.message || responseObj.error || 'An error occurred';
+      const responseObj = exceptionResponse as ExceptionResponseBody;
+      message = Array.isArray(responseObj.message)
+        ? responseObj.message.join(', ')
+        : responseObj.message || responseObj.error || 'An error occurred';
       error = responseObj.error || HttpStatus[status];
       explicitCode = responseObj.code;
-
-      if (Array.isArray(message)) {
-        validationFailure = true;
-        message = message.join(', ');
-      }
+      validationFailure = Array.isArray(responseObj.message);
     } else {
       message = 'An unexpected error occurred';
       error = HttpStatus[status];
@@ -83,7 +91,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const code = resolveErrorCode(status, explicitCode, validationFailure);
 
     // Get user ID if authenticated
-    const user = request as any;
+    const user = request as AuthenticatedRequest;
     const userId = user.user?.userId || 'anonymous';
 
     // Log error with context
@@ -97,7 +105,17 @@ export class HttpExceptionFilter implements ExceptionFilter {
     });
 
     // Build response body
-    const responseBody: any = {
+    const responseBody: {
+      success: boolean;
+      statusCode: number;
+      message: string;
+      error: string;
+      code: string;
+      timestamp: string;
+      path: string;
+      correlationId: string;
+      stack?: string;
+    } = {
       success: false,
       statusCode: status,
       message,

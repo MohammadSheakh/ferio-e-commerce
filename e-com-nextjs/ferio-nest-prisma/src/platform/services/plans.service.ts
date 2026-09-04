@@ -38,7 +38,10 @@ export class PlansService {
   ) {}
 
   async create(input: CreatePlanInput) {
-    const key = input.key.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+    const key = input.key
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]/g, '');
     if (!key) throw new ConflictException('PLAN_KEY_INVALID');
     try {
       const plan = await this.platform.client.plan.create({
@@ -65,8 +68,14 @@ export class PlansService {
         newValue: { key, amountMinor: plan.amountMinor },
       });
       return plan;
-    } catch (error: any) {
-      if (error?.code === 'P2002') throw new ConflictException('PLAN_KEY_TAKEN');
+    } catch (error: unknown) {
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        error.code === 'P2002'
+      )
+        throw new ConflictException('PLAN_KEY_TAKEN');
       throw error;
     }
   }
@@ -103,7 +112,9 @@ export class PlansService {
         limit: entitlement.limit ?? null,
       };
     });
-    const uniqueFeatureKeys = new Set(entitlements?.map((item) => item.featureKey));
+    const uniqueFeatureKeys = new Set(
+      entitlements?.map((item) => item.featureKey),
+    );
     if (entitlements && uniqueFeatureKeys.size !== entitlements.length) {
       throw new ConflictException('PLAN_FEATURE_DUPLICATE');
     }
@@ -119,9 +130,7 @@ export class PlansService {
           billingInterval: input.billingInterval,
           amountMinor: input.amountMinor,
           isActive: input.isActive,
-          ...(entitlements
-            ? { entitlements: { create: entitlements } }
-            : {}),
+          ...(entitlements ? { entitlements: { create: entitlements } } : {}),
         },
         include: { entitlements: true },
       });

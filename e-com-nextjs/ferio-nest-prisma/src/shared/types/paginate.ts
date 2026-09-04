@@ -6,7 +6,7 @@ export interface PaginateOptions {
   page?: number;
   limit?: number;
   sortBy?: string;
-  populate?: any;
+  populate?: string | string[];
   select?: string;
 }
 

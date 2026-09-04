@@ -50,18 +50,27 @@ export class TenancyController {
       const resolved = await this.resolver.resolveFromHost(effectiveHost);
       let storeName: string | undefined;
       try {
-        const organization = await this.platform.client.organization.findUnique({
-          where: { id: resolved.organizationId },
-          select: { name: true },
-        });
+        const organization = await this.platform.client.organization.findUnique(
+          {
+            where: { id: resolved.organizationId },
+            select: { name: true },
+          },
+        );
         storeName = organization?.name;
       } catch {
         // Branding is cosmetic; state mapping must not depend on it.
       }
       return { code: 'ACTIVE', storeName };
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Map resolver failures to stable codes with their intended status.
-      const code = (error?.response as TenancyStatusPayload | undefined)?.code;
+      const response =
+        typeof error === 'object' && error !== null && 'response' in error
+          ? error.response
+          : undefined;
+      const code =
+        typeof response === 'object' && response !== null && 'code' in response
+          ? response.code
+          : undefined;
       if (
         code === 'TENANT_SUSPENDED' ||
         code === 'TENANT_UNAVAILABLE' ||

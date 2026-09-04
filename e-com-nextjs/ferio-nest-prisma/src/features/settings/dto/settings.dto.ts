@@ -39,7 +39,7 @@ export class CreateOrUpdateSettingsDto {
   })
   @IsOptional()
   @IsObject({ message: 'introductionVideo must be an object' })
-  introductionVideo?: Record<string, any>;
+  introductionVideo?: Record<string, unknown>;
 }
 
 /**

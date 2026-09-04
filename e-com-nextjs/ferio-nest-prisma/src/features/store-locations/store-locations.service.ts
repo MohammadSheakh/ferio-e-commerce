@@ -6,7 +6,8 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '@app/database';
 import { TenantDbService } from '../../tenancy/tenant-db.service';
-import type { PrismaClient } from '@prisma/client';import { AuditService } from '../audit/audit.service';
+import { Prisma, type PrismaClient } from '@prisma/client';
+import { AuditService } from '../audit/audit.service';
 import type { UserPayload } from '@app/common';
 import { assertTenantCommerceWritable } from '../../tenancy/commerce-write-guard.util';
 import type {
@@ -117,7 +118,7 @@ export class StoreLocationsService {
     const skip = (page - 1) * limit;
     const search = query?.search?.trim();
 
-    const where: any = search
+    const where: Prisma.WarehouseWhereInput = search
       ? {
           OR: [
             { name: { contains: search, mode: 'insensitive' } },
@@ -169,7 +170,9 @@ export class StoreLocationsService {
       where: { code: dto.code },
     });
     if (existing) {
-      throw new ConflictException(`Store/Warehouse code '${dto.code}' already exists.`);
+      throw new ConflictException(
+        `Store/Warehouse code '${dto.code}' already exists.`,
+      );
     }
 
     const store = await db.warehouse.create({
@@ -195,7 +198,7 @@ export class StoreLocationsService {
       action: 'STORE_LOCATION_CREATED',
       entityType: 'Warehouse',
       entityId: store.id,
-      actor: { userId: actor.userId || (actor as any).sub, role: actor.role },
+      actor: { userId: actor.userId, role: actor.role },
       metadata: { storeName: store.name, code: store.code },
     });
 
@@ -223,7 +226,7 @@ export class StoreLocationsService {
       action: 'STORE_LOCATION_UPDATED',
       entityType: 'Warehouse',
       entityId: updated.id,
-      actor: { userId: actor.userId || (actor as any).sub, role: actor.role },
+      actor: { userId: actor.userId, role: actor.role },
       metadata: { changes: dto },
     });
 
@@ -254,7 +257,7 @@ export class StoreLocationsService {
       action: 'STORE_LOCATION_DELETED',
       entityType: 'Warehouse',
       entityId: id,
-      actor: { userId: actor.userId || (actor as any).sub, role: actor.role },
+      actor: { userId: actor.userId, role: actor.role },
       metadata: { storeName: existing.name },
     });
 

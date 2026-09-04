@@ -1,5 +1,7 @@
 import {
-  ConflictException, Injectable, NotFoundException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
   Optional,
 } from '@nestjs/common';
 import type { PrismaClient } from '@prisma/client';
@@ -9,12 +11,19 @@ import { PrismaService } from '@app/database';
 import { TenantDbService } from '../../tenancy/tenant-db.service';
 import { timingSafeEqual } from 'crypto';
 import { normalizeBangladeshPhone } from '../checkout/utils/checkout.util';
-import { LinkCustomerAccountDto, UpdateCustomerProfileDto } from './customer-account.dto';
+import {
+  CreateCustomerAddressDto,
+  LinkCustomerAccountDto,
+  UpdateCustomerAddressDto,
+  UpdateCustomerProfileDto,
+} from './customer-account.dto';
 
 @Injectable()
 export class CustomerAccountService {
-  constructor(private readonly prisma: PrismaService,
-    @Optional() private readonly tenantDb?: TenantDbService,) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly tenantDb?: TenantDbService,
+  ) {}
 
   /**
    * MT-7: tenant client inside resolved contexts; explicit legacy fallback
@@ -73,8 +82,10 @@ export class CustomerAccountService {
     const db = await this.db();
     const data: Prisma.UserUpdateInput = {};
     if (dto.name !== undefined) data.name = dto.name.trim();
-    if (dto.phoneNumber !== undefined) data.phoneNumber = dto.phoneNumber.trim();
-    if (dto.profileImageUrl !== undefined) data.profileImageUrl = dto.profileImageUrl.trim();
+    if (dto.phoneNumber !== undefined)
+      data.phoneNumber = dto.phoneNumber.trim();
+    if (dto.profileImageUrl !== undefined)
+      data.profileImageUrl = dto.profileImageUrl.trim();
 
     const user = await db.user.update({
       where: { id: actor.userId },
@@ -196,8 +207,7 @@ export class CustomerAccountService {
       linked: Boolean(user.customer),
       customer: user.customer,
       orderHistoryLimit: 50,
-      orderHistoryTruncated:
-        (user.customer?._count.orders ?? 0) > 50,
+      orderHistoryTruncated: (user.customer?._count.orders ?? 0) > 50,
     };
   }
 
@@ -248,7 +258,7 @@ export class CustomerAccountService {
     return customerId;
   }
 
-  async addAddress(dto: any, actor: UserPayload) {
+  async addAddress(dto: CreateCustomerAddressDto, actor: UserPayload) {
     const db = await this.db();
     const customerId = await this.ensureCustomerForUser(actor.userId);
     const existingCount = await db.customerAddress.count({
@@ -279,8 +289,14 @@ export class CustomerAccountService {
         area: dto.area.trim(),
         detailedAddress: dto.detailedAddress.trim(),
         landmark: dto.landmark?.trim() || null,
-        latitude: dto.latitude !== undefined && dto.latitude !== null ? Number(dto.latitude) : null,
-        longitude: dto.longitude !== undefined && dto.longitude !== null ? Number(dto.longitude) : null,
+        latitude:
+          dto.latitude !== undefined && dto.latitude !== null
+            ? Number(dto.latitude)
+            : null,
+        longitude:
+          dto.longitude !== undefined && dto.longitude !== null
+            ? Number(dto.longitude)
+            : null,
         isDefault,
         customerId,
       },
@@ -289,7 +305,11 @@ export class CustomerAccountService {
     return this.profile(actor);
   }
 
-  async updateAddress(addressId: string, dto: any, actor: UserPayload) {
+  async updateAddress(
+    addressId: string,
+    dto: UpdateCustomerAddressDto,
+    actor: UserPayload,
+  ) {
     const db = await this.db();
     const customerId = await this.ensureCustomerForUser(actor.userId);
     const address = await db.customerAddress.findFirst({
@@ -317,14 +337,28 @@ export class CustomerAccountService {
       where: { id: addressId },
       data: {
         ...(dto.label !== undefined ? { label: dto.label.trim() } : {}),
-        ...(dto.recipientName !== undefined ? { recipientName: dto.recipientName.trim() } : {}),
-        ...(dto.phone !== undefined ? { phoneOriginal: dto.phone.trim(), phoneNormalized } : {}),
-        ...(dto.district !== undefined ? { district: dto.district.trim() } : {}),
+        ...(dto.recipientName !== undefined
+          ? { recipientName: dto.recipientName.trim() }
+          : {}),
+        ...(dto.phone !== undefined
+          ? { phoneOriginal: dto.phone.trim(), phoneNormalized }
+          : {}),
+        ...(dto.district !== undefined
+          ? { district: dto.district.trim() }
+          : {}),
         ...(dto.area !== undefined ? { area: dto.area.trim() } : {}),
-        ...(dto.detailedAddress !== undefined ? { detailedAddress: dto.detailedAddress.trim() } : {}),
-        ...(dto.landmark !== undefined ? { landmark: dto.landmark?.trim() || null } : {}),
-        ...(dto.latitude !== undefined ? { latitude: dto.latitude !== null ? Number(dto.latitude) : null } : {}),
-        ...(dto.longitude !== undefined ? { longitude: dto.longitude !== null ? Number(dto.longitude) : null } : {}),
+        ...(dto.detailedAddress !== undefined
+          ? { detailedAddress: dto.detailedAddress.trim() }
+          : {}),
+        ...(dto.landmark !== undefined
+          ? { landmark: dto.landmark?.trim() || null }
+          : {}),
+        ...(dto.latitude !== undefined
+          ? { latitude: dto.latitude !== null ? Number(dto.latitude) : null }
+          : {}),
+        ...(dto.longitude !== undefined
+          ? { longitude: dto.longitude !== null ? Number(dto.longitude) : null }
+          : {}),
         ...(dto.isDefault !== undefined ? { isDefault: dto.isDefault } : {}),
       },
     });

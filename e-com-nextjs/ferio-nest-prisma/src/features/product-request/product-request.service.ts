@@ -1,8 +1,16 @@
-import type { PrismaClient } from '@prisma/client';
+import {
+  Prisma,
+  ProductRequestStatus,
+  type PrismaClient,
+} from '@prisma/client';
 import { Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { PrismaService } from '@app/database';
 import { TenantDbService } from '../../tenancy/tenant-db.service';
-import { CreateProductRequestDto, QueryProductRequestDto, UpdateProductRequestStatusDto } from './dto/product-request.dto';
+import {
+  CreateProductRequestDto,
+  QueryProductRequestDto,
+  UpdateProductRequestStatusDto,
+} from './dto/product-request.dto';
 
 @Injectable()
 export class ProductRequestService {
@@ -64,10 +72,15 @@ export class ProductRequestService {
     const limit = Math.max(1, Number(query.limit) || 20);
     const skip = (page - 1) * limit;
 
-    const where: any = {};
+    const where: Prisma.ProductRequestWhereInput = {};
 
-    if (query.status) {
-      where.status = query.status;
+    if (
+      query.status &&
+      Object.values(ProductRequestStatus).includes(
+        query.status as ProductRequestStatus,
+      )
+    ) {
+      where.status = query.status as ProductRequestStatus;
     }
 
     if (query.search?.trim()) {
@@ -132,7 +145,7 @@ export class ProductRequestService {
     return db.productRequest.update({
       where: { id },
       data: {
-        status: dto.status ? (dto.status as any) : existing.status,
+        status: dto.status ?? existing.status,
         notes: dto.notes !== undefined ? dto.notes : existing.notes,
       },
       include: {

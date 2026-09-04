@@ -8,6 +8,7 @@ import type { PrismaClient } from '@prisma/client';
 import { tryGetTenantContext } from '../../../tenancy/tenant-context';
 import { TenantFanoutService } from '../../../tenancy/tenant-fanout.service';
 import { scopedSocketRoom } from './socket-auth.service';
+import { errorMessage } from '@app/common';
 
 /**
  * Socket Room Service
@@ -289,7 +290,7 @@ export class SocketRoomService {
         this.logger.log(`✅ User ${userId} auto-joined family room ${familyRoomId}`);
       }
     } catch (error) {
-      this.logger.error(`❌ Error auto-joining family room: ${error.message}`);
+      this.logger.error(`❌ Error auto-joining family room: ${errorMessage(error)}`);
     }
   }
 

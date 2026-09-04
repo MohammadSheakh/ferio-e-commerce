@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { OrganizationStatus } from '../generated/platform-client';
 import { PlatformPrismaService } from '../platform-prisma.service';
 import { PlatformAuditService } from './platform-audit.service';
@@ -56,8 +60,13 @@ export class OrganizationsService {
         newValue: { slug, name: organization.name },
       });
       return organization;
-    } catch (error: any) {
-      if (error?.code === 'P2002') {
+    } catch (error: unknown) {
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        error.code === 'P2002'
+      ) {
         throw new ConflictException('ORGANIZATION_SLUG_TAKEN');
       }
       throw error;
@@ -135,7 +144,9 @@ export class OrganizationsService {
     return organization;
   }
 
-  async list(params: { status?: OrganizationStatus; skip?: number; take?: number } = {}) {
+  async list(
+    params: { status?: OrganizationStatus; skip?: number; take?: number } = {},
+  ) {
     const [items, total] = await Promise.all([
       this.platform.client.organization.findMany({
         where: params.status ? { status: params.status } : undefined,

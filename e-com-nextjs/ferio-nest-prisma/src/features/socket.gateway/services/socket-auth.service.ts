@@ -7,6 +7,7 @@ import { PrismaService } from '@app/database';
 import { TenantDbService } from '../../../tenancy/tenant-db.service';
 import type { PrismaClient } from '@prisma/client';
 import { TenantFanoutService } from '../../../tenancy/tenant-fanout.service';
+import { errorMessage } from '@app/common';
 
 export interface SocketUser {
   userId: string;
@@ -153,7 +154,7 @@ export class SocketAuthService {
         name: 'Guest Visitor',
       };
     } catch (error) {
-      this.logger.warn(`⚠️ Socket authentication failed: ${error.message}`);
+      this.logger.warn(`⚠️ Socket authentication failed: ${errorMessage(error)}`);
       return null;
     }
   }
@@ -269,7 +270,7 @@ export class SocketAuthService {
       // Remove from Redis state
       return await this.removeOnlineUser(user, socketId);
     } catch (error) {
-      this.logger.error(`❌ Error handling user disconnection: ${error.message}`);
+      this.logger.error(`❌ Error handling user disconnection: ${errorMessage(error)}`);
       return false;
     }
   }
@@ -431,7 +432,7 @@ export class SocketAuthService {
         return relatedOnlineUsers;
       });
     } catch (error) {
-      this.logger.error(`❌ Error getting related online users: ${error.message}`);
+      this.logger.error(`❌ Error getting related online users: ${errorMessage(error)}`);
       return [];
     }
   }

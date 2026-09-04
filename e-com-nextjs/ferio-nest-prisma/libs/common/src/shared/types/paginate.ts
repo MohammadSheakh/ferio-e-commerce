@@ -10,7 +10,7 @@ export interface PaginateOptions {
   page?: number;
   limit?: number;
   sortBy?: string;
-  populate?: any;
+  populate?: string | string[];
   select?: string;
 }
 
@@ -55,14 +55,21 @@ export class PaginateQueryDto {
   @Min(1)
   page?: number = 1;
 
-  @ApiPropertyOptional({ description: 'Number of items per page', minimum: 1, default: 10 })
+  @ApiPropertyOptional({
+    description: 'Number of items per page',
+    minimum: 1,
+    default: 10,
+  })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
   limit?: number = 10;
 
-  @ApiPropertyOptional({ description: 'Sort field and order (e.g. -createdAt or createdAt)', default: '-createdAt' })
+  @ApiPropertyOptional({
+    description: 'Sort field and order (e.g. -createdAt or createdAt)',
+    default: '-createdAt',
+  })
   @IsOptional()
   @IsString()
   sortBy?: string;
@@ -72,14 +79,21 @@ export class PaginateQueryDto {
  * Base Cursor Paginate Query DTO
  */
 export class CursorPaginateQueryDto {
-  @ApiPropertyOptional({ description: 'Number of items per page', minimum: 1, default: 10 })
+  @ApiPropertyOptional({
+    description: 'Number of items per page',
+    minimum: 1,
+    default: 10,
+  })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
   limit?: number = 10;
 
-  @ApiPropertyOptional({ description: 'Cursor for pagination (ID of the last item of the previous page)' })
+  @ApiPropertyOptional({
+    description:
+      'Cursor for pagination (ID of the last item of the previous page)',
+  })
   @IsOptional()
   @IsString()
   cursor?: string;

@@ -44,6 +44,7 @@ export * from './utils/log-sanitizer';
 export * from './utils/request-context';
 export * from './utils/request-metrics';
 export * from './utils/tenant-metrics';
+export * from './utils/error-message';
 export * from './utils/error-code';
 export * from './utils/structured-logger';
 

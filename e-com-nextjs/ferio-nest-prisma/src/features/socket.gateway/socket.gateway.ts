@@ -14,12 +14,16 @@ import { JwtService } from '@nestjs/jwt';
 import { createAdapter } from '@socket.io/redis-adapter';
 import { Redis } from 'ioredis';
 
-import { SocketAuthService, scopedSocketRoom } from './services/socket-auth.service';
+import {
+  SocketAuthService,
+  scopedSocketRoom,
+} from './services/socket-auth.service';
 import { tryGetTenantContext } from '../../tenancy/tenant-context';
 import { SocketRoomService } from './services/socket-room.service';
 import { WsJwtGuard } from './guards/ws-jwt.guard';
 import { REDIS_PUB_CLIENT, REDIS_SUB_CLIENT } from '@app/redis';
 import { FirebaseService } from '@app/notification';
+import { errorMessage } from '@app/common';
 
 const socketAllowedOrigins = [
   process.env.CUSTOMER_WEB_URL || 'http://localhost:3000',
@@ -31,7 +35,7 @@ const socketAllowedOrigins = [
 
 /**
  * Socket.IO Gateway
- * 
+ *
  * 📚 REAL-TIME NOTIFICATION & CHAT GATEWAY
  */
 @WebSocketGateway(Number(process.env.SOCKET_PORT) || 6734, {
@@ -75,14 +79,16 @@ export class SocketGateway
    */
   afterInit(server: Server) {
     this.logger.log('✅ Socket.IO Gateway initialized');
-    
+
     // Attach Redis adapter for multi-worker support
     try {
       const adapter = createAdapter(this.redisPubClient, this.redisSubClient);
       server.adapter(adapter);
       this.logger.log('✅ Redis adapter attached to Socket.IO server');
     } catch (error) {
-      this.logger.error(`❌ Failed to attach Redis adapter: ${error.message}`);
+      this.logger.error(
+        `❌ Failed to attach Redis adapter: ${errorMessage(error)}`,
+      );
     }
   }
 
@@ -121,7 +127,9 @@ export class SocketGateway
       const orgRoom = (room: string) => scopedSocketRoom(user, room);
       client.join(orgRoom(user.userId));
       client.join(orgRoom(`conv-${user.userId}`));
-      this.logger.log(`✅ User ${user.userId} joined rooms: ${user.userId}, conv-${user.userId}`);
+      this.logger.log(
+        `✅ User ${user.userId} joined rooms: ${user.userId}, conv-${user.userId}`,
+      );
 
       // Auto-join role-based room
       if (user.role) {
@@ -137,7 +145,9 @@ export class SocketGateway
             client.join(`role::${user.role}`);
             client.join(`role::${lowerRole}`);
           }
-          this.logger.log(`✅ Admin user ${user.userId} joined admin role rooms`);
+          this.logger.log(
+            `✅ Admin user ${user.userId} joined admin role rooms`,
+          );
         } else if (!user.organizationId) {
           client.join(`role::${user.role}`);
           client.join(`role::${lowerRole}`);
@@ -178,7 +188,7 @@ export class SocketGateway
         socketId: client.id,
       });
     } catch (error) {
-      this.logger.error(`❌ Connection error: ${error.message}`);
+      this.logger.error(`❌ Connection error: ${errorMessage(error)}`);
       client.emit('io-error', {
         success: false,
         message: 'Connection error',
@@ -203,10 +213,8 @@ export class SocketGateway
       this.logger.log(`🔌 User disconnected: ${userId} (Socket: ${client.id})`);
 
       // Handle user disconnection in Redis
-      const becameOffline = await this.socketAuthService.handleUserDisconnection(
-        client,
-        user,
-      );
+      const becameOffline =
+        await this.socketAuthService.handleUserDisconnection(client, user);
 
       // Notify related users about online status
       if (becameOffline) {
@@ -235,11 +243,11 @@ export class SocketGateway
         socketId: client.id,
         page,
         role: user?.role || 'guest',
-          userId: client.data.userId || client.id,
-          name: user?.name || 'Guest Visitor',
-          organizationId: user?.organizationId,
-          updatedAt: Date.now(),
-        });
+        userId: client.data.userId || client.id,
+        name: user?.name || 'Guest Visitor',
+        organizationId: user?.organizationId,
+        updatedAt: Date.now(),
+      });
       this.broadcastLivePageStats(user?.organizationId);
     } else if (this.activePageViews.delete(client.id)) {
       this.broadcastLivePageStats(user?.organizationId);
@@ -257,7 +265,12 @@ export class SocketGateway
     };
 
     let totalActive = 0;
-    const activeVisitors: Array<{ page: string; role: string; name: string; userId: string }> = [];
+    const activeVisitors: Array<{
+      page: string;
+      role: string;
+      name: string;
+      userId: string;
+    }> = [];
 
     for (const [socketId, info] of this.activePageViews.entries()) {
       if (info.organizationId !== organizationId) continue;
@@ -269,7 +282,11 @@ export class SocketGateway
       const lowerPage = rawPage.toLowerCase().trim();
       if (lowerPage.startsWith('/delivery') || lowerPage.includes('delivery')) {
         cleanPage = '/delivery/portal';
-      } else if (lowerPage.startsWith('/products') || lowerPage.startsWith('/catalog') || lowerPage.startsWith('/shop')) {
+      } else if (
+        lowerPage.startsWith('/products') ||
+        lowerPage.startsWith('/catalog') ||
+        lowerPage.startsWith('/shop')
+      ) {
         cleanPage = '/products';
       } else if (lowerPage.startsWith('/track')) {
         cleanPage = '/track';
@@ -338,11 +355,17 @@ export class SocketGateway
    * Notify Related Users about Online Status
    */
   private async notifyRelatedUsersOnlineStatus(
-    user: { userId: string; role: string; name: string; organizationId?: string },
+    user: {
+      userId: string;
+      role: string;
+      name: string;
+      organizationId?: string;
+    },
     isOnline: boolean,
   ) {
     try {
-      const relatedUsers = await this.socketAuthService.getRelatedOnlineUsers(user);
+      const relatedUsers =
+        await this.socketAuthService.getRelatedOnlineUsers(user);
 
       for (const relatedUserId of relatedUsers) {
         // Don't notify self
@@ -356,7 +379,9 @@ export class SocketGateway
           });
       }
     } catch (error) {
-      this.logger.error(`❌ Failed to notify related users: ${error.message}`);
+      this.logger.error(
+        `❌ Failed to notify related users: ${errorMessage(error)}`,
+      );
     }
   }
 
@@ -376,7 +401,12 @@ export class SocketGateway
         return { success: false, message: 'conversationId is required' };
       }
 
-      if (!(await this.socketAuthService.canAccessConversation(client.data.user, conversationId))) {
+      if (
+        !(await this.socketAuthService.canAccessConversation(
+          client.data.user,
+          conversationId,
+        ))
+      ) {
         return { success: false, message: 'Conversation access denied' };
       }
 
@@ -401,12 +431,14 @@ export class SocketGateway
       );
 
       // Notify others in the chat
-      client.to(scopedSocketRoom(client.data?.user, conversationId)).emit('user-joined-chat', {
-        userId,
-        userName: client.data.user?.name,
-        conversationId,
-        isOnline: true,
-      });
+      client
+        .to(scopedSocketRoom(client.data?.user, conversationId))
+        .emit('user-joined-chat', {
+          userId,
+          userName: client.data.user?.name,
+          conversationId,
+          isOnline: true,
+        });
 
       return {
         success: true,
@@ -414,7 +446,7 @@ export class SocketGateway
         roomUsers,
       };
     } catch (error) {
-      this.logger.error(`❌ Join room error: ${error.message}`);
+      this.logger.error(`❌ Join room error: ${errorMessage(error)}`);
       return { success: false, message: 'Failed to join room' };
     }
   }
@@ -446,15 +478,17 @@ export class SocketGateway
       );
 
       // Notify others
-      client.to(scopedSocketRoom(client.data?.user, conversationId)).emit('user-left-chat', {
-        userId,
-        userName: client.data.user?.name,
-        conversationId,
-      });
+      client
+        .to(scopedSocketRoom(client.data?.user, conversationId))
+        .emit('user-left-chat', {
+          userId,
+          userName: client.data.user?.name,
+          conversationId,
+        });
 
       return { success: true, message: 'Left conversation successfully' };
     } catch (error) {
-      this.logger.error(`❌ Leave room error: ${error.message}`);
+      this.logger.error(`❌ Leave room error: ${errorMessage(error)}`);
       return { success: false, message: 'Failed to leave room' };
     }
   }
@@ -472,9 +506,17 @@ export class SocketGateway
       const user = client.data?.user;
       const userId = user?.userId;
       const targetConvId = conversationId || `conv-${userId}`;
-      const text = typeof data?.text === 'string' ? data.text.trim().slice(0, 4000) : '';
+      const text =
+        typeof data?.text === 'string' ? data.text.trim().slice(0, 4000) : '';
 
-      if (!userId || !text || !(await this.socketAuthService.canAccessConversation(user, targetConvId))) {
+      if (
+        !userId ||
+        !text ||
+        !(await this.socketAuthService.canAccessConversation(
+          user,
+          targetConvId,
+        ))
+      ) {
         return { success: false, message: 'Conversation access denied' };
       }
       const db = await this.socketAuthService.databaseForSocket(user);
@@ -489,7 +531,9 @@ export class SocketGateway
           : undefined;
 
       const payload = {
-        _messageId: data?._messageId || `msg_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+        _messageId:
+          data?._messageId ||
+          `msg_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
         conversationId: targetConvId,
         text: text || '',
         senderId: userId,
@@ -500,11 +544,15 @@ export class SocketGateway
         isAdmin,
       };
 
-      this.logger.log(`💬 Socket Message Relay: [${payload.senderName}] in [${targetConvId}]: "${payload.text}"`);
+      this.logger.log(
+        `💬 Socket Message Relay: [${payload.senderName}] in [${targetConvId}]: "${payload.text}"`,
+      );
 
       // 1. Broadcast to target conversation room & prefixed room
       const rawConvId = targetConvId.replace(/^conv-/, '');
-      const prefConvId = targetConvId.startsWith('conv-') ? targetConvId : `conv-${targetConvId}`;
+      const prefConvId = targetConvId.startsWith('conv-')
+        ? targetConvId
+        : `conv-${targetConvId}`;
 
       // 1. Target Room Emission — tenant-scoped by the sender's binding
       const senderUser: { organizationId?: string } | null =
@@ -529,10 +577,7 @@ export class SocketGateway
         }),
         db.customer.findFirst({
           where: {
-            OR: [
-              { id: targetIdToSearch },
-              { id: rawConvId },
-            ],
+            OR: [{ id: targetIdToSearch }, { id: rawConvId }],
           },
           include: { user: true },
         }),
@@ -607,11 +652,20 @@ export class SocketGateway
       if (senderOrg) {
         this.server
           .to(scopedSocketRoom({ organizationId: senderOrg }, 'role::admin'))
-          .to(scopedSocketRoom({ organizationId: senderOrg }, 'role::super-admin'))
+          .to(
+            scopedSocketRoom(
+              { organizationId: senderOrg },
+              'role::super-admin',
+            ),
+          )
           .to(scopedSocketRoom({ organizationId: senderOrg }, 'admin-room'))
           .emit('new-message-received', payload);
       } else {
-        this.server.to('role::admin').to('role::super-admin').to('admin-room').emit('new-message-received', payload);
+        this.server
+          .to('role::admin')
+          .to('role::super-admin')
+          .to('admin-room')
+          .emit('new-message-received', payload);
       }
 
       // 3. Direct target emission
@@ -620,7 +674,12 @@ export class SocketGateway
           .to(scopedSocketRoom({ organizationId: senderOrg }, payload.senderId))
           .emit('new-message-received', payload);
         this.server
-          .to(scopedSocketRoom({ organizationId: senderOrg }, `conv-${payload.senderId}`))
+          .to(
+            scopedSocketRoom(
+              { organizationId: senderOrg },
+              `conv-${payload.senderId}`,
+            ),
+          )
           .emit('new-message-received', payload);
       }
       if (payload.guestId) {
@@ -628,7 +687,12 @@ export class SocketGateway
           .to(scopedSocketRoom({ organizationId: senderOrg }, payload.guestId))
           .emit('new-message-received', payload);
         this.server
-          .to(scopedSocketRoom({ organizationId: senderOrg }, `conv-${payload.guestId}`))
+          .to(
+            scopedSocketRoom(
+              { organizationId: senderOrg },
+              `conv-${payload.guestId}`,
+            ),
+          )
           .emit('new-message-received', payload);
       }
 
@@ -636,7 +700,9 @@ export class SocketGateway
       try {
         const canonicalConvId = linkedCustomer?.id
           ? `conv-${linkedCustomer.id}`
-          : (linkedUser?.customerId ? `conv-${linkedUser.customerId}` : prefConvId);
+          : linkedUser?.customerId
+            ? `conv-${linkedUser.customerId}`
+            : prefConvId;
 
         let validSenderUser: any = null;
 
@@ -701,16 +767,20 @@ export class SocketGateway
                 createdAt: new Date(payload.createdAt),
               },
             });
-            this.logger.log(`💾 Persisted message [${payload._messageId}] to DB in conversation [${conversation.id}]`);
+            this.logger.log(
+              `💾 Persisted message [${payload._messageId}] to DB in conversation [${conversation.id}]`,
+            );
           }
         }
       } catch (dbErr: any) {
-        this.logger.warn(`⚠️ Could not persist chat message to DB: ${dbErr.message}`);
+        this.logger.warn(
+          `⚠️ Could not persist chat message to DB: ${dbErr.message}`,
+        );
       }
 
       return { success: true, data: payload };
     } catch (error: any) {
-      this.logger.error(`❌ handleNewMessage error: ${error.message}`);
+      this.logger.error(`❌ handleNewMessage error: ${errorMessage(error)}`);
       return { success: false, message: 'Failed to process message' };
     }
   }
@@ -759,9 +829,7 @@ export class SocketGateway
         client.data.user?.organizationId,
       );
 
-      this.logger.log(
-        `📋 Task room ${taskRoom} has ${roomUsers.length} users`,
-      );
+      this.logger.log(`📋 Task room ${taskRoom} has ${roomUsers.length} users`);
 
       // Notify others in the task
       client.to(taskRoom).emit('user-joined-task', {
@@ -773,7 +841,7 @@ export class SocketGateway
 
       return { success: true, message: 'Joined task room successfully' };
     } catch (error) {
-      this.logger.error(`❌ Join task room error: ${error.message}`);
+      this.logger.error(`❌ Join task room error: ${errorMessage(error)}`);
       return { success: false, message: 'Failed to join task room' };
     }
   }
@@ -815,7 +883,7 @@ export class SocketGateway
 
       return { success: true, message: 'Left task room successfully' };
     } catch (error) {
-      this.logger.error(`❌ Leave task room error: ${error.message}`);
+      this.logger.error(`❌ Leave task room error: ${errorMessage(error)}`);
       return { success: false, message: 'Failed to leave task room' };
     }
   }
@@ -831,9 +899,8 @@ export class SocketGateway
     try {
       const user = client.data.user;
       if (!user) return { success: false, message: 'Authentication required' };
-      const relatedOnlineUsers = await this.socketAuthService.getRelatedOnlineUsers(
-        user,
-      );
+      const relatedOnlineUsers =
+        await this.socketAuthService.getRelatedOnlineUsers(user);
 
       this.logger.log(
         `📊 Related online users for ${user.userId}: ${relatedOnlineUsers.length}`,
@@ -844,7 +911,9 @@ export class SocketGateway
         data: relatedOnlineUsers,
       };
     } catch (error) {
-      this.logger.error(`❌ Get related online users error: ${error.message}`);
+      this.logger.error(
+        `❌ Get related online users error: ${errorMessage(error)}`,
+      );
       return {
         success: false,
         message: 'Failed to fetch related online users',
@@ -873,7 +942,9 @@ export class SocketGateway
         data: activities,
       };
     } catch (error) {
-      this.logger.error(`❌ Get family activity feed error: ${error.message}`);
+      this.logger.error(
+        `❌ Get family activity feed error: ${errorMessage(error)}`,
+      );
       return {
         success: false,
         message: 'Failed to fetch activity feed',
@@ -903,7 +974,10 @@ export class SocketGateway
    * @param userId - User ID
    * @param notification - Notification data
    */
-  async emitNotificationToUser(userId: string, notification: any): Promise<boolean> {
+  async emitNotificationToUser(
+    userId: string,
+    notification: any,
+  ): Promise<boolean> {
     try {
       const eventName = `notification::${userId}`;
 
@@ -915,7 +989,9 @@ export class SocketGateway
 
       return true;
     } catch (error) {
-      this.logger.error(`❌ Failed to emit notification: ${error.message}`);
+      this.logger.error(
+        `❌ Failed to emit notification: ${errorMessage(error)}`,
+      );
       return false;
     }
   }
@@ -934,9 +1010,13 @@ export class SocketGateway
         this.server.to(room).emit(eventName, { count, hasUnread: count > 0 });
       }
 
-      this.logger.debug(`📊 Unread count update sent to user ${userId}: ${count}`);
+      this.logger.debug(
+        `📊 Unread count update sent to user ${userId}: ${count}`,
+      );
     } catch (error) {
-      this.logger.error(`❌ Failed to emit unread count: ${error.message}`);
+      this.logger.error(
+        `❌ Failed to emit unread count: ${errorMessage(error)}`,
+      );
     }
   }
 
@@ -957,7 +1037,9 @@ export class SocketGateway
 
       this.logger.log(`📢 Broadcast to role ${role}: ${event}`);
     } catch (error) {
-      this.logger.error(`❌ Failed to broadcast to role: ${error.message}`);
+      this.logger.error(
+        `❌ Failed to broadcast to role: ${errorMessage(error)}`,
+      );
     }
   }
 
@@ -1007,7 +1089,7 @@ export class SocketGateway
 
       return false;
     } catch (error) {
-      this.logger.error(`❌ Failed to emit to user: ${error.message}`);
+      this.logger.error(`❌ Failed to emit to user: ${errorMessage(error)}`);
       return false;
     }
   }
@@ -1026,7 +1108,7 @@ export class SocketGateway
       }
       return true;
     } catch (error) {
-      this.logger.error(`❌ Failed to emit to room: ${error.message}`);
+      this.logger.error(`❌ Failed to emit to room: ${errorMessage(error)}`);
       return false;
     }
   }
@@ -1041,7 +1123,9 @@ export class SocketGateway
     try {
       return await this.socketRoomService.isUserInRoom(userId, roomId);
     } catch (error) {
-      this.logger.error(`❌ Failed to check if member is in room: ${error.message}`);
+      this.logger.error(
+        `❌ Failed to check if member is in room: ${errorMessage(error)}`,
+      );
       return false;
     }
   }

@@ -13,6 +13,7 @@ import {
 } from '@app/queue';
 import { SendMessageDto } from './dto/message.dto';
 import { tryGetTenantContext } from '../../../tenancy/tenant-context';
+import { errorMessage } from '@app/common';
 
 @Injectable()
 export class MessageService {
@@ -379,7 +380,7 @@ export class MessageService {
 
       this.logger.log(`📬 Queued notification for ${participantIds.length} participants`);
     } catch (error) {
-      this.logger.error(`❌ Failed to notify participants: ${error.message}`);
+      this.logger.error(`❌ Failed to notify participants: ${errorMessage(error)}`);
     }
   }
 
@@ -406,7 +407,7 @@ export class MessageService {
 
       this.logger.debug(`📡 Emitted new-message-received to room ${conversationId}`);
     } catch (error) {
-      this.logger.error(`❌ Failed to emit new message event: ${error.message}`);
+      this.logger.error(`❌ Failed to emit new message event: ${errorMessage(error)}`);
     }
   }
 

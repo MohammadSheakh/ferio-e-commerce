@@ -20,9 +20,11 @@ import { GenericService } from './generic.service';
  * Supports simple CRUD routes and Prisma-style `include` / `select` query strings:
  * `?include=profile,wallet` or `?select=id,email,name`.
  */
+type GenericObject = Record<string, unknown>;
+
 @Controller()
 @ApiTags('Generic')
-export class GenericController<TDelegate = any, TRecord = any> {
+export class GenericController<TDelegate = unknown, TRecord = unknown> {
   protected modelName: string;
 
   constructor(
@@ -54,7 +56,7 @@ export class GenericController<TDelegate = any, TRecord = any> {
   @ApiOperation({ summary: 'Get all records' })
   @ApiResponse({ status: 200, description: 'Records retrieved successfully' })
   async getAll(
-    @Query() filters?: Record<string, any>,
+    @Query() filters?: GenericObject,
     @Query('include') include?: string,
     @Query('populate') populate?: string,
     @Query('select') select?: string,
@@ -70,7 +72,7 @@ export class GenericController<TDelegate = any, TRecord = any> {
   @ApiOperation({ summary: 'Get records with pagination' })
   @ApiResponse({ status: 200, description: 'Records retrieved successfully' })
   async getAllWithPagination(
-    @Query() filters?: Record<string, any>,
+    @Query() filters?: GenericObject,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('sortBy') sortBy?: string,
@@ -96,7 +98,7 @@ export class GenericController<TDelegate = any, TRecord = any> {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create record' })
   @ApiResponse({ status: 201, description: 'Record created successfully' })
-  async create(@Body() data: Record<string, any>) {
+  async create(@Body() data: GenericObject) {
     return await this.service.create(data);
   }
 
@@ -105,7 +107,7 @@ export class GenericController<TDelegate = any, TRecord = any> {
   @ApiParam({ name: 'id', description: 'Record ID' })
   @ApiResponse({ status: 200, description: 'Record updated successfully' })
   @ApiResponse({ status: 404, description: 'Record not found' })
-  async updateById(@Param('id') id: string, @Body() data: Record<string, any>) {
+  async updateById(@Param('id') id: string, @Body() data: GenericObject) {
     return await this.service.updateById(id, data);
   }
 
@@ -134,7 +136,7 @@ export class GenericController<TDelegate = any, TRecord = any> {
   @Get('count')
   @ApiOperation({ summary: 'Count records' })
   @ApiResponse({ status: 200, description: 'Record count retrieved' })
-  async count(@Query() filters?: Record<string, any>) {
+  async count(@Query() filters?: GenericObject) {
     return await this.service.count(filters);
   }
 

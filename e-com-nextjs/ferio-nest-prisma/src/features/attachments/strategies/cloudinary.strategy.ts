@@ -1,14 +1,18 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { v2 as cloudinary } from 'cloudinary';
-import { IFileUploadStrategy, FileUploadResult } from './file-upload.strategy.interface';
+import {
+  IFileUploadStrategy,
+  FileUploadResult,
+} from './file-upload.strategy.interface';
+import { errorMessage } from '@app/common';
 
 /**
  * Cloudinary File Upload Strategy
- * 
+ *
  * 📚 STRATEGY PATTERN IMPLEMENTATION
- * 
+ *
  * Implements file upload using Cloudinary
- * 
+ *
  * Features:
  * ✅ Automatic folder creation
  * ✅ Public ID generation
@@ -32,7 +36,10 @@ export class CloudinaryStrategy implements IFileUploadStrategy {
   /**
    * Upload file to Cloudinary
    */
-  async uploadFile(file: Express.Multer.File, folder: string): Promise<FileUploadResult> {
+  async uploadFile(
+    file: Express.Multer.File,
+    folder: string,
+  ): Promise<FileUploadResult> {
     try {
       // Convert buffer to base64
       const base64File = `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
@@ -68,8 +75,10 @@ export class CloudinaryStrategy implements IFileUploadStrategy {
         mimeType: result.format,
       };
     } catch (error) {
-      this.logger.error(`Cloudinary upload failed: ${error.message}`);
-      throw new Error(`Failed to upload file to Cloudinary: ${error.message}`);
+      this.logger.error(`Cloudinary upload failed: ${errorMessage(error)}`);
+      throw new Error(
+        `Failed to upload file to Cloudinary: ${errorMessage(error)}`,
+      );
     }
   }
 
@@ -95,8 +104,10 @@ export class CloudinaryStrategy implements IFileUploadStrategy {
 
       this.logger.log(`File deleted from Cloudinary: ${publicId}`);
     } catch (error) {
-      this.logger.error(`Cloudinary deletion failed: ${error.message}`);
-      throw new Error(`Failed to delete file from Cloudinary: ${error.message}`);
+      this.logger.error(`Cloudinary deletion failed: ${errorMessage(error)}`);
+      throw new Error(
+        `Failed to delete file from Cloudinary: ${errorMessage(error)}`,
+      );
     }
   }
 

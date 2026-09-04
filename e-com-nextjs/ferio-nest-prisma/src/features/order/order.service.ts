@@ -75,8 +75,10 @@ export class OrderService {
     private readonly wallet: WalletService,
     private readonly customerNotifications: CustomerNotificationsService,
     @Optional() private readonly tenantDb?: TenantDbService,
-    @Optional() private readonly entitlements?: import('../../platform/services/entitlements.service').EntitlementsService,
-    @Optional() private readonly usage?: import('../../platform/services/usage.service').UsageService,
+    @Optional()
+    private readonly entitlements?: import('../../platform/services/entitlements.service').EntitlementsService,
+    @Optional()
+    private readonly usage?: import('../../platform/services/usage.service').UsageService,
   ) {}
 
   /**
@@ -556,7 +558,8 @@ export class OrderService {
     orderId: string,
     reason: string,
     actorId: string,
-  ) {    const reservations = await transaction.inventoryReservation.findMany({
+  ) {
+    const reservations = await transaction.inventoryReservation.findMany({
       where: { orderItem: { orderId }, status: 'ACTIVE' },
     });
     for (const reservation of reservations) {
@@ -698,7 +701,9 @@ export class OrderService {
     // MT-10 §13.2: plan limits enforced server-side at the monetizable event.
     if (tenantContext && this.entitlements) {
       const decision = await this.entitlements
-        .evaluate(tenantContext.organizationId, 'orders_per_month', { requestedCount: 1 })
+        .evaluate(tenantContext.organizationId, 'orders_per_month', {
+          requestedCount: 1,
+        })
         .catch(() => null);
       if (decision && !decision.allowed) {
         throw new ForbiddenException(decision.code ?? 'PLAN_LIMIT_REACHED');
@@ -1340,7 +1345,10 @@ export class OrderService {
           }
           const reason = dto.reason.normalize('NFKC').trim();
           await this.releaseReservations(transaction, id, reason, actor.userId);
-          if (order.paymentMethod === 'WALLET' && order.paymentStatus === 'PAID') {
+          if (
+            order.paymentMethod === 'WALLET' &&
+            order.paymentStatus === 'PAID'
+          ) {
             await this.wallet.refundCancelledOrder(
               transaction,
               order.customerId,
@@ -1354,11 +1362,13 @@ export class OrderService {
               status: 'CANCELLED',
               fulfillmentStatus: 'CANCELLED',
               paymentStatus:
-                order.paymentMethod === 'WALLET' && order.paymentStatus === 'PAID'
+                order.paymentMethod === 'WALLET' &&
+                order.paymentStatus === 'PAID'
                   ? 'REFUNDED'
                   : order.paymentStatus,
               refundStatus:
-                order.paymentMethod === 'WALLET' && order.paymentStatus === 'PAID'
+                order.paymentMethod === 'WALLET' &&
+                order.paymentStatus === 'PAID'
                   ? 'REFUNDED'
                   : order.refundStatus,
               codVerification:
@@ -1741,7 +1751,7 @@ export class OrderService {
         action: 'STORE_PICKUP_SCHEDULED',
         entityType: 'Order',
         entityId: orderId,
-        actor: { userId: actor.userId || (actor as any).sub, role: actor.role },
+        actor: { userId: actor.userId, role: actor.role },
         metadata: { scheduledDate, slot: dto.preferredPickupSlot },
       });
     }
@@ -1777,7 +1787,7 @@ export class OrderService {
       action: 'STORE_PICKUP_STATUS_UPDATED',
       entityType: 'Order',
       entityId: orderId,
-      actor: { userId: actor.userId || (actor as any).sub, role: actor.role },
+      actor: { userId: actor.userId, role: actor.role },
       metadata: {
         previousStatus: order.storePickupStatus,
         newStatus: storePickupStatus,
@@ -1832,7 +1842,7 @@ export class OrderService {
         oldStatus: order.status,
         newStatus: 'DELIVERED',
         source: 'ADMIN',
-        actorId: actor.userId || (actor as any).sub,
+        actorId: actor.userId,
         note: `Store pickup handover completed at ${order.pickupStore?.name ?? 'store'}`,
       },
     });
@@ -1843,7 +1853,7 @@ export class OrderService {
           oldStatus: order.fulfillmentStatus,
           newStatus: 'FULFILLED',
           source: 'ADMIN',
-          actorId: actor.userId || (actor as any).sub,
+          actorId: actor.userId,
           note: 'Store pickup handover completed',
         },
       });
@@ -1852,12 +1862,11 @@ export class OrderService {
       await this.consumeDeliveredReservations(tx, orderId);
     });
 
-
     await this.audit.record({
       action: 'STORE_PICKUP_HANDOVER_COMPLETED',
       entityType: 'Order',
       entityId: orderId,
-      actor: { userId: actor.userId || (actor as any).sub, role: actor.role },
+      actor: { userId: actor.userId, role: actor.role },
       metadata: {
         storeId: order.pickupStoreId,
         storeName: order.pickupStore?.name,

@@ -66,6 +66,24 @@ These are intentionally not marked as application-code fixes:
 
 ## Review Rule
 
+## TypeScript Strictness Review
+
+- Fixed: enabled `noImplicitAny`, `useUnknownInCatchVariables`,
+  `strictBindCallApply`, and `noFallthroughCasesInSwitch` in the backend
+  compiler configuration.
+- Fixed: removed application-owned `any` from shared pagination, generic
+  Prisma boundaries, platform request/auth handling, settings, product
+  requests, customer accounts, store locations, order audit actors, user
+  profiles, Redis boundaries, and HTTP exception handling.
+- Verified: `pnpm exec tsc --noEmit` passes and `pnpm test -- --runInBand`
+  passes with 90 suites and 408 tests.
+- Remaining explicit `any` inventory is isolated for a follow-up pass in
+  legacy Mongoose/base-entity adapters, file-upload and Cloudinary adapters,
+  authentication provider profile contracts, chat/socket dynamic payloads,
+  and queue/third-party SDK contracts. These are boundaries requiring domain
+  interfaces or vendor-specific types, not permission to add `any` to new
+  code.
+
 When a future backend audit finding is fixed, add its status, implementation
 evidence, validation command, and commit reference here. Do not rewrite the
 historical analysis document unless explicitly requested.

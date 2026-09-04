@@ -1,4 +1,5 @@
-import { BadRequestException,
+import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
@@ -29,6 +30,10 @@ const CHECKOUT_DRAFT_LIFETIME_HOURS = 24;
 const deliveryZoneInclude = {
   districts: { orderBy: { name: 'asc' as const } },
 } satisfies Prisma.DeliveryZoneInclude;
+
+type PickupStore = Prisma.WarehouseGetPayload<{
+  include: { inventory: true };
+}>;
 
 @Injectable()
 export class CheckoutService {
@@ -298,7 +303,7 @@ export class CheckoutService {
       | 'NOT_APPLICABLE'
       | 'AVAILABLE_IN_STORE'
       | 'TRANSFER_REQUIRED' = 'NOT_APPLICABLE';
-    let pickupStore: any = null;
+    let pickupStore: PickupStore | null = null;
 
     if (isStorePickup) {
       if (!dto.pickupStoreId) {
@@ -315,10 +320,11 @@ export class CheckoutService {
           'Selected store location is not available.',
         );
       }
+      const pickupInventory = pickupStore.inventory;
 
       // Check if all cart items are available in the selected store
       const allAvailableInStore = cart.items.every((item) => {
-        const storeStock = pickupStore.inventory.find(
+        const storeStock = pickupInventory.find(
           (inv) => inv.variantId === item.variantId,
         );
         const availableCount = storeStock

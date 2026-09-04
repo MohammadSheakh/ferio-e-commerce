@@ -85,7 +85,7 @@ export class PlatformAuthGuard implements CanActivate {
     if (!header?.startsWith('Bearer ')) {
       throw new UnauthorizedException('PLATFORM_AUTH_REQUIRED');
     }
-    let payload: any;
+    let payload: unknown;
     try {
       payload = await this.jwt.verifyAsync(header.slice(7), {
         secret: process.env.PLATFORM_JWT_SECRET,
@@ -93,13 +93,13 @@ export class PlatformAuthGuard implements CanActivate {
     } catch {
       throw new UnauthorizedException('PLATFORM_TOKEN_INVALID');
     }
-    if (payload?.realm !== 'platform' || !payload?.sub) {
+    if (!isPlatformTokenPayload(payload)) {
       throw new UnauthorizedException('PLATFORM_REALM_MISMATCH');
     }
     const principal: PlatformPrincipal = {
       platformUserId: payload.sub,
-      email: String(payload.email ?? ''),
-      roles: Array.isArray(payload.roles) ? payload.roles.map(String) : [],
+      email: payload.email ?? '',
+      roles: payload.roles,
     };
     request.platformPrincipal = principal;
 
@@ -115,4 +115,24 @@ export class PlatformAuthGuard implements CanActivate {
     if (!ok) throw new ForbiddenException('PLATFORM_PERMISSION_DENIED');
     return true;
   }
+}
+
+type PlatformTokenPayload = {
+  realm: 'platform';
+  sub: string;
+  email?: string;
+  roles: string[];
+};
+
+function isPlatformTokenPayload(value: unknown): value is PlatformTokenPayload {
+  if (!value || typeof value !== 'object') return false;
+  const payload = value as Record<string, unknown>;
+  return (
+    payload.realm === 'platform' &&
+    typeof payload.sub === 'string' &&
+    payload.sub.length > 0 &&
+    (payload.email === undefined || typeof payload.email === 'string') &&
+    Array.isArray(payload.roles) &&
+    payload.roles.every((role) => typeof role === 'string')
+  );
 }
