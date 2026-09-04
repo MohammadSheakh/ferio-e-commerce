@@ -46,8 +46,9 @@ export class TransactionalMessagingService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly adapters: MessageAdapterRegistry,
-  
-    @Optional() private readonly tenantDb?: TenantDbService,) {}
+
+    @Optional() private readonly tenantDb?: TenantDbService,
+  ) {}
 
   /**
    * MT-7: inside a tenant-resolved request this returns the resolved tenant
@@ -350,6 +351,47 @@ export class TransactionalMessagingService {
     });
   }
 
+  /**
+   * A worker can disappear after claiming a message but before recording the
+   * provider outcome. Do not retry automatically: the provider may already
+   * have accepted the request. Block it for an explicit, audited retry after
+   * the operator confirms the provider outcome.
+   */
+  async blockStaleProcessing(limit: number) {
+    const db = await this.db();
+    const timeoutMinutes = boundedInt(
+      process.env.TRANSACTIONAL_MESSAGE_PROCESSING_TIMEOUT_MINUTES,
+      30,
+      5,
+      1_440,
+    );
+    const stale = await db.commerceMessage.findMany({
+      where: {
+        status: 'PROCESSING',
+        lockedAt: {
+          lt: new Date(Date.now() - timeoutMinutes * 60_000),
+        },
+      },
+      orderBy: { lockedAt: 'asc' },
+      take: Math.min(Math.max(Number(limit) || 1, 1), 500),
+      select: { id: true },
+    });
+    if (stale.length === 0) return 0;
+    const result = await db.commerceMessage.updateMany({
+      where: { id: { in: stale.map(({ id }) => id) } },
+      data: {
+        status: 'BLOCKED',
+        terminalReason:
+          'Worker lease expired; provider outcome requires review',
+        lastError: 'WORKER_LEASE_EXPIRED',
+        failedAt: new Date(),
+        completedAt: new Date(),
+        lockedAt: null,
+      },
+    });
+    return result.count;
+  }
+
   async prepareRetry(messageId: string) {
     const db = await this.db();
     const message = await db.commerceMessage.findUniqueOrThrow({
@@ -380,4 +422,16 @@ export class TransactionalMessagingService {
     if (!value || Array.isArray(value) || typeof value !== 'object') return {};
     return value as Record<string, unknown>;
   }
+}
+
+function boundedInt(
+  value: string | undefined,
+  fallback: number,
+  minimum: number,
+  maximum: number,
+): number {
+  const parsed = Number(value ?? fallback);
+  return Number.isSafeInteger(parsed) && parsed >= minimum
+    ? Math.min(parsed, maximum)
+    : fallback;
 }

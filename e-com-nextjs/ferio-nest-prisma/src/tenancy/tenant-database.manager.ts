@@ -48,13 +48,18 @@ export class TenantDatabaseManager implements OnModuleDestroy {
   private sweepTimer: NodeJS.Timeout;
 
   constructor() {
-    this.maxClients = Math.max(Number(process.env.TENANT_DB_MAX_CLIENTS ?? 25), 2);
-    this.idleTtlMs = Number(process.env.TENANT_DB_IDLE_TTL_SECONDS ?? 300) * 1000;
+    this.maxClients = boundedInt(process.env.TENANT_DB_MAX_CLIENTS, 25, 2, 500);
+    this.idleTtlMs =
+      boundedInt(process.env.TENANT_DB_IDLE_TTL_SECONDS, 300, 30, 86_400) *
+      1000;
     this.evictionGraceMs = Math.max(
       Number(process.env.TENANT_DB_EVICTION_GRACE_MS ?? this.idleTtlMs),
       0,
     );
-    this.sweepTimer = setInterval(() => void this.evictIdle(), Math.min(this.idleTtlMs / 2, 60_000));
+    this.sweepTimer = setInterval(
+      () => void this.evictIdle(),
+      Math.min(this.idleTtlMs / 2, 60_000),
+    );
     // Never hold the process open for the sweeper.
     this.sweepTimer.unref?.();
   }
@@ -122,8 +127,25 @@ export class TenantDatabaseManager implements OnModuleDestroy {
         password,
         // MT-13 connection budget: per-tenant pools must sum inside the
         // server's max_connections alongside control plane + workers.
-        max: Math.max(Number(process.env.TENANT_DB_POOL_MAX ?? 3), 1),
-        connectionTimeoutMillis: Number(process.env.TENANT_DB_ACQUIRE_TIMEOUT_MS ?? 5000),
+        max: boundedInt(process.env.TENANT_DB_POOL_MAX, 3, 1, 50),
+        idleTimeoutMillis: boundedInt(
+          process.env.TENANT_DB_IDLE_TIMEOUT_MS,
+          30_000,
+          1_000,
+          300_000,
+        ),
+        connectionTimeoutMillis: boundedInt(
+          process.env.TENANT_DB_ACQUIRE_TIMEOUT_MS,
+          5_000,
+          250,
+          60_000,
+        ),
+        maxUses: boundedInt(
+          process.env.TENANT_DB_POOL_MAX_USES,
+          0,
+          0,
+          1_000_000,
+        ),
       });
       const client = new PrismaClient({ adapter: new PrismaPg(pool) });
       await client.$connect();
@@ -203,7 +225,9 @@ export class TenantDatabaseManager implements OnModuleDestroy {
       activeClients: this.cache.size,
       pendingClients: this.creations.size,
       maxClients: this.maxClients,
-      openBreakers: [...this.breakers.entries()].filter(([, b]) => b.openedAt !== null).length,
+      openBreakers: [...this.breakers.entries()].filter(
+        ([, b]) => b.openedAt !== null,
+      ).length,
     };
   }
 
@@ -290,6 +314,20 @@ export class TenantDatabaseManager implements OnModuleDestroy {
     this.shuttingDown = true;
     clearInterval(this.sweepTimer);
     await Promise.allSettled([...this.creations.values()]);
-    await Promise.allSettled([...this.cache.keys()].map((id) => this.disconnect(id)));
+    await Promise.allSettled(
+      [...this.cache.keys()].map((id) => this.disconnect(id)),
+    );
   }
+}
+
+function boundedInt(
+  value: string | undefined,
+  fallback: number,
+  minimum: number,
+  maximum: number,
+): number {
+  const parsed = Number(value ?? fallback);
+  return Number.isSafeInteger(parsed) && parsed >= minimum
+    ? Math.min(parsed, maximum)
+    : fallback;
 }

@@ -1,4 +1,9 @@
-import { ConflictException, Injectable, OnModuleInit, Optional } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  OnModuleInit,
+  Optional,
+} from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { ConfigService } from '@nestjs/config';
 import type { Queue } from 'bullmq';
@@ -11,7 +16,8 @@ import { TransactionalMessagingService } from './transactional-messaging.service
 
 export const TRANSACTIONAL_MESSAGE_JOB = 'dispatch-transactional-message';
 export const TRANSACTIONAL_MESSAGE_SWEEP_JOB = 'sweep-transactional-messages';
-export const TRANSACTIONAL_MESSAGE_SCHEDULER_ID = 'ferio-transactional-message-dispatch';
+export const TRANSACTIONAL_MESSAGE_SCHEDULER_ID =
+  'ferio-transactional-message-dispatch';
 
 export type TransactionalMessageJobData = {
   messageId?: string;
@@ -42,7 +48,13 @@ export class TransactionalMessageQueue implements OnModuleInit {
     const policy = await this.messages.getPolicy();
     try {
       const [counts, scheduler, eligible] = await Promise.all([
-        this.queue.getJobCounts('waiting', 'active', 'completed', 'failed', 'delayed'),
+        this.queue.getJobCounts(
+          'waiting',
+          'active',
+          'completed',
+          'failed',
+          'delayed',
+        ),
         this.queue.getJobScheduler(TRANSACTIONAL_MESSAGE_SCHEDULER_ID),
         this.messages.eligibleMessages(this.batchSize()),
       ]);
@@ -53,7 +65,9 @@ export class TransactionalMessageQueue implements OnModuleInit {
         batchSize: this.batchSize(),
         eligibleCount: eligible.length,
         counts,
-        scheduler: scheduler ? { id: scheduler.id, name: scheduler.name, next: scheduler.next } : null,
+        scheduler: scheduler
+          ? { id: scheduler.id, name: scheduler.name, next: scheduler.next }
+          : null,
         policyEnabled: policy.enabled,
       };
     } catch (error) {
@@ -73,23 +87,26 @@ export class TransactionalMessageQueue implements OnModuleInit {
     // stamps each job with its organization so the processor resolves the
     // correct database. Legacy mode runs once, envelope-free.
     if ((process.env.TENANCY_ENABLED || 'false') !== 'true') {
-      const messages = await this.messages.eligibleMessages(this.batchSize());
-      await this.queue.addBulk(
-        messages.map(({ id }) => this.jobFor(id)),
+      const staleBlocked = await this.messages.blockStaleProcessing(
+        this.batchSize(),
       );
-      return { queuedCount: messages.length };
+      const messages = await this.messages.eligibleMessages(this.batchSize());
+      await this.queue.addBulk(messages.map(({ id }) => this.jobFor(id)));
+      return { queuedCount: messages.length, staleBlocked };
     }
 
     if (!this.fanout) throw new Error('TENANT_FANOUT_UNAVAILABLE');
     let queuedCount = 0;
+    let staleBlocked = 0;
     const fanout = await this.fanout.forEachTenant(
       async () => {
+        staleBlocked += await this.messages.blockStaleProcessing(
+          this.batchSize(),
+        );
         const messages = await this.messages.eligibleMessages(this.batchSize());
         const context = tryGetTenantContext();
         await this.queue.addBulk(
-          messages.map(({ id }) =>
-            this.jobFor(id, context?.organizationId),
-          ),
+          messages.map(({ id }) => this.jobFor(id, context?.organizationId)),
         );
         queuedCount += messages.length;
       },
@@ -97,6 +114,7 @@ export class TransactionalMessageQueue implements OnModuleInit {
     );
     return {
       queuedCount,
+      staleBlocked,
       tenantsProcessed: fanout.processed,
       tenantFailures: fanout.failures,
     };
@@ -121,10 +139,13 @@ export class TransactionalMessageQueue implements OnModuleInit {
 
   async retry(messageId: string, actor: UserPayload) {
     if (!this.enabled()) {
-      throw new ConflictException('Transactional dispatch is disabled by deployment configuration');
+      throw new ConflictException(
+        'Transactional dispatch is disabled by deployment configuration',
+      );
     }
     const policy = await this.messages.getPolicy();
-    if (!policy.enabled) throw new ConflictException('Transactional routing policy is disabled');
+    if (!policy.enabled)
+      throw new ConflictException('Transactional routing policy is disabled');
     await this.messages.prepareRetry(messageId);
     const context = tryGetTenantContext();
     if (
@@ -154,14 +175,23 @@ export class TransactionalMessageQueue implements OnModuleInit {
   }
 
   private enabled() {
-    return this.config.get<string>('TRANSACTIONAL_MESSAGE_DISPATCH_ENABLED', 'false') === 'true';
+    return (
+      this.config.get<string>(
+        'TRANSACTIONAL_MESSAGE_DISPATCH_ENABLED',
+        'false',
+      ) === 'true'
+    );
   }
 
   private everyMinutes() {
-    return Number(this.config.get<string>('TRANSACTIONAL_MESSAGE_SWEEP_EVERY_MINUTES', '5'));
+    return Number(
+      this.config.get<string>('TRANSACTIONAL_MESSAGE_SWEEP_EVERY_MINUTES', '5'),
+    );
   }
 
   private batchSize() {
-    return Number(this.config.get<string>('TRANSACTIONAL_MESSAGE_BATCH_SIZE', '100'));
+    return Number(
+      this.config.get<string>('TRANSACTIONAL_MESSAGE_BATCH_SIZE', '100'),
+    );
   }
 }

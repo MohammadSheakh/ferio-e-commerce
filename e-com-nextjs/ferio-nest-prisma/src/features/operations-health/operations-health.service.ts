@@ -57,7 +57,7 @@ export class OperationsHealthService {
   }
 
   private async db(): Promise<PrismaClient> {
-    return (await this.tenantDb?.tryGet() ?? this.prisma) as PrismaClient;
+    return ((await this.tenantDb?.tryGet()) ?? this.prisma) as PrismaClient;
   }
 
   async getHealth() {
@@ -104,7 +104,14 @@ export class OperationsHealthService {
         },
       },
       requests: RequestMetrics.snapshot(),
-      dependencies: { database, redis },
+      dependencies: {
+        database,
+        redis,
+        pools: {
+          controlPlane: this.prisma.poolMetrics,
+          tenant: this.tenantDb?.metrics(),
+        },
+      },
       queues,
       commerce,
       providers: {
