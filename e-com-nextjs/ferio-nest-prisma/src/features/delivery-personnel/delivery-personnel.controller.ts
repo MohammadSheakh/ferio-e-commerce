@@ -7,7 +7,6 @@ import {
   Patch,
   Post,
   Query,
-  Req,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -20,7 +19,9 @@ import {
   RolesGuard,
   SlidingWindowRateLimitGuard,
   RateLimit,
+  User,
 } from '@app/common';
+import type { UserPayload } from '@app/common';
 import {
   ApplyDeliveryPersonnelDto,
   AssignOrderDto,
@@ -145,9 +146,8 @@ export class DeliveryPersonnelController {
   @Get('my-orders')
   @UseGuards(AuthGuard, RolesGuard)
   @Roles('delivery_man')
-  getMyOrders(@Req() req: any) {
-    const userId = req.user?.userId || req.user?.id || req.user?.sub;
-    return this.service.getMyAssignedOrders(userId);
+  getMyOrders(@User() actor: UserPayload) {
+    return this.service.getMyAssignedOrders(actor.userId);
   }
 
   /**
@@ -157,12 +157,11 @@ export class DeliveryPersonnelController {
   @UseGuards(AuthGuard, RolesGuard)
   @Roles('delivery_man')
   updateDeliveryOrderStatus(
-    @Req() req: any,
+    @User() actor: UserPayload,
     @Param('orderId') orderId: string,
     @Body() dto: UpdateDeliveryOrderStatusDto,
   ) {
-    const userId = req.user?.userId || req.user?.id || req.user?.sub;
-    return this.service.updateDeliveryOrderStatus(userId, orderId, dto);
+    return this.service.updateDeliveryOrderStatus(actor.userId, orderId, dto);
   }
 
   /**
@@ -171,9 +170,8 @@ export class DeliveryPersonnelController {
   @Get('me')
   @UseGuards(AuthGuard, RolesGuard)
   @Roles('delivery_man')
-  getMyProfile(@Req() req: any) {
-    const userId = req.user?.userId || req.user?.id || req.user?.sub;
-    return this.service.getMyProfile(userId);
+  getMyProfile(@User() actor: UserPayload) {
+    return this.service.getMyProfile(actor.userId);
   }
 
   /**
@@ -182,9 +180,11 @@ export class DeliveryPersonnelController {
   @Patch('online-status')
   @UseGuards(AuthGuard, RolesGuard)
   @Roles('delivery_man')
-  toggleOnlineStatus(@Req() req: any, @Body() dto: { isOnline: boolean }) {
-    const userId = req.user?.userId || req.user?.id || req.user?.sub;
-    return this.service.toggleOnlineStatus(userId, dto.isOnline);
+  toggleOnlineStatus(
+    @User() actor: UserPayload,
+    @Body() dto: { isOnline: boolean },
+  ) {
+    return this.service.toggleOnlineStatus(actor.userId, dto.isOnline);
   }
 
   /**
@@ -193,8 +193,7 @@ export class DeliveryPersonnelController {
   @Post('location')
   @UseGuards(AuthGuard, RolesGuard)
   @Roles('delivery_man')
-  updateLocation(@Req() req: any, @Body() dto: UpdateLocationDto) {
-    const userId = req.user?.userId || req.user?.id || req.user?.sub;
-    return this.service.updateLocation(userId, dto);
+  updateLocation(@User() actor: UserPayload, @Body() dto: UpdateLocationDto) {
+    return this.service.updateLocation(actor.userId, dto);
   }
 }

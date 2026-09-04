@@ -57,7 +57,10 @@ export class CourierRouterService {
       input.district.trim().toLowerCase() === 'dhaka' ||
       input.district.trim().toLowerCase().includes('dhaka');
 
-    const dbProviders = await db.shipmentProvider.findMany();
+    const dbProviders = await db.shipmentProvider.findMany({
+      take: 100,
+      select: { code: true, isActive: true, name: true, id: true },
+    });
     const configuredStatus: Record<ShipmentProviderCode, boolean> = {
       PATHAO: Boolean(
         this.config.get('PATHAO_CLIENT_ID') &&

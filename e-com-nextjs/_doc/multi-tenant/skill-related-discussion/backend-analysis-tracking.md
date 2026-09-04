@@ -84,6 +84,21 @@ These are intentionally not marked as application-code fixes:
   interfaces or vendor-specific types, not permission to add `any` to new
   code.
 
+## Architecture Skill Alignment
+
+- Fixed: audit reads and writes now fail closed to the tenant database when
+  tenancy mode is enabled; legacy Prisma fallback is limited to legacy mode.
+- Fixed: shipping retry fan-out no longer performs a dead tenant lookup or
+  silently falls back to the legacy database in tenancy mode.
+- Fixed: courier provider configuration reads are bounded and select only the
+  fields required by routing.
+- Fixed: delivery-personnel rider endpoints use the typed `@User()` principal
+  instead of arbitrary request objects.
+- Updated: `ferio-backend-architecture/SKILL.md` now documents the API route,
+  response/error, typed-principal, and no-new-explicit-`any` contracts.
+- Verified: `pnpm exec tsc --noEmit`, `pnpm test -- --runInBand` (90 suites,
+  408 tests), and `git diff --check` pass.
+
 When a future backend audit finding is fixed, add its status, implementation
 evidence, validation command, and commit reference here. Do not rewrite the
 historical analysis document unless explicitly requested.

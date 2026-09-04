@@ -32,6 +32,23 @@ For tenant-scoped modules:
 - Ensure every module that injects `TenantDbService` imports `TenancyModule`; optional injection must not hide missing dependency wiring.
 - Keep platform services on `PlatformPrismaService`; never mix platform records with tenant commerce records.
 
+## API And TypeScript Contract
+
+- REST routes are exposed below the configured global `api/v1` prefix. Use
+  plural resource nouns, stable nested resources for ownership, and an
+  explicit `admin/` route namespace for tenant-operator actions.
+- Controllers accept validated DTOs and typed `@User()` principals; do not
+  read arbitrary `request.user` shapes or use `req: any`.
+- Preserve the existing response transformation and stable error envelope;
+  domain failures should expose stable error codes rather than database or
+  provider internals.
+- Type every application-owned value. `noImplicitAny` does not prohibit
+  explicit `any`, so new code must use `unknown`, DTOs, Prisma payload/input
+  types, discriminated unions, or a narrow adapter interface instead.
+- Legacy Mongoose, file-upload, OAuth-profile, socket payload, queue, and SDK
+  boundaries must have named adapter types and a migration issue; they are
+  not a reason to spread `any` into domain services.
+
 ## Module Shape
 
 New modules should normally contain:
@@ -139,5 +156,7 @@ Before declaring a new module complete, confirm:
 - Its queues/realtime paths preserve tenant identity.
 - Its tests cover the security and failure paths above.
 - Build, generated Prisma clients, type-check, lint, and relevant tests have been verified or their failures are clearly reported.
+- No new explicit `any` is introduced; changed legacy boundaries have a
+  named type or a documented migration exception.
 
 This skill guides engineering decisions; it does not replace production load testing, capacity planning, threat modeling, database migration review, or incident-readiness work.

@@ -1,5 +1,5 @@
 import { Injectable, Optional } from '@nestjs/common';
-import { AuditSource, Prisma } from '@prisma/client';
+import { AuditSource, Prisma, type PrismaClient } from '@prisma/client';
 import type { UserPayload } from '@app/common';
 import { PrismaService } from '@app/database';
 import { TenantDbService } from '../../tenancy/tenant-db.service';
@@ -27,7 +27,7 @@ export class AuditService {
   ) {}
 
   async record(input: RecordAuditInput, client?: AuditClient) {
-    const db = client ?? (await this.tenantDb?.tryGet()) ?? this.prisma;
+    const db = client ?? (await this.databaseForRequest());
     return db.auditLog.create({
       data: {
         action: input.action,
@@ -44,16 +44,25 @@ export class AuditService {
   }
 
   async getAuditLogs(query: AuditLogQueryDto) {
-    const db = (await this.tenantDb?.tryGet()) ?? this.prisma;
+    const db = await this.databaseForRequest();
     const where: Prisma.AuditLogWhereInput = {
       action: query.action
-        ? { contains: query.action.normalize('NFKC').trim(), mode: 'insensitive' }
+        ? {
+            contains: query.action.normalize('NFKC').trim(),
+            mode: 'insensitive',
+          }
         : undefined,
       entityType: query.entityType
-        ? { equals: query.entityType.normalize('NFKC').trim(), mode: 'insensitive' }
+        ? {
+            equals: query.entityType.normalize('NFKC').trim(),
+            mode: 'insensitive',
+          }
         : undefined,
       entityId: query.entityId
-        ? { contains: query.entityId.normalize('NFKC').trim(), mode: 'insensitive' }
+        ? {
+            contains: query.entityId.normalize('NFKC').trim(),
+            mode: 'insensitive',
+          }
         : undefined,
       actorId: query.actorId,
       source: query.source,
@@ -85,5 +94,14 @@ export class AuditService {
         hasPrevPage: query.page > 1,
       },
     };
+  }
+
+  private async databaseForRequest(): Promise<PrismaClient> {
+    if ((process.env.TENANCY_ENABLED || 'false') === 'true') {
+      if (!this.tenantDb)
+        throw new Error('TENANT_DATABASE_SERVICE_UNAVAILABLE');
+      return this.tenantDb.get();
+    }
+    return this.prisma;
   }
 }
