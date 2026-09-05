@@ -7,9 +7,10 @@ import {
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { Request } from 'express';
+import type { Request } from 'express';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import type { UserPayload } from '../types/user-payload.type';
+import type { AuthenticatedRequest } from '../types/http-request.type';
 
 /**
  * Authentication Guard
@@ -32,7 +33,7 @@ export class AuthGuard implements CanActivate {
     ]);
 
     // Extract request
-    const request = context.switchToHttp().getRequest<Request>();
+    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const token = this.extractTokenFromHeader(request);
 
     if (isPublic) {
@@ -43,7 +44,7 @@ export class AuthGuard implements CanActivate {
             secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
           });
           if (!this.matchesResolvedTenant(request, payload)) return true;
-          request['user'] = payload;
+          request.user = payload;
         } catch {
           // Ignore errors for public routes
         }
@@ -67,7 +68,7 @@ export class AuthGuard implements CanActivate {
       }
 
       // Attach payload
-      request['user'] = payload;
+      request.user = payload;
     } catch (error) {
       if (error instanceof Error && error.name === 'TokenExpiredError') {
         throw new UnauthorizedException('Token has expired');
@@ -84,13 +85,11 @@ export class AuthGuard implements CanActivate {
   }
 
   private matchesResolvedTenant(
-    request: Request,
+    request: AuthenticatedRequest,
     payload: UserPayload,
   ): boolean {
     if ((process.env.TENANCY_ENABLED || 'false') !== 'true') return true;
-    const resolvedOrganizationId = (
-      request as Request & { tenantOrganizationId?: string }
-    ).tenantOrganizationId;
+    const resolvedOrganizationId = request.tenantOrganizationId;
     return Boolean(
       resolvedOrganizationId &&
       payload.organizationId &&

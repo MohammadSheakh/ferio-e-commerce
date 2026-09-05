@@ -4,6 +4,22 @@ import { StructuredLogger } from '@app/common';
 import { QUEUE_NAMES } from '../bullmq.constants';
 import { EmailService } from '../../../features/authentication/email/email.service';
 
+type EmailJobData = {
+  email?: unknown;
+  otp?: unknown;
+  type?: unknown;
+  name?: unknown;
+  token?: unknown;
+  purpose?: unknown;
+};
+
+function requiredString(value: unknown, field: string): string {
+  if (typeof value !== 'string' || value.length === 0) {
+    throw new Error(`EMAIL_JOB_INVALID_FIELD:${field}`);
+  }
+  return value;
+}
+
 /**
  * Email Processor
  *
@@ -19,38 +35,34 @@ export class EmailProcessor extends WorkerHost {
     super();
   }
 
-  async process(job: Job<any, any, string>): Promise<any> {
+  async process(job: Job<EmailJobData, unknown, string>): Promise<unknown> {
     this.logger.log('email_job_started', { jobId: job.id, jobName: job.name });
 
     try {
       switch (job.name) {
         case 'send-otp-email':
           return await this.emailService.sendOtpEmailNow(
-            job.data.email,
-            job.data.otp,
-            job.data.type,
+            requiredString(job.data.email, 'email'),
+            requiredString(job.data.otp, 'otp'),
+            requiredString(job.data.type, 'type') as 'verify' | 'reset',
           );
         case 'send-welcome-email':
           return await this.emailService.sendWelcomeEmailNow(
-            job.data.email,
-            job.data.name,
+            requiredString(job.data.email, 'email'),
+            requiredString(job.data.name, 'name'),
           );
         case 'send-password-reset-confirmation':
           return await this.emailService.sendPasswordResetConfirmationNow(
-            job.data.email,
+            requiredString(job.data.email, 'email'),
           );
         case 'send-staff-access-email':
           return await this.emailService.sendStaffAccessEmailNow(
-            job.data.email,
-            job.data.token,
-            job.data.purpose,
+            requiredString(job.data.email, 'email'),
+            requiredString(job.data.token, 'token'),
+            requiredString(job.data.purpose, 'purpose') as 'INVITE' | 'RESET',
           );
         case 'send-task-notification':
-          return await this.emailService.sendTaskNotificationEmailNow(
-            job.data.email,
-            job.data.taskTitle,
-            job.data.type,
-          );
+          throw new Error(`EMAIL_JOB_NOT_IMPLEMENTED:${job.name}`);
         default:
           this.logger.warn('email_job_unknown', { jobName: job.name });
       }

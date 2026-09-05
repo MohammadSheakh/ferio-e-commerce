@@ -5,7 +5,6 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import type { Request } from 'express';
 import {
   Permission,
   roleHasPermission,
@@ -13,6 +12,7 @@ import {
 import { PERMISSIONS_KEY } from '../decorators/permissions.decorator';
 import type { UserPayload } from '../types/user-payload.type';
 import { StructuredLogger } from '../utils/structured-logger';
+import type { AuthenticatedRequest } from '../types/http-request.type';
 
 @Injectable()
 export class PermissionsGuard implements CanActivate {
@@ -27,7 +27,7 @@ export class PermissionsGuard implements CanActivate {
     );
     if (!requiredPermissions?.length) return true;
 
-    const request = context.switchToHttp().getRequest<Request>();
+    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const user = request.user;
     if (!user) {
       this.logger.warn('authorization_permission_rejected', {

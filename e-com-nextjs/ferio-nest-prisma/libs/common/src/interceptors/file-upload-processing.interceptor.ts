@@ -7,11 +7,7 @@ import {
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
-import type { Request } from 'express';
-
-interface UploadRequest extends Request {
-  files?: Record<string, Express.Multer.File[]>;
-}
+import type { UploadRequest } from '../types/http-request.type';
 
 /**
  * File Upload Processing Interceptor

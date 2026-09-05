@@ -1,4 +1,4 @@
-import type { UserPayload } from './libs/common/src/types/user-payload.type';
+import type { UserPayload } from './user-payload.type';
 
 declare global {
   namespace Express {
@@ -8,4 +8,5 @@ declare global {
     }
   }
 }
+
 export {};

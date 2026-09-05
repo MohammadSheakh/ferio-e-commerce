@@ -1,10 +1,10 @@
 import { Processor, Process } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
-import { Logger, Inject } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 
-import { QUEUE_NAMES, BULLMQ_NOTIFICATION_QUEUE } from './bullmq.constants';
+import { QUEUE_NAMES } from './bullmq.constants';
 import { Notification, NotificationDocument } from '../../modules/notification.module/notification.schema';
 import { SocketGateway } from '../../modules/socket.gateway/socket.gateway';
 import { SendNotificationDto } from '../../modules/notification.module/dto/notification.dto';
@@ -27,7 +27,6 @@ export class NotificationProcessor {
 
   constructor(
     @InjectModel(Notification.name) private notificationModel: Model<NotificationDocument>,
-    @Inject(BULLMQ_NOTIFICATION_QUEUE) private notificationQueue: any,
     private socketGateway: SocketGateway,
   ) {}
 
@@ -81,8 +80,10 @@ export class NotificationProcessor {
           this.logger.log(`📴 User ${receiverId} is offline, notification saved in DB only`);
         }
       }
-    } catch (err: any) {
-      this.logger.error(`❌ Notification job ${jobId} failed: ${err.message}`, err.stack);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      const stack = err instanceof Error ? err.stack : undefined;
+      this.logger.error(`❌ Notification job ${jobId} failed: ${message}`, stack);
       throw err; // ensures retry/backoff
     }
   }

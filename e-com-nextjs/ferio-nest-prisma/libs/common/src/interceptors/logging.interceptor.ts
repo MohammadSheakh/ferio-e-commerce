@@ -10,6 +10,7 @@ import { Request, Response } from 'express';
 import { sanitizeUrlForLogs } from '../utils/log-sanitizer';
 import { RequestMetrics } from '../utils/request-metrics';
 import { StructuredLogger } from '../utils/structured-logger';
+import type { AuthenticatedRequest } from '../types/http-request.type';
 
 /**
  * Logging Interceptor
@@ -37,7 +38,7 @@ export class LoggingInterceptor implements NestInterceptor {
   private readonly logger = new StructuredLogger(LoggingInterceptor.name);
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
-    const request = context.switchToHttp().getRequest<Request>();
+    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const response = context.switchToHttp().getResponse<Response>();
 
     const { method, url } = request;
