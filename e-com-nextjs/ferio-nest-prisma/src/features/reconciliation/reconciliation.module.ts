@@ -3,10 +3,10 @@ import { PrismaModule } from '@app/database';
 import { TenancyModule } from '../../tenancy/tenancy.module';
 import { AuthModule } from '../authentication/auth.module';
 import { AuditModule } from '../audit/audit.module';
-import { ReconciliationController } from './reconciliation.controller';
-import { ReconciliationProcessor } from './reconciliation.processor';
-import { ReconciliationQueue } from './reconciliation.queue';
-import { ReconciliationService } from './reconciliation.service';
+import { ReconciliationController } from './controllers/reconciliation.controller';
+import { ReconciliationProcessor } from './processors/reconciliation.processor';
+import { ReconciliationQueue } from './queues/reconciliation.queue';
+import { ReconciliationService } from './services/reconciliation.service';
 
 @Module({
   imports: [ TenancyModule,PrismaModule, AuthModule, AuditModule],

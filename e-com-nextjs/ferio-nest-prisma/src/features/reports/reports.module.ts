@@ -2,8 +2,8 @@ import { Module } from '@nestjs/common';
 import { PrismaModule } from '@app/database';
 import { TenancyModule } from '../../tenancy/tenancy.module';
 import { AuthModule } from '../authentication/auth.module';
-import { ReportsController } from './reports.controller';
-import { ReportsService } from './reports.service';
+import { ReportsController } from './controllers/reports.controller';
+import { ReportsService } from './services/reports.service';
 import { AuditModule } from '../audit/audit.module';
 
 @Module({

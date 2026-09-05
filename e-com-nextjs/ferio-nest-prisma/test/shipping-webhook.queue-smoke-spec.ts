@@ -2,7 +2,7 @@ import type { ConfigService } from '@nestjs/config';
 import { Queue, QueueEvents, Worker } from 'bullmq';
 import type { PrismaService } from '@app/database';
 import type { AuditService } from '../src/features/audit/audit.service';
-import type { ShippingService } from '../src/features/shipping/shipping.service';
+import type { ShippingService } from '../src/features/shipping/services/shipping.service';
 import { ShippingWebhookProcessor } from '../src/features/shipping/shipping-webhook.processor';
 import {
   COURIER_CALLBACK_RETRY_JOB,

@@ -10,7 +10,7 @@ import {
 import {
   normalizeCourierStatus,
   secureWebhookCredentialEquals,
-} from '../shipping.util';
+} from '../utils/shipping.util';
 
 @Injectable()
 export class SteadfastAdapter implements CourierAdapter {

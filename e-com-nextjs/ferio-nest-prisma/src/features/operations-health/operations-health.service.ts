@@ -7,7 +7,7 @@ import { RedisService } from '@app/redis';
 import { QUEUE_NAMES } from '@app/queue';
 import { RequestMetrics } from '@app/common';
 import { PaymentGatewayRegistry } from '../commerce-payments/gateways/payment-gateway.registry';
-import { ShippingService } from '../shipping/shipping.service';
+import { ShippingService } from '../shipping/services/shipping.service';
 import { TenantDbService } from '../../tenancy/tenant-db.service';
 import type { PrismaClient } from '@prisma/client';
 
@@ -24,6 +24,7 @@ type QueueEvidence = {
 };
 
 type CourierReadiness = Awaited<ReturnType<ShippingService['getProviders']>>;
+type CourierReadinessItem = CourierReadiness[number];
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -64,7 +65,7 @@ export class OperationsHealthService {
     const [database, redis, queues, commerce, couriers] = await Promise.all([
       this.databaseProbe(),
       this.redisProbe(),
-      Promise.all(this.queues.map((queue) => this.queueEvidence(queue))),
+      Promise.all(this.queues.map((queue: { name: string; queue: Queue }) => this.queueEvidence(queue))),
       this.commerceEvidence(),
       this.shipping.getProviders().catch(() => [] as CourierReadiness),
     ]);
@@ -80,7 +81,7 @@ export class OperationsHealthService {
       ...(payments.some((provider) => provider.configured)
         ? []
         : ['No prepaid payment provider is configured.']),
-      ...(couriers.some((provider) => provider.isActive && provider.configured)
+      ...(couriers.some((provider: CourierReadinessItem) => provider.isActive && provider.configured)
         ? []
         : ['No active courier has verified runtime configuration.']),
       ...(backup.status === 'CURRENT'
@@ -116,7 +117,7 @@ export class OperationsHealthService {
       commerce,
       providers: {
         payments,
-        couriers: couriers.map((provider) => ({
+        couriers: couriers.map((provider: CourierReadinessItem) => ({
           code: provider.code,
           name: provider.name,
           active: provider.isActive,

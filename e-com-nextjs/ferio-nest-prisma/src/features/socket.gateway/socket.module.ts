@@ -1,7 +1,7 @@
 import { Module, Global, forwardRef } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 
-import { SocketGateway } from './socket.gateway';
+import { SocketGateway } from './gateway/socket.gateway';
 import { SocketAuthService } from './services/socket-auth.service';
 import { SocketRoomService } from './services/socket-room.service';
 import { RedisModule } from '@app/redis';
@@ -9,7 +9,7 @@ import { PrismaModule } from '@app/database';
 import { FirebaseModule } from '@app/notification';
 import { ChattingModule } from '../chatting/chatting.module';
 import { TenancyModule } from '../../tenancy/tenancy.module';
-import { SocketAuthController } from './socket-auth.controller';
+import { SocketAuthController } from './controllers/socket-auth.controller';
 
 /**
  * Socket Module

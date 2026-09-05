@@ -18,15 +18,15 @@ feature-name/
   adapters/ | gateways/ | processors/ | policies/ | utils/
   *.controller.ts               # acceptable for a small feature
   *.service.ts                  # acceptable for a small feature
-  *.spec.ts                     # colocated tests are valid NestJS practice
+  tests/                        # feature-level unit/integration tests
 ```
 
 Important decisions:
 
-- Colocated `*.spec.ts` files are not a defect. Nest CLI and the official
-  ecosystem commonly keep a unit test beside the class it verifies. Moving
-  every test to a global `__tests__` tree would weaken ownership and create
-  unnecessary import churn.
+- Colocated `*.spec.ts` files are technically valid NestJS practice, but this
+  repository uses feature-local `tests/` directories as its chosen convention.
+  Tests remain beside their owning feature without mixing production files and
+  test files in the same folder.
 - Multiple controllers/services inside one module are industry-standard when
   they represent one bounded context or explicit subdomains. The module
   should be split only when subdomains have different dependencies, release
@@ -87,6 +87,21 @@ Important decisions:
 - Moved historical user-management submodule notes to
   `_doc/multi-tenant/skill-related-discussion/module-notes/user-management/`.
 - No runtime imports were changed by those moves.
+- Standardized the high-complexity runtime boundaries for `purchase-activity`,
+  `reconciliation`, `refunds`, `reports`, `returns`, `settlements`, `shipping`,
+  and `socket.gateway`.
+- Added explicit `controllers/`, `services/`, `processors/`, `queues/`,
+  `utils/`, and `gateway/` folders where those roles exist. Small cohesive
+  features intentionally keep a flat runtime root instead of receiving empty
+  ceremonial folders.
+- Moved feature-level tests for the remaining modules into local `tests/`
+  folders, including audit, cart, catalog, commerce-payments,
+  customer-account, customer-notifications, customers, operations-health,
+  order, product-request, rto, staff-access, store-locations,
+  storefront-analytics, transactional-messaging, wallet, and warranty.
+- Updated all affected application, test, and integration-test imports.
+- Verification for this refactor: `pnpm exec tsc --noEmit` passed;
+  `pnpm test -- --runInBand` passed with 90 suites and 408 tests.
 
 ## Controlled Follow-Up Refactors
 
@@ -132,5 +147,13 @@ For every rename or extraction:
 - Initial inventory: complete for all feature directories.
 - Structure assessment: complete for 35 feature modules.
 - Safe documentation relocation: complete.
+- Feature role/test layout migration: complete for the current safe wave.
 - Naming migration: pending dedicated implementation wave.
 - Large-service decomposition: pending behavior-first design work.
+
+## Refactor Boundary
+
+This wave intentionally did not flatten the established submodule structures
+under authentication, chatting, checkout, or user-management. Those folders
+already express bounded subdomains and should be renamed or decomposed only as
+an atomic dependency migration, not as a cosmetic bulk move.

@@ -7,7 +7,7 @@ import { Queue } from 'bullmq';
 import type { PrismaClient } from '@prisma/client';
 import { PrismaService } from '@app/database';
 import { TenantDbService } from '../../../tenancy/tenant-db.service';
-import { SocketGateway } from '../../socket.gateway/socket.gateway';
+import { SocketGateway } from '../../socket.gateway/gateway/socket.gateway';
 import {
   BULLMQ_NOTIFY_PARTICIPANTS_QUEUE,
 } from '@app/queue';

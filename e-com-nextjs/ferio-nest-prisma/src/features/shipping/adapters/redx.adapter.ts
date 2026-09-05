@@ -15,7 +15,7 @@ import {
 import {
   normalizeCourierStatus,
   secureWebhookCredentialEquals,
-} from '../shipping.util';
+} from '../utils/shipping.util';
 
 @Injectable()
 export class RedxAdapter implements CourierAdapter {

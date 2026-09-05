@@ -11,7 +11,7 @@ import type { PrismaService } from '@app/database';
 import { AuditService } from '../src/features/audit/audit.service';
 import { PathaoAdapter } from '../src/features/shipping/adapters/pathao.adapter';
 import { SteadfastAdapter } from '../src/features/shipping/adapters/steadfast.adapter';
-import { ShippingService } from '../src/features/shipping/shipping.service';
+import { ShippingService } from '../src/features/shipping/services/shipping.service';
 import { ShippingPollingService } from '../src/features/shipping/shipping-polling.service';
 import { TransactionalMessagingService } from '../src/features/transactional-messaging/transactional-messaging.service';
 import {
