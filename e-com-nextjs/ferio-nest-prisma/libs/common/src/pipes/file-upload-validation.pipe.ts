@@ -34,7 +34,7 @@ export interface FileUploadValidationOptions {
 export class FileUploadValidationPipe implements PipeTransform {
   constructor(private options: FileUploadValidationOptions[]) {}
 
-  transform(value: any, metadata: ArgumentMetadata) {
+  transform(value: unknown, _metadata: ArgumentMetadata) {
     // This pipe is used with @UploadedFiles() decorator
     const files = value as Express.Multer.File[] | Record<string, Express.Multer.File[]>;
 

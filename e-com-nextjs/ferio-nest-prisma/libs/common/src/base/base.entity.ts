@@ -9,7 +9,7 @@ type UpdateQuery<T> = Partial<T>;
 type QueryOptions = Record<string, unknown>;
 
 export interface IBaseEntity {
-  _id: any;
+  _id: string;
   createdAt?: Date;
   updatedAt?: Date;
   isDeleted?: boolean;
@@ -20,16 +20,16 @@ export interface IBaseEntity {
  * Defines common CRUD operations
  */
 export interface IBaseService<T extends IBaseEntity> {
-  findById(id: string, populateOptions?: any, select?: string): Promise<T | null>;
+  findById(id: string, populateOptions?: unknown, select?: string): Promise<T | null>;
   findAll(
     filters?: FilterQuery<T>,
-    populateOptions?: any,
+    populateOptions?: unknown,
     select?: string,
   ): Promise<T[]>;
   findAllWithPagination(
     filters: FilterQuery<T>,
     options: PaginateOptions,
-    populateOptions?: any,
+    populateOptions?: unknown,
     select?: string,
   ): Promise<PaginateResult<T>>;
   create(data: Partial<T>): Promise<T>;
