@@ -121,7 +121,7 @@ export class MigrationOrchestratorService {
       run.results.map((r) => r.tenantDatabaseId),
     );
 
-    let registries = (
+    const registries = (
       await this.platform.client.tenantDatabase.findMany({
         where: { status: 'READY', organization: { status: 'ACTIVE' } },
         orderBy: { organizationId: 'asc' },

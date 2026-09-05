@@ -95,6 +95,26 @@ describe('PlatformBillingService', () => {
     }
   });
 
+  it('rejects structured gateway URLs instead of stringifying provider objects', async () => {
+    const restore = global.fetch;
+    global.fetch = jest.fn().mockResolvedValue({
+      json: async () => ({ GatewayPageURL: { href: 'https://attacker.invalid' } }),
+    }) as unknown as typeof fetch;
+    try {
+      const built = build();
+      await expect(built.service.initiatePayment('inv-1')).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      expect(built.platform.client.saasPaymentAttempt.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: 'FAILED' }),
+        }),
+      );
+    } finally {
+      global.fetch = restore;
+    }
+  });
+
   it('applies a validated success exactly once and marks the invoice paid', async () => {
     const built = build();
     built.platform.client.saasPaymentAttempt.findUnique.mockResolvedValueOnce({

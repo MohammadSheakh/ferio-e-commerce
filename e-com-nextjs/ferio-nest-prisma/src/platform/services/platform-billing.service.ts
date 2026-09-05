@@ -12,6 +12,12 @@ import { toPlatformJsonInput } from '../utils/json-input.util';
 const SSLC_SANDBOX = 'https://sandbox.sslcommerz.com';
 const SSLC_LIVE = 'https://securepay.sslcommerz.com';
 
+function providerText(value: unknown, fallback = ''): string {
+  return typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'
+    ? String(value)
+    : fallback;
+}
+
 export interface InvoiceWithAttempts {
   id: string;
   number: string;
@@ -142,8 +148,6 @@ export class PlatformBillingService {
     const cbBase = publicBase.endsWith('/api/v1')
       ? publicBase
       : `${publicBase}/api/v1`;
-    const callbackQs = `ref=${encodeURIComponent(reference)}`;
-
     const body = new URLSearchParams({
       store_id: creds.storeId,
       store_passwd: creds.password,
@@ -175,8 +179,8 @@ export class PlatformBillingService {
         body,
       });
       const raw = (await response.json()) as Record<string, unknown>;
-      redirectUrl = String(raw.GatewayPageURL ?? '');
-      if (!redirectUrl) throw new Error(String(raw.failedreason ?? 'session failed'));
+      redirectUrl = providerText(raw.GatewayPageURL);
+      if (!redirectUrl) throw new Error(providerText(raw.failedreason, 'session failed'));
       await this.platform.client.saasPaymentAttempt.updateMany({
         where: { reference, status: 'INITIATED' },
         data: { raw: toPlatformJsonInput(raw) },
@@ -318,10 +322,10 @@ export class PlatformBillingService {
     );
     const raw = (await response.json()) as Record<string, unknown>;
     return {
-      status: String(raw.status ?? '').toUpperCase(),
-      tranId: String(raw.tran_id ?? ''),
-      amount: String(raw.amount ?? ''),
-      currency: String(raw.currency ?? 'BDT'),
+      status: providerText(raw.status).toUpperCase(),
+      tranId: providerText(raw.tran_id),
+      amount: providerText(raw.amount),
+      currency: providerText(raw.currency, 'BDT'),
     };
   }
 

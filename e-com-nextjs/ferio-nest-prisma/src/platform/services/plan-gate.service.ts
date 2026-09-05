@@ -1,5 +1,4 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
-import { EntitlementsService } from './entitlements.service';
 import { PlatformPrismaService } from '../platform-prisma.service';
 
 /**
