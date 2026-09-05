@@ -1,5 +1,5 @@
 import { NotFoundException } from '@nestjs/common';
-import { UserDevicesService } from './userDevices.service';
+import { UserDevicesService } from '../userDevices.service';
 
 describe('UserDevicesService ownership', () => {
   function setup(device: { id: string } | null) {

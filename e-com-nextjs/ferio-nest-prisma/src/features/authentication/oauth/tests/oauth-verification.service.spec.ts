@@ -4,7 +4,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { OAuth2Client } from 'google-auth-library';
-import { OAuthVerificationService } from './oauth-verification.service';
+import { OAuthVerificationService } from '../oauth-verification.service';
 
 describe('OAuthVerificationService', () => {
   afterEach(() => jest.restoreAllMocks());

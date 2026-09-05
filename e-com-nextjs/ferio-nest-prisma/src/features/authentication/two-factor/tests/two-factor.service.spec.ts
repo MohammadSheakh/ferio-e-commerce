@@ -1,4 +1,4 @@
-import { TwoFactorService } from './two-factor.service';
+import { TwoFactorService } from '../two-factor.service';
 
 describe('TwoFactorService', () => {
   function setup() {

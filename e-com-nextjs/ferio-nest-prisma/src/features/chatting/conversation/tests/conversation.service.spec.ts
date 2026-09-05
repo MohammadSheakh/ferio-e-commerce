@@ -1,6 +1,6 @@
 import { ForbiddenException } from '@nestjs/common';
-import { ConversationService } from './conversation.service';
-import { ParticipantRole } from './conversation.constant';
+import { ConversationService } from '../conversation.service';
+import { ParticipantRole } from '../conversation.constant';
 
 describe('ConversationService participant authorization', () => {
   function createService(actor: { role: string } | null) {

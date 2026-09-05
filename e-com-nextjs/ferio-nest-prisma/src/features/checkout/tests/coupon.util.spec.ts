@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { calculateCouponDiscount } from './coupon.util';
+import { calculateCouponDiscount } from '../utils/coupon.util';
 
 const rules = JSON.stringify([
   {

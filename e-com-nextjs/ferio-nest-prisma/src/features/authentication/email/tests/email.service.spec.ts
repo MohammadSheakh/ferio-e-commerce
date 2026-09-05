@@ -1,4 +1,4 @@
-import { EmailService } from './email.service';
+import { EmailService } from '../email.service';
 
 describe('EmailService secret-safe diagnostics', () => {
   it('queues required delivery data without logging recipient or OTP values', async () => {

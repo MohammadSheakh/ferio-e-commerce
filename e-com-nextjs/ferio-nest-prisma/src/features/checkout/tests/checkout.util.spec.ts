@@ -3,7 +3,7 @@ import {
   calculateDeliveryFee,
   normalizeBangladeshPhone,
   normalizeDistrict,
-} from './checkout.util';
+} from '../utils/checkout.util';
 
 describe('checkout utilities', () => {
   it.each([

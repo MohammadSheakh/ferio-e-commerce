@@ -161,6 +161,9 @@ For every rename or extraction:
   chatting, and storage.
 - Utility/documentation cleanup: complete for the remaining utility-heavy
   feature modules.
+- Nested test cleanup: complete for authentication, chatting, checkout,
+  settings, and user-management. Tests now live in submodule-local `tests/`
+  folders without flattening those bounded contexts.
 - Naming migration: pending dedicated implementation wave.
 - Large-service decomposition: pending behavior-first design work.
 

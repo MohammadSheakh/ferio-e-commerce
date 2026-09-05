@@ -1,7 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { createHash } from 'crypto';
-import { OtpService } from './otp.service';
-import { OtpType } from './interfaces/otp-payload.interface';
+import { OtpService } from '../otp.service';
+import { OtpType } from '../interfaces/otp-payload.interface';
 
 describe('OtpService security events', () => {
   it('logs invalid verification attempts without email or OTP data', async () => {

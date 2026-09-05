@@ -1,9 +1,9 @@
 import type { Request, Response } from 'express';
 import { UnauthorizedException } from '@nestjs/common';
 
-jest.mock('./auth.service', () => ({ AuthService: class AuthService {} }));
+jest.mock('../auth.service', () => ({ AuthService: class AuthService {} }));
 
-import { AuthController } from './auth.controller';
+import { AuthController } from '../auth.controller';
 
 describe('AuthController native session contract', () => {
   const authService = {

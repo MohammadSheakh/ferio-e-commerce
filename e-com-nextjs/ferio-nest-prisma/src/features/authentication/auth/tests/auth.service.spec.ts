@@ -1,8 +1,8 @@
-jest.mock('../otp/otp.service', () => ({ OtpService: class OtpService {} }));
-jest.mock('../email/email.service', () => ({
+jest.mock('../../otp/otp.service', () => ({ OtpService: class OtpService {} }));
+jest.mock('../../email/email.service', () => ({
   EmailService: class EmailService {},
 }));
-jest.mock('../oauth/oauth-verification.service', () => ({
+jest.mock('../../oauth/oauth-verification.service', () => ({
   OAuthVerificationService: class OAuthVerificationService {},
 }));
 jest.mock('bcrypt', () => ({
@@ -12,7 +12,7 @@ jest.mock('bcrypt', () => ({
 
 import { UnauthorizedException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
-import { AuthService } from './auth.service';
+import { AuthService } from '../auth.service';
 
 describe('AuthService token lifecycle', () => {
   const signAsync = jest.fn().mockResolvedValue('signed-token');

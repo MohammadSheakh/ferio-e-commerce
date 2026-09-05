@@ -3,7 +3,7 @@ import type { UserPayload } from '@app/common';
 import type { PrismaService } from '@app/database';
 import type { AuditService } from '../../audit/services/audit.service';
 import type { ConfigService } from '@nestjs/config';
-import { CommerceSettingsService } from './commerce-settings.service';
+import { CommerceSettingsService } from '../services/commerce-settings.service';
 
 const actor = { userId: 'admin-1', role: 'admin' } as UserPayload;
 const previous = {
