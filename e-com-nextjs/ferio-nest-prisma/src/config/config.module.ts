@@ -39,6 +39,25 @@ import { ConfigModule as NestConfigModule } from '@nestjs/config';
           );
         }
 
+        const nodeEnv = config.NODE_ENV || 'development';
+        if (!['development', 'test', 'production'].includes(nodeEnv)) {
+          throw new Error(
+            'NODE_ENV must be development, test, or production',
+          );
+        }
+
+        const tenancyEnabled = config.TENANCY_ENABLED || 'false';
+        if (!['true', 'false'].includes(tenancyEnabled)) {
+          throw new Error('TENANCY_ENABLED must be true or false');
+        }
+        if (nodeEnv === 'production' && tenancyEnabled !== 'true') {
+          throw new Error(
+            'TENANCY_ENABLED=true is required when NODE_ENV=production; refusing to start in legacy single-tenant mode',
+          );
+        }
+        config.NODE_ENV = nodeEnv;
+        config.TENANCY_ENABLED = tenancyEnabled;
+
         // Validation rules
         const knownWeakSecrets = [
           'your-64-character-random-string-here',
