@@ -87,9 +87,7 @@ export class OrderService {
    * explicitly falls back to the legacy single-tenant DB. Never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    return this.tenantDb
-      ? this.tenantDb.getOrLegacy(this.prisma)
-      : this.prisma;
+    return this.tenantDb ? this.tenantDb.getOrLegacy(this.prisma) : this.prisma;
   }
   private hashIdempotencyKey(value: string): string {
     return createHash('sha256').update(value).digest('hex');
@@ -693,6 +691,12 @@ export class OrderService {
     if (paymentMethod === 'WALLET' && !actor) {
       throw new BadRequestException('Sign in to pay with your wallet');
     }
+    const requireActor = (): UserPayload => {
+      if (!actor) {
+        throw new BadRequestException('Sign in to pay with your wallet');
+      }
+      return actor;
+    };
     // PO-005: suspended tenants keep browsing + admin visibility but new
     // checkout is disabled. Stable code drives both UI and API behavior.
     const tenantContext = tryGetTenantContext();
@@ -804,7 +808,7 @@ export class OrderService {
             paymentMethod === 'WALLET'
               ? await this.resolveWalletCustomer(
                   transaction,
-                  actor!.userId,
+                  requireActor().userId,
                   draft,
                 )
               : await this.resolveCustomer(transaction, draft);
@@ -977,7 +981,7 @@ export class OrderService {
           if (paymentMethod === 'WALLET') {
             await this.wallet.debitOrder(
               transaction,
-              actor!.userId,
+              requireActor().userId,
               order.id,
               total,
             );
