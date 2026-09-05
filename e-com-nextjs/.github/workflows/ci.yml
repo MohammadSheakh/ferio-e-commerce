@@ -148,6 +148,11 @@ jobs:
             echo 'Production Redis healthcheck must receive REDISCLI_AUTH in-container.' >&2
             exit 1
           fi
+          security_count="$(grep -c 'no-new-privileges:true' <<<"$rendered" || true)"
+          if [ "$security_count" -lt 4 ]; then
+            echo 'All production application services must enable no-new-privileges.' >&2
+            exit 1
+          fi
       - name: Assert web runtime images are non-root
         run: |
           for dockerfile in ferio-customer-web/Dockerfile ferio-admin-dashboard/ferio-admin/Dockerfile ferio-platform-admin/Dockerfile; do

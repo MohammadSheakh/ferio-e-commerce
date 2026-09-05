@@ -110,6 +110,9 @@ services:
         reservations:
           cpus: "0.50"
           memory: 512M
+    init: true
+    security_opt:
+      - no-new-privileges:true
     restart: unless-stopped
 
   customer-web:
@@ -137,6 +140,9 @@ services:
         reservations:
           cpus: "0.25"
           memory: 128M
+    init: true
+    security_opt:
+      - no-new-privileges:true
     restart: unless-stopped
 
   admin-web:
@@ -163,6 +169,9 @@ services:
         reservations:
           cpus: "0.25"
           memory: 128M
+    init: true
+    security_opt:
+      - no-new-privileges:true
     restart: unless-stopped
 
   platform-admin:
@@ -182,4 +191,7 @@ services:
         reservations:
           cpus: "0.25"
           memory: 128M
+    init: true
+    security_opt:
+      - no-new-privileges:true
     restart: unless-stopped
