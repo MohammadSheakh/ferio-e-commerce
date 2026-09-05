@@ -6,7 +6,9 @@ import { TenantResolverService } from './tenant-resolver.service';
 
 describe('normalizeTenantHost (ADR-0002 security boundary)', () => {
   it('canonicalizes ordinary hosts', () => {
-    expect(normalizeTenantHost('Acme.Ferio.Local:6733')).toBe('acme.ferio.local');
+    expect(normalizeTenantHost('Acme.Ferio.Local:6733')).toBe(
+      'acme.ferio.local',
+    );
     expect(normalizeTenantHost('shop.example.com.')).toBe('shop.example.com');
   });
 
@@ -22,7 +24,9 @@ describe('normalizeTenantHost (ADR-0002 security boundary)', () => {
     ['a'.repeat(300) + '.com'],
     ['under_score.example.com'],
   ])('rejects %j with TENANT_HOST_INVALID', (input) => {
-    expect(() => normalizeTenantHost(input as string)).toThrow(TenantResolutionException);
+    expect(() => normalizeTenantHost(input as string)).toThrow(
+      TenantResolutionException,
+    );
   });
 });
 
@@ -33,7 +37,12 @@ describe('TenantResolverService fail-closed resolution (MT-2 gate)', () => {
   const redis = { getClient: jest.fn().mockResolvedValue(null) };
 
   beforeEach(() => {
-    platform = { client: { tenantDomain: { findUnique: jest.fn() }, tenantDatabase: { findUnique: jest.fn() } } };
+    platform = {
+      client: {
+        tenantDomain: { findUnique: jest.fn() },
+        tenantDatabase: { findUnique: jest.fn() },
+      },
+    };
     // Constructed manually to avoid Nest DI in tests.
     service = new TenantResolverService(platform as never, redis as never);
     jest.spyOn(service, 'writeCache').mockResolvedValue(undefined);
@@ -145,12 +154,20 @@ describe('TenantResolverService fail-closed resolution (MT-2 gate)', () => {
     platform.client.tenantDomain.findUnique.mockResolvedValue({
       id: 'dom-1',
       status: 'ACTIVE',
-      organization: { id: 'org-1', status: 'SUSPENDED', subscription: { status: 'SUSPENDED' } },
+      organization: {
+        id: 'org-1',
+        status: 'SUSPENDED',
+        subscription: { status: 'SUSPENDED' },
+      },
     });
     platform.client.tenantDatabase.findUnique.mockResolvedValue({
       id: 'tdb-1',
       status: 'READY',
-      host: 'h', port: 5432, databaseName: 'd', username: 'u', credentialCipher: 'c',
+      host: 'h',
+      port: 5432,
+      databaseName: 'd',
+      username: 'u',
+      credentialCipher: 'c',
     });
 
     await expect(
@@ -165,7 +182,11 @@ describe('TenantResolverService fail-closed resolution (MT-2 gate)', () => {
     platform.client.tenantDomain.findUnique.mockResolvedValue({
       id: 'dom-1',
       status: 'ACTIVE',
-      organization: { id: 'org-9', status: 'CLOSURE_PENDING', subscription: null },
+      organization: {
+        id: 'org-9',
+        status: 'CLOSURE_PENDING',
+        subscription: null,
+      },
     });
     await expect(
       service.resolveFromHost('closing.example.com'),
@@ -193,7 +214,9 @@ describe('TenantResolverService fail-closed resolution (MT-2 gate)', () => {
       credentialCipher: 'envelope-blob', // ciphertext only; never plaintext
     });
 
-    await expect(service.resolveFromHost('acme.example.com:8080')).resolves.toEqual({
+    await expect(
+      service.resolveFromHost('acme.example.com:8080'),
+    ).resolves.toEqual({
       organizationId: 'org-1',
       tenantDatabaseId: 'tdb-1',
       database: {
@@ -228,22 +251,24 @@ describe('TenantResolverService fail-closed resolution (MT-2 gate)', () => {
 
   it('does not trust malformed or cross-host positive cache entries', async () => {
     const cached = {
-      get: jest.fn().mockResolvedValue(
-        JSON.stringify({
-          organizationId: 'org-attacker',
-          tenantDatabaseId: 'tdb-attacker',
-          database: {
-            id: 'tdb-attacker',
-            host: 'db',
-            port: 5432,
-            databaseName: 'tenant',
-            username: 'tenant',
-            credentialCipher: 'cipher',
-          },
-          domainId: 'dom-attacker',
-          hostname: 'other.example.com',
-          subscriptionStatus: 'ACTIVE',
-        }),
+      get: jest.fn().mockImplementation((key: string) =>
+        key.includes(':neg:')
+          ? null
+          : JSON.stringify({
+              organizationId: 'org-attacker',
+              tenantDatabaseId: 'tdb-attacker',
+              database: {
+                id: 'tdb-attacker',
+                host: 'db',
+                port: 5432,
+                databaseName: 'tenant',
+                username: 'tenant',
+                credentialCipher: 'cipher',
+              },
+              domainId: 'dom-attacker',
+              hostname: 'other.example.com',
+              subscriptionStatus: 'ACTIVE',
+            }),
       ),
     };
     const redisBackedService = new TenantResolverService(
