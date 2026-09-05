@@ -10,42 +10,44 @@ export class FirebaseService {
     this.initialize();
   }
 
-  private initialize() {
+  private initialize(): void {
     if (this.firebaseInitialized) return;
 
     try {
-      if (!process.env.FIREBASE_PROJECT_ID) {
+      const projectId = process.env.FIREBASE_PROJECT_ID;
+      const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+      const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+
+      if (!projectId || !clientEmail || !privateKey) {
         this.logger.warn('⚠️ Firebase credentials not found in env. Push notifications will be disabled.');
         return;
       }
 
       if (admin.apps.length === 0) {
-        const serviceAccount = {
-          type: process.env.FIREBASE_TYPE,
-          project_id: process.env.FIREBASE_PROJECT_ID,
-          private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
-          private_key: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-          client_email: process.env.FIREBASE_CLIENT_EMAIL,
-          client_id: process.env.FIREBASE_CLIENT_ID,
-          auth_uri: process.env.FIREBASE_AUTH_URI,
-          token_uri: process.env.FIREBASE_TOKEN_URI,
-          auth_provider_x509_cert_url: process.env.FIREBASE_AUTH_PROVIDER_X509_CERT_URL,
-          client_x509_cert_url: process.env.FIREBASE_CLIENT_X509_CERT_URL,
-          universe_domain: process.env.FIREBASE_UNIVERSE_DOMAIN
+        const serviceAccount: admin.ServiceAccount = {
+          projectId,
+          clientEmail,
+          privateKey,
         };
 
         admin.initializeApp({
-          credential: admin.credential.cert(serviceAccount as any),
+          credential: admin.credential.cert(serviceAccount),
         });
         this.logger.log('✅ Firebase Admin SDK initialized');
       }
       this.firebaseInitialized = true;
-    } catch (error: any) {
-      this.logger.warn(`⚠️ Failed to initialize Firebase Admin SDK: ${error.message}`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unknown initialization error';
+      this.logger.warn(`⚠️ Failed to initialize Firebase Admin SDK: ${message}`);
     }
   }
 
-  async sendPushNotification(fcmToken: string, title: string, body: string, data?: any) {
+  async sendPushNotification(
+    fcmToken: string,
+    title: string,
+    body: string,
+    data?: Record<string, string>,
+  ): Promise<void> {
     if (!this.firebaseInitialized) {
       this.logger.warn('⚠️ Push notification skipped (Firebase Admin SDK not initialized)');
       return;

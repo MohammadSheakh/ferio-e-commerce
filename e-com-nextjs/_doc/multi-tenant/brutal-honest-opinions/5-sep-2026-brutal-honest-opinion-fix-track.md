@@ -36,3 +36,4 @@ and must not be modified to make the project look better.
 - Refined the application typecheck to follow `src/main.ts`, `src/app.module.ts`, and `src/platform/platform.module.ts`; it passes without compiling orphaned legacy duplicate trees.
 - Added `pnpm typecheck:application` and its CI gate. This verifies the active dependency graph but does not close the explicit-`any` work.
 - Replaced global request `any` types with `UserPayload` and typed upload metadata; tightened shared guards, user decorator, logging interceptor, exception filter, and upload interceptor. The application typecheck remains green.
+- Replaced Firebase credential and notification payload `any` boundaries with `admin.ServiceAccount`, required credential checks, `unknown` error handling, and `Record<string, string>` message data. The application typecheck remains green.
