@@ -1,6 +1,7 @@
 # ─── Full-Stack Ferio Commerce SaaS ───
-# Runs all infrastructure + applications. Suitable for demo, alpha, or
-# single-server production with a reverse proxy in front.
+# Runs all infrastructure + applications for local development, demos, and
+# alpha testing. It is not a production deployment; use the hardened
+# docker-compose.production.yml overlay with an ingress/orchestrator instead.
 #
 # Quick start:
 #   docker compose up -d --build

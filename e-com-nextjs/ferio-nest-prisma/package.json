@@ -29,6 +29,7 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "test:integration": "jest --config ./test/jest-integration.json --runInBand",
+    "test:performance": "jest --config ./test/jest-integration.json --runInBand --runTestsByPath test/performance-baseline.integration-spec.ts",
     "test:queue-smoke": "jest --config ./test/jest-queue-smoke.json --runInBand",
     "prisma:generate:platform": "pnpm prisma generate --schema prisma/platform.prisma",
     "prisma:migrate:platform": "pnpm exec prisma migrate deploy --config prisma/platform.config.ts",

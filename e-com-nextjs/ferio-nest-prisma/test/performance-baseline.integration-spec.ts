@@ -208,7 +208,7 @@ describe('§16.3 resolver load behavior', () => {
 
 // ─────────────────── Connection manager bounds & latency ───────────────────
 
-describe('§16.3 connection manager baselines (real PostgreSQL)', () => {
+conditionalDescribe('§16.3 connection manager baselines (real PostgreSQL)', () => {
   const created: string[] = [];
 
   afterAll(async () => {

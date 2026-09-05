@@ -85,6 +85,8 @@ jobs:
         run: pnpm test
       - name: Cross-tenant isolation + bootstrap integration tests
         run: pnpm test:integration
+      - name: Tenant capacity baseline evidence
+        run: pnpm test:performance
       - name: BullMQ runtime smoke tests
         run: pnpm test:queue-smoke
 
