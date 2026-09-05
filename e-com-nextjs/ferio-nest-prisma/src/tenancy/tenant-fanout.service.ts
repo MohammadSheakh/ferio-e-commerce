@@ -10,6 +10,10 @@ export interface FanoutOutcome<T> {
   failures: Array<{ organizationId: string; error: string }>;
 }
 
+type TenantDatabaseMaterial = Parameters<TenantDatabaseManager['runTransient']>[0] & {
+  organizationId: string;
+};
+
 /**
  * Multi-tenant worker fan-out (MT-8 §11.2).
  *
@@ -101,18 +105,10 @@ export class TenantFanoutService {
       throw new Error(`TENANT_DATABASE_NOT_READY:${organizationId}`);
     }
     await this.manager.getClient(registry);
-    return runWithTenantContext(this.contextFor(registry as never), fn);
+    return runWithTenantContext(this.contextFor(registry), fn);
   }
 
-  private contextFor(registry: {
-    id: string;
-    organizationId: string;
-    host: string;
-    port: number;
-    databaseName: string;
-    username: string;
-    credentialCipher: string;
-  }): TenantContext {
+  private contextFor(registry: TenantDatabaseMaterial): TenantContext {
     return Object.freeze({
       organizationId: registry.organizationId,
       tenantDatabaseId: registry.id,
