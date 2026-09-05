@@ -26,7 +26,7 @@ import type { AuthenticatedRequest } from '../types/http-request.type';
  * Features:
  * ✅ Sliding window algorithm (no burst at window edges)
  * ✅ Atomic operations via Redis Pipeline
- * ✅ Fail-open logic for high availability
+ * ✅ Environment-aware Redis outage policy
  * ✅ Standard X-RateLimit headers
  * ✅ Custom route-based presets
  */
@@ -52,13 +52,10 @@ export class SlidingWindowRateLimitGuard implements CanActivate {
       return true;
     }
 
-    // If Redis is down, fail open (allow request)
+    // Production fails closed unless an operator explicitly opts into the
+    // availability trade-off. Development and test remain fail-open.
     if (!this.redisClient) {
-      this.logger.warn('rate_limit_bypassed', {
-        reason: 'REDIS_UNAVAILABLE',
-        keyPrefix: options.keyPrefix || 'default',
-      });
-      return true;
+      return this.handleUnavailable(options, 'REDIS_UNAVAILABLE');
     }
 
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
@@ -97,12 +94,16 @@ export class SlidingWindowRateLimitGuard implements CanActivate {
       const results = await pipeline.exec();
 
       if (!results) {
-        return true; // Fail open
+        return this.handleUnavailable(options, 'REDIS_PIPELINE_EMPTY');
       }
 
       // results is array of [error, result]
       // index 3 is zcard result
-      const count = results[3][1] as number;
+      const countResult = results[3]?.[1];
+      if (typeof countResult !== 'number') {
+        return this.handleUnavailable(options, 'REDIS_COUNT_INVALID');
+      }
+      const count = countResult;
       const remaining = Math.max(0, options.max - count);
       const reset = Math.ceil((now + options.windowMs) / 1000);
 
@@ -113,7 +114,7 @@ export class SlidingWindowRateLimitGuard implements CanActivate {
 
       if (count > options.max) {
         let retryAfterSeconds = Math.ceil(options.windowMs / 1000);
-        const zrangeResult = results[4]?.[1] as string[] | undefined;
+        const zrangeResult: unknown = results[4]?.[1];
         if (Array.isArray(zrangeResult) && zrangeResult.length >= 2) {
           const oldestScore = Number(zrangeResult[1]);
           if (!Number.isNaN(oldestScore) && oldestScore > 0) {
@@ -153,8 +154,31 @@ export class SlidingWindowRateLimitGuard implements CanActivate {
       this.logger.error('rate_limit_evaluation_failed', error, {
         keyPrefix,
       });
-      return true; // Fail open for any other errors
+      return this.handleUnavailable(options, 'REDIS_EVALUATION_FAILED');
     }
+  }
+
+  private handleUnavailable(options: RateLimitOptions, reason: string): boolean {
+    const keyPrefix = options.keyPrefix || 'default';
+    const failOpen =
+      process.env.NODE_ENV !== 'production' ||
+      process.env.RATE_LIMIT_FAIL_OPEN === 'true';
+
+    this.logger.warn('rate_limit_unavailable', {
+      reason,
+      keyPrefix,
+      failOpen,
+    });
+
+    if (failOpen) return true;
+
+    throw new HttpException(
+      {
+        success: false,
+        message: 'Request protection is temporarily unavailable.',
+      },
+      HttpStatus.SERVICE_UNAVAILABLE,
+    );
   }
 
   private formatDuration(seconds: number): string {
