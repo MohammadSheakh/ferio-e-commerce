@@ -65,7 +65,7 @@ export class RedisService {
     }
   }
 
-  async getClient(): Promise<Redis | null> {
-    return this.redisClient;
+  getClient(): Promise<Redis | null> {
+    return Promise.resolve(this.redisClient);
   }
 }
