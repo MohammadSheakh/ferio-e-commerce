@@ -46,7 +46,7 @@ export class WarrantyService {
   private async db(): Promise<PrismaClient> {
     return this.tenantDb
       ? this.tenantDb.getOrLegacy(this.prisma)
-      : (this.prisma as PrismaClient);
+      : this.prisma;
   }  private async verifiedOrder(dto: VerifyWarrantyOrderDto) {
     const db = await this.db();
     const reference = dto.reference.trim().toUpperCase();

@@ -58,7 +58,7 @@ export class TransactionalMessagingService {
   private async db(): Promise<PrismaClient> {
     return this.tenantDb
       ? this.tenantDb.getOrLegacy(this.prisma)
-      : (this.prisma as PrismaClient);
+      : this.prisma;
   }
   async enqueueAfterCommit(input: EnqueueCommerceMessageInput): Promise<void> {
     const db = await this.db();
