@@ -45,8 +45,9 @@ export class SettingsService {
 
   /** Tenant client inside resolved requests; legacy DB otherwise (MT-7). */
   private async db(): Promise<PrismaClient> {
-    const tenant = await this.tenantDb?.tryGet();
-    return tenant ?? (this.prisma as PrismaClient);
+    return this.tenantDb
+      ? this.tenantDb.getOrLegacy(this.prisma)
+      : (this.prisma as PrismaClient);
   }
 
   async createOrUpdateSettings(

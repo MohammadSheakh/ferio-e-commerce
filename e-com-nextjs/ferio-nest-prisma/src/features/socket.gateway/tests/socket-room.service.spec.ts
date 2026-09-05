@@ -96,7 +96,7 @@ describe('SocketRoomService tenant isolation', () => {
       }),
     };
     const tenantDb = {
-      tryGet: jest.fn().mockResolvedValue({ user: tenantUser }),
+      getOrLegacy: jest.fn().mockResolvedValue({ user: tenantUser }),
     };
     const fanout = {
       forOrganization: jest.fn((_organizationId, operation) => operation()),

@@ -18,7 +18,7 @@ describe('StorefrontAnalyticsService measured metrics', () => {
     get: jest.fn().mockReturnValue('analytics-test-secret'),
     getOrThrow: jest.fn().mockReturnValue('analytics-test-secret'),
   };
-  const tenantDb = { tryGet: jest.fn().mockResolvedValue(db) };
+  const tenantDb = { getOrLegacy: jest.fn().mockResolvedValue(db) };
 
   function service() {
     return new StorefrontAnalyticsService(
@@ -32,7 +32,7 @@ describe('StorefrontAnalyticsService measured metrics', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     settings.get.mockResolvedValue({ storefrontAnalyticsEnabled: true });
-    tenantDb.tryGet.mockResolvedValue(db);
+    tenantDb.getOrLegacy.mockResolvedValue(db);
   });
 
   it('stores structured search-result evidence', async () => {

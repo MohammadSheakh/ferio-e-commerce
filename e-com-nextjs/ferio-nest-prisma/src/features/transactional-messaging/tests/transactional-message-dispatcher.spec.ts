@@ -107,12 +107,12 @@ describe('TransactionalMessageDispatcher', () => {
     const previous = process.env.TENANCY_ENABLED;
     process.env.TENANCY_ENABLED = 'true';
     const { dispatcher, prisma } = setup([{ status: 'ACCEPTED' }]);
-    const tenantDb = { tryGet: jest.fn().mockResolvedValue(prisma) };
+    const tenantDb = { getOrLegacy: jest.fn().mockResolvedValue(prisma) };
     (dispatcher as unknown as { tenantDb: typeof tenantDb }).tenantDb = tenantDb;
 
     try {
       await dispatcher.execute(message.id);
-      expect(tenantDb.tryGet).toHaveBeenCalledTimes(1);
+      expect(tenantDb.getOrLegacy).toHaveBeenCalledTimes(1);
     } finally {
       if (previous === undefined) delete process.env.TENANCY_ENABLED;
       else process.env.TENANCY_ENABLED = previous;
@@ -123,6 +123,12 @@ describe('TransactionalMessageDispatcher', () => {
     const previous = process.env.TENANCY_ENABLED;
     process.env.TENANCY_ENABLED = 'true';
     const { dispatcher } = setup([]);
+    const tenantDb = {
+      getOrLegacy: jest.fn().mockRejectedValue(
+        new Error('TRANSACTIONAL_MESSAGE_TENANT_CONTEXT_REQUIRED'),
+      ),
+    };
+    (dispatcher as unknown as { tenantDb: typeof tenantDb }).tenantDb = tenantDb;
 
     try {
       await expect(dispatcher.execute(message.id)).rejects.toThrow(

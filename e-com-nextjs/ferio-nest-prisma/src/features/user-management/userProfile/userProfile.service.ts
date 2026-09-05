@@ -3,7 +3,6 @@ import {
   Logger,
   NotFoundException,
   Optional,
-  ServiceUnavailableException,
 } from '@nestjs/common';
 import { Prisma, PrismaClient, UserProfile } from '@prisma/client';
 
@@ -52,12 +51,9 @@ export class UserProfileService {
   ) {}
 
   private async db(): Promise<PrismaClient> {
-    const tenant = await this.tenantDb?.tryGet();
-    if (tenant) return tenant;
-    if ((process.env.TENANCY_ENABLED || 'false') === 'true') {
-      throw new ServiceUnavailableException('TENANT_IDENTITY_CONTEXT_REQUIRED');
-    }
-    return this.prisma as PrismaClient;
+    return this.tenantDb
+      ? this.tenantDb.getOrLegacy(this.prisma)
+      : (this.prisma as PrismaClient);
   }
 
   private getCacheKey(userId: string): string {

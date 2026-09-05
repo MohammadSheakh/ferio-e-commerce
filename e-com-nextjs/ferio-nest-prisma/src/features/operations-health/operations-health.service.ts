@@ -58,7 +58,9 @@ export class OperationsHealthService {
   }
 
   private async db(): Promise<PrismaClient> {
-    return ((await this.tenantDb?.tryGet()) ?? this.prisma) as PrismaClient;
+    return this.tenantDb
+      ? this.tenantDb.getOrLegacy(this.prisma)
+      : (this.prisma as PrismaClient);
   }
 
   async getHealth() {

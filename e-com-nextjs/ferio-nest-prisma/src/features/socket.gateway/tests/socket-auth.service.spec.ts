@@ -99,7 +99,7 @@ describe('SocketAuthService', () => {
   it('re-enters the signed organization for conversation authorization', async () => {
     process.env.TENANCY_ENABLED = 'true';
     const tenantDb = {
-      tryGet: jest.fn().mockResolvedValue({
+      getOrLegacy: jest.fn().mockResolvedValue({
         user: { findUnique: jest.fn().mockResolvedValue({ customerId: 'customer-1' }) },
       }),
     };
@@ -134,7 +134,7 @@ describe('SocketAuthService', () => {
   it('resolves the gateway database from the signed socket organization', async () => {
     process.env.TENANCY_ENABLED = 'true';
     const tenantClient = { user: { findUnique: jest.fn() } };
-    const tenantDb = { tryGet: jest.fn().mockResolvedValue(tenantClient) };
+    const tenantDb = { getOrLegacy: jest.fn().mockResolvedValue(tenantClient) };
     const fanout = {
       forOrganization: jest.fn((_organizationId, operation) => operation()),
     };

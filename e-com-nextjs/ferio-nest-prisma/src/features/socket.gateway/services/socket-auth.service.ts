@@ -60,12 +60,9 @@ export class SocketAuthService {
    * fallback outside resolved requests. Never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    const tenant = await this.tenantDb?.tryGet?.();
-    if (tenant) return tenant;
-    if ((process.env.TENANCY_ENABLED || 'false') === 'true') {
-      throw new Error('SOCKET_TENANT_CONTEXT_REQUIRED');
-    }
-    return this.prisma as unknown as PrismaClient;
+    return this.tenantDb
+      ? this.tenantDb.getOrLegacy(this.prisma)
+      : (this.prisma as PrismaClient);
   }
 
   /**

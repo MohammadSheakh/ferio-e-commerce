@@ -72,8 +72,9 @@ export class SettlementImportsService {
    * outside resolved requests. Never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    const tenant = await this.tenantDb?.tryGet();
-    return tenant ?? (this.prisma as unknown as PrismaClient);
+    return this.tenantDb
+      ? this.tenantDb.getOrLegacy(this.prisma)
+      : (this.prisma as PrismaClient);
   }
 
   async list() {

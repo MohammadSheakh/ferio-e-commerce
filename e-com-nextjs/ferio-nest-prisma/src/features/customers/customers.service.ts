@@ -26,8 +26,9 @@ export class CustomersService {
    * database client; outside one it explicitly falls back to the legacy DB.
    */
   private async db(): Promise<PrismaClient> {
-    const tenant = await this.tenantDb?.tryGet();
-    return tenant ?? (this.prisma as PrismaClient);
+    return this.tenantDb
+      ? this.tenantDb.getOrLegacy(this.prisma)
+      : (this.prisma as PrismaClient);
   }
   async list(query: CustomerQueryDto) {
     const db = await this.db();

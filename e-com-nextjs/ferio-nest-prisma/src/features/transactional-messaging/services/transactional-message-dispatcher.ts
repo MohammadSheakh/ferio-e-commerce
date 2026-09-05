@@ -147,12 +147,9 @@ export class TransactionalMessageDispatcher {
   }
 
   private async db(): Promise<PrismaClient> {
-    const tenant = await this.tenantDb?.tryGet();
-    if (tenant) return tenant;
-    if ((process.env.TENANCY_ENABLED || 'false') === 'true') {
-      throw new Error('TRANSACTIONAL_MESSAGE_TENANT_CONTEXT_REQUIRED');
-    }
-    return this.prisma as PrismaClient;
+    return this.tenantDb
+      ? this.tenantDb.getOrLegacy(this.prisma)
+      : (this.prisma as PrismaClient);
   }
 
   private block(db: PrismaClient, messageId: string, reason: string) {
