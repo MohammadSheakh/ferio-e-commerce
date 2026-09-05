@@ -2012,6 +2012,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/storage/presign-get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["StorageController_presignGet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/storage/presign-put": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["StorageController_presignPut"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/checkout/delivery-options": {
         parameters: {
             query?: never;
@@ -4260,6 +4292,7 @@ export interface components {
         };
         LoginDto: {
             /**
+             * Format: email
              * @description User email address
              * @example user@example.com
              */
@@ -4270,9 +4303,17 @@ export interface components {
              */
             password: string;
         };
-        TwoFactorChallengeDto: Record<string, never>;
-        TwoFactorCodeDto: Record<string, never>;
-        DisableTwoFactorDto: Record<string, never>;
+        TwoFactorChallengeDto: {
+            challengeToken: string;
+            code: string;
+        };
+        TwoFactorCodeDto: {
+            code: string;
+        };
+        DisableTwoFactorDto: {
+            code: string;
+            password: string;
+        };
         RegisterDto: {
             /**
              * @description User full name
@@ -4280,6 +4321,7 @@ export interface components {
              */
             name: string;
             /**
+             * Format: email
              * @description User email address
              * @example user@example.com
              */
@@ -4296,13 +4338,19 @@ export interface components {
             phoneNumber?: string;
         };
         VerifyEmailDto: {
-            /** @example user@example.com */
+            /**
+             * Format: email
+             * @example user@example.com
+             */
             email: string;
             /** @example 123456 */
             otp: string;
         };
         ResendVerificationDto: {
-            /** @example user@example.com */
+            /**
+             * Format: email
+             * @example user@example.com
+             */
             email: string;
         };
         OAuthLoginDto: {
@@ -4323,9 +4371,12 @@ export interface components {
              */
             fcmToken?: string;
         };
-        TokenSessionDto: Record<string, never>;
+        TokenSessionDto: {
+            refreshToken?: string;
+        };
         CreateOtpDto: {
             /**
+             * Format: email
              * @description Email address to send OTP
              * @example user@example.com
              */
@@ -4339,6 +4390,7 @@ export interface components {
         };
         VerifyOtpDto: {
             /**
+             * Format: email
              * @description Email address
              * @example user@example.com
              */
@@ -4357,6 +4409,7 @@ export interface components {
         };
         ResetPasswordDto: {
             /**
+             * Format: email
              * @description Email address
              * @example user@example.com
              */
@@ -4477,17 +4530,18 @@ export interface components {
         UpdateCommerceSettingsDto: {
             /** @example Ferio */
             storeName?: string;
-            legalName?: Record<string, never> | null;
+            legalName?: string | null;
             /** @example +8801712345678 */
-            supportPhone?: Record<string, never> | null;
-            supportEmail?: Record<string, never> | null;
+            supportPhone?: string | null;
+            /** Format: email */
+            supportEmail?: string | null;
             /** @enum {string} */
             currency?: "BDT";
             /** @example Asia/Dhaka */
             timezone?: string;
             /** @example FER */
             orderPrefix?: string;
-            defaultReturnWindowDays?: Record<string, never> | null;
+            defaultReturnWindowDays?: number | null;
             codEnabled?: boolean;
             prepaidEnabled?: boolean;
             serviceBookingEnabled?: boolean;
@@ -4503,42 +4557,305 @@ export interface components {
             purchaseActivityExcludedProductIds?: string[];
             categoryTopNavEnabled?: boolean;
             categorySideNavEnabled?: boolean;
-            termsUrl?: Record<string, never> | null;
-            privacyUrl?: Record<string, never> | null;
-            returnPolicyUrl?: Record<string, never> | null;
+            /** Format: uri */
+            termsUrl?: string | null;
+            /** Format: uri */
+            privacyUrl?: string | null;
+            /** Format: uri */
+            returnPolicyUrl?: string | null;
         };
-        CreateCategoryDto: Record<string, never>;
-        UpdateCategoryDto: Record<string, never>;
-        CreateBrandDto: Record<string, never>;
-        UpdateBrandDto: Record<string, never>;
-        CreateProductDto: Record<string, never>;
-        UpdateProductDto: Record<string, never>;
-        UpdateProductStatusDto: Record<string, never>;
-        AdjustInventoryDto: Record<string, never>;
-        AddCartItemDto: Record<string, never>;
-        UpdateCartItemDto: Record<string, never>;
-        SaveCartDto: Record<string, never>;
-        ReorderDto: Record<string, never>;
-        CheckoutPreviewDto: Record<string, never>;
-        CreateDeliveryZoneDto: Record<string, never>;
-        UpdateDeliveryZoneDto: Record<string, never>;
-        PlaceOrderDto: Record<string, never>;
-        TrackOrderDto: Record<string, never>;
-        ScheduleStorePickupDto: Record<string, never>;
-        UpdateCodPolicyDto: Record<string, never>;
-        ConfirmOrderDto: Record<string, never>;
-        CancelOrderDto: Record<string, never>;
-        UpdateFulfillmentDto: Record<string, never>;
-        UpdateStorePickupStatusDto: Record<string, never>;
-        VerifyStoreHandoverDto: Record<string, never>;
-        CreateFulfillmentExceptionDto: Record<string, never>;
-        ResolveFulfillmentExceptionDto: Record<string, never>;
-        UpdateMessageTemplateDto: Record<string, never>;
-        UpdateMessagingPolicyDto: Record<string, never>;
-        CreateWalletTopUpDto: Record<string, never>;
-        ReviewWalletTopUpDto: Record<string, never>;
-        UpdateShipmentProviderDto: Record<string, never>;
-        CreateShipmentDto: Record<string, never>;
+        Object: Record<string, never>;
+        CreateCategoryDto: {
+            name: string;
+            slug?: string;
+            description?: string;
+            parentId?: string | null;
+            sortOrder?: number;
+            isActive?: boolean;
+        };
+        UpdateCategoryDto: {
+            name?: string;
+            slug?: string;
+            description?: string;
+            parentId?: string | null;
+            sortOrder?: number;
+            isActive?: boolean;
+        };
+        CreateBrandDto: {
+            name: string;
+            slug?: string;
+            description?: string;
+            logoUrl?: string;
+            isActive?: boolean;
+        };
+        UpdateBrandDto: {
+            name?: string;
+            slug?: string;
+            description?: string;
+            logoUrl?: string;
+            isActive?: boolean;
+        };
+        CreateProductVariantDto: {
+            name: string;
+            sku: string;
+            attributes?: Record<string, never>;
+            price: number;
+            compareAtPrice?: number;
+            isActive?: boolean;
+            sortOrder?: number;
+            weightGrams?: number;
+            initialStock?: number;
+            lowStockThreshold?: number;
+        };
+        CreateProductMediaDto: {
+            /** Format: uri */
+            url: string;
+            altText?: string;
+            /** @enum {string} */
+            type?: "IMAGE" | "VIDEO";
+            sortOrder?: number;
+        };
+        ProductYoutubeReviewInputDto: {
+            youtubeUrl: string;
+            title?: string;
+            reviewerName?: string;
+            isFeatured?: boolean;
+        };
+        ProductFeatureInputDto: {
+            title: string;
+            description: string;
+            image?: string;
+            tag?: string;
+            sortOrder?: number;
+        };
+        ProductSpecificationInputDto: {
+            group?: string;
+            key: string;
+            value: string;
+            sortOrder?: number;
+        };
+        CreateProductDto: {
+            name: string;
+            slug?: string;
+            description: string;
+            categoryId: string;
+            brand?: string;
+            brandId?: string;
+            /** @enum {string} */
+            status?: "DRAFT" | "ACTIVE" | "ARCHIVED";
+            isFeatured?: boolean;
+            codAvailable?: boolean;
+            deliveryNote?: string;
+            returnNote?: string;
+            /** @enum {string} */
+            condition?: "NEW" | "SECOND_HAND";
+            /** @enum {string} */
+            conditionGrade?: "LIKE_NEW" | "GOOD" | "FAIR";
+            conditionNote?: string;
+            seoTitle?: string;
+            seoDescription?: string;
+            variants: components["schemas"]["CreateProductVariantDto"][];
+            media?: components["schemas"]["CreateProductMediaDto"][];
+            youtubeReviews?: components["schemas"]["ProductYoutubeReviewInputDto"][];
+            features?: components["schemas"]["ProductFeatureInputDto"][];
+            specifications?: components["schemas"]["ProductSpecificationInputDto"][];
+        };
+        UpdateProductVariantDto: {
+            name: string;
+            sku: string;
+            attributes?: Record<string, never>;
+            price: number;
+            compareAtPrice?: number;
+            isActive?: boolean;
+            sortOrder?: number;
+            weightGrams?: number;
+            initialStock?: number;
+            lowStockThreshold?: number;
+            id?: string;
+        };
+        UpdateProductDto: {
+            name?: string;
+            slug?: string;
+            description?: string;
+            categoryId?: string;
+            brand?: string;
+            brandId?: string;
+            isFeatured?: boolean;
+            codAvailable?: boolean;
+            deliveryNote?: string;
+            returnNote?: string;
+            /** @enum {string} */
+            condition?: "NEW" | "SECOND_HAND";
+            /** @enum {string} */
+            conditionGrade?: "LIKE_NEW" | "GOOD" | "FAIR";
+            conditionNote?: string;
+            seoTitle?: string;
+            seoDescription?: string;
+            variants?: components["schemas"]["UpdateProductVariantDto"][];
+            media?: components["schemas"]["CreateProductMediaDto"][];
+            youtubeReviews?: components["schemas"]["ProductYoutubeReviewInputDto"][];
+            features?: components["schemas"]["ProductFeatureInputDto"][];
+            specifications?: components["schemas"]["ProductSpecificationInputDto"][];
+        };
+        UpdateProductStatusDto: {
+            /** @enum {string} */
+            status: "DRAFT" | "ACTIVE" | "ARCHIVED";
+        };
+        AdjustInventoryDto: {
+            quantityDelta: number;
+            /** @enum {string} */
+            adjustmentReason: "STOCK_COUNT_CORRECTION" | "PURCHASE_RECEIPT" | "CUSTOMER_RETURN" | "DAMAGE_WRITE_OFF" | "OTHER";
+            reason: string;
+            referenceType?: string;
+            referenceId?: string;
+            unitCost?: number;
+            /** Format: uri */
+            evidenceUrl?: string;
+            effectiveAt?: string;
+        };
+        AddCartItemDto: {
+            variantId: string;
+            /** @default 1 */
+            quantity: Record<string, never>;
+        };
+        UpdateCartItemDto: {
+            quantity: number;
+            replacementVariantId?: string;
+        };
+        SaveCartDto: {
+            name?: string;
+        };
+        ReorderDto: {
+            orderItemIds?: string[];
+        };
+        CheckoutPreviewDto: {
+            couponCode?: string;
+            /**
+             * @default HOME_DELIVERY
+             * @enum {string}
+             */
+            deliveryMethod: "HOME_DELIVERY" | "STORE_PICKUP";
+            pickupStoreId?: string;
+            preferredPickupDate?: string;
+            preferredPickupSlot?: string;
+            /**
+             * @default COD
+             * @enum {string}
+             */
+            paymentMethod: "COD" | "PREPAID" | "PAY_AT_STORE" | "WALLET";
+            /** @enum {string} */
+            paymentProvider?: "SSLCOMMERZ" | "AAMARPAY";
+            name: string;
+            phone: string;
+            /** Format: email */
+            email?: string;
+            district: string;
+            area: string;
+            detailedAddress: string;
+            landmark?: string;
+            customerNote?: string;
+            latitude?: number;
+            longitude?: number;
+            marketingConsent?: boolean;
+            purchaseActivityConsent?: boolean;
+            termsAccepted: boolean;
+            source?: string;
+            medium?: string;
+            campaign?: string;
+        };
+        CreateDeliveryZoneDto: {
+            name: string;
+            districts: string[];
+            deliveryFee: number;
+            freeDeliveryThreshold?: number | null;
+            isActive?: boolean;
+            sortOrder?: number;
+        };
+        UpdateDeliveryZoneDto: {
+            name?: string;
+            districts?: string[];
+            deliveryFee?: number;
+            freeDeliveryThreshold?: number | null;
+            isActive?: boolean;
+            sortOrder?: number;
+        };
+        PlaceOrderDto: {
+            /** @enum {string} */
+            paymentMethod: "COD" | "PREPAID" | "PAY_AT_STORE";
+        };
+        TrackOrderDto: {
+            reference: string;
+            phone: string;
+        };
+        ScheduleStorePickupDto: {
+            pickupScheduledAt?: string;
+            preferredPickupSlot?: string;
+            customerPickupNotes?: string;
+        };
+        UpdateCodPolicyDto: {
+            /** @enum {string} */
+            mode: "ALWAYS" | "ABOVE_AMOUNT" | "NEVER";
+            amountThreshold?: number | null;
+        };
+        ConfirmOrderDto: {
+            note?: string;
+        };
+        CancelOrderDto: {
+            reason: string;
+        };
+        UpdateFulfillmentDto: {
+            /** @enum {string} */
+            status: "UNFULFILLED" | "READY_FOR_FULFILLMENT" | "PICKING" | "PACKED" | "QUALITY_CHECKED" | "READY_FOR_HANDOVER" | "HANDED_OVER" | "CANCELLED" | "FULFILLED";
+            note?: string;
+        };
+        UpdateStorePickupStatusDto: {
+            /** @enum {string} */
+            status: "AVAILABLE_IN_STORE" | "TRANSFER_REQUIRED" | "IN_TRANSFER" | "READY_FOR_PICKUP" | "CANCELLED";
+        };
+        VerifyStoreHandoverDto: {
+            otp: string;
+        };
+        CreateFulfillmentExceptionDto: {
+            /** @enum {string} */
+            type: "SHORTAGE" | "SUBSTITUTION" | "OTHER";
+            orderItemId?: string;
+            quantity?: number;
+            description: string;
+        };
+        ResolveFulfillmentExceptionDto: {
+            resolution: string;
+        };
+        UpdateMessageTemplateDto: {
+            enabled?: boolean;
+            subjectTemplate?: string;
+            bodyTemplate?: string;
+        };
+        UpdateMessagingPolicyDto: {
+            enabled?: boolean;
+            channelPriority?: ("WHATSAPP" | "SMS" | "EMAIL")[];
+            fallbackOnDefinitiveFailure?: boolean;
+        };
+        CreateWalletTopUpDto: {
+            /** @enum {string} */
+            provider: "BKASH" | "NAGAD" | "ROCKET" | "BANK_TRANSFER";
+            amount: number;
+            customerReference: string;
+            customerNote?: string;
+        };
+        ReviewWalletTopUpDto: {
+            /** @enum {string} */
+            status: "COMPLETED" | "REJECTED";
+            reviewNote: string;
+        };
+        UpdateShipmentProviderDto: {
+            isActive: boolean;
+        };
+        CreateShipmentDto: {
+            provider: Record<string, never>;
+            parcelReady: boolean;
+            note?: string;
+            providerData?: Record<string, never>;
+        };
         CheckStoreAvailabilityDto: {
             /** @example clx...storeId */
             storeId: string;
@@ -4591,44 +4908,360 @@ export interface components {
             operatingDays?: string;
             pickupInstructions?: string;
         };
-        ApplyDeliveryPersonnelDto: Record<string, never>;
-        CreateDeliveryPersonnelDto: Record<string, never>;
-        UpdateApprovalDto: Record<string, never>;
-        UpdateDeliveryPersonnelDto: Record<string, never>;
-        AssignOrderDto: Record<string, never>;
-        UpdateDeliveryOrderStatusDto: Record<string, never>;
-        UpdateLocationDto: Record<string, never>;
-        ReviewReturnCaseDto: Record<string, never>;
-        InspectReturnCaseDto: Record<string, never>;
-        CreateReturnCaseDto: Record<string, never>;
-        CreateRefundDto: Record<string, never>;
-        RecordRefundResultDto: Record<string, never>;
-        InspectRtoCaseDto: Record<string, never>;
-        ImportSettlementReportDto: Record<string, never>;
-        PreflightSettlementReportDto: Record<string, never>;
-        CreateCourierSettlementDto: Record<string, never>;
-        RunReconciliationDto: Record<string, never>;
-        ReconciliationActionDto: Record<string, never>;
-        InitiateCommercePaymentDto: Record<string, never>;
-        RetryCommercePaymentDto: Record<string, never>;
-        SubmitYoutubeReviewDto: Record<string, never>;
-        ModerateYoutubeReviewDto: Record<string, never>;
-        CreateReviewBannerDto: Record<string, never>;
-        UpdateReviewBannerDto: Record<string, never>;
-        CreateBookingDto: Record<string, never>;
-        SaveServiceDto: Record<string, never>;
-        UpdateBookingStatusDto: Record<string, never>;
-        VerifyWarrantyOrderDto: Record<string, never>;
-        CreateWarrantyClaimDto: Record<string, never>;
-        UpdateWarrantyClaimDto: Record<string, never>;
-        UpdateCustomerProfileDto: Record<string, never>;
-        LinkCustomerAccountDto: Record<string, never>;
-        CreateCustomerAddressDto: Record<string, never>;
-        UpdateCustomerAddressDto: Record<string, never>;
-        CompleteStaffAccessDto: Record<string, never>;
-        InviteStaffDto: Record<string, never>;
-        UpdateStaffAccessDto: Record<string, never>;
-        CreateStorefrontAnalyticsEventDto: Record<string, never>;
+        ApplyDeliveryPersonnelDto: {
+            name: string;
+            phone: string;
+            email?: string;
+            nidNumber: string;
+            /**
+             * @default BIKE
+             * @enum {string}
+             */
+            vehicleType: "BIKE" | "BICYCLE" | "E_BIKE" | "BUS" | "CUSTOM" | "WALK";
+            operatingZone: string;
+            drivingLicense?: string;
+            emergencyPhone: string;
+        };
+        CreateDeliveryPersonnelDto: {
+            name: string;
+            phone: string;
+            email: string;
+            password: string;
+            nidNumber?: string;
+            /**
+             * @default BIKE
+             * @enum {string}
+             */
+            vehicleType: "BIKE" | "BICYCLE" | "E_BIKE" | "BUS" | "CUSTOM" | "WALK";
+            operatingZone?: string;
+            drivingLicense?: string;
+            emergencyPhone?: string;
+        };
+        UpdateApprovalDto: {
+            /** @enum {string} */
+            status: "PENDING_APPROVAL" | "APPROVED" | "REJECTED" | "SUSPENDED";
+            notes?: string;
+            initialPassword?: string;
+        };
+        UpdateDeliveryPersonnelDto: {
+            name?: string;
+            phone?: string;
+            email?: string;
+            password?: string;
+            nidNumber?: string;
+            /** @enum {string} */
+            vehicleType?: "BIKE" | "BICYCLE" | "E_BIKE" | "BUS" | "CUSTOM" | "WALK";
+            operatingZone?: string;
+            drivingLicense?: string;
+            emergencyPhone?: string;
+            /** @enum {string} */
+            status?: "PENDING_APPROVAL" | "APPROVED" | "REJECTED" | "SUSPENDED";
+        };
+        AssignOrderDto: {
+            orderId: string;
+            deliveryPersonnelId: string;
+        };
+        UpdateDeliveryOrderStatusDto: {
+            status: Record<string, never>;
+            note?: string;
+            latitude?: number;
+            longitude?: number;
+        };
+        UpdateLocationDto: {
+            latitude: number;
+            longitude: number;
+        };
+        ReviewReturnItemDto: {
+            returnItemId: string;
+            approvedQuantity: number;
+        };
+        ReviewReturnCaseDto: {
+            /** @enum {string} */
+            decision: "APPROVE" | "PARTIAL_APPROVE" | "REJECT";
+            reason: string;
+            items?: components["schemas"]["ReviewReturnItemDto"][];
+        };
+        InspectReturnItemDto: {
+            returnItemId: string;
+            receivedQuantity: number;
+            acceptedQuantity: number;
+            /** @enum {string} */
+            condition: "SEALED" | "UNUSED" | "OPENED" | "USED" | "DAMAGED" | "WRONG_ITEM" | "OTHER";
+            /** @enum {string} */
+            inventoryDisposition: "SELLABLE" | "DAMAGED" | "QUARANTINED" | "LOST";
+            note?: string;
+        };
+        InspectReturnCaseDto: {
+            /** @enum {string} */
+            decision: "ACCEPT" | "PARTIAL_ACCEPT" | "REJECT";
+            /** @enum {string} */
+            finalResolution: "REFUND" | "REPLACEMENT" | "EXCHANGE" | "REJECTED" | "OTHER";
+            note: string;
+            items: components["schemas"]["InspectReturnItemDto"][];
+        };
+        CreateReturnItemDto: {
+            orderItemId: string;
+            quantity: number;
+        };
+        CreateReturnCaseDto: {
+            /** @enum {string} */
+            reason: "DAMAGED" | "DEFECTIVE" | "WRONG_ITEM" | "NOT_AS_DESCRIBED" | "SIZE_OR_FIT" | "CHANGED_MIND" | "OTHER";
+            description: string;
+            /** @enum {string} */
+            requestedResolution: "REFUND" | "REPLACEMENT" | "EXCHANGE" | "OTHER";
+            /** @enum {string} */
+            requestChannel: "CUSTOMER" | "SUPPORT" | "ADMIN";
+            items: components["schemas"]["CreateReturnItemDto"][];
+            evidenceUrls?: string[];
+        };
+        CreateRefundDto: {
+            amount: number;
+            /** @enum {string} */
+            method: "ORIGINAL_PAYMENT" | "BANK_TRANSFER" | "BKASH" | "NAGAD" | "ROCKET" | "CASH" | "OTHER";
+            reason: string;
+            sourcePaymentReference?: string;
+        };
+        RecordRefundResultDto: {
+            /** @enum {string} */
+            executionMode: "MANUAL" | "PROVIDER";
+            /** @enum {string} */
+            outcome: "SUCCEEDED" | "FAILED";
+            provider?: string;
+            externalReference?: string;
+            result?: Record<string, never>;
+            failureReason?: string;
+        };
+        InspectRtoItemDto: {
+            rtoItemId: string;
+            receivedQuantity: number;
+            sellableQuantity: number;
+            damagedQuantity: number;
+            lostQuantity: number;
+            note?: string;
+        };
+        InspectRtoCaseDto: {
+            /** @enum {string} */
+            reason: "CUSTOMER_UNREACHABLE" | "CUSTOMER_REFUSED" | "ADDRESS_ISSUE" | "DELIVERY_ATTEMPTS_EXHAUSTED" | "COURIER_ISSUE" | "DAMAGED_IN_TRANSIT" | "OTHER";
+            reasonNote: string;
+            outboundCourierCost: number;
+            returnCourierCost: number;
+            otherCost: number;
+            items: components["schemas"]["InspectRtoItemDto"][];
+        };
+        SettlementCsvEvidenceDto: {
+            fileName: string;
+            sourceChecksum: string;
+            content: string;
+        };
+        ImportSettlementReportRowDto: {
+            providerRowReference: string;
+            trackingNumber: string;
+            collectedAmount: number;
+            courierFee: number;
+            otherDeduction: number;
+            note?: string;
+        };
+        ImportSettlementReportDto: {
+            /** @enum {string} */
+            provider: "PATHAO" | "STEADFAST";
+            /** @enum {string} */
+            source: "API" | "CSV" | "MANUAL_JSON";
+            providerReportReference: string;
+            bankReference: string;
+            remittedAmount: number;
+            settledAt: string;
+            supersedesImportId?: string;
+            note?: string;
+            csvEvidence?: components["schemas"]["SettlementCsvEvidenceDto"];
+            rows: components["schemas"]["ImportSettlementReportRowDto"][];
+        };
+        PreflightSettlementReportDto: {
+            /** @enum {string} */
+            provider: "PATHAO" | "STEADFAST";
+            fileName: string;
+            content: string;
+        };
+        CreateSettlementItemDto: {
+            shipmentId: string;
+            collectedAmount: number;
+            courierFee: number;
+            otherDeduction: number;
+            note?: string;
+        };
+        CreateCourierSettlementDto: {
+            /** @enum {string} */
+            provider: "PATHAO" | "STEADFAST";
+            providerSettlementReference: string;
+            bankReference: string;
+            remittedAmount: number;
+            settledAt: string;
+            note?: string;
+            items: components["schemas"]["CreateSettlementItemDto"][];
+        };
+        RunReconciliationDto: {
+            /** @default 168 */
+            overdueHours: Record<string, never>;
+        };
+        ReconciliationActionDto: {
+            /** @enum {string} */
+            action: "CLAIM" | "ACKNOWLEDGE" | "RESOLVE" | "REOPEN";
+            note: string;
+        };
+        InitiateCommercePaymentDto: {
+            orderId: string;
+            reference: string;
+            phone: string;
+            /** @enum {string} */
+            provider: "SSLCOMMERZ" | "AAMARPAY";
+        };
+        RetryCommercePaymentDto: {
+            reference: string;
+            phone: string;
+            /** @enum {string} */
+            provider: "SSLCOMMERZ" | "AAMARPAY";
+        };
+        SubmitYoutubeReviewDto: {
+            /** Format: uri */
+            youtubeUrl: string;
+            title?: string;
+            reviewerName?: string;
+        };
+        ModerateYoutubeReviewDto: {
+            /** @enum {string} */
+            status?: "APPROVED" | "REJECTED";
+            isFeatured?: boolean;
+            rejectionReason?: string;
+            title?: string;
+            reviewerName?: string;
+        };
+        CreateReviewBannerDto: {
+            /** Format: uri */
+            imageUrl: string;
+            altText?: string;
+            sortOrder?: number;
+            isActive?: boolean;
+        };
+        UpdateReviewBannerDto: {
+            /** Format: uri */
+            imageUrl: string;
+            altText?: string;
+            sortOrder?: number;
+            isActive?: boolean;
+        };
+        CreateBookingDto: {
+            serviceId: string;
+            customerName: string;
+            phone: string;
+            /** Format: email */
+            email?: string;
+            preferredAt: string;
+            address?: string;
+            customerNote?: string;
+        };
+        SaveServiceDto: {
+            name: string;
+            slug?: string;
+            description: string;
+            categoryId: string;
+            price: number;
+            durationMinutes: number;
+            leadTimeHours?: number;
+            serviceAreaNote?: string;
+            requirements?: string;
+            /** Format: uri */
+            imageUrl?: string;
+            /** @enum {string} */
+            status?: "DRAFT" | "ACTIVE" | "ARCHIVED";
+        };
+        UpdateBookingStatusDto: {
+            /** @enum {string} */
+            status: "CONFIRMED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED" | "REJECTED";
+            note?: string;
+        };
+        VerifyWarrantyOrderDto: {
+            reference: string;
+            phone: string;
+        };
+        WarrantyEvidenceDto: {
+            imageUrl: string;
+            publicId?: string;
+        };
+        CreateWarrantyClaimDto: {
+            reference: string;
+            phone: string;
+            orderItemId: string;
+            issueDescription: string;
+            evidence: components["schemas"]["WarrantyEvidenceDto"][];
+        };
+        UpdateWarrantyClaimDto: {
+            /** @enum {string} */
+            status: "PRODUCT_RECEIVED" | "UNDER_DIAGNOSIS" | "SENT_TO_BRAND" | "RECEIVED_FROM_BRAND" | "REPAIRED" | "RESOLVED" | "REJECTED";
+            note?: string;
+            rejectionReason?: string;
+        };
+        UpdateCustomerProfileDto: {
+            name?: string;
+            phoneNumber?: string;
+            profileImageUrl?: string;
+        };
+        LinkCustomerAccountDto: {
+            reference: string;
+            phone: string;
+        };
+        CreateCustomerAddressDto: {
+            label?: string;
+            recipientName: string;
+            phone: string;
+            district: string;
+            area: string;
+            detailedAddress: string;
+            landmark?: string;
+            latitude?: number;
+            longitude?: number;
+            isDefault?: boolean;
+        };
+        UpdateCustomerAddressDto: {
+            label?: string;
+            recipientName?: string;
+            phone?: string;
+            district?: string;
+            area?: string;
+            detailedAddress?: string;
+            landmark?: string;
+            latitude?: number;
+            longitude?: number;
+            isDefault?: boolean;
+        };
+        CompleteStaffAccessDto: {
+            token: string;
+            password: string;
+        };
+        InviteStaffDto: {
+            name: string;
+            /** Format: email */
+            email: string;
+            permissions: ("catalog.read" | "catalog.manage" | "inventory.adjust" | "orders.read" | "orders.manage" | "orders.policy.manage" | "payments.read" | "payments.manage" | "wallets.read" | "wallets.manage" | "shipping.read" | "shipping.manage" | "shipping.providers.manage" | "returns.read" | "returns.manage" | "refunds.read" | "refunds.manage" | "settlements.read" | "settlements.manage" | "reconciliation.read" | "reconciliation.manage" | "customers.read" | "audit.read" | "reports.read" | "settings.read" | "settings.manage" | "messaging.read" | "messaging.manage" | "chat.read" | "delivery-zones.read" | "delivery-zones.manage" | "delivery-personnel.read" | "delivery-personnel.manage" | "product-content.read" | "product-content.manage" | "purchase-activity.read" | "rto.read" | "rto.manage" | "services.read" | "services.manage" | "store-locations.read" | "store-locations.manage" | "warranty.read" | "warranty.manage")[];
+        };
+        UpdateStaffAccessDto: {
+            permissions: ("catalog.read" | "catalog.manage" | "inventory.adjust" | "orders.read" | "orders.manage" | "orders.policy.manage" | "payments.read" | "payments.manage" | "wallets.read" | "wallets.manage" | "shipping.read" | "shipping.manage" | "shipping.providers.manage" | "returns.read" | "returns.manage" | "refunds.read" | "refunds.manage" | "settlements.read" | "settlements.manage" | "reconciliation.read" | "reconciliation.manage" | "customers.read" | "audit.read" | "reports.read" | "settings.read" | "settings.manage" | "messaging.read" | "messaging.manage" | "chat.read" | "delivery-zones.read" | "delivery-zones.manage" | "delivery-personnel.read" | "delivery-personnel.manage" | "product-content.read" | "product-content.manage" | "purchase-activity.read" | "rto.read" | "rto.manage" | "services.read" | "services.manage" | "store-locations.read" | "store-locations.manage" | "warranty.read" | "warranty.manage")[];
+            /** @enum {string} */
+            status: "active" | "inactive";
+        };
+        CreateStorefrontAnalyticsEventDto: {
+            /** Format: uuid */
+            eventId: string;
+            /** Format: uuid */
+            anonymousId: string;
+            /** @enum {string} */
+            type: "PRODUCT_VIEW" | "SEARCH" | "FILTER" | "ADD_TO_CART" | "CHECKOUT_BEGIN";
+            productId?: string;
+            variantId?: string;
+            searchTerm?: string;
+            searchResultCount?: number;
+            filters?: Record<string, never>;
+            quantity?: number;
+            path?: string;
+        };
     };
     responses: never;
     parameters: never;
@@ -4753,7 +5386,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -4806,14 +5441,16 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
     PlatformAdminController_getOrganizationUsage: {
         parameters: {
-            query: {
-                periodKey: string;
+            query?: {
+                periodKey?: string;
             };
             header?: never;
             path: {
@@ -4846,7 +5483,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -4901,7 +5540,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -4918,7 +5559,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>[];
+                };
             };
         };
     };
@@ -4935,7 +5578,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -5009,7 +5654,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>[];
+                };
             };
         };
     };
@@ -5043,7 +5690,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>[];
+                };
             };
         };
     };
@@ -5079,7 +5728,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -5161,8 +5812,8 @@ export interface operations {
     };
     PlatformAdminController_listSupportAccess: {
         parameters: {
-            query: {
-                organizationId: string;
+            query?: {
+                organizationId?: string;
             };
             header?: never;
             path?: never;
@@ -5255,7 +5906,7 @@ export interface operations {
             query: {
                 ref: string;
                 outcome: string;
-                val_id: string;
+                val_id?: string;
             };
             header?: never;
             path?: never;
@@ -5276,7 +5927,7 @@ export interface operations {
             query: {
                 ref: string;
                 outcome: string;
-                val_id: string;
+                val_id?: string;
             };
             header?: never;
             path?: never;
@@ -5305,7 +5956,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -5322,7 +5975,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -6745,7 +7400,15 @@ export interface operations {
     };
     AuditController_getAuditLogs: {
         parameters: {
-            query?: never;
+            query: {
+                page: components["schemas"]["Object"];
+                limit: components["schemas"]["Object"];
+                action?: string;
+                entityType?: string;
+                entityId?: string;
+                actorId?: string;
+                source?: components["schemas"]["Object"];
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -6779,7 +7442,10 @@ export interface operations {
     };
     PublicCatalogController_getBrands: {
         parameters: {
-            query?: never;
+            query?: {
+                search?: string;
+                categoryId?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -6790,13 +7456,28 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>[];
+                };
             };
         };
     };
     PublicCatalogController_getProducts: {
         parameters: {
-            query?: never;
+            query: {
+                page: components["schemas"]["Object"];
+                limit: components["schemas"]["Object"];
+                search?: string;
+                category?: string;
+                featured?: "true" | "false";
+                condition?: components["schemas"]["Object"];
+                minPrice?: number;
+                maxPrice?: number;
+                inStock?: "true" | "false";
+                sort?: components["schemas"]["Object"];
+                attributeKey?: string;
+                attributeValue?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -6912,7 +7593,10 @@ export interface operations {
     };
     AdminCatalogController_getBrands: {
         parameters: {
-            query?: never;
+            query?: {
+                search?: string;
+                categoryId?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -6923,7 +7607,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>[];
+                };
             };
         };
     };
@@ -6992,7 +7678,21 @@ export interface operations {
     };
     AdminCatalogController_getProducts: {
         parameters: {
-            query?: never;
+            query: {
+                page: components["schemas"]["Object"];
+                limit: components["schemas"]["Object"];
+                search?: string;
+                category?: string;
+                featured?: "true" | "false";
+                condition?: components["schemas"]["Object"];
+                minPrice?: number;
+                maxPrice?: number;
+                inStock?: "true" | "false";
+                sort?: components["schemas"]["Object"];
+                attributeKey?: string;
+                attributeValue?: string;
+                status?: components["schemas"]["Object"];
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -7118,7 +7818,12 @@ export interface operations {
     };
     AdminCatalogController_getInventory: {
         parameters: {
-            query?: never;
+            query: {
+                page: components["schemas"]["Object"];
+                limit: components["schemas"]["Object"];
+                search?: string;
+                lowStock?: "true" | "false";
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -7135,8 +7840,8 @@ export interface operations {
     };
     AdminCatalogController_getInventoryMovements: {
         parameters: {
-            query: {
-                limit: string;
+            query?: {
+                limit?: string;
             };
             header?: never;
             path: {
@@ -7169,7 +7874,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -7276,7 +7983,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -7440,6 +8149,40 @@ export interface operations {
             };
         };
     };
+    StorageController_presignGet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    StorageController_presignPut: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     PublicCheckoutController_getDeliveryOptions: {
         parameters: {
             query?: never;
@@ -7510,7 +8253,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>[];
+                };
             };
         };
     };
@@ -7531,7 +8276,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -7554,7 +8301,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -7645,7 +8394,16 @@ export interface operations {
     };
     AdminOrderController_getOrders: {
         parameters: {
-            query?: never;
+            query: {
+                page: components["schemas"]["Object"];
+                limit: components["schemas"]["Object"];
+                search?: string;
+                status?: components["schemas"]["Object"];
+                paymentStatus?: components["schemas"]["Object"];
+                fulfillmentStatus?: components["schemas"]["Object"];
+                dateFrom?: string;
+                dateTo?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -7881,7 +8639,13 @@ export interface operations {
     };
     TransactionalMessagingController_getMessages: {
         parameters: {
-            query?: never;
+            query: {
+                page: components["schemas"]["Object"];
+                limit: components["schemas"]["Object"];
+                status?: components["schemas"]["Object"];
+                eventType?: string;
+                search?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -7987,7 +8751,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -8012,10 +8778,10 @@ export interface operations {
     };
     CustomerNotificationsController_list: {
         parameters: {
-            query: {
-                page: string;
-                limit: string;
-                unreadOnly: string;
+            query?: {
+                page?: string;
+                limit?: string;
+                unreadOnly?: string;
             };
             header?: never;
             path?: never;
@@ -8105,9 +8871,9 @@ export interface operations {
     };
     CustomerWalletController_summary: {
         parameters: {
-            query: {
-                page: string;
-                limit: string;
+            query?: {
+                page?: string;
+                limit?: string;
             };
             header?: never;
             path?: never;
@@ -8146,7 +8912,12 @@ export interface operations {
     };
     AdminWalletController_listTopUps: {
         parameters: {
-            query?: never;
+            query: {
+                page: components["schemas"]["Object"];
+                limit: components["schemas"]["Object"];
+                status?: components["schemas"]["Object"];
+                search?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -8231,7 +9002,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -8248,7 +9021,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>[];
+                };
             };
         };
     };
@@ -8282,7 +9057,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -8318,7 +9095,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>[];
+                };
             };
         };
     };
@@ -8335,7 +9114,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -8396,7 +9177,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -8419,7 +9202,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -8587,7 +9372,11 @@ export interface operations {
     };
     DeliveryPersonnelController_listAll: {
         parameters: {
-            query?: never;
+            query?: {
+                status?: "PENDING_APPROVAL" | "APPROVED" | "REJECTED" | "SUSPENDED";
+                zone?: string;
+                search?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -8697,7 +9486,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -8720,7 +9511,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -8758,7 +9551,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>[];
+                };
             };
         };
     };
@@ -8842,7 +9637,12 @@ export interface operations {
     };
     ReportsController_overview: {
         parameters: {
-            query?: never;
+            query?: {
+                dateFrom?: string;
+                dateTo?: string;
+                source?: string;
+                provider?: components["schemas"]["Object"];
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -8859,7 +9659,12 @@ export interface operations {
     };
     ReportsController_ordersExport: {
         parameters: {
-            query?: never;
+            query?: {
+                dateFrom?: string;
+                dateTo?: string;
+                source?: string;
+                provider?: components["schemas"]["Object"];
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -8876,7 +9681,11 @@ export interface operations {
     };
     ReturnsController_getCases: {
         parameters: {
-            query?: never;
+            query: {
+                page: components["schemas"]["Object"];
+                limit: components["schemas"]["Object"];
+                status?: components["schemas"]["Object"];
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -8910,7 +9719,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -8933,7 +9744,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -8971,7 +9784,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>[];
+                };
             };
         };
     };
@@ -8994,7 +9809,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -9032,7 +9849,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>[];
+                };
             };
         };
     };
@@ -9055,7 +9874,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -9078,7 +9899,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -9095,7 +9918,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>[];
+                };
             };
         };
     };
@@ -9118,7 +9943,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -9135,7 +9962,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>[];
+                };
             };
         };
     };
@@ -9156,7 +9985,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -9173,7 +10004,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>[];
+                };
             };
         };
     };
@@ -9190,7 +10023,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>[];
+                };
             };
         };
     };
@@ -9211,7 +10046,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -9255,7 +10092,13 @@ export interface operations {
     };
     ReconciliationController_list: {
         parameters: {
-            query?: never;
+            query: {
+                domain?: components["schemas"]["Object"];
+                severity?: components["schemas"]["Object"];
+                status?: components["schemas"]["Object"];
+                limit: components["schemas"]["Object"];
+                page: components["schemas"]["Object"];
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -9321,7 +10164,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -9442,7 +10287,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -9462,7 +10309,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -9482,7 +10331,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -9502,7 +10353,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -9522,7 +10375,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -9542,7 +10397,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -9562,13 +10419,23 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
     AdminCommercePaymentsController_attempts: {
         parameters: {
-            query?: never;
+            query: {
+                page: components["schemas"]["Object"];
+                limit: components["schemas"]["Object"];
+                search?: string;
+                provider?: components["schemas"]["Object"];
+                status?: components["schemas"]["Object"];
+                paymentStatus?: components["schemas"]["Object"];
+                refundStatus?: components["schemas"]["Object"];
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -9632,7 +10499,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -9668,7 +10537,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -9708,7 +10579,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>[];
+                };
             };
         };
     };
@@ -9851,7 +10724,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>[];
+                };
             };
         };
     };
@@ -9870,7 +10745,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -9891,7 +10768,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -9908,7 +10787,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>[];
+                };
             };
         };
     };
@@ -9988,7 +10869,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>[];
+                };
             };
         };
     };
@@ -10011,7 +10894,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -10070,7 +10955,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
@@ -10087,13 +10974,20 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>[];
+                };
             };
         };
     };
     AdminWarrantyController_all: {
         parameters: {
-            query?: never;
+            query: {
+                status?: components["schemas"]["Object"];
+                search?: string;
+                page: components["schemas"]["Object"];
+                limit: components["schemas"]["Object"];
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -10127,13 +11021,19 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
     PurchaseActivityController_get: {
         parameters: {
-            query?: never;
+            query: {
+                surface: components["schemas"]["Object"];
+                page: components["schemas"]["Object"];
+                limit: components["schemas"]["Object"];
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -10150,7 +11050,11 @@ export interface operations {
     };
     AdminPurchaseActivityController_get: {
         parameters: {
-            query?: never;
+            query: {
+                surface: components["schemas"]["Object"];
+                page: components["schemas"]["Object"];
+                limit: components["schemas"]["Object"];
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -10167,7 +11071,14 @@ export interface operations {
     };
     CustomersController_list: {
         parameters: {
-            query?: never;
+            query: {
+                page: components["schemas"]["Object"];
+                limit: components["schemas"]["Object"];
+                search?: string;
+                sort?: string;
+                filter?: string;
+                month?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -10481,14 +11392,16 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": Record<string, never>;
+                };
             };
         };
     };
     StorefrontAnalyticsController_getAnalyticsDashboard: {
         parameters: {
-            query: {
-                days: string;
+            query?: {
+                days?: string;
             };
             header?: never;
             path?: never;

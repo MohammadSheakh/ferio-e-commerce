@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start -p 3100",
     "lint": "next lint",
-    "api:codegen": "openapi-typescript ../ferio-nest-prisma/openapi.json -o lib/api-schema.ts"
+    "api:codegen": "openapi-typescript ../ferio-nest-prisma/openapi.json -o lib/api-schema.ts",
+    "api:check": "tmp=$(mktemp) && trap 'rm -f \"$tmp\"' EXIT && openapi-typescript ../ferio-nest-prisma/openapi.json -o \"$tmp\" && cmp -s \"$tmp\" lib/api-schema.ts"
   },
   "dependencies": {
     "next": "14.2.35",

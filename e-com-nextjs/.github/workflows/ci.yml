@@ -124,6 +124,8 @@ jobs:
           cache-dependency-path: ferio-customer-web/pnpm-lock.yaml
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Verify committed OpenAPI client schema
+        run: pnpm api:check
       - name: TypeScript check
         run: pnpm exec tsc --noEmit
       - name: Production build
@@ -149,6 +151,8 @@ jobs:
           cache-dependency-path: ferio-admin-dashboard/ferio-admin/pnpm-lock.yaml
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Verify committed OpenAPI client schema
+        run: pnpm api:check
       - name: TypeScript check
         run: pnpm exec tsc --noEmit
       - name: Production build
@@ -172,6 +176,8 @@ jobs:
           cache-dependency-path: ferio-platform-admin/pnpm-lock.yaml
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Verify committed OpenAPI client schema
+        run: pnpm api:check
       - name: TypeScript check
         run: pnpm exec tsc --noEmit
       - name: Production build
