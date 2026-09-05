@@ -51,7 +51,10 @@ describe('RefundsService', () => {
   const prisma = {
     commerceRefund: { findUnique: jest.fn(), findMany: jest.fn() },
     returnCase: { findUnique: jest.fn() },
-    $transaction: jest.fn((callback) => callback(transaction)),
+    $transaction: jest.fn(
+      (callback: (tx: typeof transaction) => unknown) =>
+        Promise.resolve(callback(transaction)),
+    ),
   };
   const audit = { record: jest.fn() };
   const service = new RefundsService(

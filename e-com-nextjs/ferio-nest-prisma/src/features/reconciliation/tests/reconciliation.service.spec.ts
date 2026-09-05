@@ -56,8 +56,9 @@ describe('ReconciliationService', () => {
     shipmentPollAttempt: { groupBy: jest.fn() },
     commerceMessage: { groupBy: jest.fn() },
     commerceRefund: { groupBy: jest.fn() },
-    $transaction: jest.fn((input) =>
-      typeof input === 'function' ? input(transaction) : Promise.all(input),
+    $transaction: jest.fn(
+      (callback: (tx: typeof transaction) => unknown) =>
+        Promise.resolve(callback(transaction)),
     ),
   };
   const audit = { record: jest.fn() };

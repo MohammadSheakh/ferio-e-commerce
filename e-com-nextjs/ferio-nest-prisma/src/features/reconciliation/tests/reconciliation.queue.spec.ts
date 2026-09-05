@@ -1,6 +1,9 @@
 import type { ConfigService } from '@nestjs/config';
 import type { Queue } from 'bullmq';
-import { ReconciliationQueue } from '../queues/reconciliation.queue';
+import {
+  ReconciliationQueue,
+  type ReconciliationJobData,
+} from '../queues/reconciliation.queue';
 import type { ReconciliationService } from '../services/reconciliation.service';
 
 describe('ReconciliationQueue', () => {
@@ -26,7 +29,7 @@ describe('ReconciliationQueue', () => {
     getRetryableRun: jest.fn(),
   };
   const service = new ReconciliationQueue(
-    queue as unknown as Queue,
+    queue as unknown as Queue<ReconciliationJobData>,
     config as unknown as ConfigService,
     reconciliation as unknown as ReconciliationService,
   );

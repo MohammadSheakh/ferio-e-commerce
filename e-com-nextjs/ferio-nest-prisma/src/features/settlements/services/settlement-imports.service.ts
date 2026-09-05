@@ -127,7 +127,7 @@ export class SettlementImportsService {
       : null;
     let correctionApplied = false;
     try {
-      let rows = await this.classifyRows(dto, correctionTarget?.id);
+      const rows = await this.classifyRows(dto, correctionTarget?.id);
       if (rows.some((row) => row.status !== 'APPLIED')) {
         return await this.persistImport({
           idempotencyKeyHash,

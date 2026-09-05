@@ -31,7 +31,10 @@ describe('ReturnsService review', () => {
     inventoryMovement: { create: jest.fn() },
   };
   const prisma = {
-    $transaction: jest.fn((callback) => callback(transaction)),
+    $transaction: jest.fn(
+      (callback: (tx: typeof transaction) => unknown) =>
+        Promise.resolve(callback(transaction)),
+    ),
   };
   const audit = { record: jest.fn() };
   const service = new ReturnsService(

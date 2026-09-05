@@ -60,7 +60,10 @@ describe('SettlementsService', () => {
     },
     courierSettlementItem: { findFirst: jest.fn() },
     codCollection: { findMany: jest.fn() },
-    $transaction: jest.fn((callback) => callback(transaction)),
+    $transaction: jest.fn(
+      (callback: (tx: typeof transaction) => unknown) =>
+        Promise.resolve(callback(transaction)),
+    ),
   };
   const audit = { record: jest.fn() };
   const service = new SettlementsService(
@@ -70,7 +73,10 @@ describe('SettlementsService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    prisma.$transaction.mockImplementation((callback) => callback(transaction));
+    prisma.$transaction.mockImplementation(
+      (callback: (tx: typeof transaction) => unknown) =>
+        Promise.resolve(callback(transaction)),
+    );
     prisma.courierSettlement.findUnique.mockResolvedValue(null);
     prisma.courierSettlement.findFirst.mockResolvedValue(null);
     prisma.courierSettlementItem.findFirst.mockResolvedValue(null);
