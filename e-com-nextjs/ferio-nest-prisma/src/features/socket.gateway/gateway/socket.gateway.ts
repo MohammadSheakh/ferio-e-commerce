@@ -515,15 +515,19 @@ export class SocketGateway
   @SubscribeMessage('new-message-received')
   async handleNewMessage(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: any,
+    @MessageBody() data: unknown,
   ) {
     try {
-      const { conversationId } = data || {};
+      const input = asSocketPayload(data);
+      const conversationId =
+        typeof input.conversationId === 'string'
+          ? input.conversationId.trim()
+          : undefined;
       const user = client.data?.user;
       const userId = user?.userId;
       const targetConvId = conversationId || `conv-${userId}`;
       const text =
-        typeof data?.text === 'string' ? data.text.trim().slice(0, 4000) : '';
+        typeof input.text === 'string' ? input.text.trim().slice(0, 4000) : '';
 
       if (
         !userId ||
@@ -548,13 +552,19 @@ export class SocketGateway
 
       const payload = {
         _messageId:
-          data?._messageId ||
+          (typeof input._messageId === 'string' && input._messageId.trim()
+            ? input._messageId.trim()
+            : undefined) ||
           `msg_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
         conversationId: targetConvId,
         text: text || '',
         senderId: userId,
         senderName: user.name || (isGuest ? 'Guest Visitor' : 'Customer'),
-        createdAt: data?.createdAt || new Date().toISOString(),
+        createdAt:
+          typeof input.createdAt === 'string' &&
+          !Number.isNaN(Date.parse(input.createdAt))
+            ? input.createdAt
+            : new Date().toISOString(),
         isGuest,
         guestId: targetGuestId,
         isAdmin,
@@ -788,14 +798,14 @@ export class SocketGateway
             );
           }
         }
-      } catch (dbErr: any) {
+      } catch (dbErr: unknown) {
         this.logger.warn(
-          `⚠️ Could not persist chat message to DB: ${dbErr.message}`,
+          `⚠️ Could not persist chat message to DB: ${errorMessage(dbErr)}`,
         );
       }
 
       return { success: true, data: payload };
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger.error(`❌ handleNewMessage error: ${errorMessage(error)}`);
       return { success: false, message: 'Failed to process message' };
     }
@@ -804,7 +814,7 @@ export class SocketGateway
   @SubscribeMessage('send-message')
   async handleSendMessageAlias(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: any,
+    @MessageBody() data: unknown,
   ) {
     return this.handleNewMessage(client, data);
   }
