@@ -11,7 +11,19 @@ import {
   UsageReconciliationReport,
 } from '../../tenancy/usage-reconciliation.service';
 
-function platformWithEntitlements(limit: number | null): { client: Record<string, any> } {
+type UsagePlatform = {
+  client: {
+    usageCounter: {
+      upsert: jest.Mock;
+      findUnique: jest.Mock;
+    };
+    subscription: { findUnique: jest.Mock };
+    tenantDatabase?: { findUnique: jest.Mock };
+    organizationMember?: { count: jest.Mock };
+  };
+};
+
+function platformWithEntitlements(limit: number | null): UsagePlatform {
   const subscription =
     limit === null
       ? null
@@ -32,7 +44,13 @@ function platformWithEntitlements(limit: number | null): { client: Record<string
             create,
             update,
           }: {
-            where: { organizationId_metric_periodKey: { organizationId: string; metric: string; periodKey: string } };
+            where: {
+              organizationId_metric_periodKey: {
+                organizationId: string;
+                metric: string;
+                periodKey: string;
+              };
+            };
             create: { value: bigint };
             update: { value: { increment?: bigint; set?: bigint } };
           }) => {
@@ -54,7 +72,17 @@ function platformWithEntitlements(limit: number | null): { client: Record<string
           },
         ),
         findUnique: jest.fn().mockImplementation(
-          ({ where }: { where: { organizationId_metric_periodKey: { organizationId: string; metric: string; periodKey: string } } }) => {
+          ({
+            where,
+          }: {
+            where: {
+              organizationId_metric_periodKey: {
+                organizationId: string;
+                metric: string;
+                periodKey: string;
+              };
+            };
+          }) => {
             const k = `${where.organizationId_metric_periodKey.organizationId}:${where.organizationId_metric_periodKey.metric}:${where.organizationId_metric_periodKey.periodKey}`;
             const value = counters.get(k);
             return Promise.resolve(value === undefined ? null : { value });
@@ -82,7 +110,9 @@ describe('Usage metric registry (§9.4 authoritative counters)', () => {
   });
 
   it('derives the UTC month start from a period key', () => {
-    expect(periodKeyStart('2026-08').toISOString()).toBe('2026-08-01T00:00:00.000Z');
+    expect(periodKeyStart('2026-08').toISOString()).toBe(
+      '2026-08-01T00:00:00.000Z',
+    );
     // Malformed keys fall back to the current month start — never widen.
     const fallback = periodKeyStart('bogus');
     expect(fallback.getUTCDate()).toBe(1);
@@ -190,10 +220,13 @@ describe('UsageReconciliationService (§9.4 counter-vs-fact reconciliation)', ()
       recordedOrders: '118',
     });
 
-    const report: UsageReconciliationReport = await service.reconcileOrganization('org-a');
+    const report: UsageReconciliationReport =
+      await service.reconcileOrganization('org-a');
 
     expect(report.drifted).toBe(3); // orders + products + seats all differ
-    const ordersEntry = report.entries.find((entry) => entry.metric === 'orders_per_month')!;
+    const ordersEntry = report.entries.find(
+      (entry) => entry.metric === 'orders_per_month',
+    )!;
     expect(ordersEntry.counted).toBe(120);
     expect(ordersEntry.corrected).toBe(true);
     expect(usage.setValue).toHaveBeenCalledWith(
@@ -203,16 +236,24 @@ describe('UsageReconciliationService (§9.4 counter-vs-fact reconciliation)', ()
       report.periodKey,
     );
 
-    const productsEntry = report.entries.find((entry) => entry.metric === 'products_max')!;
+    const productsEntry = report.entries.find(
+      (entry) => entry.metric === 'products_max',
+    )!;
     expect(productsEntry.counted).toBe(40);
     expect(productsEntry.corrected).toBe(true);
   });
 
   it('counts staff seats from the control plane, not the tenant DB', async () => {
-    const { service } = reconciliationWith({ orders: 0, products: 0, staff: 6 });
+    const { service } = reconciliationWith({
+      orders: 0,
+      products: 0,
+      staff: 6,
+    });
 
     const report = await service.reconcileOrganization('org-a');
-    const seats = report.entries.find((entry) => entry.metric === 'staff_seats')!;
+    const seats = report.entries.find(
+      (entry) => entry.metric === 'staff_seats',
+    )!;
     expect(seats.source).toBe('control_plane');
     expect(seats.counted).toBe(6);
     expect(seats.corrected).toBe(true); // recorded 0 vs counted 6 → corrected
@@ -220,7 +261,11 @@ describe('UsageReconciliationService (§9.4 counter-vs-fact reconciliation)', ()
   });
 
   it('refuses to reconcile a tenant whose database is not READY', async () => {
-    const { service } = reconciliationWith({ orders: 0, products: 0, staff: 0 });
+    const { service } = reconciliationWith({
+      orders: 0,
+      products: 0,
+      staff: 0,
+    });
     const platformRef = service as unknown as {
       platform: {
         client: { tenantDatabase: { findUnique: jest.Mock } };
