@@ -1,4 +1,9 @@
-import { Injectable, Logger, Optional, ServiceUnavailableException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  Optional,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { Prisma, PrismaClient } from '@prisma/client';
 
 import { RedisService } from '@app/redis';
@@ -94,13 +99,11 @@ export class UserService {
     dto: UpdateProfileDto,
   ): Promise<PublicUserRecord | null> {
     const db = await this.db();
-    const { name, phoneNumber, email, ...profileData } = dto as any;
+    const { name, phoneNumber, ...profileData } = dto;
 
     const updateData: Prisma.UserUpdateInput = {};
     if (name) updateData.name = name;
     if (phoneNumber) updateData.phoneNumber = phoneNumber;
-    if (email) updateData.email = email;
-
     if (Object.keys(profileData).length > 0) {
       updateData.ownedProfile = {
         upsert: {
@@ -127,7 +130,7 @@ export class UserService {
     return this.redisService.getOrSet(
       this.getCacheKey('profile', id),
       () => this.fetchUserById(id),
-      USER_CACHE_CONFIG.PROFILE
+      USER_CACHE_CONFIG.PROFILE,
     );
   }
 
@@ -137,11 +140,14 @@ export class UserService {
 
   async invalidateCache(id: string): Promise<void> {
     const keys = USER_CACHE_CONFIG.INVALIDATION_PATTERNS.PROFILE_UPDATED(id);
-    await this.redisService.invalidate(keys as any);
+    await this.redisService.invalidate(keys);
     this.logger.log(`Invalidated cache for user: ${id}`);
   }
 
-  async updatePreferredTime(userId: string, preferredTime: string): Promise<PublicUserRecord | null> {
+  async updatePreferredTime(
+    userId: string,
+    preferredTime: string,
+  ): Promise<PublicUserRecord | null> {
     const db = await this.db();
     const result = await db.user.update({
       where: { id: userId },
@@ -156,7 +162,7 @@ export class UserService {
     return this.redisService.getOrSet(
       this.getCacheKey('stats', userId),
       () => this.fetchUserStatistics(userId),
-      USER_CACHE_CONFIG.STATISTICS
+      USER_CACHE_CONFIG.STATISTICS,
     );
   }
 
@@ -164,7 +170,7 @@ export class UserService {
     const db = await this.db();
     const baseWhere = {
       isDeleted: false,
-      OR: [{ accountCreatorId: userId }], 
+      OR: [{ accountCreatorId: userId }],
     };
     const totalChildren = await db.user.count({ where: baseWhere });
     return { totalChildren };

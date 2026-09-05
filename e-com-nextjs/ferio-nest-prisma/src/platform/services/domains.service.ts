@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PlatformAuditService } from './platform-audit.service';
 import { invalidateDomainCache } from '../utils/domain-cache-invalidation';
 import { PlatformPrismaService } from '../platform-prisma.service';
@@ -34,10 +38,15 @@ export class DomainsService {
    */
   async reserveSubdomain(organizationId: string, slug: string) {
     const normalized = slug.trim().toLowerCase();
-    if (!HOSTNAME_LABEL.test(normalized) || RESERVED_SUBDOMAINS.has(normalized)) {
+    if (
+      !HOSTNAME_LABEL.test(normalized) ||
+      RESERVED_SUBDOMAINS.has(normalized)
+    ) {
       throw new ConflictException('SUBDOMAIN_RESERVED_OR_INVALID');
     }
-    const baseDomain = (process.env.PLATFORM_PUBLIC_DOMAIN || 'ferio.local').replace(/^\.+/, '');
+    const baseDomain = (
+      process.env.PLATFORM_PUBLIC_DOMAIN || 'ferio.local'
+    ).replace(/^\.+/, '');
     const hostname = `${normalized}.${baseDomain}`;
 
     const organization = await this.platform.client.organization.findUnique({
@@ -63,8 +72,13 @@ export class DomainsService {
       });
       invalidateDomainCache(hostname);
       return domain;
-    } catch (error: any) {
-      if (error?.code === 'P2002') {
+    } catch (error: unknown) {
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        error.code === 'P2002'
+      ) {
         throw new ConflictException('DOMAIN_HOSTNAME_TAKEN');
       }
       throw error;
@@ -99,8 +113,13 @@ export class DomainsService {
         newValue: { hostname, organizationId },
       });
       return { domain, verificationToken };
-    } catch (error: any) {
-      if (error?.code === 'P2002') {
+    } catch (error: unknown) {
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        error.code === 'P2002'
+      ) {
         throw new ConflictException('DOMAIN_HOSTNAME_TAKEN');
       }
       throw error;
@@ -109,13 +128,18 @@ export class DomainsService {
 
   /** Ownership proof: TXT challenge match activates the domain. */
   async verifyOwnership(domainId: string, presentedToken: string) {
-    const domain = await this.platform.client.tenantDomain.findUnique({ where: { id: domainId } });
+    const domain = await this.platform.client.tenantDomain.findUnique({
+      where: { id: domainId },
+    });
     if (!domain) throw new NotFoundException('DOMAIN_NOT_FOUND');
     if (domain.status === 'ACTIVE') return domain;
     if (domain.status !== 'PENDING_VERIFICATION') {
       throw new ConflictException('DOMAIN_NOT_VERIFIABLE');
     }
-    if (!domain.verificationToken || domain.verificationToken !== presentedToken.trim()) {
+    if (
+      !domain.verificationToken ||
+      domain.verificationToken !== presentedToken.trim()
+    ) {
       await this.platform.client.tenantDomain.update({
         where: { id: domainId },
         data: { status: 'VERIFICATION_FAILED' },
@@ -154,11 +178,15 @@ export class DomainsService {
         data: { isPrimary: true },
       }),
     ]);
-    return this.platform.client.tenantDomain.findUnique({ where: { id: domainId } });
+    return this.platform.client.tenantDomain.findUnique({
+      where: { id: domainId },
+    });
   }
 
   async disable(domainId: string, actorId?: string) {
-    const domain = await this.platform.client.tenantDomain.findUnique({ where: { id: domainId } });
+    const domain = await this.platform.client.tenantDomain.findUnique({
+      where: { id: domainId },
+    });
     if (!domain) throw new NotFoundException('DOMAIN_NOT_FOUND');
     invalidateDomainCache(domain.hostname);
     const updated = await this.platform.client.tenantDomain.update({
@@ -177,9 +205,6 @@ export class DomainsService {
   }
 
   normalizeHostname(input: string): string {
-    return input
-      .trim()
-      .toLowerCase()
-      .replace(/\.$/, '');
+    return input.trim().toLowerCase().replace(/\.$/, '');
   }
 }

@@ -8,7 +8,7 @@ import {
 } from '@app/common';
 import { TenantMembershipGuard } from '../../tenancy/tenant-membership.guard';
 import { tryGetTenantContext } from '../../tenancy/tenant-context';
-import type { StorageStrategy } from './r2.strategy';
+import type { StorageStrategy } from './strategies/r2.strategy';
 
 
 /**

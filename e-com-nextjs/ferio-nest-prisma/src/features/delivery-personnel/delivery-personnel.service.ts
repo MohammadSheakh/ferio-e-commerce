@@ -10,7 +10,7 @@ import { Prisma } from '@prisma/client';
 import type { PrismaClient } from '@prisma/client';
 import { PrismaService } from '@app/database';
 import { TenantDbService } from '../../tenancy/tenant-db.service';
-import { AuditService } from '../audit/audit.service';
+import { AuditService } from '../audit/services/audit.service';
 import {
   ApplyDeliveryPersonnelDto,
   AssignOrderDto,

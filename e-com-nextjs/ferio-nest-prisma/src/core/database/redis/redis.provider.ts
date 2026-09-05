@@ -1,7 +1,13 @@
 import { Provider, Logger } from '@nestjs/common';
 import Redis from 'ioredis';
-import { REDIS_CLIENT, REDIS_PUB_CLIENT, REDIS_SUB_CLIENT } from './redis.constants';
+import {
+  REDIS_CLIENT,
+  REDIS_PUB_CLIENT,
+  REDIS_SUB_CLIENT,
+} from './redis.constants';
 import { ConfigService } from '@nestjs/config';
+import type { RedisOptions } from 'ioredis';
+import { errorMessage } from '@app/common';
 
 /**
  * Redis configuration options shared across the application
@@ -16,7 +22,11 @@ export const getRedisOptions = (configService: ConfigService) => ({
 /**
  * Creates a Redis client with the given options and logger
  */
-const createRedisClient = (options: any, logger: Logger, label: string) => {
+const createRedisClient = (
+  options: RedisOptions,
+  logger: Logger,
+  label: string,
+): Redis | null => {
   try {
     const client = new Redis({
       ...options,
@@ -29,12 +39,19 @@ const createRedisClient = (options: any, logger: Logger, label: string) => {
       },
     });
 
-    client.on('error', (err) => logger.error(`Redis Client (${label}) Error:`, err.message));
-    client.on('connect', () => logger.log(`Redis Client (${label}) connected successfully`));
+    client.on('error', (err) =>
+      logger.error(`Redis Client (${label}) Error:`, errorMessage(err)),
+    );
+    client.on('connect', () =>
+      logger.log(`Redis Client (${label}) connected successfully`),
+    );
 
     return client;
   } catch (error) {
-    logger.error(`Redis Client (${label}) connection failed:`, error.message);
+    logger.error(
+      `Redis Client (${label}) connection failed:`,
+      errorMessage(error),
+    );
     return null;
   }
 };

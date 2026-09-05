@@ -15,7 +15,7 @@ import { SettingsType } from '../constants/settings.constants';
 import { CreateOrUpdateSettingsDto } from '../dto/settings.dto';
 import { SETTINGS_CACHE_CONFIG } from '../constants/settings.cache.constants';
 import type { UserPayload } from '@app/common';
-import { AuditService } from '../../audit/audit.service';
+import { AuditService } from '../../audit/services/audit.service';
 import { Optional } from '@nestjs/common';
 import { TenantDbService } from '../../../tenancy/tenant-db.service';
 import { tryGetTenantContext } from '../../../tenancy/tenant-context';
@@ -66,33 +66,31 @@ export class SettingsService {
     }
 
     const db = await this.db();
-    const result: Settings = await db.$transaction(
-      async (transaction) => {
-        const previous = await transaction.settings.findUnique({
-          where: { type },
-        });
-        const updated = await transaction.settings.upsert({
-          where: { type },
-          update: updateData,
-          create: {
-            type,
-            details: dto.details || '',
-          },
-        });
-        await this.audit.record(
-          {
-            action: previous ? 'SETTINGS_UPDATED' : 'SETTINGS_CREATED',
-            entityType: 'Settings',
-            entityId: updated.id,
-            actor,
-            previousValue: previous,
-            newValue: updated,
-          },
-          transaction,
-        );
-        return updated;
-      },
-    );
+    const result: Settings = await db.$transaction(async (transaction) => {
+      const previous = await transaction.settings.findUnique({
+        where: { type },
+      });
+      const updated = await transaction.settings.upsert({
+        where: { type },
+        update: updateData,
+        create: {
+          type,
+          details: dto.details || '',
+        },
+      });
+      await this.audit.record(
+        {
+          action: previous ? 'SETTINGS_UPDATED' : 'SETTINGS_CREATED',
+          entityType: 'Settings',
+          entityId: updated.id,
+          actor,
+          previousValue: previous,
+          newValue: updated,
+        },
+        transaction,
+      );
+      return updated;
+    });
 
     // Invalidate cache
     await this.invalidateCache(type);
@@ -120,9 +118,9 @@ export class SettingsService {
   }
 
   async getAllWithPagination(
-    filters: Record<string, any> = {},
+    filters: Record<string, unknown> = {},
     options: PaginateOptions,
-    include?: Record<string, any>,
+    include?: Record<string, unknown>,
     select?: Record<string, boolean>,
   ): Promise<PaginateResult<Settings>> {
     const db = await this.db();
@@ -155,9 +153,9 @@ export class SettingsService {
   }
 
   async getAllWithPaginationCursor(
-    filters: Record<string, any> = {},
+    filters: Record<string, unknown> = {},
     options: CursorPaginateOptions,
-    include?: Record<string, any>,
+    include?: Record<string, unknown>,
     select?: Record<string, boolean>,
   ): Promise<CursorPaginateResult<Settings>> {
     const db = await this.db();

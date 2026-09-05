@@ -7,6 +7,7 @@ import { PrismaService } from '@app/database';
 import { TenantDbService } from '../../../tenancy/tenant-db.service';
 import type { PrismaClient } from '@prisma/client';
 import { TenantFanoutService } from '../../../tenancy/tenant-fanout.service';
+import { errorMessage } from '@app/common';
 
 export interface SocketUser {
   userId: string;
@@ -59,7 +60,7 @@ export class SocketAuthService {
    * fallback outside resolved requests. Never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    const tenant = await this.tenantDb?.tryGet();
+    const tenant = await this.tenantDb?.tryGet?.();
     if (tenant) return tenant;
     if ((process.env.TENANCY_ENABLED || 'false') === 'true') {
       throw new Error('SOCKET_TENANT_CONTEXT_REQUIRED');
@@ -153,7 +154,7 @@ export class SocketAuthService {
         name: 'Guest Visitor',
       };
     } catch (error) {
-      this.logger.warn(`⚠️ Socket authentication failed: ${error.message}`);
+      this.logger.warn(`⚠️ Socket authentication failed: ${errorMessage(error)}`);
       return null;
     }
   }
@@ -222,7 +223,13 @@ export class SocketAuthService {
           allowedIds.add(`conv-${account.customerId}`);
         }
       }
-      return allowedIds.has(conversationId);
+      if (allowedIds.has(conversationId)) return true;
+      const db = await this.db();
+      const participant = await db.conversationParticipents?.findFirst?.({
+        where: { conversationId, userId: user.userId, isDeleted: false },
+        select: { id: true },
+      });
+      return !!participant;
     });
   }
 
@@ -263,7 +270,7 @@ export class SocketAuthService {
       // Remove from Redis state
       return await this.removeOnlineUser(user, socketId);
     } catch (error) {
-      this.logger.error(`❌ Error handling user disconnection: ${error.message}`);
+      this.logger.error(`❌ Error handling user disconnection: ${errorMessage(error)}`);
       return false;
     }
   }
@@ -425,7 +432,7 @@ export class SocketAuthService {
         return relatedOnlineUsers;
       });
     } catch (error) {
-      this.logger.error(`❌ Error getting related online users: ${error.message}`);
+      this.logger.error(`❌ Error getting related online users: ${errorMessage(error)}`);
       return [];
     }
   }

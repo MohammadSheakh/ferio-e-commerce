@@ -1,9 +1,9 @@
 import type { ConfigService } from '@nestjs/config';
 import { Queue, QueueEvents, Worker } from 'bullmq';
-import type { AuditService } from '../src/features/audit/audit.service';
-import type { CommercePaymentsService } from '../src/features/commerce-payments/commerce-payments.service';
-import { PaymentRecoveryProcessor } from '../src/features/commerce-payments/payment-recovery.processor';
-import { PAYMENT_EXPIRY_JOB, PAYMENT_EXPIRY_SWEEP_JOB, PAYMENT_RECOVERY_SCHEDULER_ID, PaymentRecoveryJobData, PaymentRecoveryQueue } from '../src/features/commerce-payments/payment-recovery.queue';
+import type { AuditService } from '../src/features/audit/services/audit.service';
+import type { CommercePaymentsService } from '../src/features/commerce-payments/services/commerce-payments.service';
+import { PaymentRecoveryProcessor } from '../src/features/commerce-payments/processors/payment-recovery.processor';
+import { PAYMENT_EXPIRY_JOB, PAYMENT_EXPIRY_SWEEP_JOB, PAYMENT_RECOVERY_SCHEDULER_ID, PaymentRecoveryJobData, PaymentRecoveryQueue } from '../src/features/commerce-payments/queues/payment-recovery.queue';
 
 const redisPort = Number(process.env.TEST_REDIS_PORT);
 const queuePrefix = process.env.TEST_QUEUE_PREFIX;

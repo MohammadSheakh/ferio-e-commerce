@@ -24,7 +24,7 @@ import { Server as IoServer } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { randomUUID } from 'node:crypto';
 
-import { SocketGateway } from '../src/features/socket.gateway/socket.gateway';
+import { SocketGateway } from '../src/features/socket.gateway/gateway/socket.gateway';
 import {
   SocketAuthService,
 } from '../src/features/socket.gateway/services/socket-auth.service';

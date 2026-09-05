@@ -1,9 +1,11 @@
+import { Prisma } from '@prisma/client';
 import type { PrismaClient } from '@prisma/client';
 import { BadRequestException, ConflictException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { PrismaService } from '@app/database';
 import { TenantDbService } from '../../tenancy/tenant-db.service';
 import type { UserPayload } from '@app/common';
-import { AuditService } from '../audit/audit.service';
+import { AuditService } from '../audit/services/audit.service';
+import { assertTenantCommerceWritable } from '../../tenancy/commerce-write-guard.util';
 import { CreateReviewBannerDto, ModerateYoutubeReviewDto, SubmitYoutubeReviewDto, UpdateReviewBannerDto } from './product-content.dto';
 
 @Injectable()
@@ -34,14 +36,22 @@ export class ProductContentService {
     return db.product.findFirst({ where: { slug, status: 'ACTIVE' }, select: { id: true, reviewBanners: { where: { isActive: true }, orderBy: { sortOrder: 'asc' } }, youtubeReviews: { where: { status: 'APPROVED' }, orderBy: [{ isFeatured: 'desc' }, { createdAt: 'desc' }], select: { id: true, youtubeUrl: true, youtubeVideoId: true, title: true, reviewerName: true, isFeatured: true } } } });
   }
   async submit(productId: string, dto: SubmitYoutubeReviewDto, user: UserPayload) {
+    assertTenantCommerceWritable();
     const db = await this.db();
     const product = await db.product.findFirst({ where: { id: productId, status: 'ACTIVE' }, select: { id: true } });
     if (!product) throw new NotFoundException('Published product not found');
-    try { return await db.productYoutubeReview.create({ data: { productId, submittedById: user.userId, youtubeUrl: dto.youtubeUrl, youtubeVideoId: this.videoId(dto.youtubeUrl), title: dto.title?.trim(), reviewerName: dto.reviewerName?.trim() } }); }
-    catch { throw new ConflictException('This video was already submitted for the product'); }
+    try {
+      return await db.productYoutubeReview.create({ data: { productId, submittedById: user.userId, youtubeUrl: dto.youtubeUrl, youtubeVideoId: this.videoId(dto.youtubeUrl), title: dto.title?.trim(), reviewerName: dto.reviewerName?.trim() } });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new ConflictException('This video was already submitted for the product');
+      }
+      throw error;
+    }
   }
   async adminReviews() { const db = await this.db(); return db.productYoutubeReview.findMany({ include: { product: { select: { name: true } }, submittedBy: { select: { name: true, email: true } } }, orderBy: { createdAt: 'desc' } }); }
   async moderate(id: string, dto: ModerateYoutubeReviewDto, actor: UserPayload) {
+    assertTenantCommerceWritable();
     const db = await this.db();
     const review = await db.productYoutubeReview.findUnique({ where: { id } });
     if (!review) throw new NotFoundException('Review not found');
@@ -72,9 +82,9 @@ export class ProductContentService {
       return updated;
     });
   }
-  async deleteReview(id: string) { const db = await this.db(); return db.productYoutubeReview.delete({ where: { id } }); }
+  async deleteReview(id: string) { assertTenantCommerceWritable(); const db = await this.db(); return db.productYoutubeReview.delete({ where: { id } }); }
   async banners(productId: string) { const db = await this.db(); return db.productReviewBanner.findMany({ where: { productId }, orderBy: { sortOrder: 'asc' } }); }
-  async createBanner(productId: string, dto: CreateReviewBannerDto) { const db = await this.db(); return db.productReviewBanner.create({ data: { productId, imageUrl: dto.imageUrl, altText: dto.altText?.trim(), sortOrder: dto.sortOrder ?? 0, isActive: dto.isActive ?? true } }); }
-  async updateBanner(id: string, dto: UpdateReviewBannerDto) { const db = await this.db(); return db.productReviewBanner.update({ where: { id }, data: dto }); }
-  async deleteBanner(id: string) { const db = await this.db(); return db.productReviewBanner.delete({ where: { id } }); }
+  async createBanner(productId: string, dto: CreateReviewBannerDto) { assertTenantCommerceWritable(); const db = await this.db(); return db.productReviewBanner.create({ data: { productId, imageUrl: dto.imageUrl, altText: dto.altText?.trim(), sortOrder: dto.sortOrder ?? 0, isActive: dto.isActive ?? true } }); }
+  async updateBanner(id: string, dto: UpdateReviewBannerDto) { assertTenantCommerceWritable(); const db = await this.db(); return db.productReviewBanner.update({ where: { id }, data: dto }); }
+  async deleteBanner(id: string) { assertTenantCommerceWritable(); const db = await this.db(); return db.productReviewBanner.delete({ where: { id } }); }
 }

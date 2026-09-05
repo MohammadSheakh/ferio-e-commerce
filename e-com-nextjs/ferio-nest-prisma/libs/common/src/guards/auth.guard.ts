@@ -13,7 +13,7 @@ import type { UserPayload } from '../types/user-payload.type';
 
 /**
  * Authentication Guard
- * 
+ *
  * 📚 INDUSTRY STANDARD IMPLEMENTATION
  */
 @Injectable()
@@ -69,7 +69,7 @@ export class AuthGuard implements CanActivate {
       // Attach payload
       request['user'] = payload;
     } catch (error) {
-      if (error.name === 'TokenExpiredError') {
+      if (error instanceof Error && error.name === 'TokenExpiredError') {
         throw new UnauthorizedException('Token has expired');
       }
       throw new UnauthorizedException('Invalid token');
@@ -83,15 +83,18 @@ export class AuthGuard implements CanActivate {
     return type?.toLowerCase() === 'bearer' ? token : undefined;
   }
 
-  private matchesResolvedTenant(request: Request, payload: UserPayload): boolean {
+  private matchesResolvedTenant(
+    request: Request,
+    payload: UserPayload,
+  ): boolean {
     if ((process.env.TENANCY_ENABLED || 'false') !== 'true') return true;
     const resolvedOrganizationId = (
       request as Request & { tenantOrganizationId?: string }
     ).tenantOrganizationId;
     return Boolean(
       resolvedOrganizationId &&
-        payload.organizationId &&
-        payload.organizationId === resolvedOrganizationId,
+      payload.organizationId &&
+      payload.organizationId === resolvedOrganizationId,
     );
   }
 }

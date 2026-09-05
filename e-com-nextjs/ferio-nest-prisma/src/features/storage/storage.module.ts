@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../authentication/auth.module';
 import { TenancyModule } from '../../tenancy/tenancy.module';
-import { R2Strategy } from './r2.strategy';
+import { R2Strategy } from './strategies/r2.strategy';
 import { StorageController } from './storage.controller';
 
 /**

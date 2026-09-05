@@ -11,6 +11,7 @@ import { PrismaService } from '@app/database';
 import { TenantDbService } from '../../tenancy/tenant-db.service';
 import type { UserPayload } from '@app/common';
 import { normalizeBangladeshPhone } from '../checkout/utils/checkout.util';
+import { assertTenantCommerceWritable } from '../../tenancy/commerce-write-guard.util';
 import {
   CreateBookingDto,
   SaveServiceDto,
@@ -58,6 +59,7 @@ export class ServiceBookingService {
       orderBy: { createdAt: 'desc' },
     });
   }async save(dto: SaveServiceDto, id?: string) {
+    assertTenantCommerceWritable();
     const db = await this.db();
     const data = {
       ...dto,
@@ -68,10 +70,12 @@ export class ServiceBookingService {
       ? db.serviceOffering.update({ where: { id }, data })
       : db.serviceOffering.create({ data });
   }async delete(id: string) {
+    assertTenantCommerceWritable();
     const db = await this.db();
     return db.serviceOffering.delete({ where: { id } });
   }
   async book(dto: CreateBookingDto) {
+    assertTenantCommerceWritable();
     const db = await this.db();
     const service = await db.serviceOffering.findFirst({
       where: { id: dto.serviceId, status: 'ACTIVE' },
@@ -114,6 +118,7 @@ export class ServiceBookingService {
     });
   }
   async status(id: string, dto: UpdateBookingStatusDto, actor: UserPayload) {
+    assertTenantCommerceWritable();
     const db = await this.db();
     const booking = await db.serviceBooking.findUnique({
       where: { id },

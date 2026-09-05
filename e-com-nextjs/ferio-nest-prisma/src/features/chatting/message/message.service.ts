@@ -7,12 +7,13 @@ import { Queue } from 'bullmq';
 import type { PrismaClient } from '@prisma/client';
 import { PrismaService } from '@app/database';
 import { TenantDbService } from '../../../tenancy/tenant-db.service';
-import { SocketGateway } from '../../socket.gateway/socket.gateway';
+import { SocketGateway } from '../../socket.gateway/gateway/socket.gateway';
 import {
-  BULLMQ_CONVERSATION_LAST_MESSAGE_QUEUE,
   BULLMQ_NOTIFY_PARTICIPANTS_QUEUE,
 } from '@app/queue';
 import { SendMessageDto } from './dto/message.dto';
+import { tryGetTenantContext } from '../../../tenancy/tenant-context';
+import { errorMessage } from '@app/common';
 
 @Injectable()
 export class MessageService {
@@ -21,17 +22,16 @@ export class MessageService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly socketGateway: SocketGateway,
-    @Inject(BULLMQ_CONVERSATION_LAST_MESSAGE_QUEUE) private conversationLastMessageQueue: Queue,
     @Inject(BULLMQ_NOTIFY_PARTICIPANTS_QUEUE) private notifyParticipantsQueue: Queue,
-  
-    @Optional() private readonly tenantDb?: TenantDbService,) {}
+    @Optional() private readonly tenantDb?: TenantDbService,
+  ) {}
 
   /**
    * MT-7: inside a tenant-resolved request this returns the resolved tenant
    * database client; outside one it explicitly falls back to the legacy DB.
    */
   private async db(): Promise<PrismaClient> {
-    const tenant = await this.tenantDb?.tryGet();
+    const tenant = await this.tenantDb?.tryGet?.();
     return tenant ?? (this.prisma as PrismaClient);
   }
   /**
@@ -43,7 +43,7 @@ export class MessageService {
     dto: SendMessageDto,
   ) {
     const db = await this.db();
-    const { text, attachments } = dto;
+    const { text } = dto;
 
     const conversation = await db.conversation.findUnique({
       where: { id: conversationId, isDeleted: false },
@@ -65,32 +65,19 @@ export class MessageService {
       throw new BadRequestException('You are not a participant in this conversation');
     }
 
-    const message = await db.message.create({
-      data: {
-        text,
-        senderId,
-        conversationId,
-        // attachments: { connect: attachments?.map(id => ({ id })) || [] }, // Handle attachments if model exists
-      },
-      include: {
-        sender: {
-          select: { name: true, profileImageUrl: true, role: true }
-        }
-      }
+    const message = await db.$transaction(async (tx) => {
+      const created = await tx.message.create({
+        data: { text, senderId, conversationId },
+        include: { sender: { select: { name: true, profileImageUrl: true, role: true } } },
+      });
+      await tx.conversation.update({
+        where: { id: conversationId },
+        data: { lastMessageId: created.id, lastMessageText: text, lastMessageCreatedAt: created.createdAt },
+      });
+      return created;
     });
 
     this.logger.log(`✅ Message created: ${message.id} in conversation ${conversationId}`);
-
-    // Update conversation last message (async via BullMQ)
-    await this.conversationLastMessageQueue.add(
-      'update-conversation-last-message',
-      {
-        conversationId,
-        lastMessageId: message.id,
-        lastMessage: text,
-      },
-      { removeOnComplete: true }
-    );
 
     // Notify participants (async via BullMQ)
     await this.notifyParticipantsInConversation(conversationId, message);
@@ -112,92 +99,14 @@ export class MessageService {
     role?: string,
   ) {
     const db = await this.db();
+    page = Math.max(1, Number(page) || 1);
+    limit = Math.min(100, Math.max(1, Number(limit) || 50));
     await this.assertConversationAccess(conversationId, userId, role);
     const skip = (page - 1) * limit;
 
-    const rawId = conversationId.replace('conv-', '');
-    const prefId = conversationId.startsWith('conv-') ? conversationId : `conv-${conversationId}`;
-
-    const possibleIds = new Set<string>([conversationId, rawId, prefId]);
-
-    try {
-      const [user, customer] = await Promise.all([
-        db.user.findFirst({
-          where: {
-            OR: [
-              { id: rawId },
-              { customerId: rawId },
-              { id: conversationId },
-              { customerId: conversationId },
-            ],
-          },
-        }),
-        db.customer.findFirst({
-          where: {
-            OR: [
-              { id: rawId },
-              { id: conversationId },
-            ],
-          },
-          include: { user: true },
-        }),
-      ]);
-
-      if (user) {
-        possibleIds.add(user.id);
-        possibleIds.add(`conv-${user.id}`);
-        if (user.customerId) {
-          possibleIds.add(user.customerId);
-          possibleIds.add(`conv-${user.customerId}`);
-        }
-      }
-
-      if (customer) {
-        possibleIds.add(customer.id);
-        possibleIds.add(`conv-${customer.id}`);
-        if (customer.user?.id) {
-          possibleIds.add(customer.user.id);
-          possibleIds.add(`conv-${customer.user.id}`);
-        }
-      }
-
-      // If we found a user or customer with an email, search by email cross-reference
-      const targetEmail = user?.email || customer?.email;
-      if (targetEmail) {
-        const [linkedUserByEmail, linkedCustByEmail] = await Promise.all([
-          db.user.findFirst({ where: { email: targetEmail } }),
-          db.customer.findFirst({
-            where: { email: targetEmail },
-            include: { user: true },
-          }),
-        ]);
-
-        if (linkedUserByEmail) {
-          possibleIds.add(linkedUserByEmail.id);
-          possibleIds.add(`conv-${linkedUserByEmail.id}`);
-          if (linkedUserByEmail.customerId) {
-            possibleIds.add(linkedUserByEmail.customerId);
-            possibleIds.add(`conv-${linkedUserByEmail.customerId}`);
-          }
-        }
-        if (linkedCustByEmail) {
-          possibleIds.add(linkedCustByEmail.id);
-          possibleIds.add(`conv-${linkedCustByEmail.id}`);
-          if (linkedCustByEmail.user?.id) {
-            possibleIds.add(linkedCustByEmail.user.id);
-            possibleIds.add(`conv-${linkedCustByEmail.user.id}`);
-          }
-        }
-      }
-    } catch {
-      // Fallback ignore
-    }
-
-    const queryIds = Array.from(possibleIds);
-
     const messages = await db.message.findMany({
       where: {
-        conversationId: { in: queryIds },
+        conversationId,
         isDeleted: false,
       },
       include: {
@@ -213,7 +122,7 @@ export class MessageService {
 
     const total = await db.message.count({
       where: {
-        conversationId: { in: queryIds },
+        conversationId,
         isDeleted: false,
       },
     });
@@ -253,6 +162,7 @@ export class MessageService {
     await this.assertConversationAccess(conversationId, userId, role);
     const { before, after, limit = 20 } = options;
 
+    const boundedLimit = Math.min(100, Math.max(1, Number(limit) || 20));
     const query: any = {
       conversationId,
       isDeleted: false,
@@ -277,11 +187,11 @@ export class MessageService {
         attachments: true
       },
       orderBy: { createdAt: before ? 'desc' : 'asc' },
-      take: limit + 1,
+      take: boundedLimit + 1,
     });
 
-    const hasMore = messages.length > limit;
-    const resultMessages = hasMore ? messages.slice(0, limit) : messages;
+    const hasMore = messages.length > boundedLimit;
+    const resultMessages = hasMore ? messages.slice(0, boundedLimit) : messages;
 
     // Mark messages as read
     await this.markMessagesAsRead(
@@ -321,7 +231,11 @@ export class MessageService {
       }
     }
 
-    if (!allowedIds.has(conversationId)) {
+    const participant = await db.conversationParticipents.findFirst({
+      where: { conversationId, userId, isDeleted: false },
+      select: { id: true },
+    });
+    if (!allowedIds.has(conversationId) && !participant) {
       throw new ForbiddenException('Conversation access denied');
     }
   }
@@ -459,13 +373,14 @@ export class MessageService {
             role: sender?.role || 'user',
           },
           participantIds,
+          organizationId: tryGetTenantContext()?.organizationId,
         },
         { removeOnComplete: true },
       );
 
       this.logger.log(`📬 Queued notification for ${participantIds.length} participants`);
     } catch (error) {
-      this.logger.error(`❌ Failed to notify participants: ${error.message}`);
+      this.logger.error(`❌ Failed to notify participants: ${errorMessage(error)}`);
     }
   }
 
@@ -492,7 +407,7 @@ export class MessageService {
 
       this.logger.debug(`📡 Emitted new-message-received to room ${conversationId}`);
     } catch (error) {
-      this.logger.error(`❌ Failed to emit new message event: ${error.message}`);
+      this.logger.error(`❌ Failed to emit new message event: ${errorMessage(error)}`);
     }
   }
 

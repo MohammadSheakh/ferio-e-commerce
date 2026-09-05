@@ -46,10 +46,9 @@ export class EmailProcessor extends WorkerHost {
             job.data.purpose,
           );
         case 'send-task-notification':
-          this.logger.warn('email_job_not_implemented', { jobName: job.name });
-          return undefined;
+          throw new Error(`EMAIL_JOB_NOT_IMPLEMENTED:${job.name}`);
         default:
-          this.logger.warn('email_job_unknown', { jobName: job.name });
+          throw new Error(`EMAIL_JOB_UNKNOWN:${job.name}`);
       }
     } catch (err: unknown) {
       this.logger.error('email_job_failed', {

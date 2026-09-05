@@ -1,8 +1,22 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Req,
+  UnauthorizedException,
+  UseGuards,
+} from '@nestjs/common';
 import { OrganizationsService } from './services/organizations.service';
 import { DomainsService } from './services/domains.service';
 import { PlansService } from './services/plans.service';
-import type { CreatePlanInput } from './services/plans.service';
+import type {
+  CreatePlanInput,
+  UpdatePlanInput,
+} from './services/plans.service';
 import { SubscriptionsService } from './services/subscriptions.service';
 import { ProvisioningService } from './services/provisioning.service';
 import { MigrationOrchestratorService } from './services/migration-orchestrator.service';
@@ -25,6 +39,17 @@ import {
   PlatformPermissions,
 } from './guards/platform-auth.guard';
 import { ThrottlerGuard, Throttle } from '@nestjs/throttler';
+import type { Request } from 'express';
+import type { PlatformPrincipal } from './guards/platform-auth.guard';
+import type {
+  OrganizationStatus,
+  SubscriptionStatus,
+} from './generated/platform-client';
+
+type PlatformRequest = Request & {
+  platformPrincipal?: PlatformPrincipal;
+  user?: { platformUserId?: string; userId?: string };
+};
 
 /**
  * Minimal Platform Admin API (MT-1 foundation). The full operational UI is
@@ -58,7 +83,7 @@ export class PlatformAdminController {
   createOrganization(
     @Body()
     body: { name: string; slug: string; ownerEmail: string },
-    @Req() request: any,
+    @Req() request: PlatformRequest,
   ) {
     return this.organizations.create({
       name: body.name,
@@ -78,7 +103,7 @@ export class PlatformAdminController {
     const orgs = await this.platformPrisma.client.organization.findMany({
       select: { id: true, name: true },
     });
-    return new Map(orgs.map((org: any) => [org.id, org.name]));
+    return new Map(orgs.map((org) => [org.id, org.name]));
   }
 
   /** MT-9 §12.3 — subscription directory for the console billing views. */
@@ -94,7 +119,7 @@ export class PlatformAdminController {
       },
     });
     return {
-      items: rows.map((row: any) => ({
+      items: rows.map((row) => ({
         id: row.id,
         organizationId: row.organizationId,
         organizationName: row.organization?.name ?? '—',
@@ -120,7 +145,7 @@ export class PlatformAdminController {
       this.organizationNames(),
     ]);
     return {
-      items: rows.map((row: any) => ({
+      items: rows.map((row) => ({
         id: row.id,
         number: row.number,
         organizationName: orgNames.get(row.organizationId) ?? '—',
@@ -145,7 +170,7 @@ export class PlatformAdminController {
     });
     const orgNames = await this.organizationNames();
     return {
-      items: rows.map((row: any) => ({
+      items: rows.map((row) => ({
         id: row.id,
         invoiceNumber: row.invoice?.number ?? '—',
         provider: row.provider,
@@ -171,7 +196,7 @@ export class PlatformAdminController {
       orderBy: { createdAt: 'asc' },
       include: { organization: { select: { name: true, status: true } } },
     });
-    const databases = rows.map((row: any) => ({
+    const databases = rows.map((row) => ({
       tenantDatabaseId: row.id,
       organizationName: row.organization?.name ?? '—',
       organizationStatus: row.organization?.status ?? '—',
@@ -182,7 +207,7 @@ export class PlatformAdminController {
     return {
       canonicalHead,
       totalDatabases: databases.length,
-      upToDateCount: databases.filter((db: any) => db.upToDate).length,
+      upToDateCount: databases.filter((db) => db.upToDate).length,
       databases,
     };
   }
@@ -200,7 +225,10 @@ export class PlatformAdminController {
    */
   @Get('organizations/:id/usage')
   @PlatformPermissions('organization:read')
-  async getOrganizationUsage(@Param('id') id: string, @Query('periodKey') periodKey?: string) {
+  async getOrganizationUsage(
+    @Param('id') id: string,
+    @Query('periodKey') periodKey?: string,
+  ) {
     const key = periodKey || currentPeriodKey();
     const [subscription, counters] = await Promise.all([
       this.platformPrisma.client.subscription.findUnique({
@@ -210,7 +238,9 @@ export class PlatformAdminController {
       this.usage.snapshot(id, usageMetricKeys(), key),
     ]);
     const entitlements = new Map(
-      (subscription?.plan.entitlements ?? []).map((item: any) => [item.featureKey, item]),
+      (subscription?.plan.entitlements ?? []).map(
+        (item) => [item.featureKey, item] as const,
+      ),
     );
     const metrics = USAGE_METRICS.map((definition) => {
       const entitlement = entitlements.get(definition.key) as
@@ -228,7 +258,8 @@ export class PlatformAdminController {
         recorded,
         enabled: entitlement?.enabled ?? false,
         limit,
-        usageRatio: limit && Number(limit) > 0 ? Number(recorded) / Number(limit) : null,
+        usageRatio:
+          limit && Number(limit) > 0 ? Number(recorded) / Number(limit) : null,
         warning:
           warningThresholdValue !== null &&
           entitlement?.enabled === true &&
@@ -244,13 +275,17 @@ export class PlatformAdminController {
    */
   @Post('organizations/:id/usage/reconcile')
   @PlatformPermissions('organization:write')
-  async reconcileOrganizationUsage(@Param('id') id: string, @Req() request: any) {
+  async reconcileOrganizationUsage(
+    @Param('id') id: string,
+    @Req() request: PlatformRequest,
+  ) {
     const report = await this.usageReconciliation.reconcileOrganization(id);
     await this.audit.record({
       action: 'USAGE_RECONCILED',
       entityType: 'UsageCounter',
       entityId: id,
-      actorId: request?.user?.platformUserId ?? request?.user?.userId ?? 'platform',
+      actorId:
+        request?.user?.platformUserId ?? request?.user?.userId ?? 'platform',
       newValue: { drifted: report.drifted, entries: report.entries },
       metadata: { periodKey: report.periodKey },
     });
@@ -264,12 +299,13 @@ export class PlatformAdminController {
    */
   @Post('maintenance/retention-sweep')
   @PlatformPermissions('organization:write')
-  async runRetentionSweep(@Req() request: any) {
+  async runRetentionSweep(@Req() request: PlatformRequest) {
     const result = await this.retentionSweep.sweepAllReady();
     await this.audit.record({
       action: 'RETENTION_SWEEP',
       entityType: 'TenantDatabase',
-      actorId: request?.user?.platformUserId ?? request?.user?.userId ?? 'platform',
+      actorId:
+        request?.user?.platformUserId ?? request?.user?.userId ?? 'platform',
       newValue: {
         swept: result.swept,
         totalDeleted: result.totalDeleted,
@@ -283,8 +319,8 @@ export class PlatformAdminController {
   @PlatformPermissions('organization:write')
   transitionOrganization(
     @Param('id') id: string,
-    @Body() body: { status: any; reason?: string },
-    @Req() request: any,
+    @Body() body: { status: OrganizationStatus; reason?: string },
+    @Req() request: PlatformRequest,
   ) {
     return this.organizations.transition(id, body.status, {
       actorId: request.platformPrincipal?.platformUserId,
@@ -297,7 +333,7 @@ export class PlatformAdminController {
   provision(
     @Param('id') id: string,
     @Body() body: { idempotencyKey?: string },
-    @Req() request: any,
+    @Req() request: PlatformRequest,
   ) {
     return this.provisioning.start(id, {
       actorId: request.platformPrincipal?.platformUserId,
@@ -307,8 +343,24 @@ export class PlatformAdminController {
 
   @Post('plans')
   @PlatformPermissions('subscription:write')
-  createPlan(@Body() body: CreatePlanInput, @Req() request: any) {
-    return this.plans.create({ ...body, actorId: request.platformPrincipal?.platformUserId });
+  createPlan(@Body() body: CreatePlanInput, @Req() request: PlatformRequest) {
+    return this.plans.create({
+      ...body,
+      actorId: request.platformPrincipal?.platformUserId,
+    });
+  }
+
+  @Patch('plans/:id')
+  @PlatformPermissions('subscription:write')
+  updatePlan(
+    @Param('id') id: string,
+    @Body() body: UpdatePlanInput,
+    @Req() request: PlatformRequest,
+  ) {
+    return this.plans.update(id, {
+      ...body,
+      actorId: request.platformPrincipal?.platformUserId,
+    });
   }
 
   @Get('plans')
@@ -323,15 +375,19 @@ export class PlatformAdminController {
     @Param('id') id: string,
     @Body() body: { planKey: string; trialDays?: number },
   ) {
-    return this.subscriptions.startTrial(id, body.planKey, Math.min(body.trialDays ?? 14, 90));
+    return this.subscriptions.startTrial(
+      id,
+      body.planKey,
+      Math.min(body.trialDays ?? 14, 90),
+    );
   }
 
   @Patch('organizations/:id/subscription/status')
   @PlatformPermissions('subscription:write')
   transitionSubscription(
     @Param('id') id: string,
-    @Body() body: { status: any; note?: string },
-    @Req() request: any,
+    @Body() body: { status: SubscriptionStatus; note?: string },
+    @Req() request: PlatformRequest,
   ) {
     return this.subscriptions.transition(id, body.status, {
       actorId: request.platformPrincipal?.platformUserId,
@@ -345,25 +401,30 @@ export class PlatformAdminController {
   @Get('dashboard')
   @PlatformPermissions('organization:read')
   async dashboard() {
-    const [orgLifecycle, subsByStatus, dbsByStatus, provisioningFailed, activeGrants] =
-      await Promise.all([
-        this.platformPrisma.client.organization.groupBy({
-          by: ['status'],
-          _count: { _all: true },
-        }),
-        this.platformPrisma.client.subscription.groupBy({
-          by: ['status'],
-          _count: { _all: true },
-        }),
-        this.platformPrisma.client.tenantDatabase.groupBy({
-          by: ['status'],
-          _count: { _all: true },
-        }),
-        this.platformPrisma.client.provisioningRun.count({
-          where: { status: 'FAILED' },
-        }),
-        this.supportAccess.countActive(),
-      ]);
+    const [
+      orgLifecycle,
+      subsByStatus,
+      dbsByStatus,
+      provisioningFailed,
+      activeGrants,
+    ] = await Promise.all([
+      this.platformPrisma.client.organization.groupBy({
+        by: ['status'],
+        _count: { _all: true },
+      }),
+      this.platformPrisma.client.subscription.groupBy({
+        by: ['status'],
+        _count: { _all: true },
+      }),
+      this.platformPrisma.client.tenantDatabase.groupBy({
+        by: ['status'],
+        _count: { _all: true },
+      }),
+      this.platformPrisma.client.provisioningRun.count({
+        where: { status: 'FAILED' },
+      }),
+      this.supportAccess.countActive(),
+    ]);
     const toMap = (rows: Array<{ status: string; _count: { _all: number } }>) =>
       Object.fromEntries(rows.map((row) => [row.status, row._count._all]));
     return {
@@ -391,9 +452,7 @@ export class PlatformAdminController {
   // privileged credential surface in the system.
   @Throttle({ platform: { limit: 10, ttl: 60_000 } })
   @PlatformPermissions() // public within the platform controller realm guard
-  async login(
-    @Body() body: { email?: string; password?: string },
-  ) {
+  async login(@Body() body: { email?: string; password?: string }) {
     if (!body.email || !body.password) {
       throw new (require('@nestjs/common').UnauthorizedException)(
         'PLATFORM_CREDENTIALS_INVALID',
@@ -430,7 +489,7 @@ export class PlatformAdminController {
       concurrencyLimit?: number;
       failureThreshold?: number;
     },
-    @Req() request: any,
+    @Req() request: PlatformRequest,
   ) {
     return this.migrations.start({
       actorId: request.platformPrincipal?.platformUserId,
@@ -469,7 +528,7 @@ export class PlatformAdminController {
   initiateClosure(
     @Param('id') id: string,
     @Body() body: { reason?: string },
-    @Req() request: any,
+    @Req() request: PlatformRequest,
   ) {
     return this.closure.initiateClosure(id, {
       actorId: request.platformPrincipal?.platformUserId,
@@ -481,8 +540,12 @@ export class PlatformAdminController {
   @PlatformPermissions('organization:write')
   finalizeClosure(
     @Param('id') id: string,
-    @Body() body: { retentionAcknowledged?: boolean; overrideRetentionPeriod?: boolean },
-    @Req() request: any,
+    @Body()
+    body: {
+      retentionAcknowledged?: boolean;
+      overrideRetentionPeriod?: boolean;
+    },
+    @Req() request: PlatformRequest,
   ) {
     return this.closure.finalizeClosure(id, {
       actorId: request.platformPrincipal?.platformUserId,
@@ -501,7 +564,7 @@ export class PlatformAdminController {
   @PlatformPermissions('support_access:request')
   revokeSupportAccess(
     @Param('grantId') grantId: string,
-    @Req() request: any,
+    @Req() request: PlatformRequest,
   ) {
     return this.supportAccess.revoke(
       grantId,
@@ -513,10 +576,16 @@ export class PlatformAdminController {
   @PlatformPermissions('support_access:request')
   requestSupportAccess(
     @Body()
-    body: { organizationId: string; reason: string; ttlMinutes?: number; scope?: Record<string, unknown> },
-    @Req() request: any,
+    body: {
+      organizationId: string;
+      reason: string;
+      ttlMinutes?: number;
+      scope?: Record<string, unknown>;
+    },
+    @Req() request: PlatformRequest,
   ) {
     const principal = request.platformPrincipal;
+    if (!principal) throw new UnauthorizedException('PLATFORM_AUTH_REQUIRED');
     return this.supportAccess.grant({
       organizationId: body.organizationId,
       platformUserId: principal.platformUserId,

@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsOptional, IsString, IsArray } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsNotEmpty, IsOptional, IsString, IsArray, IsInt, Max, Min, ArrayMaxSize } from 'class-validator';
 
 /**
  * Create Conversation DTO
@@ -13,6 +14,8 @@ export class CreateConversationDto {
     required: true,
   })
   @IsArray()
+  @ArrayMaxSize(50)
+  @IsString({ each: true })
   @IsNotEmpty({ each: true })
   participants: string[];
 
@@ -54,6 +57,8 @@ export class AddParticipantsDto {
     required: true,
   })
   @IsArray()
+  @ArrayMaxSize(50)
+  @IsString({ each: true })
   @IsNotEmpty({ each: true })
   participants: string[];
 
@@ -98,6 +103,9 @@ export class GetConversationsQueryDto {
     required: false,
   })
   @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
   page?: number = 1;
 
   @ApiProperty({
@@ -106,6 +114,10 @@ export class GetConversationsQueryDto {
     required: false,
   })
   @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
   limit?: number = 10;
 
   @ApiProperty({

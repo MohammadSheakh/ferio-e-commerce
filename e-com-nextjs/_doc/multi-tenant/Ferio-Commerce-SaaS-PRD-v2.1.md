@@ -96,6 +96,55 @@ Ferio enables a business to:
 
 Ferio is a **multi-tenant Commerce SaaS platform**. Each business operates its own storefront and back office. It is not initially a multi-vendor marketplace where multiple sellers transact in one shared storefront, nor a full ERP, ad-management replacement, warehouse management suite, or AI platform.
 
+### 3.5 Backend module structure and maintainability contract
+
+Ferio's NestJS backend remains a modular monolith organized by bounded feature
+contexts. The codebase must use a consistent feature structure so tenant
+isolation, authorization, queue ownership, and operational responsibilities
+remain visible as the platform scales.
+
+The standard feature shape is:
+
+```text
+feature-name/
+  feature-name.module.ts
+  controllers/                 # for multiple/cohesive controllers
+  services/                    # for multiple/cohesive application services
+  dto/
+  adapters/ | gateways/        # provider and integration boundaries
+  processors/                  # asynchronous workers
+  queues/                      # job enqueueing and scheduling
+  utils/                       # pure domain helpers
+  tests/                       # feature/submodule-owned tests
+```
+
+This is a scalability and ownership contract, not a cosmetic requirement.
+Small cohesive features may keep one controller and one service at the feature
+root. Complex features must separate runtime roles when they have distinct
+authorization, persistence, queue, provider, or operational responsibilities.
+
+Required conventions:
+
+- Tests live in feature-local or bounded-submodule `tests/` directories and
+  remain owned by the production boundary they verify.
+- DTOs validate transport input; services own application use cases; adapters
+  and gateways isolate external providers; processors and queues own async
+  execution; utilities remain side-effect-free where practical.
+- Feature modules make control-plane, tenant-plane, and shared-infrastructure
+  dependencies explicit. No feature may acquire a tenant database from
+  client-supplied routing data.
+- Runtime feature directories contain executable source only. Historical
+  reports and architecture decisions belong under `_doc/`.
+- New directories use kebab-case. Renaming legacy directories requires an
+  atomic import/test/script migration and must not change public API contracts.
+- Structural changes require typecheck, focused tests, the complete backend
+  test suite, and a documented migration entry before release.
+
+The implementation checklist and the file/folder tracking document are the
+operational sources for applying this contract. Product behavior, tenant
+isolation, authorization, and route contracts remain the higher-order
+requirements; folder movement alone does not count as feature completion.
+
 ---
 
 ## 4. Problem Definition

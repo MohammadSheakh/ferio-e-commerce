@@ -31,7 +31,7 @@ export function UsageCard({
     setWorking(true);
     setMessage("");
     const res = await fetch(
-      `/api/platform/platform/organizations/${organizationId}/usage/reconcile`,
+      `/api/platform/organizations/${organizationId}/usage/reconcile`,
       { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" },
     );
     const data = await res.json().catch(() => ({}));

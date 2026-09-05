@@ -8,19 +8,19 @@ import { RedxAdapter } from './adapters/redx.adapter';
 import { EcourierAdapter } from './adapters/ecourier.adapter';
 import { PaperflyAdapter } from './adapters/paperfly.adapter';
 import { CarrybeeAdapter } from './adapters/carrybee.adapter';
-import { CourierRouterService } from './courier-router.service';
+import { CourierRouterService } from './services/courier-router.service';
 import {
   AdminShippingController,
   CourierWebhookController,
-} from './shipping.controller';
-import { ShippingService } from './shipping.service';
+} from './controllers/shipping.controller';
+import { ShippingService } from './services/shipping.service';
 import { TransactionalMessagingModule } from '../transactional-messaging/transactional-messaging.module';
 import { AuditModule } from '../audit/audit.module';
-import { ShippingWebhookProcessor } from './shipping-webhook.processor';
-import { ShippingWebhookQueue } from './shipping-webhook.queue';
-import { ShippingPollingService } from './shipping-polling.service';
-import { ShippingPollingQueue } from './shipping-polling.queue';
-import { ShippingPollingProcessor } from './shipping-polling.processor';
+import { ShippingWebhookProcessor } from './processors/shipping-webhook.processor';
+import { ShippingWebhookQueue } from './queues/shipping-webhook.queue';
+import { ShippingPollingService } from './services/shipping-polling.service';
+import { ShippingPollingQueue } from './queues/shipping-polling.queue';
+import { ShippingPollingProcessor } from './processors/shipping-polling.processor';
 
 @Module({
   imports: [

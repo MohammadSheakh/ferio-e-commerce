@@ -1,5 +1,15 @@
-export function cleanFilters(filters: Record<string, any>): Record<string, any> {
-  const controlKeys = new Set(['page', 'limit', 'sortBy', 'include', 'populate', 'select', 'cursor']);
+export function cleanFilters(
+  filters: Record<string, unknown>,
+): Record<string, unknown> {
+  const controlKeys = new Set([
+    'page',
+    'limit',
+    'sortBy',
+    'include',
+    'populate',
+    'select',
+    'cursor',
+  ]);
   return Object.fromEntries(
     Object.entries(filters).filter((entry) => {
       const [key, value] = entry;
@@ -8,7 +18,10 @@ export function cleanFilters(filters: Record<string, any>): Record<string, any> 
   );
 }
 
-export function parseSort(sortBy?: string, defaultKey: string = 'createdAt'): Record<string, 'asc' | 'desc'> {
+export function parseSort(
+  sortBy?: string,
+  defaultKey: string = 'createdAt',
+): Record<string, 'asc' | 'desc'> {
   if (!sortBy) {
     return { [defaultKey]: 'desc' };
   }
@@ -21,9 +34,9 @@ export function parseSort(sortBy?: string, defaultKey: string = 'createdAt'): Re
 }
 
 export function buildProjection(
-  include?: Record<string, any>,
+  include?: Record<string, unknown>,
   select?: Record<string, boolean>,
-): Record<string, any> {
+): Record<string, unknown> {
   if (include) {
     return { include };
   }

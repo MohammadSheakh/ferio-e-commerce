@@ -16,7 +16,7 @@ import {
   VerifyWarrantyOrderDto,
   WarrantyClaimQueryDto,
 } from './warranty.dto';
-import { canTransitionWarranty } from './warranty.util';
+import { canTransitionWarranty } from './utils/warranty.util';
 
 const adminClaimInclude = {
   submittedBy: { select: { name: true, email: true } },

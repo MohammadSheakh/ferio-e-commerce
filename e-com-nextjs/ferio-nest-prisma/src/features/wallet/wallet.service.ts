@@ -13,7 +13,7 @@ import { PrismaService } from '@app/database';
 import { assertTenantCommerceWritable } from '../../tenancy/commerce-write-guard.util';
 import { TenantDbService } from '../../tenancy/tenant-db.service';
 import type { UserPayload } from '@app/common';
-import { AuditService } from '../audit/audit.service';
+import { AuditService } from '../audit/services/audit.service';
 import { CustomerNotificationsService } from '../customer-notifications/customer-notifications.service';
 import {
   CreateWalletTopUpDto,

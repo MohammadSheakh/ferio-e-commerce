@@ -10,7 +10,11 @@ const COOKIE = "ferio_platform_token";
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (pathname === "/login") return NextResponse.next();
+  // The login page and its same-origin API endpoint must be public. The API
+  // route exchanges credentials for the httpOnly platform session cookie.
+  if (pathname === "/login" || pathname === "/api/auth/login") {
+    return NextResponse.next();
+  }
 
   if (!request.cookies.get(COOKIE)?.value) {
     const url = request.nextUrl.clone();

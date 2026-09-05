@@ -1,15 +1,24 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PaginateOptions, PaginateResult } from '../shared/types/paginate';
-import { cleanFilters, parseSort, buildProjection } from '../utils/prisma.utils';
+import {
+  cleanFilters,
+  parseSort,
+  buildProjection,
+} from '../utils/prisma.utils';
 
-type PrismaDelegate<TRecord = any> = {
-  findUnique(args: any): Promise<TRecord | null>;
-  findFirst(args: any): Promise<TRecord | null>;
-  findMany(args: any): Promise<TRecord[]>;
-  count(args?: any): Promise<number>;
-  create(args: any): Promise<TRecord>;
-  update(args: any): Promise<TRecord>;
-  delete(args: any): Promise<TRecord>;
+type GenericObject = Record<string, unknown>;
+type PrismaDelegate<TRecord = unknown> = {
+  findUnique(args: GenericObject): Promise<TRecord | null>;
+  findFirst(args: GenericObject): Promise<TRecord | null>;
+  findMany(args: GenericObject): Promise<TRecord[]>;
+  count(args?: GenericObject): Promise<number>;
+  create(args: GenericObject): Promise<TRecord>;
+  update(args: GenericObject): Promise<TRecord>;
+  delete(args: GenericObject): Promise<TRecord>;
 };
 
 /**
@@ -26,9 +35,9 @@ type PrismaDelegate<TRecord = any> = {
  * ```
  */
 @Injectable()
-export class GenericService<TDelegate = any, TRecord = any> {
+export class GenericService<TDelegate = unknown, TRecord = unknown> {
   protected delegate: PrismaDelegate<TRecord>;
-  protected model: any;
+  protected model: TDelegate;
   protected defaultSelect?: Record<string, boolean>;
 
   constructor(delegate: TDelegate, defaultSelect?: Record<string, boolean>) {
@@ -40,7 +49,7 @@ export class GenericService<TDelegate = any, TRecord = any> {
 
   async findById(
     id: string,
-    include?: Record<string, any>,
+    include?: GenericObject,
     select?: Record<string, boolean>,
   ): Promise<TRecord | null> {
     this.validateId(id);
@@ -52,8 +61,8 @@ export class GenericService<TDelegate = any, TRecord = any> {
   }
 
   async findAll(
-    filters: Record<string, any> = {},
-    include?: Record<string, any>,
+    filters: GenericObject = {},
+    include?: GenericObject,
     select?: Record<string, boolean>,
   ): Promise<TRecord[]> {
     return this.delegate.findMany({
@@ -63,9 +72,9 @@ export class GenericService<TDelegate = any, TRecord = any> {
   }
 
   async findAllWithPagination(
-    filters: Record<string, any> = {},
+    filters: GenericObject = {},
     options: PaginateOptions,
-    include?: Record<string, any>,
+    include?: GenericObject,
     select?: Record<string, boolean>,
   ): Promise<PaginateResult<TRecord>> {
     const page = Number(options.page) || 1;
@@ -93,14 +102,14 @@ export class GenericService<TDelegate = any, TRecord = any> {
     };
   }
 
-  async create(data: Record<string, any>): Promise<TRecord> {
+  async create(data: GenericObject): Promise<TRecord> {
     return this.delegate.create({
       data,
       ...this.buildProjection(),
     });
   }
 
-  async updateById(id: string, data: Record<string, any>): Promise<TRecord | null> {
+  async updateById(id: string, data: GenericObject): Promise<TRecord | null> {
     this.validateId(id);
 
     try {
@@ -133,19 +142,19 @@ export class GenericService<TDelegate = any, TRecord = any> {
     });
   }
 
-  async count(filters: Record<string, any> = {}): Promise<number> {
+  async count(filters: GenericObject = {}): Promise<number> {
     return this.delegate.count({ where: this.cleanFilters(filters) });
   }
 
-  async exists(filters: Record<string, any> = {}): Promise<boolean> {
+  async exists(filters: GenericObject = {}): Promise<boolean> {
     const count = await this.count(filters);
     return count > 0;
   }
 
   protected buildProjection(
-    include?: Record<string, any>,
+    include?: GenericObject,
     select?: Record<string, boolean>,
-  ): Record<string, any> {
+  ): GenericObject {
     const projection = buildProjection(include, select);
     if (Object.keys(projection).length === 0 && this.defaultSelect) {
       return { select: this.defaultSelect };
@@ -153,11 +162,13 @@ export class GenericService<TDelegate = any, TRecord = any> {
     return projection;
   }
 
-  protected cleanFilters(filters: Record<string, any>): Record<string, any> {
+  protected cleanFilters(filters: GenericObject): GenericObject {
     return cleanFilters(filters);
   }
 
-  protected parseSort(sortBy?: string): Record<string, 'asc' | 'desc'> | undefined {
+  protected parseSort(
+    sortBy?: string,
+  ): Record<string, 'asc' | 'desc'> | undefined {
     return parseSort(sortBy);
   }
 
@@ -167,8 +178,13 @@ export class GenericService<TDelegate = any, TRecord = any> {
     }
   }
 
-  protected throwNotFoundOnMissingRecord(error: any): void {
-    if (error?.code === 'P2025') {
+  protected throwNotFoundOnMissingRecord(error: unknown): void {
+    if (
+      error &&
+      typeof error === 'object' &&
+      'code' in error &&
+      error.code === 'P2025'
+    ) {
       throw new NotFoundException('Record not found');
     }
   }

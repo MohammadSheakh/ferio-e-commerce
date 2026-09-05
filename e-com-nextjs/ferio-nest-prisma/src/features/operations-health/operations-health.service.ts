@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { ConfigService } from '@nestjs/config';
 import type { Queue } from 'bullmq';
@@ -7,7 +7,9 @@ import { RedisService } from '@app/redis';
 import { QUEUE_NAMES } from '@app/queue';
 import { RequestMetrics } from '@app/common';
 import { PaymentGatewayRegistry } from '../commerce-payments/gateways/payment-gateway.registry';
-import { ShippingService } from '../shipping/shipping.service';
+import { ShippingService } from '../shipping/services/shipping.service';
+import { TenantDbService } from '../../tenancy/tenant-db.service';
+import type { PrismaClient } from '@prisma/client';
 
 type DependencyProbe = {
   available: boolean;
@@ -22,6 +24,7 @@ type QueueEvidence = {
 };
 
 type CourierReadiness = Awaited<ReturnType<ShippingService['getProviders']>>;
+type CourierReadinessItem = CourierReadiness[number];
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -42,6 +45,7 @@ export class OperationsHealthService {
     @InjectQueue(QUEUE_NAMES.TRANSACTIONAL_MESSAGE)
     transactionalMessageQueue: Queue,
     @InjectQueue(QUEUE_NAMES.PAYMENT_RECOVERY) paymentRecoveryQueue: Queue,
+    @Optional() private readonly tenantDb?: TenantDbService,
   ) {
     this.queues = [
       { name: 'Authentication email', queue: emailQueue },
@@ -53,11 +57,15 @@ export class OperationsHealthService {
     ];
   }
 
+  private async db(): Promise<PrismaClient> {
+    return ((await this.tenantDb?.tryGet()) ?? this.prisma) as PrismaClient;
+  }
+
   async getHealth() {
     const [database, redis, queues, commerce, couriers] = await Promise.all([
       this.databaseProbe(),
       this.redisProbe(),
-      Promise.all(this.queues.map((queue) => this.queueEvidence(queue))),
+      Promise.all(this.queues.map((queue: { name: string; queue: Queue }) => this.queueEvidence(queue))),
       this.commerceEvidence(),
       this.shipping.getProviders().catch(() => [] as CourierReadiness),
     ]);
@@ -73,7 +81,7 @@ export class OperationsHealthService {
       ...(payments.some((provider) => provider.configured)
         ? []
         : ['No prepaid payment provider is configured.']),
-      ...(couriers.some((provider) => provider.isActive && provider.configured)
+      ...(couriers.some((provider: CourierReadinessItem) => provider.isActive && provider.configured)
         ? []
         : ['No active courier has verified runtime configuration.']),
       ...(backup.status === 'CURRENT'
@@ -97,12 +105,19 @@ export class OperationsHealthService {
         },
       },
       requests: RequestMetrics.snapshot(),
-      dependencies: { database, redis },
+      dependencies: {
+        database,
+        redis,
+        pools: {
+          controlPlane: this.prisma.poolMetrics,
+          tenant: this.tenantDb?.metrics(),
+        },
+      },
       queues,
       commerce,
       providers: {
         payments,
-        couriers: couriers.map((provider) => ({
+        couriers: couriers.map((provider: CourierReadinessItem) => ({
           code: provider.code,
           name: provider.name,
           active: provider.isActive,
@@ -117,7 +132,8 @@ export class OperationsHealthService {
   private async databaseProbe(): Promise<DependencyProbe> {
     const startedAt = Date.now();
     try {
-      await this.prisma.$queryRaw`SELECT 1`;
+      const db = await this.db();
+      await db.$queryRaw`SELECT 1`;
       return { available: true, latencyMs: Date.now() - startedAt };
     } catch {
       return {
@@ -167,6 +183,7 @@ export class OperationsHealthService {
   private async commerceEvidence() {
     const since = new Date(Date.now() - DAY_MS);
     try {
+      const db = await this.db();
       const [
         ordersPlaced,
         ordersDelivered,
@@ -177,27 +194,27 @@ export class OperationsHealthService {
         failedRefunds,
         openCriticalFindings,
       ] = await Promise.all([
-        this.prisma.order.count({ where: { createdAt: { gte: since } } }),
-        this.prisma.order.count({
+        db.order.count({ where: { createdAt: { gte: since } } }),
+        db.order.count({
           where: {
             status: { in: ['DELIVERED', 'COMPLETED'] },
             updatedAt: { gte: since },
           },
         }),
-        this.prisma.order.count({
+        db.order.count({
           where: { paymentStatus: 'PAID', updatedAt: { gte: since } },
         }),
-        this.prisma.commercePaymentAttempt.count({
+        db.commercePaymentAttempt.count({
           where: { status: 'FAILED', createdAt: { gte: since } },
         }),
-        this.prisma.commercePaymentAttempt.count({
+        db.commercePaymentAttempt.count({
           where: { status: 'UNKNOWN', createdAt: { gte: since } },
         }),
-        this.prisma.shipment.count({ where: { createdAt: { gte: since } } }),
-        this.prisma.commerceRefund.count({
+        db.shipment.count({ where: { createdAt: { gte: since } } }),
+        db.commerceRefund.count({
           where: { status: 'FAILED', createdAt: { gte: since } },
         }),
-        this.prisma.reconciliationFinding.count({
+        db.reconciliationFinding.count({
           where: {
             status: { in: ['OPEN', 'ACKNOWLEDGED'] },
             severity: { in: ['CRITICAL', 'HIGH'] },
