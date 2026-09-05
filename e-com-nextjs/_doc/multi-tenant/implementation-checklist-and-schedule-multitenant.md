@@ -92,6 +92,55 @@ Verification: backend production build clean; **67 suites / 264 unit tests passi
 - [ ] Freeze accidental new global tables in the existing tenant schema until ownership is classified.
 - [ ] Create a tenant-boundary review checklist for every future module/PR.
 
+## 3.1.1 Backend feature structure convention
+
+The NestJS backend is a modular monolith organized by bounded feature context.
+Each feature owns its module, DTOs, runtime roles, tests, and supporting
+documentation. This structure is an implementation and code-review standard,
+not a requirement to create empty folders in small modules.
+
+```text
+feature-name/
+  feature-name.module.ts
+  controllers/                 # when multiple/cohesive controllers exist
+  services/                    # when multiple/cohesive services exist
+  dto/
+  adapters/ | gateways/        # external provider boundaries
+  processors/                  # BullMQ/background workers
+  queues/                      # job scheduling and enqueueing
+  utils/                       # pure domain helpers
+  tests/                       # feature or submodule-owned tests
+```
+
+Rules:
+
+- Keep one-controller/one-service features flat when additional role folders
+  would add ceremony without improving dependency boundaries.
+- Use explicit role folders for complex features such as payments, shipping,
+  reconciliation, settlements, transactional messaging, audit, storage, and
+  real-time gateways.
+- Keep tests inside the owning feature or bounded submodule under `tests/`;
+  do not mix test files with production files in the same directory.
+- Keep DTOs, adapters, processors, queues, gateways, policies, and utilities
+  behind the feature that owns them. Do not create cross-feature utility dumps.
+- Keep control-plane, tenant-plane, and shared-infrastructure dependencies
+  visible in the feature module and preserve tenant-boundary direction.
+- Keep historical reports, completion notes, and architecture documents under
+  `_doc/`; runtime `src/features` directories contain executable source only.
+- Use kebab-case for new directories. Existing names are normalized only in an
+  atomic migration with all imports, tests, scripts, and documentation updated.
+- A structure refactor must preserve public module exports and route contracts.
+  It must pass typecheck, focused tests, the full backend suite, and
+  `git diff --check`.
+
+Implementation tracking: `_doc/multi-tenant/skill-related-discussion/file-folder-structure-track.md`.
+
+- [x] Establish the feature role and test-folder convention.
+- [x] Apply the convention to complex existing backend modules.
+- [x] Move nested feature tests into dedicated `tests/` folders.
+- [ ] Complete the controlled kebab-case naming migration for legacy folders.
+- [ ] Replace or isolate legacy Mongoose-shaped feature boundaries.
+
 ## 3.2 Data classification
 
 - [x] Produce a table for every current Prisma model: `CONTROL_PLANE`, `TENANT`, `PLATFORM_SHARED`, or `REMOVE/LEGACY`. (`_doc/multi-tenant/data-classification.md`)
