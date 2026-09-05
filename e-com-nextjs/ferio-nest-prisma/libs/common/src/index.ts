@@ -8,7 +8,6 @@ export * from './decorators/use-file-upload-pipeline.decorator';
 
 // Filters
 export * from './filters/http-exception.filter';
-// export * from './filters/mongoose-exception.filter';
 
 // Guards
 export * from './guards/auth.guard';

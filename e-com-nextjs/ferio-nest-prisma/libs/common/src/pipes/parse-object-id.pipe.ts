@@ -1,5 +1,4 @@
 import { PipeTransform, Injectable, ArgumentMetadata, BadRequestException } from '@nestjs/common';
-import { Types } from 'mongoose';
 
 /**
  * Parse ObjectId Pipe
@@ -15,7 +14,7 @@ export class ParseObjectIdPipe implements PipeTransform<string, string> {
       throw new BadRequestException('ID is required');
     }
 
-    if (!Types.ObjectId.isValid(value)) {
+    if (!/^[0-9a-fA-F]{24}$/.test(value)) {
       throw new BadRequestException(`Invalid ID format: ${value}`);
     }
 
