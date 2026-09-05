@@ -23,7 +23,7 @@ and must not be modified to make the project look better.
 | BO-06 | CI lacks lint, frontend/mobile tests, migration verification, image smoke tests, and strict dependency failure policy. | IN PROGRESS | Backend `lint` is now read-only; mobile typecheck, frozen-lockfile dependency audit, migration deployment, and production Compose render/exposure checks are covered, while lint, frontend tests, image smoke tests, and migration rollback tests remain open. |
 | BO-07 | Scalability claims lack load, saturation, failure, and multi-instance evidence. | IN PROGRESS | CI now exposes a repeatable tenant resolver/database capacity baseline; HTTP, WebSocket, queue throughput, saturation, failure-injection, and multi-instance evidence remain open. |
 | BO-08 | Frontend has repeated fetch/parsing patterns, manual types, `any`, and no coherent test strategy. | TODO | Establish shared typed request/error utilities and test critical auth, tenancy, checkout, and admin flows. |
-| BO-09 | Agent and skill rules are better documented than enforced by tooling. | TODO | Convert the highest-value rules into lint, type, architecture, contract, secret, and CI checks. |
+| BO-09 | Agent and skill rules are better documented than enforced by tooling. | IN PROGRESS | Added an executable backend architecture-boundary check to CI; remaining tenancy, dependency, contract, and folder-convention rules still need enforcement. |
 
 ## Change Log
 
@@ -74,3 +74,4 @@ and must not be modified to make the project look better.
 - BO-03: corrected the base Compose documentation so the development stack is no longer described as production-capable; production use must go through the hardened overlay and an ingress/orchestrator.
 - BO-07: added an explicit `test:performance` command and CI step for the existing tenant resolver, bounded connection-manager, LRU, and tenant bootstrap baselines. This is measurable baseline evidence, not a million-user capacity claim; broader saturation and multi-instance testing remain open.
 - BO-07: fixed the performance baseline's missing-database guard so local runs skip only PostgreSQL-dependent cases instead of failing with an invalid URL. The local resolver baseline passes (2,000 cached resolutions in 14ms in this run); CI still runs the real PostgreSQL cases through `TEST_DATABASE_URL`.
+- BO-09: added `pnpm architecture:check`, which strips comments before asserting that the active `AppModule` and legacy Mongo module do not register a Mongoose root connection, and verifies the hardened production Compose overlay exists. CI now runs this boundary check before migrations and application tests.
