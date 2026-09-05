@@ -1,0 +1,85 @@
+# Ferio production overlay.
+#
+# Use with the base service definitions:
+#   docker compose -f docker-compose.yml -f docker-compose.production.yml up -d --build
+#
+# Put TLS, public DNS, and rate limiting in the reverse proxy or orchestrator.
+# This overlay deliberately exposes application services only to the compose
+# network and requires credentials instead of inheriting development defaults.
+
+services:
+  postgres:
+    ports: !reset []
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+    restart: unless-stopped
+
+  redis:
+    ports: !reset []
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?REDIS_PASSWORD must be set}"]
+    restart: unless-stopped
+
+  minio:
+    ports: !reset []
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?MINIO_ROOT_USER must be set}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD must be set}
+    restart: unless-stopped
+
+  minio-init:
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000
+      ${MINIO_ROOT_USER:?MINIO_ROOT_USER must be set}
+      ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD must be set} &&
+      mc mb --ignore-existing local/ferio-media &&
+      echo 'bucket ready: ferio-media'"
+
+  tenant-migrate:
+    environment:
+      DATABASE_URL: postgresql://ferio:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/ferio_dev
+
+  platform-migrate:
+    environment:
+      PLATFORM_DATABASE_URL: postgresql://ferio:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/ferio_platform
+
+  backend:
+    ports: !reset []
+    expose:
+      - "6733"
+      - "6734"
+    environment:
+      DATABASE_URL: postgresql://ferio:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/ferio_dev
+      PLATFORM_DATABASE_URL: postgresql://ferio:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/ferio_platform
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
+      NODE_ENV: production
+      TENANCY_ENABLED: "true"
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET must be set}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET must be set}
+      PLATFORM_JWT_SECRET: ${PLATFORM_JWT_SECRET:?PLATFORM_JWT_SECRET must be set}
+      PLATFORM_DB_CREDENTIAL_KEY: ${PLATFORM_DB_CREDENTIAL_KEY:?PLATFORM_DB_CREDENTIAL_KEY must be set}
+      # Do not inherit local bootstrap credentials. Create the first operator
+      # through a controlled production provisioning procedure instead.
+      PLATFORM_INITIAL_SUPERADMIN_PASSWORD: ""
+      PLATFORM_INITIAL_SUPERADMIN_PASSWORD_HASH: ""
+      R2_ACCESS_KEY_ID: ${MINIO_ROOT_USER:?MINIO_ROOT_USER must be set}
+      R2_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD must be set}
+    restart: unless-stopped
+
+  customer-web:
+    ports: !reset []
+    expose:
+      - "3000"
+    restart: unless-stopped
+
+  admin-web:
+    ports: !reset []
+    expose:
+      - "3000"
+    restart: unless-stopped
+
+  platform-admin:
+    ports: !reset []
+    expose:
+      - "3000"
+    restart: unless-stopped

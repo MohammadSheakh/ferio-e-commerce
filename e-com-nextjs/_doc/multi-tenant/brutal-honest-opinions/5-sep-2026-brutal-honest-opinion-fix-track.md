@@ -17,7 +17,7 @@ and must not be modified to make the project look better.
 | --- | --- | --- | --- |
 | BO-01 | Backend typecheck excludes production runtime modules and `any` remains widespread. | IN PROGRESS | Added an entrypoint-based application typecheck and CI gate; remaining `any` reduction and isolated legacy trees are still open. |
 | BO-02 | ESLint permits explicit and unsafe `any` usage. | TODO | Establish a measurable baseline, enable errors for new production `any`, then reduce the legacy baseline. |
-| BO-03 | Docker compose is development-oriented and unsafe as a production deployment. | TODO | Separate local compose from a hardened deployment configuration; remove insecure defaults and public infrastructure exposure. |
+| BO-03 | Docker compose is development-oriented and unsafe as a production deployment. | IN PROGRESS | Added a production overlay that requires credentials, enables tenancy, removes host exposure, and enables Redis authentication; TLS/ingress remains deployment-owned. |
 | BO-04 | Legacy database/Mongoose fallback paths remain in active backend modules. | TODO | Inventory every fallback, define migration exit criteria, then remove or isolate each path. |
 | BO-05 | API contracts are generated per app but not centrally enforced. | TODO | Add one canonical contract workflow and CI drift detection before introducing a shared client package. |
 | BO-06 | CI lacks lint, frontend/mobile tests, migration verification, image smoke tests, and strict dependency failure policy. | IN PROGRESS | Backend `lint` is now read-only; CI lint is intentionally deferred until the existing lint baseline is reduced. |
@@ -37,3 +37,6 @@ and must not be modified to make the project look better.
 - Added `pnpm typecheck:application` and its CI gate. This verifies the active dependency graph but does not close the explicit-`any` work.
 - Replaced global request `any` types with `UserPayload` and typed upload metadata; tightened shared guards, user decorator, logging interceptor, exception filter, and upload interceptor. The application typecheck remains green.
 - Replaced Firebase credential and notification payload `any` boundaries with `admin.ServiceAccount`, required credential checks, `unknown` error handling, and `Record<string, string>` message data. The application typecheck remains green.
+- Added `docker-compose.production.yml` as a hardened overlay; local compose remains unchanged for development. The overlay requires production credentials, sets `NODE_ENV=production` and `TENANCY_ENABLED=true`, removes host ports for infrastructure/apps, and configures Redis authentication.
+- Rendered the production overlay with temporary validation values and verified Compose produces no `published` host ports, production mode is enabled, tenancy is enabled, and Redis uses `--requirepass`. TLS, ingress, image pinning, resource limits, and orchestration remain open.
+- Prevented production Compose from inheriting local platform superadmin bootstrap credentials; first operator provisioning must be deliberate and secret-managed.
