@@ -12,17 +12,6 @@ import { RedisService } from '@app/redis';
 import { USER_CACHE_CONFIG } from '../user/user.constants';
 import { TenantDbService } from '../../../tenancy/tenant-db.service';
 
-const publicUserProfileSelect = {
-  id: true,
-  isDeleted: true,
-  createdAt: true,
-  updatedAt: true,
-} satisfies Prisma.UserProfileSelect;
-
-type UserProfileRecord = Prisma.UserProfileGetPayload<{
-  select: typeof publicUserProfileSelect;
-}>;
-
 type UserProfileWithUser = Prisma.UserProfileGetPayload<{
   include: {
     user: {

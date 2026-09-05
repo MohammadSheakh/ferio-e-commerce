@@ -3,7 +3,6 @@ import {
   Injectable,
   NotFoundException,
   Optional,
-  ServiceUnavailableException,
 } from '@nestjs/common';
 import { OAuthAccount, OAuthProvider, PrismaClient } from '@prisma/client';
 

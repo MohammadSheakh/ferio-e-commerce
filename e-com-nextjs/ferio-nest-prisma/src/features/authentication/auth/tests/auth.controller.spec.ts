@@ -10,9 +10,10 @@ describe('AuthController native session contract', () => {
     refreshToken: jest.fn(),
     logout: jest.fn(),
   };
+  const clearCookie = jest.fn();
   const response = {
     cookie: jest.fn(),
-    clearCookie: jest.fn(),
+    clearCookie,
   } as unknown as Response;
   let controller: AuthController;
 
@@ -54,7 +55,7 @@ describe('AuthController native session contract', () => {
     expect(authService.logout).toHaveBeenCalledWith(
       'native-refresh-token-value',
     );
-    expect(response.clearCookie).toHaveBeenCalled();
+    expect(clearCookie).toHaveBeenCalled();
   });
 
   it('logs refresh rejection without exposing request credentials', async () => {

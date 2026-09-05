@@ -2,7 +2,6 @@ import {
   BadRequestException,
   Injectable,
   Optional,
-  ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';

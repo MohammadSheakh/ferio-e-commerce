@@ -160,25 +160,38 @@ describe('AuthService token lifecycle', () => {
       service.login({ email: user.email, password: 'wrong-password' }),
     ).rejects.toBeInstanceOf(UnauthorizedException);
 
-    expect(update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: user.id },
-        data: expect.objectContaining({
-          failedLoginAttempts: 0,
-          lockUntil: expect.any(Date),
-        }),
-      }),
+    const updateCall = update.mock.calls[0] as unknown as [{
+      where: { id: string };
+      data: { failedLoginAttempts: number; lockUntil: Date };
+    }];
+    expect(updateCall[0].where).toEqual({ id: user.id });
+    expect(updateCall[0].data.failedLoginAttempts).toBe(0);
+    expect(updateCall[0].data.lockUntil).toBeInstanceOf(Date);
+
+    type LoginWarning = {
+      reason?: string;
+      userId?: string;
+      failedAttemptCount?: number;
+      lockApplied?: boolean;
+      lockUntil?: unknown;
+    };
+    const warningCalls = logger.warn.mock.calls as unknown as Array<
+      [string, LoginWarning]
+    >;
+    const lockoutWarning = warningCalls.find(
+      ([event, metadata]) =>
+        event === 'authentication_login_rejected' &&
+        metadata.reason === 'INVALID_CREDENTIALS' &&
+        metadata.userId === user.id,
     );
-    expect(logger.warn).toHaveBeenCalledWith(
-      'authentication_login_rejected',
-      expect.objectContaining({
-        reason: 'INVALID_CREDENTIALS',
-        userId: user.id,
-        failedAttemptCount: 5,
-        lockApplied: true,
-        lockUntil: expect.any(Date),
-      }),
-    );
+    expect(lockoutWarning).toBeDefined();
+    expect(lockoutWarning?.[1]).toMatchObject({
+      reason: 'INVALID_CREDENTIALS',
+      userId: user.id,
+      failedAttemptCount: 5,
+      lockApplied: true,
+    });
+    expect(lockoutWarning?.[1].lockUntil).toBeInstanceOf(Date);
     expect(JSON.stringify(logger.warn.mock.calls)).not.toContain(
       'wrong-password',
     );

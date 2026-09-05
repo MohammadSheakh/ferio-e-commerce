@@ -11,7 +11,6 @@ import {
   OAuthProvider as PrismaOAuthProvider,
   Prisma,
   PrismaClient,
-  UserAuthProvider,
   UserRole,
 } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
@@ -734,7 +733,7 @@ export class AuthService {
               email: normalizedEmail,
               role: UserRole.user,
               isEmailVerified: true,
-              authProvider: provider as UserAuthProvider,
+              authProvider: provider,
               profileImageUrl: profileImage,
             },
             select: authUserSelect,

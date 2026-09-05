@@ -5,6 +5,22 @@ import { scopedRedisKey } from '../../../tenancy/redis-keys.util';
 import { OtpType } from './interfaces/otp-payload.interface';
 import { StructuredLogger } from '@app/common';
 
+type OtpRecord = {
+  otpHash: string;
+  createdAt: number;
+  attempts: number;
+};
+
+function isOtpRecord(value: unknown): value is OtpRecord {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  return (
+    typeof record.otpHash === 'string' &&
+    typeof record.createdAt === 'number' &&
+    typeof record.attempts === 'number'
+  );
+}
+
 @Injectable()
 export class OtpService {
   private readonly logger = new StructuredLogger(OtpService.name);
@@ -70,22 +86,15 @@ export class OtpService {
       throw new BadRequestException('OTP expired or not found');
     }
 
-    let parsed: { otpHash: string; createdAt: number; attempts: number };
+    let parsed: OtpRecord;
     try {
-      parsed = JSON.parse(data);
+      const candidate: unknown = JSON.parse(data);
+      if (!isOtpRecord(candidate)) throw new Error('OTP_RECORD_INVALID');
+      parsed = candidate;
     } catch {
       await client.del(key);
       throw new BadRequestException('OTP expired or not found');
     }
-    if (
-      !parsed ||
-      typeof parsed.otpHash !== 'string' ||
-      typeof parsed.attempts !== 'number'
-    ) {
-      await client.del(key);
-      throw new BadRequestException('OTP expired or not found');
-    }
-
     if (parsed.attempts >= this.MAX_ATTEMPTS) {
       await client.del(key);
       this.logger.warn('authentication_otp_rejected', {

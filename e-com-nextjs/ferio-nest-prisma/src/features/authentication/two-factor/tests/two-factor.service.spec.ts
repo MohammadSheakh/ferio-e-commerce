@@ -1,5 +1,22 @@
 import { TwoFactorService } from '../two-factor.service';
 
+type TwoFactorUpdateData = {
+  twoFactorPendingEncrypted?: string;
+  twoFactorEnabled?: boolean;
+  twoFactorRecoveryCodeHashes?: string[];
+  staffSessionVersion?: { increment: number };
+};
+
+function updateData(
+  prisma: { user: { update: jest.Mock } },
+  index: number,
+): TwoFactorUpdateData {
+  const call = prisma.user.update.mock.calls[index] as unknown as [
+    { data: TwoFactorUpdateData },
+  ];
+  return call[0].data;
+}
+
 describe('TwoFactorService', () => {
   function setup() {
     const prisma = {
@@ -26,8 +43,7 @@ describe('TwoFactorService', () => {
       'admin-1',
       'admin@example.com',
     );
-    const encrypted = prisma.user.update.mock.calls[0][0].data
-      .twoFactorPendingEncrypted as string;
+    const encrypted = updateData(prisma, 0).twoFactorPendingEncrypted ?? '';
 
     expect(result.secret).toMatch(/^[A-Z2-7]{32}$/);
     expect(result.uri).toContain('otpauth://totp/');
@@ -43,8 +59,7 @@ describe('TwoFactorService', () => {
       'admin-1',
       'admin@example.com',
     );
-    const encrypted = prisma.user.update.mock.calls[0][0].data
-      .twoFactorPendingEncrypted as string;
+    const encrypted = updateData(prisma, 0).twoFactorPendingEncrypted ?? '';
     prisma.user.findUnique.mockResolvedValue({
       twoFactorPendingEncrypted: encrypted,
     });
@@ -57,7 +72,7 @@ describe('TwoFactorService', () => {
     );
 
     const result = await service.confirmEnrollment('admin-1', code);
-    const stored = prisma.user.update.mock.calls[1][0].data;
+    const stored = updateData(prisma, 1);
 
     expect(result.recoveryCodes).toHaveLength(8);
     expect(stored.twoFactorEnabled).toBe(true);
