@@ -3,6 +3,16 @@
 import { Module, Global } from '@nestjs/common';
 import { ConfigModule as NestConfigModule } from '@nestjs/config';
 
+type NormalizedConfig = Record<string, string | number | undefined>;
+
+function stringValue(
+  config: NormalizedConfig,
+  key: string,
+): string | undefined {
+  const value = config[key];
+  return typeof value === 'string' ? value : undefined;
+}
+
 /**
  * Config Module
  *
@@ -23,7 +33,15 @@ import { ConfigModule as NestConfigModule } from '@nestjs/config';
     NestConfigModule.forRoot({
       isGlobal: true,
       envFilePath: ['.env.local', '.env'],
-      validate: (config) => {
+      validate: (rawConfig: Record<string, unknown>): NormalizedConfig => {
+        const config: NormalizedConfig = {};
+        for (const [key, value] of Object.entries(rawConfig)) {
+          if (typeof value === 'string') config[key] = value;
+        }
+
+        const getString = (key: string): string | undefined =>
+          stringValue(config, key);
+
         // Required variables
         const required = [
           'DATABASE_URL',
@@ -31,7 +49,7 @@ import { ConfigModule as NestConfigModule } from '@nestjs/config';
           'JWT_REFRESH_SECRET',
           'REDIS_HOST',
         ];
-        const missing = required.filter((key) => !config[key]);
+        const missing = required.filter((key) => !getString(key));
 
         if (missing.length > 0) {
           throw new Error(
@@ -39,14 +57,12 @@ import { ConfigModule as NestConfigModule } from '@nestjs/config';
           );
         }
 
-        const nodeEnv = config.NODE_ENV || 'development';
+        const nodeEnv = getString('NODE_ENV') || 'development';
         if (!['development', 'test', 'production'].includes(nodeEnv)) {
-          throw new Error(
-            'NODE_ENV must be development, test, or production',
-          );
+          throw new Error('NODE_ENV must be development, test, or production');
         }
 
-        const tenancyEnabled = config.TENANCY_ENABLED || 'false';
+        const tenancyEnabled = getString('TENANCY_ENABLED') || 'false';
         if (!['true', 'false'].includes(tenancyEnabled)) {
           throw new Error('TENANCY_ENABLED must be true or false');
         }
@@ -63,7 +79,7 @@ import { ConfigModule as NestConfigModule } from '@nestjs/config';
             'REDIS_PASSWORD',
           ];
           const missingProduction = productionRequired.filter(
-            (key) => !config[key],
+            (key) => !getString(key),
           );
           if (missingProduction.length > 0) {
             throw new Error(
@@ -83,12 +99,16 @@ import { ConfigModule as NestConfigModule } from '@nestjs/config';
           'secret',
         ];
         const assertStrongSecret = (key: string) => {
-          const value = config[key];
+          const value = getString(key);
           if (!value) return;
           if (value.length < 32) {
-            throw new Error(`${key} must be at least 32 characters for security`);
+            throw new Error(
+              `${key} must be at least 32 characters for security`,
+            );
           }
-          if (knownWeakSecrets.some((weak) => value.toLowerCase().includes(weak))) {
+          if (
+            knownWeakSecrets.some((weak) => value.toLowerCase().includes(weak))
+          ) {
             throw new Error(
               `${key} is still set to a placeholder/template value. Generate a cryptographically random secret (e.g. openssl rand -hex 64) before starting the server.`,
             );
@@ -98,15 +118,15 @@ import { ConfigModule as NestConfigModule } from '@nestjs/config';
         assertStrongSecret('JWT_REFRESH_SECRET');
 
         if (
-          config.JWT_ACCESS_EXPIRY &&
-          !/^\d+[smhd]$/.test(config.JWT_ACCESS_EXPIRY)
+          getString('JWT_ACCESS_EXPIRY') &&
+          !/^\d+[smhd]$/.test(getString('JWT_ACCESS_EXPIRY') ?? '')
         ) {
           throw new Error(
             'JWT_ACCESS_EXPIRY must be in format: number + s/m/h/d (e.g., 15m)',
           );
         }
 
-        const redisPort = Number(config.REDIS_PORT || 6379);
+        const redisPort = Number(getString('REDIS_PORT') || 6379);
         if (
           !Number.isInteger(redisPort) ||
           redisPort < 1 ||
@@ -119,21 +139,23 @@ import { ConfigModule as NestConfigModule } from '@nestjs/config';
         config.PORT = Number(config.PORT || 6733);
 
         const scheduleEnabled =
-          config.RECONCILIATION_SCHEDULE_ENABLED || 'false';
+          getString('RECONCILIATION_SCHEDULE_ENABLED') || 'false';
         if (!['true', 'false'].includes(scheduleEnabled)) {
           throw new Error(
             'RECONCILIATION_SCHEDULE_ENABLED must be true or false',
           );
         }
         const scheduleMinutes = Number(
-          config.RECONCILIATION_SCHEDULE_EVERY_MINUTES || 60,
+          getString('RECONCILIATION_SCHEDULE_EVERY_MINUTES') || 60,
         );
         if (!Number.isInteger(scheduleMinutes) || scheduleMinutes < 5) {
           throw new Error(
             'RECONCILIATION_SCHEDULE_EVERY_MINUTES must be an integer of at least 5',
           );
         }
-        const overdueHours = Number(config.RECONCILIATION_OVERDUE_HOURS || 168);
+        const overdueHours = Number(
+          getString('RECONCILIATION_OVERDUE_HOURS') || 168,
+        );
         if (
           !Number.isInteger(overdueHours) ||
           overdueHours < 24 ||
@@ -149,14 +171,14 @@ import { ConfigModule as NestConfigModule } from '@nestjs/config';
         config.RECONCILIATION_OVERDUE_HOURS = overdueHours;
 
         const courierRetryEnabled =
-          config.COURIER_CALLBACK_RETRY_ENABLED || 'false';
+          getString('COURIER_CALLBACK_RETRY_ENABLED') || 'false';
         if (!['true', 'false'].includes(courierRetryEnabled)) {
           throw new Error(
             'COURIER_CALLBACK_RETRY_ENABLED must be true or false',
           );
         }
         const courierRetryEveryMinutes = Number(
-          config.COURIER_CALLBACK_RETRY_EVERY_MINUTES || 5,
+          getString('COURIER_CALLBACK_RETRY_EVERY_MINUTES') || 5,
         );
         if (
           !Number.isInteger(courierRetryEveryMinutes) ||
@@ -168,7 +190,7 @@ import { ConfigModule as NestConfigModule } from '@nestjs/config';
           );
         }
         const courierRetryMaxAttempts = Number(
-          config.COURIER_CALLBACK_RETRY_MAX_ATTEMPTS || 6,
+          getString('COURIER_CALLBACK_RETRY_MAX_ATTEMPTS') || 6,
         );
         if (
           !Number.isInteger(courierRetryMaxAttempts) ||
@@ -183,12 +205,13 @@ import { ConfigModule as NestConfigModule } from '@nestjs/config';
         config.COURIER_CALLBACK_RETRY_EVERY_MINUTES = courierRetryEveryMinutes;
         config.COURIER_CALLBACK_RETRY_MAX_ATTEMPTS = courierRetryMaxAttempts;
 
-        const courierPollingEnabled = config.COURIER_POLLING_ENABLED || 'false';
+        const courierPollingEnabled =
+          getString('COURIER_POLLING_ENABLED') || 'false';
         if (!['true', 'false'].includes(courierPollingEnabled)) {
           throw new Error('COURIER_POLLING_ENABLED must be true or false');
         }
         const courierPollingEveryMinutes = Number(
-          config.COURIER_POLLING_EVERY_MINUTES || 15,
+          getString('COURIER_POLLING_EVERY_MINUTES') || 15,
         );
         if (
           !Number.isInteger(courierPollingEveryMinutes) ||
@@ -200,7 +223,7 @@ import { ConfigModule as NestConfigModule } from '@nestjs/config';
           );
         }
         const courierPollingBatchSize = Number(
-          config.COURIER_POLLING_BATCH_SIZE || 100,
+          getString('COURIER_POLLING_BATCH_SIZE') || 100,
         );
         if (
           !Number.isInteger(courierPollingBatchSize) ||
@@ -216,14 +239,14 @@ import { ConfigModule as NestConfigModule } from '@nestjs/config';
         config.COURIER_POLLING_BATCH_SIZE = courierPollingBatchSize;
 
         const messageDispatchEnabled =
-          config.TRANSACTIONAL_MESSAGE_DISPATCH_ENABLED || 'false';
+          getString('TRANSACTIONAL_MESSAGE_DISPATCH_ENABLED') || 'false';
         if (!['true', 'false'].includes(messageDispatchEnabled)) {
           throw new Error(
             'TRANSACTIONAL_MESSAGE_DISPATCH_ENABLED must be true or false',
           );
         }
         const messageSweepMinutes = Number(
-          config.TRANSACTIONAL_MESSAGE_SWEEP_EVERY_MINUTES || 5,
+          getString('TRANSACTIONAL_MESSAGE_SWEEP_EVERY_MINUTES') || 5,
         );
         if (
           !Number.isInteger(messageSweepMinutes) ||
@@ -235,7 +258,7 @@ import { ConfigModule as NestConfigModule } from '@nestjs/config';
           );
         }
         const messageBatchSize = Number(
-          config.TRANSACTIONAL_MESSAGE_BATCH_SIZE || 100,
+          getString('TRANSACTIONAL_MESSAGE_BATCH_SIZE') || 100,
         );
         if (
           !Number.isInteger(messageBatchSize) ||
@@ -251,12 +274,12 @@ import { ConfigModule as NestConfigModule } from '@nestjs/config';
         config.TRANSACTIONAL_MESSAGE_BATCH_SIZE = messageBatchSize;
 
         const paymentRecoveryEnabled =
-          config.PAYMENT_RECOVERY_ENABLED || 'false';
+          getString('PAYMENT_RECOVERY_ENABLED') || 'false';
         if (!['true', 'false'].includes(paymentRecoveryEnabled)) {
           throw new Error('PAYMENT_RECOVERY_ENABLED must be true or false');
         }
         const paymentRecoveryMinutes = Number(
-          config.PAYMENT_RECOVERY_EVERY_MINUTES || 5,
+          getString('PAYMENT_RECOVERY_EVERY_MINUTES') || 5,
         );
         if (
           !Number.isInteger(paymentRecoveryMinutes) ||
@@ -268,7 +291,7 @@ import { ConfigModule as NestConfigModule } from '@nestjs/config';
           );
         }
         const paymentRecoveryBatchSize = Number(
-          config.PAYMENT_RECOVERY_BATCH_SIZE || 100,
+          getString('PAYMENT_RECOVERY_BATCH_SIZE') || 100,
         );
         if (
           !Number.isInteger(paymentRecoveryBatchSize) ||
