@@ -74,6 +74,9 @@ services:
     restart: unless-stopped
 
   customer-web:
+    depends_on:
+      backend:
+        condition: service_healthy
     build:
       args:
         NEXT_PUBLIC_FERIO_API_URL: ${PUBLIC_FERIO_API_URL:?PUBLIC_FERIO_API_URL must be set}
@@ -90,6 +93,9 @@ services:
     restart: unless-stopped
 
   admin-web:
+    depends_on:
+      backend:
+        condition: service_healthy
     build:
       args:
         NEXT_PUBLIC_FERIO_API_URL: ${PUBLIC_FERIO_API_URL:?PUBLIC_FERIO_API_URL must be set}
@@ -105,6 +111,9 @@ services:
     restart: unless-stopped
 
   platform-admin:
+    depends_on:
+      backend:
+        condition: service_healthy
     ports: !reset []
     expose:
       - "3000"
