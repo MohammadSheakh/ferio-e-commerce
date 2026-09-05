@@ -41,6 +41,12 @@ jobs:
           --health-retries 5
 
     env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+      PLATFORM_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+      REDIS_HOST: 127.0.0.1
+      REDIS_PORT: "6380"
+      JWT_ACCESS_SECRET: ci-openapi-access-secret-012345678901234567890123456789
+      JWT_REFRESH_SECRET: ci-openapi-refresh-secret-012345678901234567890123456789
       # Superuser has CREATEDB — required by the tenant-bootstrap isolation
       # suite, which creates and drops scratch databases per test case.
       TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
@@ -63,6 +69,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Generate Prisma clients (tenant + platform)
         run: pnpm prisma:generate
+      - name: Verify committed backend OpenAPI contract
+        run: pnpm openapi:check
       - name: Strict typecheck (incl. specs)
         run: pnpm exec tsc --noEmit -p tsconfig.json
       - name: Active application dependency-graph typecheck
