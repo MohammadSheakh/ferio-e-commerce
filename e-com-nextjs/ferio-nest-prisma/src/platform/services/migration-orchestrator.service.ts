@@ -11,6 +11,7 @@ import { StructuredLogger } from '@app/common';
 import { PlatformPrismaService } from '../platform-prisma.service';
 import { TenantSchemaBootstrapper } from '../../tenancy/tenant-schema.bootstrapper';
 import { TenantDatabasesService } from './tenant-databases.service';
+import { toPlatformJsonInput } from '../utils/json-input.util';
 
 export const TENANT_MIGRATION_RUN_JOB = 'run-tenant-migration';
 export type TenantMigrationJobData = { migrationRunId?: string };
@@ -268,12 +269,12 @@ export class MigrationOrchestratorService {
           fromVersion: before.schemaVersion ?? null,
           toVersion: outcome.schemaVersion,
           success: true,
-          detail: { appliedCount: outcome.applied.length } as never,
+          detail: toPlatformJsonInput({ appliedCount: outcome.applied.length }),
         },
         update: {
           success: true,
           toVersion: outcome.schemaVersion,
-          detail: { appliedCount: outcome.applied.length } as never,
+          detail: toPlatformJsonInput({ appliedCount: outcome.applied.length }),
         },
       });
     } catch (error) {
@@ -288,9 +289,12 @@ export class MigrationOrchestratorService {
           fromVersion: before.schemaVersion ?? null,
           toVersion: before.schemaVersion ?? 'unknown',
           success: false,
-          detail: { error: message } as never,
+          detail: toPlatformJsonInput({ error: message }),
         },
-        update: { success: false, detail: { error: message } as never },
+        update: {
+          success: false,
+          detail: toPlatformJsonInput({ error: message }),
+        },
       });
       await this.databases.recordHealth(tenantDatabaseId, false);
       throw error;
@@ -312,7 +316,7 @@ export class MigrationOrchestratorService {
           entityType: 'TenantMigrationRun',
           entityId,
           actorId,
-          metadata: (metadata ?? undefined) as never,
+          metadata: toPlatformJsonInput(metadata),
         },
       })
       .catch(() => undefined);

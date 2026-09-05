@@ -7,6 +7,7 @@ import { correlationHeaders } from '@app/common';
 import { StructuredLogger } from '@app/common';
 import { PlatformPrismaService } from '../platform-prisma.service';
 import { PlatformAuditService } from './platform-audit.service';
+import { toPlatformJsonInput } from '../utils/json-input.util';
 
 const SSLC_SANDBOX = 'https://sandbox.sslcommerz.com';
 const SSLC_LIVE = 'https://securepay.sslcommerz.com';
@@ -178,13 +179,16 @@ export class PlatformBillingService {
       if (!redirectUrl) throw new Error(String(raw.failedreason ?? 'session failed'));
       await this.platform.client.saasPaymentAttempt.updateMany({
         where: { reference, status: 'INITIATED' },
-        data: { raw: raw as never },
+        data: { raw: toPlatformJsonInput(raw) },
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       await this.platform.client.saasPaymentAttempt.updateMany({
         where: { reference, status: 'INITIATED' },
-        data: { status: 'FAILED', raw: { initiationError: message } as never },
+        data: {
+          status: 'FAILED',
+          raw: toPlatformJsonInput({ initiationError: message }),
+        },
       });
       throw new BadRequestException('PAYMENT_SESSION_FAILED');
     }
@@ -251,7 +255,7 @@ export class PlatformBillingService {
         where: { reference: attempt.reference, status: 'INITIATED' },
         data: {
           status: 'SUCCEEDED',
-          raw: { ...input, validation } as never,
+          raw: toPlatformJsonInput({ ...input, validation }),
         },
       });
       if (updated.count === 0) return { applied: false, duplicate: true };
@@ -285,7 +289,10 @@ export class PlatformBillingService {
   private async markFailed(reference: string, reason: string): Promise<void> {
     await this.platform.client.saasPaymentAttempt.updateMany({
       where: { reference, status: 'INITIATED' },
-      data: { status: 'FAILED', raw: { failureReason: reason } as never },
+      data: {
+        status: 'FAILED',
+        raw: toPlatformJsonInput({ failureReason: reason }),
+      },
     });
     this.logger.warn('platform_payment_failed', { reference });
   }

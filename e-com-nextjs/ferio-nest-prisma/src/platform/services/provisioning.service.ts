@@ -13,6 +13,7 @@ import { TenantDatabasesService } from './tenant-databases.service';
 import { TenantSchemaBootstrapper } from '../../tenancy/tenant-schema.bootstrapper';
 import { LocalPostgresProvisioner } from './local-postgres-provisioner';
 import type { TenantDatabaseProvisioner } from './tenant-database-provisioner.interface';
+import { toPlatformJsonInput } from '../utils/json-input.util';
 
 /**
  * Pluggable physical infrastructure executor. The orchestration state machine
@@ -146,7 +147,7 @@ export class ProvisioningService {
         where: { id: stepRowId },
         data: {
           status,
-          detail: (detail ?? undefined) as never,
+          detail: toPlatformJsonInput(detail),
           startedAt: status === 'RUNNING' ? new Date() : undefined,
           completedAt: status === 'COMPLETED' || status === 'FAILED' ? new Date() : undefined,
         },
