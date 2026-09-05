@@ -13,7 +13,6 @@ import { TenantDbService } from '../../../tenancy/tenant-db.service';
 import { toTenantJsonInput } from '../../../core/database/json-input.util';
 import {
   buildCallbackToken,
-  verifyCallbackToken,
 } from '../../../tenancy/callback-tenant.util';
 import { tryGetTenantContext } from '../../../tenancy/tenant-context';
 import { OrderService } from '../../order/order.service';

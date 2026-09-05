@@ -1,4 +1,3 @@
-import type { TenantContext } from '../../../tenancy/tenant-context';
 import { tryGetTenantContext } from '../../../tenancy/tenant-context';
 import { TenantFanoutService } from '../../../tenancy/tenant-fanout.service';
 import { Injectable, OnModuleInit, Optional } from '@nestjs/common';

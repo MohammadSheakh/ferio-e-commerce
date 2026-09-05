@@ -75,6 +75,14 @@ export abstract class PaymentGateway {
     return Number.isFinite(amount) ? Math.round(amount * 100) : undefined;
   }
 
+  protected text(value: unknown, fallback = ''): string {
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number' || typeof value === 'boolean') {
+      return String(value);
+    }
+    return fallback;
+  }
+
   protected async json(response: Response) {
     const body = (await response.json()) as Record<string, unknown>;
     if (!response.ok)

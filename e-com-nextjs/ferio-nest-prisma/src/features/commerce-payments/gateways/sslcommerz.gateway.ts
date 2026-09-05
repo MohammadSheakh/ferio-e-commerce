@@ -80,15 +80,15 @@ export class SslcommerzGateway extends PaymentGateway {
       }),
     );
 
-    const redirectUrl = String(raw.GatewayPageURL ?? '');
+    const redirectUrl = this.text(raw.GatewayPageURL);
     if (!redirectUrl)
       throw new Error(
-        String(raw.failedreason ?? 'SSLCommerz initiation failed'),
+        this.text(raw.failedreason, 'SSLCommerz initiation failed'),
       );
 
     return {
       redirectUrl,
-      providerSessionId: String(raw.sessionkey ?? ''),
+      providerSessionId: this.text(raw.sessionkey),
       raw,
     };
   }
@@ -100,7 +100,7 @@ export class SslcommerzGateway extends PaymentGateway {
   async validate(
     payload: Record<string, unknown>,
   ): Promise<ValidatePaymentResult> {
-    const validationId = String(payload.val_id ?? '');
+    const validationId = this.text(payload.val_id);
 
     // Without a val_id there is nothing this server can verify with the
     // provider. Browser-reported fail/cancel outcomes are recorded as an
@@ -109,7 +109,7 @@ export class SslcommerzGateway extends PaymentGateway {
     if (!validationId)
       return {
         outcome: 'UNVERIFIED_REPORT' as const,
-        merchantTransactionId: String(
+        merchantTransactionId: this.text(
           payload.tran_id ?? payload.merchantTransactionId ?? '',
         ),
         raw: payload,
@@ -129,19 +129,19 @@ export class SslcommerzGateway extends PaymentGateway {
       ),
     );
 
-    const status = String(raw.status ?? '').toUpperCase();
+    const status = this.text(raw.status).toUpperCase();
     return {
       outcome: ['VALID', 'VALIDATED'].includes(status)
         ? 'SUCCEEDED'
         : status === 'PENDING'
           ? 'PENDING'
           : 'FAILED',
-      merchantTransactionId: String(raw.tran_id ?? payload.tran_id ?? ''),
+      merchantTransactionId: this.text(raw.tran_id ?? payload.tran_id),
       amount: this.minorAmount(raw.amount),
-      currency: String(raw.currency_type ?? payload.currency ?? ''),
-      providerTransactionId: String(raw.bank_tran_id ?? ''),
+      currency: this.text(raw.currency_type ?? payload.currency),
+      providerTransactionId: this.text(raw.bank_tran_id),
       validationId,
-      riskLevel: String(raw.risk_level ?? '0'),
+      riskLevel: this.text(raw.risk_level, '0'),
       raw: { ...payload, ...raw },
     };
   }

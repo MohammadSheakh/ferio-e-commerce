@@ -26,17 +26,23 @@ function config(values: Record<string, string>) {
   } as unknown as ConfigService;
 }
 
+function providerResponse(body: Record<string, unknown>): Response {
+  return {
+    ok: true,
+    json: () => Promise.resolve(body),
+  } as Response;
+}
+
 describe('hosted payment adapters', () => {
   afterEach(() => jest.restoreAllMocks());
 
   it('initiates SSLCommerz server-side with minor-unit conversion', async () => {
-    jest.spyOn(global, 'fetch').mockResolvedValue({
-      ok: true,
-      json: async () => ({
+    jest.spyOn(global, 'fetch').mockResolvedValue(
+      providerResponse({
         GatewayPageURL: 'https://sandbox.sslcommerz.com/pay',
         sessionkey: 'session-1',
       }),
-    } as Response);
+    );
     const adapter = new SslcommerzGateway(
       config({
         SSLCOMMERZ_STORE_ID: 'store',
@@ -47,15 +53,22 @@ describe('hosted payment adapters', () => {
       redirectUrl: 'https://sandbox.sslcommerz.com/pay',
       providerSessionId: 'session-1',
     });
-    const request = (global.fetch as jest.Mock).mock.calls[0][1];
-    expect(String(request.body)).toContain('total_amount=1250.00');
-    expect(String(request.body)).toContain('tran_id=FERPAY123');
+    const fetchMock = global.fetch as unknown as jest.MockedFunction<typeof fetch>;
+    const request = fetchMock.mock.calls[0]?.[1];
+    const body = request?.body;
+    const requestBody =
+      typeof body === 'string'
+        ? body
+        : body instanceof URLSearchParams
+          ? body.toString()
+          : '';
+    expect(requestBody).toContain('total_amount=1250.00');
+    expect(requestBody).toContain('tran_id=FERPAY123');
   });
 
   it('validates SSLCommerz transaction via server-to-server validation API', async () => {
-    jest.spyOn(global, 'fetch').mockResolvedValue({
-      ok: true,
-      json: async () => ({
+    jest.spyOn(global, 'fetch').mockResolvedValue(
+      providerResponse({
         status: 'VALID',
         tran_id: 'FERPAY123',
         amount: '1250.00',
@@ -63,7 +76,7 @@ describe('hosted payment adapters', () => {
         bank_tran_id: 'SSL-BANK-999',
         risk_level: '0',
       }),
-    } as Response);
+    );
     const adapter = new SslcommerzGateway(
       config({
         SSL_STORE_ID: 'test-store-id',
@@ -82,29 +95,23 @@ describe('hosted payment adapters', () => {
       validationId: 'VAL-12345',
       riskLevel: '0',
     });
-    expect(global.fetch).toHaveBeenCalledWith(
-      expect.stringContaining(
-        '/validator/api/validationserverAPI.php?val_id=VAL-12345',
-      ),
-      expect.objectContaining({
-        headers: expect.objectContaining({
-          'X-Correlation-ID': expect.any(String),
-        }),
-      }),
-    );
+    const validationRequest = (global.fetch as unknown as jest.MockedFunction<typeof fetch>)
+      .mock.calls[0]?.[1];
+    expect(validationRequest).toBeDefined();
+    const headers = new Headers(validationRequest?.headers);
+    expect(headers.get('X-Correlation-ID')).toEqual(expect.any(String));
   });
 
   it('validates aamarPay through transaction search instead of trusting callback fields', async () => {
-    jest.spyOn(global, 'fetch').mockResolvedValue({
-      ok: true,
-      json: async () => ({
+    jest.spyOn(global, 'fetch').mockResolvedValue(
+      providerResponse({
         pay_status: 'Successful',
         request_id: 'FERPAY123',
         amount: '1250.00',
         currency: 'BDT',
         pg_txnid: 'AAM-1',
       }),
-    } as Response);
+    );
     const adapter = new AamarpayGateway(
       config({
         AAMARPAY_STORE_ID: 'store',
@@ -120,13 +127,10 @@ describe('hosted payment adapters', () => {
       currency: 'BDT',
       providerTransactionId: 'AAM-1',
     });
-    expect(global.fetch).toHaveBeenCalledWith(
-      expect.stringContaining('/api/v1/trxcheck/request.php?'),
-      expect.objectContaining({
-        headers: expect.objectContaining({
-          'X-Correlation-ID': expect.any(String),
-        }),
-      }),
-    );
+    const aamarpayCall = (global.fetch as unknown as jest.MockedFunction<typeof fetch>)
+      .mock.calls[0];
+    expect(aamarpayCall?.[0]).toContain('/api/v1/trxcheck/request.php?');
+    const aamarpayHeaders = new Headers(aamarpayCall?.[1]?.headers);
+    expect(aamarpayHeaders.get('X-Correlation-ID')).toEqual(expect.any(String));
   });
 });

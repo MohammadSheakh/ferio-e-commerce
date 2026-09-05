@@ -44,8 +44,8 @@ export class AamarpayGateway extends PaymentGateway {
         body: JSON.stringify(request),
       }),
     );
-    const redirectUrl = String(raw.payment_url ?? '');
-    if (String(raw.result) !== 'true' || !redirectUrl)
+    const redirectUrl = this.text(raw.payment_url);
+    if (this.text(raw.result) !== 'true' || !redirectUrl)
       throw new Error('aamarPay initiation failed');
     return { redirectUrl, raw };
   }
@@ -53,7 +53,7 @@ export class AamarpayGateway extends PaymentGateway {
   async validate(
     payload: Record<string, unknown>,
   ): Promise<ValidatePaymentResult> {
-    const merchantTransactionId = String(
+    const merchantTransactionId = this.text(
       payload.mer_txnid ??
         payload.tran_id ??
         payload.merchantTransactionId ??
@@ -70,7 +70,7 @@ export class AamarpayGateway extends PaymentGateway {
         headers: correlationHeaders(),
       }),
     );
-    const status = String(raw.pay_status ?? raw.status ?? '').toLowerCase();
+    const status = this.text(raw.pay_status ?? raw.status).toLowerCase();
     return {
       outcome:
         status === 'successful' || status === 'success'
@@ -80,15 +80,15 @@ export class AamarpayGateway extends PaymentGateway {
             : status.includes('fail') || status === 'invalid-data'
               ? 'FAILED'
               : 'PENDING',
-      merchantTransactionId: String(
+      merchantTransactionId: this.text(
         raw.mer_txnid ?? raw.request_id ?? merchantTransactionId,
       ),
       // Trust only provider-reported values at this trust boundary; falling
       // back to callback payload would let callers influence amount/currency
       // comparisons. Missing provider values fail the equality check closed.
       amount: raw.amount !== undefined ? this.minorAmount(raw.amount) : undefined,
-      currency: String(raw.currency ?? raw.currency_merchant ?? ''),
-      providerTransactionId: String(raw.pg_txnid ?? raw.bank_txn ?? ''),
+      currency: this.text(raw.currency ?? raw.currency_merchant),
+      providerTransactionId: this.text(raw.pg_txnid ?? raw.bank_txn),
       raw,
     };
   }
