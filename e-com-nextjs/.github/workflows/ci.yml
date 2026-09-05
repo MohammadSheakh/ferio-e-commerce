@@ -71,6 +71,8 @@ jobs:
         run: pnpm prisma:generate
       - name: Verify backend architecture boundaries
         run: pnpm architecture:check
+      - name: Lint active application entrypoints
+        run: pnpm lint:application
       - name: Apply tenant database migrations
         run: pnpm prisma:migrate:deploy
       - name: Apply platform database migrations

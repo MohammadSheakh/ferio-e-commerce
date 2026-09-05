@@ -21,6 +21,7 @@
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/src/main",
     "typecheck:application": "tsc --noEmit -p tsconfig.application.json",
+    "lint:application": "eslint src/main.ts src/app.module.ts src/platform/platform.module.ts",
     "architecture:check": "node scripts/architecture-boundary-check.mjs",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
     "lint:fix": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",

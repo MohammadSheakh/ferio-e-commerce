@@ -205,20 +205,17 @@ async function bootstrap() {
   // Enable shutdown hooks
   app.enableShutdownHooks();
 
-  // Handle process termination
-  process.on('SIGTERM', async () => {
-    logger.log('SIGTERM signal received: closing HTTP server');
+  // Handle process termination without handing an async callback to the
+  // EventEmitter, which does not observe rejected promises.
+  const shutdown = async (signal: string): Promise<void> => {
+    logger.log(`${signal} signal received: closing HTTP server`);
     await app.close();
     logger.log('HTTP server closed');
     process.exit(0);
-  });
+  };
 
-  process.on('SIGINT', async () => {
-    logger.log('SIGINT signal received: closing HTTP server');
-    await app.close();
-    logger.log('HTTP server closed');
-    process.exit(0);
-  });
+  process.on('SIGTERM', () => void shutdown('SIGTERM'));
+  process.on('SIGINT', () => void shutdown('SIGINT'));
 
   // ────────────────────────────────────────────────────────────────────────
   // Start Application

@@ -25,7 +25,6 @@ import { TenantClosureService } from './services/tenant-closure.service';
 import { PlanGateService } from './services/plan-gate.service';
 import { PlatformBillingService } from './services/platform-billing.service';
 import { LocalPostgresProvisioner } from './services/local-postgres-provisioner';
-import { TenantDatabaseProvisioner } from './services/tenant-database-provisioner.interface';
 import {
   PlatformBillingCallbackController,
   PlatformBillingController,
