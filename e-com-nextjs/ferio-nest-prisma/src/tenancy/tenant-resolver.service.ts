@@ -13,6 +13,13 @@ import { TenantMetrics } from '@app/common';
 
 const POSITIVE_CACHE_TTL_SECONDS = 60;
 const NEGATIVE_CACHE_TTL_SECONDS = 15;
+const SUBSCRIPTION_STATUSES = [
+  'TRIALING',
+  'ACTIVE',
+  'PAST_DUE',
+  'SUSPENDED',
+  'CANCELLED',
+] as const;
 
 export interface ResolvedTenant {
   organizationId: string;
@@ -21,6 +28,40 @@ export interface ResolvedTenant {
   domainId: string;
   hostname: string;
   subscriptionStatus: 'TRIALING' | 'ACTIVE' | 'PAST_DUE' | 'SUSPENDED' | 'CANCELLED';
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isSubscriptionStatus(value: unknown): value is ResolvedTenant['subscriptionStatus'] {
+  return (
+    typeof value === 'string' &&
+    (SUBSCRIPTION_STATUSES as readonly string[]).includes(value)
+  );
+}
+
+function isResolvedTenant(value: unknown, hostname: string): value is ResolvedTenant {
+  if (!isRecord(value) || value.hostname !== hostname) return false;
+  if (
+    typeof value.organizationId !== 'string' ||
+    typeof value.tenantDatabaseId !== 'string' ||
+    typeof value.domainId !== 'string' ||
+    !isSubscriptionStatus(value.subscriptionStatus) ||
+    !isRecord(value.database)
+  ) {
+    return false;
+  }
+  const database = value.database;
+  return (
+    typeof database.id === 'string' &&
+    typeof database.host === 'string' &&
+    typeof database.port === 'number' &&
+    Number.isInteger(database.port) &&
+    typeof database.databaseName === 'string' &&
+    typeof database.username === 'string' &&
+    typeof database.credentialCipher === 'string'
+  );
 }
 
 /**
@@ -167,6 +208,11 @@ export class TenantResolverService implements OnModuleInit {
       throw new TenantResolutionException('TENANT_UNAVAILABLE', HttpStatus_SERVICE_UNAVAILABLE);
     }
 
+    const subscriptionStatus = organization.subscription?.status;
+    if (subscriptionStatus !== undefined && !isSubscriptionStatus(subscriptionStatus)) {
+      throw new TenantResolutionException('TENANT_RESOLUTION_FAILED');
+    }
+
     return {
       organizationId: organization.id,
       tenantDatabaseId: registry.id,
@@ -180,8 +226,7 @@ export class TenantResolverService implements OnModuleInit {
       },
       domainId: domain.id,
       hostname,
-      subscriptionStatus:
-        (organization.subscription?.status as ResolvedTenant['subscriptionStatus']) ?? 'TRIALING',
+      subscriptionStatus: subscriptionStatus ?? 'TRIALING',
     };
   }
 
@@ -223,7 +268,9 @@ export class TenantResolverService implements OnModuleInit {
         client.get(this.negativeKey(hostname)),
       ]);
       if (negativeRaw) return null;
-      return positiveRaw ? (JSON.parse(positiveRaw) as ResolvedTenant) : undefined;
+      if (!positiveRaw) return undefined;
+      const parsed: unknown = JSON.parse(positiveRaw);
+      return isResolvedTenant(parsed, hostname) ? parsed : undefined;
     } catch {
       return undefined; // Redis unavailable → resolve straight from control plane.
     }

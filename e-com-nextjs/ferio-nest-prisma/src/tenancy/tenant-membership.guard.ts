@@ -4,6 +4,10 @@ import {
   ForbiddenException,
   Injectable,
 } from '@nestjs/common';
+import type { Redis } from 'ioredis';
+import type { PrismaClient } from '../platform/generated/platform-client';
+import type { RedisService } from '@app/redis';
+import type { Request } from 'express';
 import { getTenantContext } from './tenant-context';
 
 export interface TenantMembershipInfo {
@@ -16,6 +20,26 @@ interface MemberRow {
   email: string;
   isActive: boolean;
   role: 'OWNER' | 'STAFF';
+}
+
+interface MembershipInvalidation {
+  organizationId?: string;
+  email?: string;
+}
+
+type TenantMembershipRequest = Request & {
+  user?: { email?: unknown };
+  platformPrincipal?: { email?: unknown };
+  tenantMembership?: TenantMembershipInfo;
+};
+
+function isMembershipInvalidation(value: unknown): value is MembershipInvalidation {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  return (
+    (record.organizationId === undefined || typeof record.organizationId === 'string') &&
+    (record.email === undefined || typeof record.email === 'string')
+  );
 }
 
 /**
@@ -45,26 +69,14 @@ export class TenantMembershipService {
   private readonly CHANNEL = 'tenancy:membership:invalidate';
 
   constructor(
-    private readonly platformClient: {
-      organizationMember: {
-        findFirst: (args: unknown) => Promise<MemberRow | null>;
-      };
-    },
+    private readonly platformClient: Pick<PrismaClient, 'organizationMember'>,
     /**
      * MT-13 multi-instance correctness: when present, invalidations are
      * published to Redis and every backend instance subscribed here clears
      * its local slice immediately — a deactivated staffer cannot ride
      * another node's 60s cache tail.
      */
-    private readonly redis?: {
-      getClient(): Promise<
-        | {
-            duplicate(): unknown;
-            publish(topic: string, payload: string): unknown;
-          }
-        | null
-      >;
-    },
+    private readonly redis?: Pick<RedisService, 'getClient'>,
   ) {}
 
   /**
@@ -76,16 +88,14 @@ export class TenantMembershipService {
     try {
       const client = await this.redis.getClient();
       if (!client) return;
-      const subscriber = client.duplicate() as {
-        on(event: 'message', handler: (channel: string, payload: string) => void): unknown;
-        subscribe(channel: string): Promise<unknown>;
-      };
+      const subscriber: Redis = client.duplicate();
       subscriber.on('message', (_channel: string, payload: string) => {
         try {
-          const parsed = JSON.parse(payload) as {
-            organizationId?: string;
-            email?: string;
-          };
+          const parsed: unknown = JSON.parse(payload);
+          if (!isMembershipInvalidation(parsed)) {
+            this.clearLocal();
+            return;
+          }
           this.clearLocal(parsed.organizationId, parsed.email);
         } catch {
           this.clearLocal();
@@ -159,7 +169,7 @@ export class TenantMembershipGuard implements CanActivate {
     if ((process.env.TENANCY_ENABLED || 'false') !== 'true') {
       return true;
     }
-    const request = context.switchToHttp().getRequest();
+    const request = context.switchToHttp().getRequest<TenantMembershipRequest>();
     const { organizationId } = getTenantContext();
 
     const principal = request.user ?? request.platformPrincipal;

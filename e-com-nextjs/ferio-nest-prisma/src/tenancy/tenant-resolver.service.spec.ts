@@ -2,6 +2,7 @@ import {
   normalizeTenantHost,
   TenantResolutionException,
 } from './tenant-errors';
+import { TenantResolverService } from './tenant-resolver.service';
 
 describe('normalizeTenantHost (ADR-0002 security boundary)', () => {
   it('canonicalizes ordinary hosts', () => {
@@ -34,7 +35,6 @@ describe('TenantResolverService fail-closed resolution (MT-2 gate)', () => {
   beforeEach(() => {
     platform = { client: { tenantDomain: { findUnique: jest.fn() }, tenantDatabase: { findUnique: jest.fn() } } };
     // Constructed manually to avoid Nest DI in tests.
-    const { TenantResolverService } = require('./tenant-resolver.service');
     service = new TenantResolverService(platform as never, redis as never);
     jest.spyOn(service, 'writeCache').mockResolvedValue(undefined);
   });
@@ -224,5 +224,36 @@ describe('TenantResolverService fail-closed resolution (MT-2 gate)', () => {
     await expect(
       service.resolveFromHost('behind.example.com'),
     ).rejects.toMatchObject({ code: 'TENANT_MIGRATION_REQUIRED' });
+  });
+
+  it('does not trust malformed or cross-host positive cache entries', async () => {
+    const cached = {
+      get: jest.fn().mockResolvedValue(
+        JSON.stringify({
+          organizationId: 'org-attacker',
+          tenantDatabaseId: 'tdb-attacker',
+          database: {
+            id: 'tdb-attacker',
+            host: 'db',
+            port: 5432,
+            databaseName: 'tenant',
+            username: 'tenant',
+            credentialCipher: 'cipher',
+          },
+          domainId: 'dom-attacker',
+          hostname: 'other.example.com',
+          subscriptionStatus: 'ACTIVE',
+        }),
+      ),
+    };
+    const redisBackedService = new TenantResolverService(
+      platform as never,
+      { getClient: jest.fn().mockResolvedValue(cached) } as never,
+    );
+
+    await expect(
+      redisBackedService.resolveFromHost('acme.example.com'),
+    ).rejects.toMatchObject({ code: 'TENANT_RESOLUTION_FAILED' });
+    expect(platform.client.tenantDomain.findUnique).toHaveBeenCalled();
   });
 });
