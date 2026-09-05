@@ -27,3 +27,5 @@ export const QUEUE_NAMES = {
   PAYMENT_RECOVERY: 'paymentRecoveryQueue-ferio',
   TENANT_MIGRATION: 'tenantMigrationQueue-ferio',
 } as const;
+
+export const EMAIL_DELIVERY_SERVICE = 'EMAIL_DELIVERY_SERVICE';

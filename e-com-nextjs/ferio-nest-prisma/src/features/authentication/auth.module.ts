@@ -12,6 +12,7 @@ import { OAuthVerificationService } from './oauth/oauth-verification.service';
 import { TwoFactorService } from './two-factor/two-factor.service';
 import { TenancyModule } from '../../tenancy/tenancy.module';
 import { jwtExpirySeconds } from '../../config/jwt-expiry.util';
+import { EMAIL_DELIVERY_SERVICE, EmailProcessor } from '@app/queue';
 
 /**
  * Auth Module
@@ -59,9 +60,14 @@ import { jwtExpirySeconds } from '../../config/jwt-expiry.util';
     AuthService,
     OtpService,
     EmailService,
+    EmailProcessor,
+    {
+      provide: EMAIL_DELIVERY_SERVICE,
+      useExisting: EmailService,
+    },
     OAuthVerificationService,
     TwoFactorService,
   ],
-  exports: [AuthService, EmailService, JwtModule],
+  exports: [AuthService, EmailService, JwtModule, EMAIL_DELIVERY_SERVICE],
 })
 export class AuthModule {}

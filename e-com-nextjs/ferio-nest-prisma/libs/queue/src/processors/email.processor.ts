@@ -2,7 +2,15 @@ import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Job } from 'bullmq';
 import { StructuredLogger } from '@app/common';
 import { QUEUE_NAMES } from '../bullmq.constants';
-import { EmailService } from '../../../features/authentication/email/email.service';
+import { Inject } from '@nestjs/common';
+import { EMAIL_DELIVERY_SERVICE } from '../bullmq.constants';
+
+interface EmailDeliveryService {
+  sendOtpEmailNow(email: string, otp: string, type: 'verify' | 'reset'): Promise<void>;
+  sendWelcomeEmailNow(email: string, name: string): Promise<void>;
+  sendPasswordResetConfirmationNow(email: string): Promise<void>;
+  sendStaffAccessEmailNow(email: string, token: string, purpose: 'INVITE' | 'RESET'): Promise<void>;
+}
 
 type EmailJobData = {
   email?: unknown;
@@ -31,7 +39,10 @@ function requiredString(value: unknown, field: string): string {
 export class EmailProcessor extends WorkerHost {
   private readonly logger = new StructuredLogger(EmailProcessor.name);
 
-  constructor(private readonly emailService: EmailService) {
+  constructor(
+    @Inject(EMAIL_DELIVERY_SERVICE)
+    private readonly emailService: EmailDeliveryService,
+  ) {
     super();
   }
 
