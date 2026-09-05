@@ -1,5 +1,10 @@
 import type { Request } from 'express';
 import { TenancyController } from './tenancy.controller';
+import type { TenantResolverService } from './tenant-resolver.service';
+
+type TenancyPlatformDouble = {
+  client: { organization: { findUnique: jest.Mock } };
+};
 
 describe('TenancyController.status (MT-5)', () => {
   const makeController = (
@@ -8,15 +13,20 @@ describe('TenancyController.status (MT-5)', () => {
   ) => {
     const resolver = {
       resolveFromHost: resolveMock,
-      effectiveHostFrom: (input: any) =>
-        input.headers?.['x-forwarded-host'] ?? input.hostname,
+      effectiveHostFrom: (
+        input: Parameters<TenantResolverService['effectiveHostFrom']>[0],
+      ) => input.headers?.['x-forwarded-host'] ?? input.hostname,
     };
-    const platform = { client: { organization: { findUnique: orgFindUnique } } };
+    const platform: TenancyPlatformDouble = {
+      client: { organization: { findUnique: orgFindUnique } },
+    };
     return new TenancyController(resolver as never, platform as never);
   };
 
-  const request = (headers: Record<string, string>, hostname = 'proxy.local'): Request =>
-    ({ headers, hostname } as unknown as Request);
+  const request = (
+    headers: Record<string, string>,
+    hostname = 'proxy.local',
+  ): Request => ({ headers, hostname }) as unknown as Request;
 
   it('returns LEGACY when tenancy is disabled — no resolution attempted', async () => {
     process.env.TENANCY_ENABLED = 'false';
@@ -31,14 +41,17 @@ describe('TenancyController.status (MT-5)', () => {
 
   it('prefers x-forwarded-host over the proxy-local hostname', async () => {
     process.env.TENANCY_ENABLED = 'true';
-    const resolveMock =
-      jest.fn().mockResolvedValue({ organizationId: 'org-1', hostname: 'acme.example.com' });
-    const orgFindUnique =
-      jest.fn().mockResolvedValue({ name: 'Acme Store' });
+    const resolveMock = jest.fn().mockResolvedValue({
+      organizationId: 'org-1',
+      hostname: 'acme.example.com',
+    });
+    const orgFindUnique = jest.fn().mockResolvedValue({ name: 'Acme Store' });
     const controller = makeController(resolveMock, orgFindUnique);
 
     await expect(
-      controller.status(request({ 'x-forwarded-host': 'acme.example.com' }, 'internal.local')),
+      controller.status(
+        request({ 'x-forwarded-host': 'acme.example.com' }, 'internal.local'),
+      ),
     ).resolves.toEqual({ code: 'ACTIVE', storeName: 'Acme Store' });
     expect(resolveMock).toHaveBeenCalledWith('acme.example.com');
   });
@@ -51,13 +64,13 @@ describe('TenancyController.status (MT-5)', () => {
   ] as const)('maps %s to a stable storefront state payload', async (code) => {
     process.env.TENANCY_ENABLED = 'true';
     const resolveMock = jest.fn().mockImplementation(() => {
-      const error: any = new Error(code);
-      error.response = { code };
-      throw error;
+      throw Object.assign(new Error(code), { response: { code } });
     });
     const controller = makeController(resolveMock);
 
-    await expect(controller.status(request({ host: 'x.example.com' }))).resolves.toEqual({
+    await expect(
+      controller.status(request({ host: 'x.example.com' })),
+    ).resolves.toEqual({
       code,
     });
   });
