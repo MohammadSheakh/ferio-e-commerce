@@ -6,7 +6,12 @@ import {
   Optional,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
-import { Prisma } from '@prisma/client';
+import {
+  DeliveryPersonnelStatus,
+  DeliveryVehicleType,
+  OrderShipmentStatus,
+  Prisma,
+} from '@prisma/client';
 import type { PrismaClient } from '@prisma/client';
 import { PrismaService } from '@app/database';
 import { TenantDbService } from '../../tenancy/tenant-db.service';
@@ -33,6 +38,20 @@ function normalizePhone(phone: string): string {
   }
   return '+' + digits;
 }
+
+type DeliveryPersonnelPatch = {
+  name?: string;
+  phoneOriginal?: string;
+  phoneNormalized?: string;
+  email?: string | null;
+  nidNumber?: string;
+  vehicleType?: DeliveryVehicleType;
+  operatingZone?: string;
+  drivingLicense?: string;
+  emergencyPhone?: string;
+  status?: DeliveryPersonnelStatus;
+  userId?: string;
+};
 
 @Injectable()
 export class DeliveryPersonnelService {
@@ -270,7 +289,7 @@ export class DeliveryPersonnelService {
               provisionedNewAccount: !personnel.userId,
             },
           },
-          tx as any,
+          tx as Prisma.TransactionClient,
         );
         return updated;
       });
@@ -279,7 +298,7 @@ export class DeliveryPersonnelService {
     return db.deliveryPersonnel.update({
       where: { id },
       data: {
-        status: dto.status as any,
+        status: dto.status as DeliveryPersonnelStatus,
         notes: dto.notes ? dto.notes.trim() : personnel.notes,
       },
     });
@@ -298,7 +317,7 @@ export class DeliveryPersonnelService {
       throw new NotFoundException('Delivery personnel record not found.');
     }
 
-    const updateData: any = {};
+    const updateData: DeliveryPersonnelPatch = {};
 
     if (dto.name) updateData.name = dto.name.trim();
     if (dto.phone) {
@@ -372,7 +391,7 @@ export class DeliveryPersonnelService {
    */
   async listAll(query: QueryDeliveryPersonnelDto) {
     const db = await this.db();
-    const where: any = {};
+    const where: Prisma.DeliveryPersonnelWhereInput = {};
 
     if (query.status) {
       where.status = query.status;
@@ -532,7 +551,7 @@ export class DeliveryPersonnelService {
     const db = await this.db();
     const personnel = await this.resolveDeliveryPersonnel(userId);
     // If turning online, update lastLocationAt timestamp
-    const updateData: any = {};
+    const updateData: Prisma.DeliveryPersonnelUpdateInput = {};
     if (isOnline) {
       updateData.lastLocationAt = new Date();
     }
@@ -576,12 +595,15 @@ export class DeliveryPersonnelService {
     const db = await this.db();
     const personnel = await this.resolveDeliveryPersonnel(userId);
 
-    const shipmentStatusMap: Record<string, any> = {
-      PICKED_UP: 'PICKED_UP',
-      IN_TRANSIT: 'OUT_FOR_DELIVERY',
-      OUT_FOR_DELIVERY: 'OUT_FOR_DELIVERY',
-      DELIVERED: 'DELIVERED',
-      DELIVERY_FAILED: 'DELIVERY_FAILED',
+    const shipmentStatusMap: Record<
+      UpdateDeliveryOrderStatusDto['status'],
+      OrderShipmentStatus
+    > = {
+      PICKED_UP: OrderShipmentStatus.PICKED_UP,
+      IN_TRANSIT: OrderShipmentStatus.OUT_FOR_DELIVERY,
+      OUT_FOR_DELIVERY: OrderShipmentStatus.OUT_FOR_DELIVERY,
+      DELIVERED: OrderShipmentStatus.DELIVERED,
+      DELIVERY_FAILED: OrderShipmentStatus.DELIVERY_FAILED,
     };
     const newShipmentStatus = shipmentStatusMap[dto.status];
     if (!newShipmentStatus) {
@@ -613,10 +635,16 @@ export class DeliveryPersonnelService {
           'DELIVERED',
           'COMPLETED',
         ];
+        const terminalShipmentStatuses: OrderShipmentStatus[] = [
+          OrderShipmentStatus.DELIVERED,
+          OrderShipmentStatus.RETURNED,
+          OrderShipmentStatus.CANCELLED,
+          OrderShipmentStatus.RTO,
+        ];
         if (
           terminalOrBlocked.includes(order.status) ||
-          ['DELIVERED', 'RETURNED', 'CANCELLED', 'RTO'].includes(
-            order.shipmentStatus as any,
+          terminalShipmentStatuses.includes(
+            order.shipmentStatus as OrderShipmentStatus,
           )
         ) {
           throw new ConflictException(
@@ -694,7 +722,7 @@ export class DeliveryPersonnelService {
                 codCashPendingStaffConfirmation: order.paymentMethod === 'COD',
               },
             },
-            tx as any,
+            tx as Prisma.TransactionClient,
           );
         }
 
