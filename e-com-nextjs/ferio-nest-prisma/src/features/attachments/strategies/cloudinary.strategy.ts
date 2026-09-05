@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { v2 as cloudinary } from 'cloudinary';
+import type { UploadApiResponse } from 'cloudinary';
 import {
   IFileUploadStrategy,
   FileUploadResult,
@@ -45,7 +46,7 @@ export class CloudinaryStrategy implements IFileUploadStrategy {
       const base64File = `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
 
       // Upload to Cloudinary
-      const result = await new Promise<any>((resolve, reject) => {
+      const result = await new Promise<UploadApiResponse>((resolve, reject) => {
         cloudinary.uploader.upload(
           base64File,
           {
@@ -59,6 +60,8 @@ export class CloudinaryStrategy implements IFileUploadStrategy {
           (error, result) => {
             if (error) {
               reject(error);
+            } else if (!result) {
+              reject(new Error('Cloudinary returned no upload result'));
             } else {
               resolve(result);
             }

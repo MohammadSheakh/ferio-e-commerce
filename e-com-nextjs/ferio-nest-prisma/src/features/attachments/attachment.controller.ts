@@ -85,12 +85,12 @@ export class AttachmentController extends GenericController<typeof Attachment, A
   ) {
     // Files are already uploaded to cloud by FileUploadProcessingInterceptor
     // req.uploadedFiles contains attachment IDs
-    const request = { uploadedFiles: files } as any;
+    const uploadedFiles = files?.attachments ?? [];
     
     return {
       message: 'Attachments uploaded successfully',
-      attachmentIds: request.uploadedFiles?.attachments || [],
-      count: request.uploadedFiles?.attachments?.length || 0,
+      attachmentIds: uploadedFiles,
+      count: uploadedFiles.length,
     };
   }
 

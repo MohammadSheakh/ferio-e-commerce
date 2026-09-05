@@ -34,8 +34,10 @@ export class ConversationLastMessageProcessor {
       // });
 
       this.logger.log(`✅ Conversation ${data.conversationId} updated`);
-    } catch (err: any) {
-      this.logger.error(`❌ Conversation update job ${jobId} failed: ${err.message}`, err.stack);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      const stack = err instanceof Error ? err.stack : undefined;
+      this.logger.error(`❌ Conversation update job ${jobId} failed: ${message}`, stack);
       throw err;
     }
   }
