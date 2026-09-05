@@ -32,14 +32,16 @@ export class ReconciliationProcessor extends WorkerHost {
         retryRunId: job.data.retryRunId,
       });
       if (job.data.retryRunId) {
+        const retryRunId = job.data.retryRunId;
         const runRetry = () =>
           this.reconciliation.retryRun(
-            job.data.retryRunId!,
+            retryRunId,
             queueJobId,
             job.data.initiatedByActorId,
           );
         if (!job.data.organizationId) return runRetry();
-        return this.fanout!.forOrganization(job.data.organizationId, runRetry);
+        if (!this.fanout) throw new Error('TENANT_FANOUT_UNAVAILABLE');
+        return this.fanout.forOrganization(job.data.organizationId, runRetry);
       }
       if ((process.env.TENANCY_ENABLED || 'false') !== 'true') {
         return this.reconciliation.runScheduled(
@@ -50,7 +52,7 @@ export class ReconciliationProcessor extends WorkerHost {
       // MT-8 §11.2: the scheduled scan fans out per READY tenant; per-org
       // failures are isolated and logged, never starving other tenants.
       if (!this.fanout) throw new Error('TENANT_FANOUT_UNAVAILABLE');
-      const overdueHours = job.data.overdueHours as number;
+      const overdueHours = job.data.overdueHours;
       return this.fanout
         .forEachTenant(
           async () => {

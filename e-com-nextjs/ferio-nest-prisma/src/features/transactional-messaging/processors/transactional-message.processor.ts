@@ -29,8 +29,8 @@ export class TransactionalMessageProcessor extends WorkerHost {
       if (job.name !== TRANSACTIONAL_MESSAGE_JOB || !job.data.messageId) {
         throw new Error(`Unsupported transactional message job: ${job.name}`);
       }
-      const organizationId = (job.data as { organizationId?: string }).organizationId;
-      const messageId = job.data.messageId as string;
+      const organizationId = job.data.organizationId;
+      const messageId = job.data.messageId;
       if (!organizationId) {
         if ((process.env.TENANCY_ENABLED || 'false') === 'true') {
           throw new Error('TRANSACTIONAL_MESSAGE_ORGANIZATION_REQUIRED');

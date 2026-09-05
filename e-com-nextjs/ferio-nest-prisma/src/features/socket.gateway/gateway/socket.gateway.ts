@@ -581,8 +581,7 @@ export class SocketGateway
         : `conv-${targetConvId}`;
 
       // 1. Target Room Emission — tenant-scoped by the sender's binding
-      const senderUser: { organizationId?: string } | null =
-        (client?.data?.user as { organizationId?: string } | null) ?? null;
+      const senderUser = client.data?.user ?? null;
       this.server
         .to(scopedSocketRoom(senderUser, targetConvId))
         .emit('new-message-received', payload);
@@ -609,9 +608,7 @@ export class SocketGateway
         }),
       ]);
 
-      const senderOrg = (
-        client?.data?.user as { organizationId?: string } | undefined
-      )?.organizationId;
+      const senderOrg = client.data?.user?.organizationId;
       const roomsToEmit = new Set<string>([
         scopedSocketRoom({ organizationId: senderOrg }, rawConvId),
         scopedSocketRoom({ organizationId: senderOrg }, prefConvId),
