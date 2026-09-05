@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
-import { PassportModule } from '@nestjs/passport';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { RedisModule } from '@app/redis';
 import { PrismaModule } from '@app/database';
@@ -41,9 +40,6 @@ import { jwtExpirySeconds } from '../../config/jwt-expiry.util';
         },
       }),
     }),
-
-    // Passport Module
-    PassportModule,
 
     // Redis Module (for OTP and token blacklist)
     RedisModule,
