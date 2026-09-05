@@ -103,4 +103,56 @@ describe('rate-limit security events', () => {
       status: HttpStatus.SERVICE_UNAVAILABLE,
     });
   });
+
+  it('fails closed in production when a Redis pipeline command fails', async () => {
+    process.env.NODE_ENV = 'production';
+    delete process.env.RATE_LIMIT_FAIL_OPEN;
+
+    const pipeline = {
+      zremrangebyscore: jest.fn(),
+      zadd: jest.fn(),
+      expire: jest.fn(),
+      zcard: jest.fn(),
+      zrange: jest.fn(),
+      exec: jest.fn().mockResolvedValue([
+        [new Error('redis command failed'), 0],
+        [null, 1],
+        [null, 1],
+        [null, 1],
+        [null, []],
+      ]),
+    };
+    for (const method of [
+      'zremrangebyscore',
+      'zadd',
+      'expire',
+      'zcard',
+      'zrange',
+    ] as const) {
+      pipeline[method].mockReturnValue(pipeline);
+    }
+
+    const reflector = {
+      get: jest.fn().mockReturnValue({
+        max: 5,
+        windowMs: 60_000,
+        keyPrefix: 'auth',
+      }),
+    };
+    const guard = new SlidingWindowRateLimitGuard(
+      reflector as never,
+      { multi: jest.fn().mockReturnValue(pipeline) } as never,
+    );
+    const context = {
+      getHandler: jest.fn(),
+      switchToHttp: () => ({
+        getRequest: () => ({ ip: 'private-client-address' }),
+        getResponse: () => ({ set: jest.fn() }),
+      }),
+    };
+
+    await expect(guard.canActivate(context as never)).rejects.toMatchObject({
+      status: HttpStatus.SERVICE_UNAVAILABLE,
+    });
+  });
 });

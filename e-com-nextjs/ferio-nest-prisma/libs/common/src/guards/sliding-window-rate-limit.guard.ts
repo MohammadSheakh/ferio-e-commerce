@@ -96,6 +96,9 @@ export class SlidingWindowRateLimitGuard implements CanActivate {
       if (!results) {
         return this.handleUnavailable(options, 'REDIS_PIPELINE_EMPTY');
       }
+      if (results.some(([error]) => error !== null)) {
+        return this.handleUnavailable(options, 'REDIS_PIPELINE_COMMAND_FAILED');
+      }
 
       // results is array of [error, result]
       // index 3 is zcard result
