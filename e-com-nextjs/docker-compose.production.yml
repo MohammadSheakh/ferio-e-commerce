@@ -26,9 +26,11 @@ services:
   redis:
     image: ${REDIS_IMAGE:?REDIS_IMAGE must be an immutable production image reference}
     ports: !reset []
+    environment:
+      REDISCLI_AUTH: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
     command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?REDIS_PASSWORD must be set}"]
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" ping | grep -q PONG"]
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
     deploy:
       resources:
         limits:

@@ -144,6 +144,10 @@ jobs:
             echo 'Production overlay must set TENANCY_ENABLED=true.' >&2
             exit 1
           fi
+          if ! grep -q 'REDISCLI_AUTH:' <<<"$rendered"; then
+            echo 'Production Redis healthcheck must receive REDISCLI_AUTH in-container.' >&2
+            exit 1
+          fi
 
   dependency-audit:
     name: Dependency audit (backend + web apps)
