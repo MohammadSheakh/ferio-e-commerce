@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import type { PrismaClient } from '@prisma/client';
 import { getTenantContext, tryGetTenantContext } from './tenant-context';
 import { TenantDatabaseManager } from './tenant-database.manager';
@@ -32,6 +32,20 @@ export class TenantDbService {
     const context = tryGetTenantContext();
     if (!context) return undefined;
     return this.manager.getClient(context.database);
+  }
+
+  /**
+   * Resolve the tenant client, or deliberately use the legacy client only
+   * when the process is running in legacy mode. Keeping this policy here
+   * prevents feature services from silently bypassing tenant isolation.
+   */
+  async getOrLegacy(legacyClient: PrismaClient): Promise<PrismaClient> {
+    const tenant = await this.tryGet();
+    if (tenant) return tenant;
+    if (process.env.TENANCY_ENABLED === 'true') {
+      throw new ServiceUnavailableException('TENANT_IDENTITY_CONTEXT_REQUIRED');
+    }
+    return legacyClient;
   }
 
   metrics() {

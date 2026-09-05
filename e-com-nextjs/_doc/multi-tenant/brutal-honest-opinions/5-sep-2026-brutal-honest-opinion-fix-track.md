@@ -45,3 +45,4 @@ and must not be modified to make the project look better.
 - Added mobile to the CI dependency-audit matrix and added a dedicated Expo TypeScript-check job using the existing `pnpm typecheck` script.
 - Added fail-fast environment validation: `NODE_ENV=production` now requires `TENANCY_ENABLED=true`, preventing accidental startup in legacy single-tenant mode. Legacy fallback code still requires module-by-module removal or isolation.
 - Extended production validation to require the platform database URL, platform JWT secret, platform credential-encryption key, and Redis password. Development/test defaults remain available only outside production.
+- Added `TenantDbService.getOrLegacy()` as the single fail-closed policy for legacy database access. Migrated catalog, customer-account, and refunds services to use it, with regression coverage for legacy mode, missing tenant context, and resolved tenant context. Remaining feature services still need migration.
