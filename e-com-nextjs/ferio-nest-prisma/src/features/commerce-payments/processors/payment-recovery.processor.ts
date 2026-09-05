@@ -34,14 +34,17 @@ export class PaymentRecoveryProcessor extends WorkerHost {
         return this.recovery.enqueueDue();
       if (job.name !== PAYMENT_EXPIRY_JOB || !job.data.attemptId)
         throw new Error(`Unsupported payment recovery job: ${job.name}`);
-      const organizationId = (
-        job.data as { organizationId?: string }
-      ).organizationId;
-      if (!organizationId) {
-        return this.payments.expireAttempt(job.data.attemptId as string);
+      const attemptId = job.data.attemptId;
+      const organizationId = job.data.organizationId;
+      if (!organizationId && (process.env.TENANCY_ENABLED || 'false') === 'true') {
+        throw new Error('TENANT_CONTEXT_REQUIRED_FOR_PAYMENT_RECOVERY');
       }
-      return this.fanout!.forOrganization(organizationId, () =>
-        this.payments.expireAttempt(job.data.attemptId as string),
+      if (!organizationId) {
+        return this.payments.expireAttempt(attemptId);
+      }
+      if (!this.fanout) throw new Error('TENANT_FANOUT_UNAVAILABLE');
+      return this.fanout.forOrganization(organizationId, () =>
+        this.payments.expireAttempt(attemptId),
       );
     });
   }

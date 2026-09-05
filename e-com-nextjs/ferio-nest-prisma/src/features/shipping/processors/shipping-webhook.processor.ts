@@ -37,15 +37,15 @@ export class ShippingWebhookProcessor extends WorkerHost {
       if (job.name !== COURIER_CALLBACK_RETRY_JOB || !job.data.callbackLogId) {
         throw new Error(`Unsupported courier callback job: ${job.name}`);
       }
-      const organizationId = (job.data as { organizationId?: string })
-        .organizationId;
+      const organizationId = job.data.organizationId;
       if (!organizationId && (process.env.TENANCY_ENABLED || 'false') === 'true') {
         throw new Error('TENANT_CONTEXT_REQUIRED_FOR_COURIER_CALLBACK');
       }
       if (!organizationId)
         return this.shipping.retryWebhookLog(job.data.callbackLogId);
-      const callbackLogId = job.data.callbackLogId as string;
-      return this.fanout!.forOrganization(organizationId, () =>
+      const callbackLogId = job.data.callbackLogId;
+      if (!this.fanout) throw new Error('TENANT_FANOUT_UNAVAILABLE');
+      return this.fanout.forOrganization(organizationId, () =>
         this.shipping.retryWebhookLog(callbackLogId),
       );
     });
