@@ -39,7 +39,6 @@ export class NotifyParticipantsProcessor {
   constructor(
     private socketGateway: SocketGateway,
     // Note: Add ConversationParticipents model when migrating chat module
-    // @InjectModel('ConversationParticipents') private conversationParticipentsModel: Model<any>,
   ) {}
 
   @Process('notify-participants')
