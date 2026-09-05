@@ -19,7 +19,13 @@ export function sanitizeUrlForLogs(rawUrl: string): string {
 }
 
 export function sanitizeLogText(value: unknown): string {
-  const text = value instanceof Error ? value.message : String(value ?? '');
+  const text = value instanceof Error
+    ? value.message
+    : value === null || value === undefined
+      ? ''
+      : typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint'
+        ? value.toString()
+        : JSON.stringify(value) ?? '';
   return text
     .replace(/Bearer\s+[^\s,;]+/gi, `Bearer ${REDACTED}`)
     .replace(SENSITIVE_VALUE, `$1${REDACTED}`);

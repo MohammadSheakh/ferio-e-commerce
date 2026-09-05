@@ -40,7 +40,7 @@ export class AuthGuard implements CanActivate {
       // Even if public, if a token exists, try to decode it for @User()
       if (token) {
         try {
-          const payload = await this.jwtService.verifyAsync(token, {
+          const payload = await this.jwtService.verifyAsync<UserPayload>(token, {
             secret: this.configService.get<string>('JWT_ACCESS_SECRET'),
           });
           if (!this.matchesResolvedTenant(request, payload)) return true;

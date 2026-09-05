@@ -6,6 +6,11 @@ import {
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
+import type { Request } from 'express';
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
 
 /**
  * Transform Response Interceptor
@@ -44,21 +49,21 @@ export class TransformResponseInterceptor<T>
 {
   intercept(
     context: ExecutionContext,
-    next: CallHandler,
+    next: CallHandler<T>,
   ): Observable<Response<T>> {
     return next.handle().pipe(
-      map((data) => {
+      map((data: T): Response<T> => {
         // If data is already in response format, return as-is
-        if (data && typeof data === 'object' && 'success' in data) {
-          return data;
+        if (isRecord(data) && 'success' in data) {
+          return data as Response<T>;
         }
 
         // If data already has a message field, preserve it
-        if (data && typeof data === 'object' && 'message' in data) {
+        if (isRecord(data) && 'message' in data) {
           return {
             success: true,
             ...data,
-          };
+          } as Response<T>;
         }
 
         // Wrap data in standard response format
@@ -75,7 +80,7 @@ export class TransformResponseInterceptor<T>
    * Get message based on HTTP method and context
    */
   private getMessageFromContext(context: ExecutionContext): string {
-    const request = context.switchToHttp().getRequest();
+    const request = context.switchToHttp().getRequest<Request>();
     const method = request.method;
 
     const messages: Record<string, string> = {

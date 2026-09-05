@@ -8,12 +8,14 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import Redis from 'ioredis';
+import type { Response } from 'express';
 import { REDIS_CLIENT } from '../constants/redis.constants';
 import {
   RATE_LIMIT_KEY,
   RateLimitOptions,
 } from '../decorators/rate-limit.decorator';
 import { StructuredLogger } from '../utils/structured-logger';
+import type { AuthenticatedRequest } from '../types/http-request.type';
 
 /**
  * Sliding Window Rate Limit Guard
@@ -59,8 +61,8 @@ export class SlidingWindowRateLimitGuard implements CanActivate {
       return true;
     }
 
-    const request = context.switchToHttp().getRequest();
-    const response = context.switchToHttp().getResponse();
+    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
+    const response = context.switchToHttp().getResponse<Response>();
 
     // Generate unique identifier
     const userId = request.user?.userId;
@@ -111,16 +113,14 @@ export class SlidingWindowRateLimitGuard implements CanActivate {
 
       if (count > options.max) {
         let retryAfterSeconds = Math.ceil(options.windowMs / 1000);
-        try {
-          const zrangeResult = results[4]?.[1] as string[] | undefined;
-          if (Array.isArray(zrangeResult) && zrangeResult.length >= 2) {
-            const oldestScore = Number(zrangeResult[1]);
-            if (!Number.isNaN(oldestScore) && oldestScore > 0) {
-              const remainingMs = oldestScore + options.windowMs - now;
-              retryAfterSeconds = Math.max(1, Math.ceil(remainingMs / 1000));
-            }
+        const zrangeResult = results[4]?.[1] as string[] | undefined;
+        if (Array.isArray(zrangeResult) && zrangeResult.length >= 2) {
+          const oldestScore = Number(zrangeResult[1]);
+          if (!Number.isNaN(oldestScore) && oldestScore > 0) {
+            const remainingMs = oldestScore + options.windowMs - now;
+            retryAfterSeconds = Math.max(1, Math.ceil(remainingMs / 1000));
           }
-        } catch {}
+        }
 
         const durationText = this.formatDuration(retryAfterSeconds);
         response.set('Retry-After', String(retryAfterSeconds));

@@ -10,6 +10,7 @@ import { PipeTransform, Injectable, ArgumentMetadata, BadRequestException } from
 @Injectable()
 export class ParseObjectIdPipe implements PipeTransform<string, string> {
   transform(value: string, metadata: ArgumentMetadata): string {
+    void metadata;
     if (!value) {
       throw new BadRequestException('ID is required');
     }

@@ -8,7 +8,6 @@ import {
 import { Reflector } from '@nestjs/core';
 import { ROLES_KEY } from '../decorators/roles.decorator';
 import { PERMISSIONS_KEY } from '../decorators/permissions.decorator';
-import type { UserPayload } from '../types/user-payload.type';
 import type { AuthenticatedRequest } from '../types/http-request.type';
 
 /**

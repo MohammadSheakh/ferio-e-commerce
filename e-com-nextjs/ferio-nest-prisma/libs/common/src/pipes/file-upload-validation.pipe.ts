@@ -35,13 +35,14 @@ export class FileUploadValidationPipe implements PipeTransform {
   constructor(private options: FileUploadValidationOptions[]) {}
 
   transform(value: unknown, _metadata: ArgumentMetadata) {
+    void _metadata;
     // This pipe is used with @UploadedFiles() decorator
     const files = value as Express.Multer.File[] | Record<string, Express.Multer.File[]>;
 
     for (const option of this.options) {
       const fieldFiles = Array.isArray(files) 
         ? files 
-        : (files[option.name] as Express.Multer.File[]);
+        : files[option.name];
 
       // ✅ 1. Required field check
       if (option.required && (!fieldFiles || fieldFiles.length === 0)) {

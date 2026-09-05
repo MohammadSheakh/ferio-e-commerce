@@ -10,7 +10,6 @@ import {
   roleHasPermission,
 } from '../constants/permissions.constants';
 import { PERMISSIONS_KEY } from '../decorators/permissions.decorator';
-import type { UserPayload } from '../types/user-payload.type';
 import { StructuredLogger } from '../utils/structured-logger';
 import type { AuthenticatedRequest } from '../types/http-request.type';
 

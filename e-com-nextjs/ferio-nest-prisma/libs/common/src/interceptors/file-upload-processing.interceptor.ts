@@ -52,7 +52,8 @@ export class FileUploadProcessingInterceptor implements NestInterceptor {
       };
 
       // Also store in body for DTO validation
-      request.body[this.fieldName] = files;
+      const body = request.body as unknown as Record<string, unknown>;
+      body[this.fieldName] = files;
 
       return next.handle().pipe(
         map((data: unknown) => ({

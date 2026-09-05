@@ -4,7 +4,7 @@ import { PaginateOptions, PaginateResult } from '../shared/types/paginate';
  * Base Entity Interface
  * Prisma-only build: keep a lightweight shared contract without Mongoose types.
  */
-type FilterQuery<T> = Record<string, unknown>;
+type FilterQuery<T> = Partial<Record<keyof T, unknown>> & Record<string, unknown>;
 type UpdateQuery<T> = Partial<T>;
 type QueryOptions = Record<string, unknown>;
 

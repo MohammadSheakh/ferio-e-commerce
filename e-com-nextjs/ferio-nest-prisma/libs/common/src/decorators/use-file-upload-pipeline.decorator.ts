@@ -1,8 +1,6 @@
 import { applyDecorators, UseInterceptors, UsePipes } from '@nestjs/common';
 import {
   FileFieldsInterceptor,
-  FilesInterceptor,
-  FileInterceptor,
 } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';

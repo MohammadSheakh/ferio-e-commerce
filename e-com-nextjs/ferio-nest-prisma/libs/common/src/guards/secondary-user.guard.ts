@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import type { IUserService } from '../types/user-service.interface';
 import { I_USER_SERVICE } from '../types/user-service.interface';
+import type { AuthenticatedRequest } from '../types/http-request.type';
 
 /**
  * Secondary User Guard
@@ -22,7 +23,7 @@ export class SecondaryUserGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest();
+    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const user = request.user;
 
     if (!user) {
