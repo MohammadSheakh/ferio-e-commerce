@@ -12,6 +12,7 @@ describe('WalletService', () => {
     },
     wallet: {
       findUnique: jest.fn(),
+      findUniqueOrThrow: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
       updateMany: jest.fn(),
@@ -25,8 +26,12 @@ describe('WalletService', () => {
       create: jest.fn(),
     },
   };
+  type WalletTransactionDouble = typeof transaction;
   const prisma = {
-    $transaction: jest.fn((callback) => callback(transaction)),
+    $transaction: jest.fn(
+      (callback: (tx: WalletTransactionDouble) => unknown) =>
+        callback(transaction),
+    ),
   };
   const audit = {
     record: jest.fn().mockResolvedValue({ id: 'audit-1' }),
@@ -44,9 +49,17 @@ describe('WalletService', () => {
     jest.clearAllMocks();
   });
 
+  function firstCallInput<T>(mock: jest.Mock): T {
+    const call = mock.mock.calls[0] as unknown as [T] | undefined;
+    if (!call) throw new Error('Expected mock call');
+    return call[0];
+  }
+
   it('returns the existing order debit for an idempotent retry', async () => {
     const existing = { id: 'ledger-1' };
-    transaction.walletTransactionHistory.findUnique.mockResolvedValueOnce(existing);
+    transaction.walletTransactionHistory.findUnique.mockResolvedValueOnce(
+      existing,
+    );
 
     await expect(
       service.debitOrder(transaction as never, 'user-1', 'order-1', 5_000),
@@ -91,7 +104,7 @@ describe('WalletService', () => {
       isDeleted: false,
     });
     transaction.wallet.updateMany.mockResolvedValueOnce({ count: 1 });
-    (transaction.wallet as any).findUniqueOrThrow = jest.fn().mockResolvedValueOnce({
+    transaction.wallet.findUniqueOrThrow.mockResolvedValueOnce({
       amount: 5_000,
     });
     transaction.walletTransactionHistory.create.mockResolvedValueOnce({
@@ -108,13 +121,17 @@ describe('WalletService', () => {
       },
       data: { amount: { decrement: 5_000 } },
     });
-    expect(transaction.walletTransactionHistory.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
+    expect(
+      firstCallInput<{ data: Record<string, unknown> }>(
+        transaction.walletTransactionHistory.create,
+      ),
+    ).toMatchObject({
+      data: {
         idempotencyKey: 'order:order-1:debit',
         balanceBefore: 10_000,
         balanceAfter: 5_000,
         referenceFor: 'OrderPurchase',
-      }),
+      },
     });
   });
 
@@ -142,7 +159,10 @@ describe('WalletService', () => {
 
     await service.reviewTopUp(
       'topup-1',
-      { status: 'COMPLETED', reviewNote: 'Verified against provider statement' },
+      {
+        status: 'COMPLETED',
+        reviewNote: 'Verified against provider statement',
+      },
       { userId: 'admin-1', role: 'admin' } as never,
     );
 
@@ -153,13 +173,17 @@ describe('WalletService', () => {
         totalBalance: { increment: 25_000 },
       },
     });
-    expect(transaction.walletTransactionHistory.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
+    expect(
+      firstCallInput<{ data: Record<string, unknown> }>(
+        transaction.walletTransactionHistory.create,
+      ),
+    ).toMatchObject({
+      data: {
         idempotencyKey: 'topup:topup-1:credit',
         balanceBefore: 10_000,
         balanceAfter: 35_000,
         referenceFor: 'WalletTopUp',
-      }),
+      },
     });
     expect(audit.record).toHaveBeenCalled();
     expect(notifications.create).toHaveBeenCalledWith(
