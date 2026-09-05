@@ -36,6 +36,25 @@ const conditionalDescribe = TEST_DATABASE_URL ? describe : describe.skip;
 const CREDENTIAL_KEY = 'ci-platform-db-credential-key-at-least-32-chars';
 const ORG_ID = 'org-plan-test';
 
+interface FakeEntitlement {
+  featureKey: string;
+  enabled: boolean;
+  limit: number;
+}
+
+interface FakeSubscription {
+  id: string;
+  organizationId: string;
+  status: 'ACTIVE';
+  planId: string;
+  plan: {
+    id: string;
+    key: string;
+    displayName: string;
+    entitlements: FakeEntitlement[];
+  };
+}
+
 function serverConfig() {
   const url = new URL(TEST_DATABASE_URL as string);
   return {
@@ -66,7 +85,7 @@ async function dropScratchDatabase(name: string): Promise<void> {
 
 /** In-memory control-plane double: subscription row + usage counters. */
 function fakePlatform() {
-  let subscription: any = {
+  let subscription: FakeSubscription = {
     id: 'sub-1',
     organizationId: ORG_ID,
     status: 'ACTIVE',
@@ -88,11 +107,25 @@ function fakePlatform() {
     client: {
       subscription: {
         findUnique: jest.fn().mockImplementation(() =>
-          Promise.resolve(subscription ? JSON.parse(JSON.stringify(subscription)) : null),
+          Promise.resolve({
+            ...subscription,
+            plan: {
+              ...subscription.plan,
+              entitlements: subscription.plan.entitlements.map((entitlement) => ({ ...entitlement })),
+            },
+          }),
         ),
       },
       usageCounter: {
-        upsert: jest.fn().mockImplementation(({ where, create, update }: any) => {
+        upsert: jest.fn().mockImplementation(({
+          where,
+          create,
+          update,
+        }: {
+          where: { organizationId_metric_periodKey: Record<string, string> };
+          create: { value: bigint };
+          update: { value: bigint | { increment: bigint } };
+        }) => {
           const k = keyOf(where);
           if (!counters.has(k)) counters.set(k, create.value);
           else if (typeof update.value === 'bigint') counters.set(k, update.value);
@@ -100,7 +133,9 @@ function fakePlatform() {
             counters.set(k, counters.get(k)! + update.value.increment);
           return Promise.resolve({ value: counters.get(k)! });
         }),
-        findUnique: jest.fn().mockImplementation(({ where }: any) =>
+        findUnique: jest.fn().mockImplementation(({
+          where,
+        }: { where: { organizationId_metric_periodKey: Record<string, string> } }) =>
           Promise.resolve(
             counters.has(keyOf(where)) ? { value: counters.get(keyOf(where))! } : null,
           ),

@@ -91,9 +91,10 @@ class RedisStub {
 }
 
 function prismaDouble() {
+  type UserWhere = { id?: string };
   return {
     user: {
-      findUnique: jest.fn().mockImplementation(({ where }: any) =>
+      findUnique: jest.fn().mockImplementation(({ where }: { where: UserWhere }) =>
         Promise.resolve(
           where?.id === 'admin-shared'
             ? { id: 'admin-shared', role: 'admin', name: 'Shared Admin' }
@@ -112,8 +113,8 @@ interface WireClient {
   id: string;
   rooms: () => Promise<string[]>;
   emitEvent: (event: string, data: unknown) => void;
-  received: Array<{ event: string; data: any }>;
-  waitFor: (event: string, timeoutMs?: number) => Promise<any>;
+  received: Array<{ event: string; data: unknown }>;
+  waitFor: <T = unknown>(event: string, timeoutMs?: number) => Promise<T>;
   expectSilence: (event: string, timeoutMs?: number) => Promise<void>;
   close: () => void;
 }
@@ -123,16 +124,16 @@ function connectClient(
   auth: Record<string, unknown>,
 ): Promise<WireClient> {
   const ws = new WebSocket(`ws://127.0.0.1:${port}/socket.io/?EIO=4&transport=websocket`);
-  const received: Array<{ event: string; data: any }> = [];
+  const received: Array<{ event: string; data: unknown }> = [];
   const waiters: Array<{
     event: string;
-    resolve: (data: any) => void;
+    resolve: (data: unknown) => void;
   }> = [];
   let id = '';
 
   const dispatch = (frame: string) => {
     if (!frame.startsWith('42')) return;
-    const parsed = JSON.parse(frame.slice(2)) as [string, any];
+    const parsed = JSON.parse(frame.slice(2)) as [string, unknown];
     received.push({ event: parsed[0], data: parsed[1] });
     const waiterIndex = waiters.findIndex((w) => w.event === parsed[0]);
     if (waiterIndex >= 0) {
@@ -179,10 +180,10 @@ function connectClient(
       ws.send(`42${JSON.stringify([event, data])}`);
     },
     received,
-    waitFor: (event: string, timeoutMs = 700) =>
-      new Promise<any>((resolve, reject) => {
+    waitFor: <T = unknown>(event: string, timeoutMs = 700) =>
+      new Promise<T>((resolve, reject) => {
         const existing = received.find((r) => r.event === event);
-        if (existing) return resolve(existing.data);
+        if (existing) return resolve(existing.data as T);
         const timer = setTimeout(
           () => reject(new Error(`timed out waiting for ${event}`)),
           timeoutMs,
@@ -191,7 +192,7 @@ function connectClient(
           event,
           resolve: (data) => {
             clearTimeout(timer);
-            resolve(data);
+            resolve(data as T);
           },
         });
       }),
@@ -344,14 +345,14 @@ describe('Two-tenant live socket isolation (§10.11 multi-client E2E)', () => {
     await runWithTenantContext(tenantContext('org-a'), () =>
       gateway.emitNotificationToUser('admin-shared', { from: 'org-a' }),
     );
-    const delivered = await adminA.waitFor('notification::admin-shared');
+    const delivered = await adminA.waitFor<{ from: string }>('notification::admin-shared');
     expect(delivered.from).toBe('org-a');
     await adminB.expectSilence('notification::admin-shared');
 
     await runWithTenantContext(tenantContext('org-b'), () =>
       gateway.emitNotificationToUser('admin-shared', { from: 'org-b' }),
     );
-    const deliveredB = await adminB.waitFor('notification::admin-shared');
+    const deliveredB = await adminB.waitFor<{ from: string }>('notification::admin-shared');
     expect(deliveredB.from).toBe('org-b');
   });
 
@@ -381,7 +382,7 @@ describe('Two-tenant live socket isolation (§10.11 multi-client E2E)', () => {
       text: 'hello from org-a',
     });
 
-    const heardByOwnOrgAdmin = await adminA.waitFor('new-message-received');
+    const heardByOwnOrgAdmin = await adminA.waitFor<{ conversationId: string }>('new-message-received');
     expect(heardByOwnOrgAdmin.conversationId).toBe(conversationId);
     await adminB.expectSilence('new-message-received');
     await guestB.client.expectSilence('new-message-received');

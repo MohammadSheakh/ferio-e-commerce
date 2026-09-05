@@ -21,6 +21,7 @@ import { Pool } from 'pg';
 
 import { TenantSchemaBootstrapper } from '../src/tenancy/tenant-schema.bootstrapper';
 import { TenantDatabaseManager } from '../src/tenancy/tenant-database.manager';
+import type { ResolvedTenant } from '../src/tenancy/tenant-resolver.service';
 import { encryptSecret } from '../src/platform/utils/secret-box';
 
 const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL;
@@ -93,10 +94,12 @@ class MiniRedis {
 
 function resolverHarness(controlPlaneOk: boolean) {
   let controlPlaneQueries = 0;
+  type DomainWhere = { hostname: string };
+  type DatabaseWhere = { organizationId: string };
   const platform = {
     client: {
       tenantDomain: {
-        findUnique: jest.fn().mockImplementation(({ where }: any) => {
+        findUnique: jest.fn().mockImplementation(({ where }: { where: DomainWhere }) => {
           controlPlaneQueries += 1;
           if (!controlPlaneOk) {
             return Promise.reject(new Error('ECONNREFUSED control plane'));
@@ -116,7 +119,7 @@ function resolverHarness(controlPlaneOk: boolean) {
         }),
       },
       tenantDatabase: {
-        findUnique: jest.fn().mockImplementation(({ where }: any) =>
+        findUnique: jest.fn().mockImplementation(({ where }: { where: DatabaseWhere }) =>
           Promise.resolve({
             id: `tdb-${where.organizationId}`,
             organizationId: where.organizationId,
@@ -143,7 +146,7 @@ describe('§16.3 resolver load behavior', () => {
 
     const iterations = 2_000;
     const started = Date.now();
-    const round: Array<Promise<unknown>> = [];
+    const round: Array<Promise<ResolvedTenant>> = [];
     for (let i = 0; i < iterations; i += 1) {
       const host = i % 2 === 0 ? 'tenant-a.ferio.test' : 'tenant-b.ferio.test';
       round.push(service.resolveFromHost(host));
@@ -152,7 +155,7 @@ describe('§16.3 resolver load behavior', () => {
     const elapsedMs = Date.now() - started;
 
     expect(settled).toHaveLength(iterations);
-    const distinctOrgs = [...new Set(settled.map((r: any) => r.organizationId))]
+    const distinctOrgs = [...new Set(settled.map((r) => r.organizationId))]
       .sort()
       .join(',');
     expect(distinctOrgs).toBe('org-tenant-a,org-tenant-b');
