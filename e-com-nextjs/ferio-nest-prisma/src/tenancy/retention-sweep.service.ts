@@ -25,12 +25,11 @@ interface RetentionDelegate {
   deleteMany(args: unknown): Promise<{ count: number }>;
 }
 
-interface TenantClient {
-  commerceMessage: RetentionDelegate;
-  storefrontAnalyticsEvent: RetentionDelegate;
-  deliveryLocationHistory: RetentionDelegate;
-  auditLog: RetentionDelegate;
-}
+type RetentionModel =
+  | 'commerceMessage'
+  | 'storefrontAnalyticsEvent'
+  | 'deliveryLocationHistory'
+  | 'auditLog';
 
 type TenantDatabaseMaterial = Parameters<TenantDatabaseManager['getClient']>[0];
 
@@ -39,7 +38,11 @@ function envDays(key: string, fallback: number): number {
   return Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
 }
 
-function boundedInteger(key: string, fallback: number, maximum: number): number {
+function boundedInteger(
+  key: string,
+  fallback: number,
+  maximum: number,
+): number {
   const value = Number(process.env[key] ?? fallback);
   return Number.isSafeInteger(value) && value > 0
     ? Math.min(value, maximum)
@@ -64,7 +67,7 @@ export class RetentionSweepService {
   ) {}
 
   private rules(now = new Date()): Array<{
-    model: keyof TenantClient;
+    model: RetentionModel;
     label: string;
     days: number;
     cutoff: Date;
@@ -75,7 +78,8 @@ export class RetentionSweepService {
         label: 'CommerceMessage',
         days: envDays('RETENTION_COMMERCE_MESSAGE_DAYS', 180),
         cutoff: new Date(
-          now.getTime() - envDays('RETENTION_COMMERCE_MESSAGE_DAYS', 180) * 86_400_000,
+          now.getTime() -
+            envDays('RETENTION_COMMERCE_MESSAGE_DAYS', 180) * 86_400_000,
         ),
       },
       {
@@ -102,7 +106,8 @@ export class RetentionSweepService {
         // 7 years unless a later legal review changes the period.
         days: envDays('RETENTION_AUDIT_LOG_DAYS', 2_555),
         cutoff: new Date(
-          now.getTime() - envDays('RETENTION_AUDIT_LOG_DAYS', 2_555) * 86_400_000,
+          now.getTime() -
+            envDays('RETENTION_AUDIT_LOG_DAYS', 2_555) * 86_400_000,
         ),
       },
     ];
@@ -121,7 +126,7 @@ export class RetentionSweepService {
 
     const material: TenantDatabaseMaterial = registry;
     return this.manager.runTransient(material, async () => {
-      const db = (await this.manager.getClient(material)) as unknown as TenantClient;
+      const db = await this.manager.getClient(material);
       const results: RetentionRuleResult[] = [];
       for (const rule of this.rules(now)) {
         if (rule.days <= 0) {
@@ -184,7 +189,11 @@ export class RetentionSweepService {
   ): Promise<RetentionRuleResult> {
     const startedAt = Date.now();
     const batchSize = boundedInteger('RETENTION_DELETE_BATCH_SIZE', 500, 5_000);
-    const rowBudget = boundedInteger('RETENTION_MAX_ROWS_PER_RULE', 10_000, 100_000);
+    const rowBudget = boundedInteger(
+      'RETENTION_MAX_ROWS_PER_RULE',
+      10_000,
+      100_000,
+    );
     let deleted = 0;
     let batches = 0;
 
