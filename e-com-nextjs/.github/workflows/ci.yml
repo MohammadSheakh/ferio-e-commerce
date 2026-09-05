@@ -93,7 +93,7 @@ jobs:
     continue-on-error: true # advisory noise tolerated initially; tighten after pilot
     strategy:
       matrix:
-        app: [ferio-nest-prisma, ferio-customer-web, ferio-admin-dashboard/ferio-admin, ferio-platform-admin]
+        app: [ferio-nest-prisma, ferio-customer-web, ferio-admin-dashboard/ferio-admin, ferio-platform-admin, ferio-mobile-expo54]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -182,3 +182,24 @@ jobs:
         run: pnpm exec tsc --noEmit
       - name: Production build
         run: pnpm build
+
+  mobile:
+    name: Mobile — typecheck
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ferio-mobile-expo54
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: ferio-mobile-expo54/pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: TypeScript check
+        run: pnpm typecheck
