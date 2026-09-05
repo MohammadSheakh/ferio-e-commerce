@@ -8,7 +8,6 @@ import {
   CursorPaginateOptions,
   CursorPaginateResult,
   cleanFilters,
-  parseSort,
   buildProjection,
 } from '@app/common';
 import { SettingsType } from '../constants/settings.constants';
@@ -21,6 +20,24 @@ import { TenantDbService } from '../../../tenancy/tenant-db.service';
 import { tryGetTenantContext } from '../../../tenancy/tenant-context';
 import type { PrismaClient } from '@prisma/client';
 import { toTenantJsonInput } from '../../../core/database/json-input.util';
+
+type SettingsSortField = 'id' | 'type' | 'createdAt' | 'updatedAt';
+
+const SETTINGS_SORT_FIELDS: readonly SettingsSortField[] = [
+  'id',
+  'type',
+  'createdAt',
+  'updatedAt',
+];
+
+function isSettingsType(value: unknown): value is SettingsType {
+  return Object.values(SettingsType).some((type) => type === value);
+}
+
+function isSettingsSortField(value: string): value is SettingsSortField {
+  return (SETTINGS_SORT_FIELDS as readonly string[]).includes(value);
+}
+
 @Injectable()
 export class SettingsService {
   private readonly logger = new Logger(SettingsService.name);
@@ -118,6 +135,21 @@ export class SettingsService {
     return db.settings.findMany({ orderBy: { type: 'asc' } });
   }
 
+  private settingsWhere(filters: Record<string, unknown>): Prisma.SettingsWhereInput {
+    const value = cleanFilters(filters).type;
+    return isSettingsType(value) ? { type: value } : {};
+  }
+
+  private settingsOrderBy(
+    sortBy: string | undefined,
+    fallback: SettingsSortField,
+  ): Prisma.SettingsOrderByWithRelationInput {
+    const descending = sortBy?.startsWith('-') ?? false;
+    const requested = sortBy?.replace(/^-/, '') ?? fallback;
+    const field = isSettingsSortField(requested) ? requested : fallback;
+    return { [field]: descending ? 'desc' : 'asc' };
+  }
+
   async getAllWithPagination(
     filters: Record<string, unknown> = {},
     options: PaginateOptions,
@@ -127,11 +159,8 @@ export class SettingsService {
     const db = await this.db();
     const page = Number(options.page) > 0 ? Number(options.page) : 1;
     const limit = Number(options.limit) || 10;
-    const where = cleanFilters(filters) as Prisma.SettingsWhereInput;
-    const orderBy = parseSort(
-      options.sortBy,
-      'type',
-    ) as Prisma.SettingsOrderByWithRelationInput;
+    const where = this.settingsWhere(filters);
+    const orderBy = this.settingsOrderBy(options.sortBy, 'type');
 
     const [docs, total] = await Promise.all([
       db.settings.findMany({
@@ -161,14 +190,11 @@ export class SettingsService {
   ): Promise<CursorPaginateResult<Settings>> {
     const db = await this.db();
     const limit = Number(options.limit) || 10;
-    const where = cleanFilters(filters) as Prisma.SettingsWhereInput;
+    const where = this.settingsWhere(filters);
 
     // For cursor pagination, sortBy defaults to 'id' or another unique field to avoid duplicates.
     // If not specified, we sort by 'id' ascending as a reliable cursor.
-    const orderBy = parseSort(
-      options.sortBy,
-      'id',
-    ) as Prisma.SettingsOrderByWithRelationInput;
+    const orderBy = this.settingsOrderBy(options.sortBy, 'id');
 
     const take = limit + 1;
     const prismaOptions: Prisma.SettingsFindManyArgs = {
