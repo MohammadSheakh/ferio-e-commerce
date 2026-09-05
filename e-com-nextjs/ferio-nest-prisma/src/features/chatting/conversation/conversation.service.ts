@@ -21,6 +21,12 @@ import { ConversationType, ParticipantRole } from './conversation.constant';
 import { tryGetTenantContext } from '../../../tenancy/tenant-context';
 type ChatDb = PrismaClient | Prisma.TransactionClient;
 
+type ConversationMessage = Prisma.MessageGetPayload<{
+  include: {
+    sender: { select: { name: true; profileImageUrl: true; role: true } };
+  };
+}>;
+
 @Injectable()
 export class ConversationService {
   private readonly logger = new Logger(ConversationService.name);
@@ -201,7 +207,7 @@ export class ConversationService {
    */
   private async notifyParticipantsInConversation(
     conversationId: string,
-    message: any,
+    message: ConversationMessage,
   ) {
     const db = await this.db();
     const participants = await db.conversationParticipents.findMany({

@@ -4,7 +4,7 @@ import {
 } from '@nestjs/common';
 import { Queue } from 'bullmq';
 
-import type { PrismaClient } from '@prisma/client';
+import type { Prisma, PrismaClient } from '@prisma/client';
 import { PrismaService } from '@app/database';
 import { TenantDbService } from '../../../tenancy/tenant-db.service';
 import { SocketGateway } from '../../socket.gateway/gateway/socket.gateway';
@@ -14,6 +14,13 @@ import {
 import { SendMessageDto } from './dto/message.dto';
 import { tryGetTenantContext } from '../../../tenancy/tenant-context';
 import { errorMessage } from '@app/common';
+
+type ChatMessage = Prisma.MessageGetPayload<{
+  include: {
+    sender: { select: { name: true; profileImageUrl: true; role: true } };
+    attachments: true;
+  };
+}>;
 
 @Injectable()
 export class MessageService {
@@ -69,7 +76,10 @@ export class MessageService {
     const message = await db.$transaction(async (tx) => {
       const created = await tx.message.create({
         data: { text, senderId, conversationId },
-        include: { sender: { select: { name: true, profileImageUrl: true, role: true } } },
+        include: {
+          sender: { select: { name: true, profileImageUrl: true, role: true } },
+          attachments: true,
+        },
       });
       await tx.conversation.update({
         where: { id: conversationId },
@@ -164,20 +174,22 @@ export class MessageService {
     const { before, after, limit = 20 } = options;
 
     const boundedLimit = Math.min(100, Math.max(1, Number(limit) || 20));
-    const query: any = {
+    const query: Prisma.MessageWhereInput = {
       conversationId,
       isDeleted: false,
     };
+    const createdAtFilter: Prisma.DateTimeFilter = {};
 
     if (before) {
       const beforeMessage = await db.message.findUnique({ where: { id: before } });
-      if (beforeMessage) query.createdAt = { lt: beforeMessage.createdAt };
+      if (beforeMessage) createdAtFilter.lt = beforeMessage.createdAt;
     }
 
     if (after) {
       const afterMessage = await db.message.findUnique({ where: { id: after } });
-      if (afterMessage) query.createdAt = { ...query.createdAt, gt: afterMessage.createdAt };
+      if (afterMessage) createdAtFilter.gt = afterMessage.createdAt;
     }
+    if (Object.keys(createdAtFilter).length > 0) query.createdAt = createdAtFilter;
 
     const messages = await db.message.findMany({
       where: query,
@@ -346,7 +358,7 @@ export class MessageService {
    */
   private async notifyParticipantsInConversation(
     conversationId: string,
-    message: any,
+    message: ChatMessage,
   ): Promise<void> {
     const db = await this.db();
     try {
@@ -390,7 +402,7 @@ export class MessageService {
    */
   private async emitNewMessageEvent(
     conversationId: string,
-    message: any,
+    message: ChatMessage,
   ): Promise<void> {
     try {
       const sender = message.sender;
