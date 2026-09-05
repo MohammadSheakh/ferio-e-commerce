@@ -2,7 +2,7 @@ import {
   sanitizeAnalyticsPath,
   sanitizeFilters,
   sanitizeSearchTerm,
-} from '../storefront-analytics.util';
+} from '../utils/storefront-analytics.util';
 
 describe('storefront analytics sanitization', () => {
   it('normalizes search text and redacts likely contact details', () => {

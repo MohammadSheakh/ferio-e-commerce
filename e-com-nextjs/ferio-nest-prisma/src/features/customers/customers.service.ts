@@ -12,7 +12,7 @@ import {
   customerRiskIndicators,
   maskCustomerEmail,
   maskCustomerPhone,
-} from './customers.util';
+} from './utils/customers.util';
 
 @Injectable()
 export class CustomersService {

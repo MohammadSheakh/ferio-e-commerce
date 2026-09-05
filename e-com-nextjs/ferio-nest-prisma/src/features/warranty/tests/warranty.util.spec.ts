@@ -1,4 +1,4 @@
-import { canTransitionWarranty } from '../warranty.util';
+import { canTransitionWarranty } from '../utils/warranty.util';
 describe('warranty transitions', () => {
   it('allows repair and brand workflows', () => {
     expect(canTransitionWarranty('SUBMITTED', 'PRODUCT_RECEIVED')).toBe(true);

@@ -39,8 +39,8 @@ import {
   orderStatusLabel,
   requiresCodVerification,
   shipmentStatusLabel,
-} from './order.util';
-import { buildOrderOperationalTimeline } from './order-timeline.util';
+} from './utils/order.util';
+import { buildOrderOperationalTimeline } from './utils/order-timeline.util';
 import { WalletService } from '../wallet/wallet.service';
 import { CustomerNotificationsService } from '../customer-notifications/customer-notifications.service';
 

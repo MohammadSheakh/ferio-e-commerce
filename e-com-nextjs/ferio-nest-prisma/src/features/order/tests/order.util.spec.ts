@@ -5,7 +5,7 @@ import {
   orderStatusLabel,
   shipmentStatusLabel,
   requiresCodVerification,
-} from '../order.util';
+} from '../utils/order.util';
 
 describe('order rules', () => {
   it('evaluates configurable COD verification', () => {

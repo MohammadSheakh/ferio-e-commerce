@@ -94,6 +94,9 @@ Important decisions:
   `commerce-payments`, `transactional-messaging`, `chatting`, and `storage`.
   Controllers, application services, processors, queues, gateways, adapters,
   utilities, and storage strategies now have explicit ownership folders.
+- Moved domain utilities for `customers`, `order`, `storefront-analytics`, and
+  `warranty` into dedicated `utils/` folders, and moved the socket gateway
+  README into module documentation.
 - Added explicit `controllers/`, `services/`, `processors/`, `queues/`,
   `utils/`, and `gateway/` folders where those roles exist. Small cohesive
   features intentionally keep a flat runtime root instead of receiving empty
@@ -156,6 +159,8 @@ For every rename or extraction:
 - Feature role/test layout migration: complete for the current safe wave.
 - Mixed-role module migration: complete for audit, payments, messaging,
   chatting, and storage.
+- Utility/documentation cleanup: complete for the remaining utility-heavy
+  feature modules.
 - Naming migration: pending dedicated implementation wave.
 - Large-service decomposition: pending behavior-first design work.
 

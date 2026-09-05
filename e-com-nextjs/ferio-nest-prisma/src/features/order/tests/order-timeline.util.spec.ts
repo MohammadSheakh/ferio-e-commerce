@@ -1,4 +1,4 @@
-import { buildOrderOperationalTimeline } from '../order-timeline.util';
+import { buildOrderOperationalTimeline } from '../utils/order-timeline.util';
 
 describe('order operational timeline', () => {
   it('sorts cross-domain evidence without requiring raw provider payloads', () => {

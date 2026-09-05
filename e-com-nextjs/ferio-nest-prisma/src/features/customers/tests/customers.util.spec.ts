@@ -2,7 +2,7 @@ import {
   customerRiskIndicators,
   maskCustomerEmail,
   maskCustomerPhone,
-} from '../customers.util';
+} from '../utils/customers.util';
 
 describe('customer operations utilities', () => {
   it('masks list-view contact details', () => {

@@ -14,7 +14,7 @@ import {
   sanitizeAnalyticsPath,
   sanitizeFilters,
   sanitizeSearchTerm,
-} from './storefront-analytics.util';
+} from './utils/storefront-analytics.util';
 
 interface DailyOrderAggregate {
   date: string;
