@@ -1,11 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { v2 as cloudinary } from 'cloudinary';
 import type { UploadApiResponse } from 'cloudinary';
-import {
-  IFileUploadStrategy,
-  FileUploadResult,
-} from './file-upload.strategy.interface';
 import { errorMessage } from '@app/common';
+
+export interface FileUploadResult {
+  url: string;
+  publicId?: string;
+  size?: number;
+  mimeType?: string;
+}
 
 /**
  * Cloudinary File Upload Strategy
@@ -21,7 +24,7 @@ import { errorMessage } from '@app/common';
  * ✅ CDN delivery
  */
 @Injectable()
-export class CloudinaryStrategy implements IFileUploadStrategy {
+export class CloudinaryStrategy {
   private readonly logger = new Logger(CloudinaryStrategy.name);
 
   constructor() {

@@ -4,10 +4,15 @@ import { resolve } from 'node:path';
 
 const root = resolve(import.meta.dirname, '..');
 const appModule = await readFile(resolve(root, 'src/app.module.ts'), 'utf8');
-const mongoModule = await readFile(
-  resolve(root, 'src/core/database/mongo/mongodb.module.ts'),
-  'utf8',
-);
+let mongoModule = '';
+try {
+  mongoModule = await readFile(
+    resolve(root, 'src/core/database/mongo/mongodb.module.ts'),
+    'utf8',
+  );
+} catch {
+  // The legacy Mongo root is allowed to be fully removed.
+}
 
 // Comments are documentation, not executable architecture. Remove them before
 // checking whether a legacy root connection has been reintroduced.
@@ -26,7 +31,7 @@ if (/MongooseModule\s*\.\s*forRoot(?:Async)?\s*\(/.test(activeAppSource)) {
 
 if (/MongooseModule\s*\.\s*forRoot(?:Async)?\s*\(/.test(activeMongoSource)) {
   violations.push(
-    'src/core/database/mongo/mongodb.module.ts must remain an unregistered legacy compatibility module',
+    'src/core/database/mongo/mongodb.module.ts must not register a legacy Mongoose root connection',
   );
 }
 
