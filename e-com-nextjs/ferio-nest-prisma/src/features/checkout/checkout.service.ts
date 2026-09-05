@@ -52,7 +52,7 @@ export class CheckoutService {
   private async db(): Promise<PrismaClient> {
     return this.tenantDb
       ? this.tenantDb.getOrLegacy(this.prisma)
-      : (this.prisma as PrismaClient);
+      : this.prisma;
   }
 
   async getPaymentOptions() {

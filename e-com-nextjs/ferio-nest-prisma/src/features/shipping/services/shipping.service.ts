@@ -66,7 +66,7 @@ export class ShippingService {
   private async db(): Promise<PrismaClient> {
     return this.tenantDb
       ? this.tenantDb.getOrLegacy(this.prisma)
-      : (this.prisma as PrismaClient);
+      : this.prisma;
   }
   private adapter(code: ShipmentProviderCode): CourierAdapter {
     switch (code) {

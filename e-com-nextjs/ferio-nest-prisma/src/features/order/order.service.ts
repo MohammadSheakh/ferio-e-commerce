@@ -89,7 +89,7 @@ export class OrderService {
   private async db(): Promise<PrismaClient> {
     return this.tenantDb
       ? this.tenantDb.getOrLegacy(this.prisma)
-      : (this.prisma as PrismaClient);
+      : this.prisma;
   }
   private hashIdempotencyKey(value: string): string {
     return createHash('sha256').update(value).digest('hex');

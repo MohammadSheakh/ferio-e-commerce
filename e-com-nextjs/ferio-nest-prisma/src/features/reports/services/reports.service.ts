@@ -268,7 +268,7 @@ export class ReportsService {
   private async db(): Promise<PrismaClient> {
     return this.tenantDb
       ? this.tenantDb.getOrLegacy(this.prisma)
-      : (this.prisma as PrismaClient);
+      : this.prisma;
   }
   async overview(query: ReportQueryDto) {
     const db = await this.db();

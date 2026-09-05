@@ -28,7 +28,7 @@ export class CustomersService {
   private async db(): Promise<PrismaClient> {
     return this.tenantDb
       ? this.tenantDb.getOrLegacy(this.prisma)
-      : (this.prisma as PrismaClient);
+      : this.prisma;
   }
   async list(query: CustomerQueryDto) {
     const db = await this.db();
