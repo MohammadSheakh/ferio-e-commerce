@@ -60,6 +60,48 @@ New modules should normally contain:
 - Unit tests for the service and high-risk authorization/data paths
 - Queue processors, policies, repositories, or utilities only when the domain needs them
 
+### Feature folder convention
+
+Organize the backend by bounded feature context. Keep the module boundary and
+its owned runtime roles visible in the filesystem:
+
+```text
+feature-name/
+  feature-name.module.ts
+  controllers/                 # multiple/cohesive controllers
+  services/                    # multiple/cohesive application services
+  dto/
+  adapters/ | gateways/        # external provider boundaries
+  processors/                  # BullMQ/background workers
+  queues/                      # enqueueing and scheduling
+  utils/                       # side-effect-free domain helpers
+  tests/                       # feature/submodule-owned tests
+```
+
+Apply these decisions:
+
+- Keep a small one-controller/one-service feature flat when role folders would
+  add ceremony without improving dependency direction.
+- Create explicit role folders when responsibilities have different
+  authorization, persistence, queue, provider, operational, or scaling
+  characteristics. Do not split services merely to make a directory look
+  larger.
+- Keep tests in a local `tests/` directory owned by the feature or bounded
+  submodule. Do not mix test files with production files in the same folder.
+- Keep DTOs, adapters, processors, queues, gateways, policies, and utilities
+  inside the feature that owns them. Do not create shared utility dumps or
+  import another feature's private implementation.
+- Runtime `src/features` directories contain executable source only. Move
+  historical reports, completion notes, and architecture documents under
+  `_doc/`.
+- Use kebab-case for new directories. Rename legacy directories only as an
+  atomic import, test, script, and documentation migration.
+- Preserve module exports, route contracts, provider tokens, and dependency
+  direction during structure-only refactors.
+
+Track repository-wide structure changes in
+`_doc/multi-tenant/skill-related-discussion/file-folder-structure-track.md`.
+
 Keep controllers thin. Controllers handle routing, DTO input, guards, and response intent. Services enforce domain rules, ownership, tenant scope, transactions, idempotency, and audit behavior.
 
 Prefer focused services over a single god service. Extract query/read services, mutation services, policy checks, integrations, and queue orchestration when their responsibilities or scaling characteristics differ.
@@ -97,6 +139,48 @@ Use transactions for multi-record state transitions. Within a transaction:
 - Keep tenant database pools bounded. Never create an unbounded Prisma client or connection pool per request.
 - Use Redis for coordination/cache only with explicit TTL, invalidation, failure behavior, and stampede protection.
 - Queue slow, retryable, or fan-out work. Jobs must carry tenant/organization identity, be idempotent, have bounded retries, and expose failures through metrics and logs.
+
+## Scalability Design Standard
+
+Treat scalability as a bounded-resource and failure-isolation problem, not as
+a consequence of NestJS module count. A module is not ready for high traffic
+until its expected load, bottlenecks, and failure behavior are measurable.
+
+- Keep HTTP handlers stateless so instances can scale horizontally. Request
+  context must not be stored in process globals; use the established tenant
+  context and correlation mechanisms.
+- Bound every resource: database clients and pools, Redis connections, queue
+  concurrency, worker batches, request payloads, file sizes, pagination,
+  report ranges, and external-provider timeouts.
+- Design tenant isolation against noisy neighbors. One tenant's expensive
+  report, queue backlog, connection churn, retry storm, or provider outage
+  must not exhaust shared capacity for other tenants.
+- Use separate read/write paths when justified: projection-based queries for
+  interactive reads, aggregate/read-model tables for dashboards, and queued
+  exports or recomputation for expensive work. Do not turn an HTTP request into
+  an unbounded relational scan.
+- Use backpressure and explicit overload behavior. Prefer bounded queues,
+  rate limits, concurrency controls, circuit breakers, deadlines, and safe
+  degradation over unlimited retries or synchronous fan-out.
+- Keep network calls outside database transactions. Use an outbox or durable
+  job handoff when a committed mutation must trigger asynchronous work.
+- Make cache keys tenant-aware and define TTL, invalidation, stampede
+  protection, and behavior during Redis failure. A cache optimization must not
+  weaken authorization or become the only source of truth.
+- Make workers horizontally safe: tenant-stamped trusted envelopes,
+  idempotent handlers, bounded retries, dead-letter/failure evidence, and
+  concurrency appropriate to database/provider capacity.
+- Instrument capacity signals per dependency and, where safe, per tenant:
+  latency, errors, saturation, pool usage, queue depth/age, retry counts,
+  circuit state, cache hit rate, and rejected work.
+- Validate claims with progressive tests: focused unit tests, integration
+  tests against PostgreSQL/Redis, concurrency tests, queue failure tests,
+  tenant-isolation tests, and load tests for hot tenants, many active tenants,
+  cold tenant connections, pool exhaustion, noisy neighbors, and slow
+  dependencies.
+- Never describe the system as supporting a target such as one million
+  concurrent users from static review alone. State the architectural limits,
+  tested workload, deployment topology, and remaining evidence instead.
 
 ## Realtime And Workers
 
