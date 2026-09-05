@@ -1,6 +1,13 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
+import type { UserPayload } from '@app/common';
+
+function isUserPayload(payload: unknown): payload is UserPayload {
+  if (typeof payload !== 'object' || payload === null) return false;
+  const candidate = payload as Record<string, unknown>;
+  return typeof candidate.userId === 'string' && typeof candidate.email === 'string';
+}
 
 /**
  * JWT Strategy
@@ -38,8 +45,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
    * Validate JWT token
    * Called automatically by Passport after token verification
    */
-  async validate(payload: any) {
-    if (!payload.userId || !payload.email) {
+  async validate(payload: unknown): Promise<UserPayload> {
+    if (!isUserPayload(payload)) {
       throw new UnauthorizedException('Invalid token payload');
     }
 
