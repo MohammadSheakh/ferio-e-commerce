@@ -1,5 +1,5 @@
 ---
-name: ferio-backend-architecture-v2
+name: ferio-backend-architecture-v2-current
 description: Implement or review Ferio NestJS backend changes using explicit multi-tenant, security, structure, scalability, and verification rules.
 ---
 

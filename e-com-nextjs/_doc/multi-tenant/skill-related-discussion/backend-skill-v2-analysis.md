@@ -3,8 +3,8 @@
 ## Purpose
 
 This document explains the design of
-`.agents/skills/ferio-backend-architecture-v2/SKILL.md`. The original
-`.agents/skills/ferio-backend-architecture/SKILL.md` is intentionally unchanged.
+`.agents/skills/ferio-backend-architecture-v2-current/SKILL.md`. The original
+`.agents/skills/ferio-backend-architecture-old/SKILL.md` is intentionally unchanged.
 
 ## Video Principles Applied
 

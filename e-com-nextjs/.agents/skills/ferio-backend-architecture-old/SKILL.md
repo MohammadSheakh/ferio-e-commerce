@@ -1,5 +1,5 @@
 ---
-name: ferio-backend-architecture
+name: ferio-backend-architecture-old
 description: Design, implement, or review Ferio NestJS backend modules using the project's multi-tenant Prisma architecture, security boundaries, operational conventions, and scalability standards.
 ---
 

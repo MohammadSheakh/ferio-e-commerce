@@ -4,7 +4,7 @@ Use this document when working in `e-com-nextjs/ferio-nest-prisma`.
 
 ## Canonical Guidance
 
-- [Backend architecture V2](../e-com-nextjs/.agents/skills/ferio-backend-architecture-v2/SKILL.md)
+- [Backend architecture V2 Current](../e-com-nextjs/.agents/skills/ferio-backend-architecture-v2-current/SKILL.md)
 - [SaaS PRD](../e-com-nextjs/_doc/multi-tenant/Ferio-Commerce-SaaS-PRD-v2.1.md)
 - [Implementation checklist](../e-com-nextjs/_doc/multi-tenant/implementation-checklist-and-schedule-multitenant.md)
 - [Architecture decisions](../e-com-nextjs/_doc/multi-tenant/adr/README.md)

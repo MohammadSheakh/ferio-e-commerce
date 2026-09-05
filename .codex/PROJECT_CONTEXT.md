@@ -22,9 +22,9 @@ and ADRs explain the accepted architecture choices.
 
 ## Engineering Skills
 
-- [Backend architecture V2](../e-com-nextjs/.agents/skills/ferio-backend-architecture-v2/SKILL.md)
+- [Backend architecture V2 Current](../e-com-nextjs/.agents/skills/ferio-backend-architecture-v2-current/SKILL.md)
   - Rule-driven NestJS, multi-tenant, security, scalability, review, and verification guidance.
-- [Backend architecture V1](../e-com-nextjs/.agents/skills/ferio-backend-architecture/SKILL.md)
+- [Backend architecture Old](../e-com-nextjs/.agents/skills/ferio-backend-architecture-old/SKILL.md)
   - Existing backend architecture reference. Keep unchanged unless explicitly requested.
 - [Design skill](../e-com-nextjs/.agents/skills/ferio-design/SKILL.md)
   - Ferio visual language and frontend implementation guidance.

@@ -94,7 +94,7 @@ These are intentionally not marked as application-code fixes:
   fields required by routing.
 - Fixed: delivery-personnel rider endpoints use the typed `@User()` principal
   instead of arbitrary request objects.
-- Updated: `ferio-backend-architecture/SKILL.md` now documents the API route,
+- Updated: `ferio-backend-architecture-old/SKILL.md` now documents the API route,
   response/error, typed-principal, and no-new-explicit-`any` contracts.
 - Verified: `pnpm exec tsc --noEmit`, `pnpm test -- --runInBand` (90 suites,
   408 tests), and `git diff --check` pass.

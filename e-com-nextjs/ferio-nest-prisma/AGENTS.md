@@ -1,6 +1,6 @@
 # Ferio Backend Instructions
 
-Apply the [backend context](../../.codex/backend-context.md) and [Backend Architecture V2](../.agents/skills/ferio-backend-architecture-v2/SKILL.md) before changing this application.
+Apply the [backend context](../../.codex/backend-context.md) and [Backend Architecture V2 Current](../.agents/skills/ferio-backend-architecture-v2-current/SKILL.md) before changing this application.
 
 - Resolve tenancy through trusted server-side context; never trust a client-selected database or tenant connection string.
 - Keep platform services on platform Prisma and tenant services on tenant Prisma.
