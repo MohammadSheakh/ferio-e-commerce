@@ -13,6 +13,14 @@ services:
     ports: !reset []
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+        reservations:
+          cpus: "0.50"
+          memory: 512M
     restart: unless-stopped
 
   redis:
@@ -21,6 +29,14 @@ services:
     command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?REDIS_PASSWORD must be set}"]
     healthcheck:
       test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" ping | grep -q PONG"]
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+        reservations:
+          cpus: "0.25"
+          memory: 256M
     restart: unless-stopped
 
   minio:
@@ -29,6 +45,14 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:?MINIO_ROOT_USER must be set}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD must be set}
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+        reservations:
+          cpus: "0.25"
+          memory: 256M
     restart: unless-stopped
 
   minio-init:
@@ -41,6 +65,11 @@ services:
       mc alias set local http://minio:9000 \"$${MINIO_ROOT_USER}\" \"$${MINIO_ROOT_PASSWORD}\" &&
       mc mb --ignore-existing local/ferio-media &&
       echo 'bucket ready: ferio-media'"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 256M
 
   tenant-migrate:
     environment:
@@ -71,6 +100,14 @@ services:
       PLATFORM_INITIAL_SUPERADMIN_PASSWORD_HASH: ""
       R2_ACCESS_KEY_ID: ${MINIO_ROOT_USER:?MINIO_ROOT_USER must be set}
       R2_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD must be set}
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 2G
+        reservations:
+          cpus: "0.50"
+          memory: 512M
     restart: unless-stopped
 
   customer-web:
@@ -90,6 +127,14 @@ services:
       NEXT_PUBLIC_FERIO_API_URL: ${PUBLIC_FERIO_API_URL:?PUBLIC_FERIO_API_URL must be set}
       NEXT_PUBLIC_SOCKET_URL: ${PUBLIC_SOCKET_URL:?PUBLIC_SOCKET_URL must be set}
       NEXT_PUBLIC_SITE_URL: ${PUBLIC_CUSTOMER_URL:?PUBLIC_CUSTOMER_URL must be set}
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
     restart: unless-stopped
 
   admin-web:
@@ -108,6 +153,14 @@ services:
       FERIO_API_URL: http://backend:6733/api/v1
       NEXT_PUBLIC_FERIO_API_URL: ${PUBLIC_FERIO_API_URL:?PUBLIC_FERIO_API_URL must be set}
       NEXT_PUBLIC_SOCKET_URL: ${PUBLIC_SOCKET_URL:?PUBLIC_SOCKET_URL must be set}
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
     restart: unless-stopped
 
   platform-admin:
@@ -119,4 +172,12 @@ services:
       - "3000"
     environment:
       NODE_ENV: production
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
     restart: unless-stopped
