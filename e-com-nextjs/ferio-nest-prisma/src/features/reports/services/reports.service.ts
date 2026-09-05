@@ -1,7 +1,4 @@
-import {
-  BadRequestException, Injectable,
-  Optional,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, Optional } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PERMISSIONS, roleHasPermission, type UserPayload } from '@app/common';
 import type { PrismaClient } from '@prisma/client';
@@ -212,9 +209,7 @@ function createReportAccumulator(): ReportOrderAcc & {
         this.codCollectionVariances += 1;
       }
 
-      if (
-        ['PARTIAL', 'REFUNDED', 'FAILED'].includes(order.refundStatus)
-      ) {
+      if (['PARTIAL', 'REFUNDED', 'FAILED'].includes(order.refundStatus)) {
         this.refundAffectedOrders += 1;
       }
       for (const refund of order.refunds) {
@@ -262,8 +257,9 @@ export class ReportsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
-  
-    @Optional() private readonly tenantDb?: TenantDbService,) {}
+
+    @Optional() private readonly tenantDb?: TenantDbService,
+  ) {}
 
   /**
    * MT-7/MT-8: tenant client inside resolved storefront/admin requests;
@@ -315,12 +311,12 @@ export class ReportsService {
             ],
           }
         : baseWhere;
-      const batch = (await db.order.findMany({
+      const batch = await db.order.findMany({
         where: pageWhere,
         select: reportOrderSelect,
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         take: REPORT_CHUNK_SIZE,
-      })) as unknown as ReportOrder[];
+      });
       if (batch.length === 0) break;
       for (const order of batch) acc.add(order);
       if (batch.length < REPORT_CHUNK_SIZE) break;
