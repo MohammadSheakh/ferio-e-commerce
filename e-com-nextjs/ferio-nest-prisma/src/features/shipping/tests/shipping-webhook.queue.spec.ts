@@ -6,6 +6,7 @@ import {
   COURIER_CALLBACK_RETRY_JOB,
   COURIER_CALLBACK_SCHEDULER_ID,
   COURIER_CALLBACK_SWEEP_JOB,
+  type CourierCallbackJobData,
   ShippingWebhookQueue,
 } from '../queues/shipping-webhook.queue';
 
@@ -36,7 +37,7 @@ describe('ShippingWebhookQueue', () => {
   };
   const audit = { record: jest.fn() };
   const service = new ShippingWebhookQueue(
-    queue as unknown as Queue,
+    queue as unknown as Queue<CourierCallbackJobData>,
     config as unknown as ConfigService,
     prisma as unknown as PrismaService,
     audit as unknown as AuditService,
@@ -82,19 +83,16 @@ describe('ShippingWebhookQueue', () => {
   });
 
   it('reports queue counts, scheduler timing, and recoverable evidence', async () => {
-    await expect(service.health()).resolves.toEqual(
-      expect.objectContaining({
-        available: true,
-        scheduleEnabled: true,
-        scheduleEveryMinutes: 5,
-        maxAttempts: 6,
-        recoverableCount: 2,
-        scheduler: expect.objectContaining({
-          id: COURIER_CALLBACK_SCHEDULER_ID,
-          name: COURIER_CALLBACK_SWEEP_JOB,
-        }),
-      }),
-    );
+    const health = await service.health();
+    expect(health.available).toBe(true);
+    expect(health.scheduleEnabled).toBe(true);
+    expect(health.scheduleEveryMinutes).toBe(5);
+    expect(health.maxAttempts).toBe(6);
+    expect(health.recoverableCount).toBe(2);
+    expect(health.scheduler).toMatchObject({
+      id: COURIER_CALLBACK_SCHEDULER_ID,
+      name: COURIER_CALLBACK_SWEEP_JOB,
+    });
   });
 
   it('enqueues recoverable callbacks with deterministic attempt IDs', async () => {

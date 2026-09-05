@@ -92,28 +92,29 @@ describe('OrderService reservation rules', () => {
         },
       ],
     ]);
-    expect(transaction.inventoryMovement.create.mock.calls).toEqual([
-      [
-        {
-          data: expect.objectContaining({
-            inventoryId: 'stock-a',
-            type: 'RESERVE',
-            quantityDelta: 1,
-            referenceId: 'order-1',
-          }),
-        },
-      ],
-      [
-        {
-          data: expect.objectContaining({
-            inventoryId: 'stock-b',
-            type: 'RESERVE',
-            quantityDelta: 2,
-            referenceId: 'order-1',
-          }),
-        },
-      ],
-    ]);
+    type MovementCall = {
+      data: {
+        inventoryId: string;
+        type: string;
+        quantityDelta: number;
+        referenceId: string;
+      };
+    };
+    const movementCalls = transaction.inventoryMovement.create.mock.calls as unknown as Array<
+      [MovementCall]
+    >;
+    expect(movementCalls[0][0].data).toMatchObject({
+      inventoryId: 'stock-a',
+      type: 'RESERVE',
+      quantityDelta: 1,
+      referenceId: 'order-1',
+    });
+    expect(movementCalls[1][0].data).toMatchObject({
+      inventoryId: 'stock-b',
+      type: 'RESERVE',
+      quantityDelta: 2,
+      referenceId: 'order-1',
+    });
     expect(transaction.order.update).toHaveBeenCalledWith({
       where: { id: 'order-1' },
       data: { paymentStatus: 'UNPAID' },
@@ -170,10 +171,13 @@ describe('OrderService reservation rules', () => {
       where: { id: 'stock-d' },
       data: { reserved: { decrement: 2 } },
     });
-    expect(transaction.inventoryReservation.update).toHaveBeenCalledWith({
-      where: { id: 'reservation-1' },
-      data: { status: 'RELEASED', releasedAt: expect.any(Date) },
-    });
+    const reservationUpdate = transaction.inventoryReservation.update.mock.calls[0] as unknown as [{
+      where: { id: string };
+      data: { status: string; releasedAt: Date };
+    }];
+    expect(reservationUpdate[0].where).toEqual({ id: 'reservation-1' });
+    expect(reservationUpdate[0].data.status).toBe('RELEASED');
+    expect(reservationUpdate[0].data.releasedAt).toBeInstanceOf(Date);
     expect(transaction.inventoryMovement.create).toHaveBeenCalledWith({
       data: {
         inventoryId: 'stock-d',

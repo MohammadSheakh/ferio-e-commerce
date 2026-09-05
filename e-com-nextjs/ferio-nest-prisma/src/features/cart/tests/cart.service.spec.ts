@@ -209,7 +209,10 @@ describe('CartService', () => {
         findFirst: jest.fn().mockResolvedValue(target),
         findUnique: jest.fn().mockResolvedValue(target),
       },
-      $transaction: jest.fn(async (callback) => callback(transaction)),
+      $transaction: jest.fn(
+        (callback: (tx: typeof transaction) => unknown) =>
+          Promise.resolve(callback(transaction)),
+      ),
     } as unknown as PrismaService;
 
     const result = await new CartService(prisma).mergeGuestCart(
@@ -232,8 +235,9 @@ describe('CartService', () => {
   });
 
   it('requires verified identity, current consent, inactivity, and no order for eligibility', async () => {
+    const findMany = jest.fn().mockResolvedValue([]);
     const prisma = {
-      cart: { findMany: jest.fn().mockResolvedValue([]) },
+      cart: { findMany },
     } as unknown as PrismaService;
     const config = {
       get: jest.fn((key: string, fallback: number) =>
@@ -245,32 +249,33 @@ describe('CartService', () => {
       prisma,
       config as never,
     ).listAbandonedCartEligibility();
-    const where = (prisma.cart.findMany as jest.Mock).mock.calls[0][0].where;
-
-    expect(where).toEqual(
-      expect.objectContaining({
-        status: 'ACTIVE',
-        userId: { not: null },
-        items: { some: {} },
-        user: {
-          is: expect.objectContaining({
-            role: 'user',
-            isDeleted: false,
-            isEmailVerified: true,
-          }),
-        },
-        checkoutDraft: {
-          is: expect.objectContaining({
-            marketingConsent: true,
-            marketingConsentAt: expect.objectContaining({
-              gte: expect.any(Date),
-              lte: expect.any(Date),
-            }),
-            order: { is: null },
-          }),
-        },
-      }),
-    );
+    type EligibilityWhere = {
+      status: string;
+      userId: { not: null };
+      items: { some: Record<string, never> };
+      user: { is: { role: string; isDeleted: boolean; isEmailVerified: boolean } };
+      checkoutDraft: {
+        is: {
+          marketingConsent: boolean;
+          marketingConsentAt: { gte: Date; lte: Date };
+          order: { is: null };
+        };
+      };
+    };
+    const call = findMany.mock.calls[0] as unknown as [{ where: EligibilityWhere }];
+    const where = call[0].where;
+    expect(where.status).toBe('ACTIVE');
+    expect(where.userId).toEqual({ not: null });
+    expect(where.items).toEqual({ some: {} });
+    expect(where.user.is).toEqual({
+      role: 'user',
+      isDeleted: false,
+      isEmailVerified: true,
+    });
+    expect(where.checkoutDraft.is.marketingConsent).toBe(true);
+    expect(where.checkoutDraft.is.marketingConsentAt.gte).toBeInstanceOf(Date);
+    expect(where.checkoutDraft.is.marketingConsentAt.lte).toBeInstanceOf(Date);
+    expect(where.checkoutDraft.is.order).toEqual({ is: null });
     expect(result.policy).toEqual({
       minimumAgeHours: 3,
       consentMaxAgeDays: 365,
