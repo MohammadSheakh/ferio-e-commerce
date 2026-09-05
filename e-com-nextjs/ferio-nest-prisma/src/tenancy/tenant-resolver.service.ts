@@ -72,6 +72,8 @@ function isResolvedTenant(value: unknown, hostname: string): value is ResolvedTe
  */
 @Injectable()
 export class TenantResolverService implements OnModuleInit {
+  private readonly inFlight = new Map<string, Promise<ResolvedTenant>>();
+
   constructor(
     private readonly platform: PlatformPrismaService,
     private readonly redis: RedisService,
@@ -141,6 +143,21 @@ export class TenantResolverService implements OnModuleInit {
     }
     if (cached) return cached;
 
+    const pending = this.inFlight.get(hostname);
+    if (pending) return pending;
+
+    const resolution = this.resolveAndCache(hostname);
+    this.inFlight.set(hostname, resolution);
+    try {
+      return await resolution;
+    } finally {
+      if (this.inFlight.get(hostname) === resolution) {
+        this.inFlight.delete(hostname);
+      }
+    }
+  }
+
+  private async resolveAndCache(hostname: string): Promise<ResolvedTenant> {
     let resolved: ResolvedTenant;
     try {
       resolved = await this.resolveFromControlPlane(hostname);

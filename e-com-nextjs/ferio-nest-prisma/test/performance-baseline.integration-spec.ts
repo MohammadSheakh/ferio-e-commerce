@@ -125,6 +125,11 @@ function resolverHarness(controlPlaneOk: boolean) {
             organizationId: where.organizationId,
             status: 'READY',
             schemaVersion: 'current',
+            host: 'localhost',
+            port: 5432,
+            databaseName: `db_${where.organizationId}`,
+            username: 'tenant_user',
+            credentialCipher: 'encrypted-credential',
           }),
         ),
       },
@@ -136,6 +141,23 @@ function resolverHarness(controlPlaneOk: boolean) {
 }
 
 describe('§16.3 resolver load behavior', () => {
+  it('coalesces a cold concurrent burst into one control-plane resolution', async () => {
+    const { service, queries } = resolverHarness(true);
+    const attempts = 100;
+
+    const results = await Promise.all(
+      Array.from({ length: attempts }, () =>
+        service.resolveFromHost('tenant-a.ferio.test'),
+      ),
+    );
+
+    expect(results).toHaveLength(attempts);
+    expect(results.every((result) => result.organizationId === 'org-tenant-a')).toBe(
+      true,
+    );
+    expect(queries()).toBe(1);
+  });
+
   it('serves hot load from cache with one control-plane query per host', async () => {
     const { service, queries } = resolverHarness(true);
 

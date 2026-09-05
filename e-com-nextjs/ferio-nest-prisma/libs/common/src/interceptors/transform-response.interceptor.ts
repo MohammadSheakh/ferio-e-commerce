@@ -54,16 +54,22 @@ export class TransformResponseInterceptor<T>
     return next.handle().pipe(
       map((data: T): Response<T> => {
         // If data is already in response format, return as-is
-        if (isRecord(data) && 'success' in data) {
-          return data as Response<T>;
+        if (isRecord(data) && 'success' in data && 'data' in data) {
+          const response: Response<T> = {
+            data: data.data as T,
+            success: data.success === true,
+          };
+          if (typeof data.message === 'string') response.message = data.message;
+          return response;
         }
 
         // If data already has a message field, preserve it
         if (isRecord(data) && 'message' in data) {
           return {
             success: true,
-            ...data,
-          } as Response<T>;
+            data,
+            message: typeof data.message === 'string' ? data.message : undefined,
+          };
         }
 
         // Wrap data in standard response format
