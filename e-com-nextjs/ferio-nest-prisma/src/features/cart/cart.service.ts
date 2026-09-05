@@ -63,8 +63,9 @@ export class CartService {
    * requests the legacy single-tenant DB applies, unchanged.
    */
   private async db(): Promise<PrismaClient> {
-    const tenant = await this.tenantDb?.tryGet();
-    return tenant ?? (this.prisma as PrismaClient);
+    return this.tenantDb
+      ? this.tenantDb.getOrLegacy(this.prisma)
+      : (this.prisma as PrismaClient);
   }
 
   private tokenHash(token: string): string {
