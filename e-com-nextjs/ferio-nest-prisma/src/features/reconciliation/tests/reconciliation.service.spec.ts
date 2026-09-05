@@ -5,6 +5,32 @@ import { ReconciliationService } from '../services/reconciliation.service';
 
 const actor = { userId: 'admin-1', role: 'admin' } as UserPayload;
 
+type FindingCreate = {
+  type: string;
+  severity: string;
+  entityId: string;
+};
+
+function lastCallInput<T>(mock: jest.Mock): T {
+  const calls = mock.mock.calls as unknown as Array<[T]>;
+  const call = calls.at(-1);
+  if (!call) {
+    throw new Error('Expected mock to have at least one call');
+  }
+  return call[0];
+}
+
+function findingCreate(mock: jest.Mock, type: string): FindingCreate {
+  const calls = mock.mock.calls as unknown as Array<
+    [{ create: FindingCreate }]
+  >;
+  const call = calls.find(([input]) => input.create.type === type);
+  if (!call) {
+    throw new Error(`Missing reconciliation finding: ${type}`);
+  }
+  return call[0].create;
+}
+
 describe('ReconciliationService', () => {
   const completedRun = {
     id: 'run-1',
@@ -57,8 +83,14 @@ describe('ReconciliationService', () => {
     commerceMessage: { groupBy: jest.fn() },
     commerceRefund: { groupBy: jest.fn() },
     $transaction: jest.fn(
-      (callback: (tx: typeof transaction) => unknown) =>
-        Promise.resolve(callback(transaction)),
+      (
+        callback:
+          | ((tx: typeof transaction) => unknown)
+          | readonly Promise<unknown>[],
+      ) =>
+        typeof callback === 'function'
+          ? Promise.resolve(callback(transaction))
+          : Promise.all(callback),
     ),
   };
   const audit = { record: jest.fn() };
@@ -169,39 +201,53 @@ describe('ReconciliationService', () => {
     ).resolves.toBe(completedRun);
 
     expect(transaction.reconciliationFinding.upsert).toHaveBeenCalledTimes(2);
-    expect(transaction.reconciliationFinding.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        create: expect.objectContaining({
-          type: 'OVERDUE_COD_COLLECTION',
-          severity: 'HIGH',
-          entityId: 'collection-1',
-        }),
-      }),
-    );
-    expect(transaction.reconciliationFinding.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        create: expect.objectContaining({
-          type: 'INVALID_STOCK_BALANCE',
-          severity: 'CRITICAL',
-          entityId: 'stock-1',
-        }),
-      }),
-    );
-    expect(transaction.reconciliationRun.update).toHaveBeenCalledWith({
+    expect(
+      findingCreate(
+        transaction.reconciliationFinding.upsert,
+        'OVERDUE_COD_COLLECTION',
+      ),
+    ).toMatchObject({
+      type: 'OVERDUE_COD_COLLECTION',
+      severity: 'HIGH',
+      entityId: 'collection-1',
+    });
+    expect(
+      findingCreate(
+        transaction.reconciliationFinding.upsert,
+        'INVALID_STOCK_BALANCE',
+      ),
+    ).toMatchObject({
+      type: 'INVALID_STOCK_BALANCE',
+      severity: 'CRITICAL',
+      entityId: 'stock-1',
+    });
+    expect(
+      lastCallInput<{
+        where: { id: string };
+        data: {
+          status: string;
+          detectedCount: number;
+          openedCount: number;
+          autoResolvedCount: number;
+        };
+      }>(transaction.reconciliationRun.update),
+    ).toMatchObject({
       where: { id: 'run-1' },
-      data: expect.objectContaining({
+      data: {
         status: 'COMPLETED',
         detectedCount: 2,
         openedCount: 2,
         autoResolvedCount: 1,
-      }),
+      },
     });
-    expect(prisma.reconciliationRun.update).toHaveBeenCalledWith({
+    expect(
+      lastCallInput<{
+        where: { id: string };
+        data: { status: string; attemptCount: { increment: number } };
+      }>(prisma.reconciliationRun.update),
+    ).toMatchObject({
       where: { id: 'run-1' },
-      data: expect.objectContaining({
-        status: 'RUNNING',
-        attemptCount: { increment: 1 },
-      }),
+      data: { status: 'RUNNING', attemptCount: { increment: 1 } },
     });
     expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'RECONCILIATION_SCAN_COMPLETED' }),
@@ -293,12 +339,17 @@ describe('ReconciliationService', () => {
       service.run('reconciliation-scan-key-0003', { overdueHours: 168 }, actor),
     ).rejects.toThrow('provider query unavailable');
 
-    expect(prisma.reconciliationRun.update).toHaveBeenLastCalledWith({
+    expect(
+      lastCallInput<{
+        where: { id: string };
+        data: { status: string; failureReason: string };
+      }>(prisma.reconciliationRun.update),
+    ).toMatchObject({
       where: { id: 'run-1' },
-      data: expect.objectContaining({
+      data: {
         status: 'FAILED',
         failureReason: 'provider query unavailable',
-      }),
+      },
     });
     expect(audit.record).toHaveBeenLastCalledWith(
       expect.objectContaining({ action: 'RECONCILIATION_SCAN_FAILED' }),
@@ -317,13 +368,22 @@ describe('ReconciliationService', () => {
     ).resolves.toBe(completedRun);
 
     expect(prisma.reconciliationRun.create).not.toHaveBeenCalled();
-    expect(prisma.reconciliationRun.update).toHaveBeenCalledWith({
+    expect(
+      lastCallInput<{
+        where: { id: string };
+        data: {
+          trigger: string;
+          queueJobId: string;
+          attemptCount: { increment: number };
+        };
+      }>(prisma.reconciliationRun.update),
+    ).toMatchObject({
       where: { id: 'run-failed' },
-      data: expect.objectContaining({
+      data: {
         trigger: 'RETRY',
         queueJobId: 'job-retry-1',
         attemptCount: { increment: 1 },
-      }),
+      },
     });
   });
 
@@ -349,14 +409,24 @@ describe('ReconciliationService', () => {
       ),
     ).resolves.toBe(updated);
 
-    expect(transaction.reconciliationFinding.update).toHaveBeenCalledWith({
+    expect(
+      lastCallInput<{
+        where: { id: string };
+        data: {
+          status: string;
+          ownerActorId: string;
+          resolvedByActorId: string;
+          resolutionNote: string;
+        };
+      }>(transaction.reconciliationFinding.update),
+    ).toMatchObject({
       where: { id: 'finding-1' },
-      data: expect.objectContaining({
+      data: {
         status: 'RESOLVED',
         ownerActorId: 'admin-1',
         resolvedByActorId: 'admin-1',
         resolutionNote: 'Provider statement corrected',
-      }),
+      },
     });
     expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'RECONCILIATION_FINDING_RESOLVE' }),
@@ -403,32 +473,35 @@ describe('ReconciliationService', () => {
       actor,
     );
 
-    expect(transaction.reconciliationFinding.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        create: expect.objectContaining({
-          type: 'PREPAID_UNVERIFIED_PAID_ORDER',
-          severity: 'CRITICAL',
-          entityId: 'prepaid-order-unverified',
-        }),
-      }),
-    );
-    expect(transaction.reconciliationFinding.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        create: expect.objectContaining({
-          type: 'PREPAID_PAYMENT_STATE_MISMATCH',
-          severity: 'CRITICAL',
-          entityId: 'attempt-mismatched-state',
-        }),
-      }),
-    );
-    expect(transaction.reconciliationFinding.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        create: expect.objectContaining({
-          type: 'PREPAID_AMOUNT_MISMATCH',
-          severity: 'CRITICAL',
-          entityId: 'attempt-mismatched-state',
-        }),
-      }),
-    );
+    expect(
+      findingCreate(
+        transaction.reconciliationFinding.upsert,
+        'PREPAID_UNVERIFIED_PAID_ORDER',
+      ),
+    ).toMatchObject({
+      type: 'PREPAID_UNVERIFIED_PAID_ORDER',
+      severity: 'CRITICAL',
+      entityId: 'prepaid-order-unverified',
+    });
+    expect(
+      findingCreate(
+        transaction.reconciliationFinding.upsert,
+        'PREPAID_PAYMENT_STATE_MISMATCH',
+      ),
+    ).toMatchObject({
+      type: 'PREPAID_PAYMENT_STATE_MISMATCH',
+      severity: 'CRITICAL',
+      entityId: 'attempt-mismatched-state',
+    });
+    expect(
+      findingCreate(
+        transaction.reconciliationFinding.upsert,
+        'PREPAID_AMOUNT_MISMATCH',
+      ),
+    ).toMatchObject({
+      type: 'PREPAID_AMOUNT_MISMATCH',
+      severity: 'CRITICAL',
+      entityId: 'attempt-mismatched-state',
+    });
   });
 });

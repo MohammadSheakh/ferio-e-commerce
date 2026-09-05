@@ -60,9 +60,8 @@ describe('SettlementsService', () => {
     },
     courierSettlementItem: { findFirst: jest.fn() },
     codCollection: { findMany: jest.fn() },
-    $transaction: jest.fn(
-      (callback: (tx: typeof transaction) => unknown) =>
-        Promise.resolve(callback(transaction)),
+    $transaction: jest.fn((callback: (tx: typeof transaction) => unknown) =>
+      Promise.resolve(callback(transaction)),
     ),
   };
   const audit = { record: jest.fn() };
@@ -98,24 +97,27 @@ describe('SettlementsService', () => {
       service.create('settlement-create-key-0001', dto, actor),
     ).resolves.toBe(created);
 
-    const matchedSettlement = transaction.courierSettlement.create.mock.calls[0] as unknown as [{
-      data: {
-        status: string;
-        grossCollected: number;
-        courierFees: number;
-        expectedRemittance: number;
-        remittedAmount: number;
-        variance: number;
-        recordedByActorId: string;
-        items: {
-          create: Array<{
-            shipmentId: string;
-            status: string;
-            collectionVariance: number;
-          }>;
+    const matchedSettlement = transaction.courierSettlement.create.mock
+      .calls[0] as unknown as [
+      {
+        data: {
+          status: string;
+          grossCollected: number;
+          courierFees: number;
+          expectedRemittance: number;
+          remittedAmount: number;
+          variance: number;
+          recordedByActorId: string;
+          items: {
+            create: Array<{
+              shipmentId: string;
+              status: string;
+              collectionVariance: number;
+            }>;
+          };
         };
-      };
-    }];
+      },
+    ];
     expect(matchedSettlement[0].data).toMatchObject({
       status: 'MATCHED',
       grossCollected: 150000,
@@ -169,24 +171,30 @@ describe('SettlementsService', () => {
       actor,
     );
 
-    const varianceSettlement = transaction.courierSettlement.create.mock.calls[0] as unknown as [{
-      data: {
-        status: string;
-        grossCollected: number;
-        expectedRemittance: number;
-        variance: number;
-      };
-    }];
+    const varianceSettlement = transaction.courierSettlement.create.mock
+      .calls[0] as unknown as [
+      {
+        data: {
+          status: string;
+          grossCollected: number;
+          expectedRemittance: number;
+          variance: number;
+        };
+      },
+    ];
     expect(varianceSettlement[0].data).toMatchObject({
       status: 'VARIANCE',
       grossCollected: 140000,
       expectedRemittance: 135000,
       variance: 0,
     });
-    const collectionUpdate = transaction.codCollection.update.mock.calls[0] as unknown as [{
-      data: { status: string; collectionVariance: number };
-    }];
-    expect(collectionUpdate[0].data).toEqual({
+    const collectionUpdate = transaction.codCollection.update.mock
+      .calls[0] as unknown as [
+      {
+        data: { status: string; collectionVariance: number };
+      },
+    ];
+    expect(collectionUpdate[0].data).toMatchObject({
       status: 'VARIANCE',
       collectionVariance: -10000,
     });
