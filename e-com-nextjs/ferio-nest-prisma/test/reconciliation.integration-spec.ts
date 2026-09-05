@@ -6,7 +6,7 @@ import { join } from 'path';
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
-import { AuditService } from '../src/features/audit/audit.service';
+import { AuditService } from '../src/features/audit/services/audit.service';
 import { ReconciliationService } from '../src/features/reconciliation/reconciliation.service';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;

@@ -12,7 +12,7 @@ import { TenantDbService } from '../../tenancy/tenant-db.service';
 import { ConfigService } from '@nestjs/config';
 import type { UserPayload } from '@app/common';
 import { CartService } from '../cart/cart.service';
-import { AuditService } from '../audit/audit.service';
+import { AuditService } from '../audit/services/audit.service';
 import {
   CheckoutPreviewDto,
   CreateDeliveryZoneDto,

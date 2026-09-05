@@ -13,7 +13,7 @@ import { assertTenantCommerceWritable } from '../../tenancy/commerce-write-guard
 import { TenantDbService } from '../../tenancy/tenant-db.service';
 import { tryGetTenantContext } from '../../tenancy/tenant-context';
 import type { UserPayload } from '@app/common';
-import { AuditService } from '../audit/audit.service';
+import { AuditService } from '../audit/services/audit.service';
 import {
   AdjustInventoryDto,
   AdminProductQueryDto,

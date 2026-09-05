@@ -11,7 +11,7 @@ import { randomUUID } from 'node:crypto';
 import { ReportQueryDto } from '../dto/report-query.dto';
 import { csvCell, maskExportName, reportPeriod } from '../utils/report.util';
 import { maskCustomerPhone } from '../../customers/customers.util';
-import { AuditService } from '../../audit/audit.service';
+import { AuditService } from '../../audit/services/audit.service';
 
 const reportOrderSelect = {
   id: true,

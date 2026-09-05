@@ -2,15 +2,15 @@ import { Processor, WorkerHost } from '@nestjs/bullmq';
 import type { Job } from 'bullmq';
 import { QUEUE_NAMES } from '@app/queue';
 import { Optional } from '@nestjs/common';
-import { TenantFanoutService } from '../../tenancy/tenant-fanout.service';
+import { TenantFanoutService } from '../../../tenancy/tenant-fanout.service';
 import { runWithCorrelationId } from '@app/common';
-import { TransactionalMessageDispatcher } from './transactional-message-dispatcher';
+import { TransactionalMessageDispatcher } from '../services/transactional-message-dispatcher';
 import {
   TRANSACTIONAL_MESSAGE_JOB,
   TRANSACTIONAL_MESSAGE_SWEEP_JOB,
   TransactionalMessageJobData,
   TransactionalMessageQueue,
-} from './transactional-message.queue';
+} from '../queues/transactional-message.queue';
 
 @Processor(QUEUE_NAMES.TRANSACTIONAL_MESSAGE)
 export class TransactionalMessageProcessor extends WorkerHost {

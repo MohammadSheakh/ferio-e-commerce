@@ -1,7 +1,7 @@
 import type { ConfigService } from '@nestjs/config';
 import type { Queue } from 'bullmq';
 import type { PrismaService } from '@app/database';
-import type { AuditService } from '../../audit/audit.service';
+import type { AuditService } from '../../audit/services/audit.service';
 import {
   COURIER_CALLBACK_RETRY_JOB,
   COURIER_CALLBACK_SCHEDULER_ID,

@@ -1,6 +1,6 @@
 import { ConflictException } from '@nestjs/common';
 import type { PrismaService } from '@app/database';
-import type { AuditService } from '../../audit/audit.service';
+import type { AuditService } from '../../audit/services/audit.service';
 import type { CustomerNotificationsService } from '../../customer-notifications/customer-notifications.service';
 import { WalletService } from '../wallet.service';
 

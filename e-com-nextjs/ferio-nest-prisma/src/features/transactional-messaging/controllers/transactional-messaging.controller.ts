@@ -9,7 +9,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { TenantMembershipGuard } from '../../tenancy/tenant-membership.guard';
+import { TenantMembershipGuard } from '../../../tenancy/tenant-membership.guard';
 import {
   AuthGuard,
   PERMISSIONS,
@@ -24,9 +24,9 @@ import {
   TransactionalMessageQueryDto,
   UpdateMessageTemplateDto,
   UpdateMessagingPolicyDto,
-} from './dto/transactional-message.dto';
-import { TransactionalMessagingService } from './transactional-messaging.service';
-import { TransactionalMessageQueue } from './transactional-message.queue';
+} from '../dto/transactional-message.dto';
+import { TransactionalMessagingService } from '../services/transactional-messaging.service';
+import { TransactionalMessageQueue } from '../queues/transactional-message.queue';
 
 @ApiTags('Admin Transactional Messages')
 @ApiBearerAuth()

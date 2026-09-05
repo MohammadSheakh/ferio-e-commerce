@@ -5,11 +5,11 @@ import { createHash } from 'crypto';
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
-import { AuditService } from '../src/features/audit/audit.service';
+import { AuditService } from '../src/features/audit/services/audit.service';
 import { CartService } from '../src/features/cart/cart.service';
 import { CatalogService } from '../src/features/catalog/catalog.service';
 import { OrderService } from '../src/features/order/order.service';
-import { TransactionalMessagingService } from '../src/features/transactional-messaging/transactional-messaging.service';
+import { TransactionalMessagingService } from '../src/features/transactional-messaging/services/transactional-messaging.service';
 
 function autoStub(): unknown {
   return new Proxy({}, {

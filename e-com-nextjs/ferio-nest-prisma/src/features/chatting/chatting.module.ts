@@ -8,7 +8,7 @@ import { ConversationService } from './conversation/conversation.service';
 
 import { MessageController } from './message/message.controller';
 import { MessageService } from './message/message.service';
-import { ChatNotificationProcessor } from './chat-notification.processor';
+import { ChatNotificationProcessor } from './processors/chat-notification.processor';
 
 import { SocketModule } from '../socket.gateway/socket.module';
 import { RedisModule } from '@app/redis';
@@ -63,7 +63,7 @@ import {
     // BullMQ Queue Providers
     {
       provide: BULLMQ_NOTIFY_PARTICIPANTS_QUEUE,
-      useFactory: (queue: any) => queue,
+      useFactory: (queue: unknown) => queue,
       inject: [getQueueToken(QUEUE_NAMES.NOTIFY_PARTICIPANTS)],
     },
   ],

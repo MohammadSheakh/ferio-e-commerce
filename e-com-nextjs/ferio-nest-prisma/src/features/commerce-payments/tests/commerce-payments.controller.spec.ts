@@ -1,7 +1,7 @@
 import type { Response } from 'express';
 import { CommercePaymentProvider } from '@prisma/client';
 import { buildCallbackToken } from '../../../tenancy/callback-tenant.util';
-import { PublicCommercePaymentsController } from '../commerce-payments.controller';
+import { PublicCommercePaymentsController } from '../controllers/commerce-payments.controller';
 
 describe('PublicCommercePaymentsController tenant returns', () => {
   const payments = {

@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
 import type { UserPayload } from '@app/common';
 import type { PrismaService } from '@app/database';
-import type { AuditService } from '../../audit/audit.service';
+import type { AuditService } from '../../audit/services/audit.service';
 import { RtoService } from '../rto.service';
 
 const actor = { userId: 'admin-1', role: 'admin' } as UserPayload;

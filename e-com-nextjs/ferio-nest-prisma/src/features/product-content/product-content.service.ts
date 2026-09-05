@@ -4,7 +4,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException, 
 import { PrismaService } from '@app/database';
 import { TenantDbService } from '../../tenancy/tenant-db.service';
 import type { UserPayload } from '@app/common';
-import { AuditService } from '../audit/audit.service';
+import { AuditService } from '../audit/services/audit.service';
 import { assertTenantCommerceWritable } from '../../tenancy/commerce-write-guard.util';
 import { CreateReviewBannerDto, ModerateYoutubeReviewDto, SubmitYoutubeReviewDto, UpdateReviewBannerDto } from './product-content.dto';
 

@@ -90,6 +90,10 @@ Important decisions:
 - Standardized the high-complexity runtime boundaries for `purchase-activity`,
   `reconciliation`, `refunds`, `reports`, `returns`, `settlements`, `shipping`,
   and `socket.gateway`.
+- Standardized the remaining mixed-role boundaries for `audit`,
+  `commerce-payments`, `transactional-messaging`, `chatting`, and `storage`.
+  Controllers, application services, processors, queues, gateways, adapters,
+  utilities, and storage strategies now have explicit ownership folders.
 - Added explicit `controllers/`, `services/`, `processors/`, `queues/`,
   `utils/`, and `gateway/` folders where those roles exist. Small cohesive
   features intentionally keep a flat runtime root instead of receiving empty
@@ -100,6 +104,8 @@ Important decisions:
   order, product-request, rto, staff-access, store-locations,
   storefront-analytics, transactional-messaging, wallet, and warranty.
 - Updated all affected application, test, and integration-test imports.
+- Moved the remaining historical `user-management` completion report out of
+  `src/features` into the module documentation area.
 - Verification for this refactor: `pnpm exec tsc --noEmit` passed;
   `pnpm test -- --runInBand` passed with 90 suites and 408 tests.
 
@@ -148,6 +154,8 @@ For every rename or extraction:
 - Structure assessment: complete for 35 feature modules.
 - Safe documentation relocation: complete.
 - Feature role/test layout migration: complete for the current safe wave.
+- Mixed-role module migration: complete for audit, payments, messaging,
+  chatting, and storage.
 - Naming migration: pending dedicated implementation wave.
 - Large-service decomposition: pending behavior-first design work.
 

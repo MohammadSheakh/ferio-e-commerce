@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { TransactionalMessagingService } from '../transactional-messaging.service';
+import { TransactionalMessagingService } from '../services/transactional-messaging.service';
 
 describe('TransactionalMessagingService templates', () => {
   const actor = {

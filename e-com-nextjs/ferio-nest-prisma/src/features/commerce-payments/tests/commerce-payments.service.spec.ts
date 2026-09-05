@@ -1,11 +1,11 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import type { PrismaService } from '@app/database';
-import { CommercePaymentsService } from '../commerce-payments.service';
+import { CommercePaymentsService } from '../services/commerce-payments.service';
 import type { PaymentGatewayRegistry } from '../gateways/payment-gateway.registry';
 import type { OrderService } from '../../order/order.service';
-import type { AuditService } from '../../audit/audit.service';
-import { AdminCommercePaymentsController } from '../commerce-payments.controller';
+import type { AuditService } from '../../audit/services/audit.service';
+import { AdminCommercePaymentsController } from '../controllers/commerce-payments.controller';
 
 describe('CommercePaymentsService', () => {
   const transaction = {

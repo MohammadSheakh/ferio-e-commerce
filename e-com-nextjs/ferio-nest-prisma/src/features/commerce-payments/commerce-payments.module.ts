@@ -10,10 +10,10 @@ import { SslcommerzGateway } from './gateways/sslcommerz.gateway';
 import {
   AdminCommercePaymentsController,
   PublicCommercePaymentsController,
-} from './commerce-payments.controller';
-import { CommercePaymentsService } from './commerce-payments.service';
-import { PaymentRecoveryProcessor } from './payment-recovery.processor';
-import { PaymentRecoveryQueue } from './payment-recovery.queue';
+} from './controllers/commerce-payments.controller';
+import { CommercePaymentsService } from './services/commerce-payments.service';
+import { PaymentRecoveryProcessor } from './processors/payment-recovery.processor';
+import { PaymentRecoveryQueue } from './queues/payment-recovery.queue';
 
 @Module({
   imports: [PrismaModule, AuthModule, OrderModule, AuditModule, TenancyModule],

@@ -30,8 +30,8 @@ import {
 } from '../dto/shipping.dto';
 import type { PollCourierShipmentInput } from '../adapters/courier-adapter.interface';
 import { canApplyShipmentStatus } from '../utils/shipping.util';
-import { TransactionalMessagingService } from '../../transactional-messaging/transactional-messaging.service';
-import { AuditService } from '../../audit/audit.service';
+import { TransactionalMessagingService } from '../../transactional-messaging/services/transactional-messaging.service';
+import { AuditService } from '../../audit/services/audit.service';
 
 const shipmentInclude = {
   provider: true,

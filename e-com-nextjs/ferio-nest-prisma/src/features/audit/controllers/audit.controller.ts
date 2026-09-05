@@ -1,5 +1,5 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
-import { TenantMembershipGuard } from '../../tenancy/tenant-membership.guard';
+import { TenantMembershipGuard } from '../../../tenancy/tenant-membership.guard';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import {
   AuthGuard,
@@ -9,8 +9,8 @@ import {
   Roles,
   RolesGuard,
 } from '@app/common';
-import { AuditService } from './audit.service';
-import { AuditLogQueryDto } from './dto/audit.dto';
+import { AuditService } from '../services/audit.service';
+import { AuditLogQueryDto } from '../dto/audit.dto';
 
 @ApiTags('Admin Audit')
 @ApiBearerAuth()

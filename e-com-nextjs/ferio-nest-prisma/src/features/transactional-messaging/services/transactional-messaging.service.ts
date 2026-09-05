@@ -9,14 +9,14 @@ import type { PrismaClient } from '@prisma/client';
 import { CommerceMessageChannel, Prisma } from '@prisma/client';
 import { StructuredLogger, type UserPayload } from '@app/common';
 import { PrismaService } from '@app/database';
-import { TenantDbService } from '../../tenancy/tenant-db.service';
-import { AuditService } from '../audit/audit.service';
+import { TenantDbService } from '../../../tenancy/tenant-db.service';
+import { AuditService } from '../../audit/services/audit.service';
 import {
   TransactionalMessageQueryDto,
   UpdateMessageTemplateDto,
   UpdateMessagingPolicyDto,
-} from './dto/transactional-message.dto';
-import { MessageAdapterRegistry } from './adapters/message-adapter.registry';
+} from '../dto/transactional-message.dto';
+import { MessageAdapterRegistry } from '../adapters/message-adapter.registry';
 import {
   buildMessageDeduplicationKey,
   commerceTemplateDefinitions,
@@ -25,7 +25,7 @@ import {
   renderMessageTemplate,
   templateForCommerceEvent,
   validateMessageTemplate,
-} from './transactional-message.util';
+} from '../utils/transactional-message.util';
 
 export type EnqueueCommerceMessageInput = {
   eventType: string;

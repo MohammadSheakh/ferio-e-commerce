@@ -40,7 +40,7 @@ interface FileUploadResult {
   publicId?: string;
 }
 
-import { tenantObjectKey } from '../../tenancy/object-keys.util';
+import { tenantObjectKey } from '../../../tenancy/object-keys.util';
 
 /**
  * Cloudflare R2 storage strategy (PO-017 / owner decision #6).

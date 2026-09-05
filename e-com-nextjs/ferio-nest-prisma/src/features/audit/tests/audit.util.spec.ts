@@ -1,4 +1,4 @@
-import { safeAuditJson } from '../audit.util';
+import { safeAuditJson } from '../utils/audit.util';
 
 describe('audit snapshots', () => {
   it('redacts secret-like keys recursively', () => {

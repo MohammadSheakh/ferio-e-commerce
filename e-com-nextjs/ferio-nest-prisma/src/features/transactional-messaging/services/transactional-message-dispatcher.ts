@@ -6,8 +6,8 @@ import {
   PrismaClient,
 } from '@prisma/client';
 import { PrismaService } from '@app/database';
-import { MessageAdapterRegistry } from './adapters/message-adapter.registry';
-import { TenantDbService } from '../../tenancy/tenant-db.service';
+import { MessageAdapterRegistry } from '../adapters/message-adapter.registry';
+import { TenantDbService } from '../../../tenancy/tenant-db.service';
 
 @Injectable()
 export class TransactionalMessageDispatcher {

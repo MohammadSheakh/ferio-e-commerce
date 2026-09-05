@@ -6,7 +6,7 @@ import { ConfigService } from '@nestjs/config';
 import type { Queue } from 'bullmq';
 import { QUEUE_NAMES } from '@app/queue';
 import { StructuredLogger, type UserPayload } from '@app/common';
-import { AuditService } from '../../audit/audit.service';
+import { AuditService } from '../../audit/services/audit.service';
 import { ShippingPollingService } from '../services/shipping-polling.service';
 
 export const COURIER_POLL_JOB = 'poll-courier-shipment';

@@ -8,11 +8,11 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { ConfigService } from '@nestjs/config';
 import type { Queue } from 'bullmq';
 import type { UserPayload } from '@app/common';
-import { TenantFanoutService } from '../../tenancy/tenant-fanout.service';
-import { tryGetTenantContext } from '../../tenancy/tenant-context';
+import { TenantFanoutService } from '../../../tenancy/tenant-fanout.service';
+import { tryGetTenantContext } from '../../../tenancy/tenant-context';
 import { QUEUE_NAMES } from '@app/queue';
-import { AuditService } from '../audit/audit.service';
-import { TransactionalMessagingService } from './transactional-messaging.service';
+import { AuditService } from '../../audit/services/audit.service';
+import { TransactionalMessagingService } from '../services/transactional-messaging.service';
 
 export const TRANSACTIONAL_MESSAGE_JOB = 'dispatch-transactional-message';
 export const TRANSACTIONAL_MESSAGE_SWEEP_JOB = 'sweep-transactional-messages';

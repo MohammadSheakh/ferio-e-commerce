@@ -1,5 +1,5 @@
 import type { PrismaService } from '@app/database';
-import type { AuditService } from '../../audit/audit.service';
+import type { AuditService } from '../../audit/services/audit.service';
 import { ReportsService } from '../services/reports.service';
 
 const baseOrder = {

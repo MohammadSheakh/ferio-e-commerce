@@ -3,8 +3,8 @@ import type { ConfigService } from '@nestjs/config';
 import type { Prisma } from '@prisma/client';
 import type { PrismaService } from '@app/database';
 import type { CartService } from '../../cart/cart.service';
-import type { TransactionalMessagingService } from '../../transactional-messaging/transactional-messaging.service';
-import type { AuditService } from '../../audit/audit.service';
+import type { TransactionalMessagingService } from '../../transactional-messaging/services/transactional-messaging.service';
+import type { AuditService } from '../../audit/services/audit.service';
 import { OrderService } from '../order.service';
 
 function createService() {

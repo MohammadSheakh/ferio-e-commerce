@@ -15,8 +15,8 @@ import { TenantDbService } from '../../tenancy/tenant-db.service';
 import { tryGetTenantContext } from '../../tenancy/tenant-context';
 import type { UserPayload } from '@app/common';
 import { CartService } from '../cart/cart.service';
-import { TransactionalMessagingService } from '../transactional-messaging/transactional-messaging.service';
-import { AuditService } from '../audit/audit.service';
+import { TransactionalMessagingService } from '../transactional-messaging/services/transactional-messaging.service';
+import { AuditService } from '../audit/services/audit.service';
 import {
   calculateDeliveryFee,
   normalizeBangladeshPhone,

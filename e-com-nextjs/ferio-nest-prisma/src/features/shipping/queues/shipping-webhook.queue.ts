@@ -16,7 +16,7 @@ import { Prisma } from '@prisma/client';
 import { QUEUE_NAMES } from '@app/queue';
 import { PrismaService } from '@app/database';
 import { StructuredLogger, type UserPayload } from '@app/common';
-import { AuditService } from '../../audit/audit.service';
+import { AuditService } from '../../audit/services/audit.service';
 
 export const COURIER_CALLBACK_RETRY_JOB = 'retry-courier-callback';
 export const COURIER_CALLBACK_SWEEP_JOB = 'sweep-courier-callbacks';

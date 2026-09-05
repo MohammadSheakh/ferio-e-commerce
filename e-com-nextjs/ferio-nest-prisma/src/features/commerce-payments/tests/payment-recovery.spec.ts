@@ -1,9 +1,9 @@
-import { CommercePaymentsService } from '../commerce-payments.service';
-import { PaymentRecoveryProcessor } from '../payment-recovery.processor';
+import { CommercePaymentsService } from '../services/commerce-payments.service';
+import { PaymentRecoveryProcessor } from '../processors/payment-recovery.processor';
 import {
   PAYMENT_EXPIRY_JOB,
   PAYMENT_EXPIRY_SWEEP_JOB,
-} from '../payment-recovery.queue';
+} from '../queues/payment-recovery.queue';
 
 describe('payment expiry recovery', () => {
   it('claims an expired attempt and releases the order through one transaction', async () => {

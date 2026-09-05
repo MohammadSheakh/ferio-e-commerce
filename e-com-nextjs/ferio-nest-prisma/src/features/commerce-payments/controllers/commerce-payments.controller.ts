@@ -11,7 +11,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { TenantMembershipGuard } from '../../tenancy/tenant-membership.guard';
+import { TenantMembershipGuard } from '../../../tenancy/tenant-membership.guard';
 import type { Response } from 'express';
 import { CommercePaymentProvider } from '@prisma/client';
 import {
@@ -29,16 +29,16 @@ import {
   User,
 } from '@app/common';
 import type { UserPayload } from '@app/common';
-import { CommercePaymentsService } from './commerce-payments.service';
+import { CommercePaymentsService } from '../services/commerce-payments.service';
 import {
   InitiateCommercePaymentDto,
   RetryCommercePaymentDto,
-} from './dto/commerce-payment.dto';
-import { PaymentRecoveryQueue } from './payment-recovery.queue';
-import { verifyCallbackToken } from '../../tenancy/callback-tenant.util';
-import { TenantCallbackRunner } from '../../tenancy/tenant-callback.runner';
-import { PaymentLedgerQueryDto } from './dto/payment-ledger.dto';
-import { TenantReturnOriginService } from '../../tenancy/tenant-return-origin.service';
+} from '../dto/commerce-payment.dto';
+import { PaymentRecoveryQueue } from '../queues/payment-recovery.queue';
+import { verifyCallbackToken } from '../../../tenancy/callback-tenant.util';
+import { TenantCallbackRunner } from '../../../tenancy/tenant-callback.runner';
+import { PaymentLedgerQueryDto } from '../dto/payment-ledger.dto';
+import { TenantReturnOriginService } from '../../../tenancy/tenant-return-origin.service';
 
 @ApiTags('Payments')
 @Controller('payments')

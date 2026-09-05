@@ -15,7 +15,7 @@ import { SettingsType } from '../constants/settings.constants';
 import { CreateOrUpdateSettingsDto } from '../dto/settings.dto';
 import { SETTINGS_CACHE_CONFIG } from '../constants/settings.cache.constants';
 import type { UserPayload } from '@app/common';
-import { AuditService } from '../../audit/audit.service';
+import { AuditService } from '../../audit/services/audit.service';
 import { Optional } from '@nestjs/common';
 import { TenantDbService } from '../../../tenancy/tenant-db.service';
 import { tryGetTenantContext } from '../../../tenancy/tenant-context';

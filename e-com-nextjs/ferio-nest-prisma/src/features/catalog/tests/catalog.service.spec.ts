@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '@app/database';
 import { CatalogService } from '../catalog.service';
-import { AuditService } from '../../audit/audit.service';
+import { AuditService } from '../../audit/services/audit.service';
 
 const actor = { userId: 'admin-1', email: 'admin@ferio.test', role: 'admin' };
 const audit = { record: jest.fn() } as unknown as AuditService;

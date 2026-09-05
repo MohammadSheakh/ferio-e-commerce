@@ -5,7 +5,7 @@ import {
   renderMessageTemplate,
   templateForCommerceEvent,
   validateMessageTemplate,
-} from '../transactional-message.util';
+} from '../utils/transactional-message.util';
 
 describe('transactional message rules', () => {
   it('maps only approved commerce events to templates', () => {

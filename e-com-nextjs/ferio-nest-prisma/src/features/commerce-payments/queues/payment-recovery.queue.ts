@@ -1,14 +1,14 @@
-import type { TenantContext } from '../../tenancy/tenant-context';
-import { tryGetTenantContext } from '../../tenancy/tenant-context';
-import { TenantFanoutService } from '../../tenancy/tenant-fanout.service';
+import type { TenantContext } from '../../../tenancy/tenant-context';
+import { tryGetTenantContext } from '../../../tenancy/tenant-context';
+import { TenantFanoutService } from '../../../tenancy/tenant-fanout.service';
 import { Injectable, OnModuleInit, Optional } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { ConfigService } from '@nestjs/config';
 import type { Queue } from 'bullmq';
 import { StructuredLogger, type UserPayload } from '@app/common';
 import { QUEUE_NAMES } from '@app/queue';
-import { AuditService } from '../audit/audit.service';
-import { CommercePaymentsService } from './commerce-payments.service';
+import { AuditService } from '../../audit/services/audit.service';
+import { CommercePaymentsService } from '../services/commerce-payments.service';
 
 export const PAYMENT_EXPIRY_JOB = 'expire-prepaid-attempt';
 export const PAYMENT_EXPIRY_SWEEP_JOB = 'sweep-expired-prepaid-attempts';

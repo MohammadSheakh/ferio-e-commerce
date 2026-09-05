@@ -1,6 +1,6 @@
 import type { ConfigService } from '@nestjs/config';
 import { Queue, QueueEvents, Worker } from 'bullmq';
-import type { AuditService } from '../src/features/audit/audit.service';
+import type { AuditService } from '../src/features/audit/services/audit.service';
 import type { ShippingPollingService } from '../src/features/shipping/shipping-polling.service';
 import { ShippingPollingProcessor } from '../src/features/shipping/shipping-polling.processor';
 import {

@@ -1,4 +1,4 @@
-import { TransactionalMessageDispatcher } from '../transactional-message-dispatcher';
+import { TransactionalMessageDispatcher } from '../services/transactional-message-dispatcher';
 
 describe('TransactionalMessageDispatcher', () => {
   const message = {

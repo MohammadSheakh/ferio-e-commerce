@@ -9,17 +9,17 @@ import { CommercePaymentProvider, Prisma } from '@prisma/client';
 import { createHash, randomBytes } from 'crypto';
 import { PrismaService } from '@app/database';
 import type { PrismaClient } from '@prisma/client';
-import { TenantDbService } from '../../tenancy/tenant-db.service';
+import { TenantDbService } from '../../../tenancy/tenant-db.service';
 import {
   buildCallbackToken,
   verifyCallbackToken,
-} from '../../tenancy/callback-tenant.util';
-import { tryGetTenantContext } from '../../tenancy/tenant-context';
-import { OrderService } from '../order/order.service';
-import { normalizeBangladeshPhone } from '../checkout/utils/checkout.util';
-import { PaymentGatewayRegistry } from './gateways/payment-gateway.registry';
-import { AuditService } from '../audit/audit.service';
-import { PaymentLedgerQueryDto } from './dto/payment-ledger.dto';
+} from '../../../tenancy/callback-tenant.util';
+import { tryGetTenantContext } from '../../../tenancy/tenant-context';
+import { OrderService } from '../../order/order.service';
+import { normalizeBangladeshPhone } from '../../checkout/utils/checkout.util';
+import { PaymentGatewayRegistry } from '../gateways/payment-gateway.registry';
+import { AuditService } from '../../audit/services/audit.service';
+import { PaymentLedgerQueryDto } from '../dto/payment-ledger.dto';
 
 @Injectable()
 export class CommercePaymentsService {

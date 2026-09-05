@@ -2,15 +2,15 @@ import { Processor, WorkerHost } from '@nestjs/bullmq';
 import type { Job } from 'bullmq';
 import { QUEUE_NAMES } from '@app/queue';
 import { Optional } from '@nestjs/common';
-import { TenantFanoutService } from '../../tenancy/tenant-fanout.service';
+import { TenantFanoutService } from '../../../tenancy/tenant-fanout.service';
 import { runWithCorrelationId, StructuredLogger } from '@app/common';
-import { CommercePaymentsService } from './commerce-payments.service';
+import { CommercePaymentsService } from '../services/commerce-payments.service';
 import {
   PAYMENT_EXPIRY_JOB,
   PAYMENT_EXPIRY_SWEEP_JOB,
   PaymentRecoveryJobData,
   PaymentRecoveryQueue,
-} from './payment-recovery.queue';
+} from '../queues/payment-recovery.queue';
 
 @Processor(QUEUE_NAMES.PAYMENT_RECOVERY)
 export class PaymentRecoveryProcessor extends WorkerHost {
