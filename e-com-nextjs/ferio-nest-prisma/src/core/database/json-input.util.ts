@@ -24,5 +24,7 @@ export function toTenantJsonInput(
     }
     return object;
   }
-  return String(value);
+  if (typeof value === 'bigint') return value.toString();
+  if (typeof value === 'symbol') return value.description;
+  return undefined;
 }

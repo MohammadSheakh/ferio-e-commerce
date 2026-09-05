@@ -28,5 +28,7 @@ describe('toTenantJsonInput', () => {
 
   it('stringifies unsupported primitive values', () => {
     expect(toTenantJsonInput(BigInt(42))).toBe('42');
+    expect(toTenantJsonInput(Symbol('tenant'))).toBe('tenant');
+    expect(toTenantJsonInput(() => 'ignored')).toBeUndefined();
   });
 });

@@ -32,5 +32,7 @@ describe('toPlatformJsonInput', () => {
 
   it('serializes unsupported primitive-like values instead of bypassing Prisma types', () => {
     expect(toPlatformJsonInput(BigInt(42))).toBe('42');
+    expect(toPlatformJsonInput(Symbol('platform'))).toBe('platform');
+    expect(toPlatformJsonInput(() => 'ignored')).toBeUndefined();
   });
 });
