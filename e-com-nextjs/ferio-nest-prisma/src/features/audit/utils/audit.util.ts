@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client';
+import { toTenantJsonInput } from '../../../core/database/json-input.util';
 
 const sensitiveKey = /(password|secret|token|authorization|cookie|credential|signature|api[-_]?key)/i;
 
@@ -21,5 +22,5 @@ function sanitize(value: unknown, depth: number): unknown {
 
 export function safeAuditJson(value: unknown): Prisma.InputJsonValue | undefined {
   if (value === undefined || value === null) return undefined;
-  return sanitize(value, 0) as Prisma.InputJsonValue;
+  return toTenantJsonInput(sanitize(value, 0));
 }

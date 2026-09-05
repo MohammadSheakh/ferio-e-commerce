@@ -8,6 +8,7 @@ import {
 import { PrismaService } from '@app/database';
 import { MessageAdapterRegistry } from '../adapters/message-adapter.registry';
 import { TenantDbService } from '../../../tenancy/tenant-db.service';
+import { toTenantJsonInput } from '../../../core/database/json-input.util';
 
 @Injectable()
 export class TransactionalMessageDispatcher {
@@ -179,6 +180,6 @@ export class TransactionalMessageDispatcher {
   }
 
   private json(value: unknown): Prisma.InputJsonValue | undefined {
-    return value === undefined ? undefined : (value as Prisma.InputJsonValue);
+    return toTenantJsonInput(value);
   }
 }

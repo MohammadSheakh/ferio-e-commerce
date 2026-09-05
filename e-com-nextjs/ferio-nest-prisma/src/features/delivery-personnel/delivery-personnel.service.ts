@@ -289,7 +289,7 @@ export class DeliveryPersonnelService {
               provisionedNewAccount: !personnel.userId,
             },
           },
-          tx as Prisma.TransactionClient,
+          tx,
         );
         return updated;
       });
@@ -722,7 +722,7 @@ export class DeliveryPersonnelService {
                 codCashPendingStaffConfirmation: order.paymentMethod === 'COD',
               },
             },
-            tx as Prisma.TransactionClient,
+            tx,
           );
         }
 

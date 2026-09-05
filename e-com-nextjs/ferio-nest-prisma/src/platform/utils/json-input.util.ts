@@ -9,8 +9,7 @@ export function toPlatformJsonInput(value: unknown): Prisma.InputJsonValue | und
   }
   if (value instanceof Date) return value.toISOString();
   if (Array.isArray(value)) {
-    return value
-      .map((item) => toPlatformJsonInput(item) ?? null) as Prisma.InputJsonArray;
+    return value.map((item) => toPlatformJsonInput(item) ?? null);
   }
   if (typeof value === 'object') {
     const object: Record<string, Prisma.InputJsonValue | null> = {};

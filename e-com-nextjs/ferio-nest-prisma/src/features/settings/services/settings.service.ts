@@ -20,6 +20,7 @@ import { Optional } from '@nestjs/common';
 import { TenantDbService } from '../../../tenancy/tenant-db.service';
 import { tryGetTenantContext } from '../../../tenancy/tenant-context';
 import type { PrismaClient } from '@prisma/client';
+import { toTenantJsonInput } from '../../../core/database/json-input.util';
 @Injectable()
 export class SettingsService {
   private readonly logger = new Logger(SettingsService.name);
@@ -62,8 +63,7 @@ export class SettingsService {
       updateData.details = dto.details;
     }
     if (dto.introductionVideo !== undefined) {
-      updateData.introductionVideo =
-        dto.introductionVideo as Prisma.InputJsonValue;
+      updateData.introductionVideo = toTenantJsonInput(dto.introductionVideo);
     }
 
     const db = await this.db();
