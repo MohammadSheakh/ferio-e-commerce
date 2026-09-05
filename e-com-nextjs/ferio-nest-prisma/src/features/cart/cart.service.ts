@@ -12,6 +12,7 @@ import type { PrismaClient } from '@prisma/client';
 import { assertTenantCommerceWritable } from '../../tenancy/commerce-write-guard.util';
 import { TenantDbService } from '../../tenancy/tenant-db.service';
 import { ConfigService } from '@nestjs/config';
+import { errorMessage } from '@app/common';
 import { AddCartItemDto, UpdateCartItemDto } from './cart.dto';
 
 const CART_LIFETIME_DAYS = 30;
@@ -47,6 +48,46 @@ type SellableVariant = Prisma.ProductVariantGetPayload<{
     product: { include: { category: true } };
   };
 }>;
+
+const savedCartItemInclude = {
+  inventory: true,
+  product: {
+    include: {
+      category: true,
+      media: { orderBy: { sortOrder: 'asc' as const } },
+    },
+  },
+} satisfies Prisma.ProductVariantInclude;
+
+type SavedCartItemRecord = Prisma.SavedCartItemGetPayload<{
+  include: { variant: { include: typeof savedCartItemInclude } };
+}>;
+
+type SavedCartRecord = {
+  id: string;
+  name: string;
+  shareToken: string;
+  userId: string | null;
+  user?: { name: string | null } | null;
+  items: SavedCartItemRecord[];
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+type SavedCartLineResult = {
+  variantId: string;
+  productName: string;
+  variantName: string;
+  quantity: number;
+};
+
+type UnavailableCartLine = {
+  variantId?: string;
+  productName: string;
+  variantName: string;
+  quantity?: number;
+  reason: string;
+};
 
 @Injectable()
 export class CartService {
@@ -546,13 +587,13 @@ export class CartService {
     return this.serializeCart(cart);
   }
 
-  private serializeSavedCart(savedCart: any) {
+  private serializeSavedCart(savedCart: SavedCartRecord) {
     const now = new Date();
-    const items = (savedCart.items || []).map((item: any) => {
+    const items = savedCart.items.map((item) => {
       const product = item.variant?.product;
       const availableStock = item.variant
         ? item.variant.inventory.reduce(
-            (total: number, stock: any) =>
+            (total, stock) =>
               total + Math.max(0, stock.onHand - stock.reserved - stock.damaged),
             0,
           )
@@ -568,7 +609,7 @@ export class CartService {
         new Date(product.publishedAt) <= now &&
         availableStock > 0;
 
-      const image = product?.media?.find((m: any) => m.type === 'IMAGE')?.url;
+      const image = product?.media?.find((media) => media.type === 'IMAGE')?.url;
 
       return {
         id: item.id,
@@ -586,11 +627,11 @@ export class CartService {
     });
 
     const subtotal = items.reduce(
-      (total: number, item: any) => total + item.price * item.quantity,
+      (total, item) => total + item.price * item.quantity,
       0,
     );
     const itemCount = items.reduce(
-      (total: number, item: any) => total + item.quantity,
+      (total, item) => total + item.quantity,
       0,
     );
 
@@ -732,8 +773,8 @@ export class CartService {
 
     if (!savedCart) throw new NotFoundException('Shared cart not found');
 
-    const addedItems: any[] = [];
-    const unavailableItems: any[] = [];
+    const addedItems: SavedCartLineResult[] = [];
+    const unavailableItems: UnavailableCartLine[] = [];
     let effectiveToken = token;
 
     for (const item of savedCart.items) {
@@ -749,12 +790,12 @@ export class CartService {
           variantName: item.variant.name,
           quantity: item.quantity,
         });
-      } catch (err: any) {
+      } catch (err: unknown) {
         unavailableItems.push({
           variantId: item.variantId,
           productName: item.variant?.product?.name ?? 'Unknown Product',
           variantName: item.variant?.name ?? 'Unknown Variant',
-          reason: err.message || 'Item unavailable or out of stock',
+          reason: errorMessage(err) || 'Item unavailable or out of stock',
         });
       }
     }
@@ -873,8 +914,8 @@ export class CartService {
       ? order.items.filter((i) => orderItemIds.includes(i.id))
       : order.items;
 
-    const addedItems: any[] = [];
-    const unavailableItems: any[] = [];
+    const addedItems: SavedCartLineResult[] = [];
+    const unavailableItems: UnavailableCartLine[] = [];
     let effectiveToken = token;
 
     for (const item of targetItems) {
@@ -899,12 +940,12 @@ export class CartService {
           variantName: item.variantName,
           quantity: item.quantity,
         });
-      } catch (err: any) {
+      } catch (err: unknown) {
         unavailableItems.push({
           variantId: item.variantId,
           productName: item.productName,
           variantName: item.variantName,
-          reason: err.message || 'Item unavailable or out of stock',
+          reason: errorMessage(err) || 'Item unavailable or out of stock',
         });
       }
     }
