@@ -32,7 +32,8 @@
     "test:queue-smoke": "jest --config ./test/jest-queue-smoke.json --runInBand",
     "prisma:generate:platform": "pnpm prisma generate --schema prisma/platform.prisma",
     "prisma:migrate:platform": "pnpm exec prisma migrate deploy --config prisma/platform.config.ts",
-    "openapi:export": "OPENAPI_EXPORT=1 ts-node -r tsconfig-paths/register src/main.ts",
+    "openapi:export": "TS_NODE_FILES=true OPENAPI_EXPORT=1 ts-node -r tsconfig-paths/register src/main.ts",
+    "openapi:check": "tmp=$(mktemp) && trap 'rm -f \"$tmp\"' EXIT && OPENAPI_OUTPUT=\"$tmp\" pnpm openapi:export >/dev/null && cmp -s \"$tmp\" openapi.json",
     "storage:smoke": "node scripts/storage-smoke.mjs"
   },
   "dependencies": {

@@ -190,8 +190,9 @@ async function bootstrap() {
     // committed contract the frontends integrate against.
     if (process.env.OPENAPI_EXPORT === '1') {
       const { writeFileSync } = await import('node:fs');
-      writeFileSync('openapi.json', JSON.stringify(document, null, 2));
-      logger.log('📦 openapi.json exported (no server started)');
+      const outputPath = process.env.OPENAPI_OUTPUT ?? 'openapi.json';
+      writeFileSync(outputPath, JSON.stringify(document, null, 2));
+      logger.log(`📦 ${outputPath} exported (no server started)`);
       await app.close();
       return;
     }
