@@ -74,19 +74,40 @@ services:
     restart: unless-stopped
 
   customer-web:
+    build:
+      args:
+        NEXT_PUBLIC_FERIO_API_URL: ${PUBLIC_FERIO_API_URL:?PUBLIC_FERIO_API_URL must be set}
+        NEXT_PUBLIC_SOCKET_URL: ${PUBLIC_SOCKET_URL:?PUBLIC_SOCKET_URL must be set}
+        NEXT_PUBLIC_SITE_URL: ${PUBLIC_CUSTOMER_URL:?PUBLIC_CUSTOMER_URL must be set}
     ports: !reset []
     expose:
       - "3000"
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_FERIO_API_URL: ${PUBLIC_FERIO_API_URL:?PUBLIC_FERIO_API_URL must be set}
+      NEXT_PUBLIC_SOCKET_URL: ${PUBLIC_SOCKET_URL:?PUBLIC_SOCKET_URL must be set}
+      NEXT_PUBLIC_SITE_URL: ${PUBLIC_CUSTOMER_URL:?PUBLIC_CUSTOMER_URL must be set}
     restart: unless-stopped
 
   admin-web:
+    build:
+      args:
+        NEXT_PUBLIC_FERIO_API_URL: ${PUBLIC_FERIO_API_URL:?PUBLIC_FERIO_API_URL must be set}
+        NEXT_PUBLIC_SOCKET_URL: ${PUBLIC_SOCKET_URL:?PUBLIC_SOCKET_URL must be set}
     ports: !reset []
     expose:
       - "3000"
+    environment:
+      NODE_ENV: production
+      FERIO_API_URL: http://backend:6733/api/v1
+      NEXT_PUBLIC_FERIO_API_URL: ${PUBLIC_FERIO_API_URL:?PUBLIC_FERIO_API_URL must be set}
+      NEXT_PUBLIC_SOCKET_URL: ${PUBLIC_SOCKET_URL:?PUBLIC_SOCKET_URL must be set}
     restart: unless-stopped
 
   platform-admin:
     ports: !reset []
     expose:
       - "3000"
+    environment:
+      NODE_ENV: production
     restart: unless-stopped
