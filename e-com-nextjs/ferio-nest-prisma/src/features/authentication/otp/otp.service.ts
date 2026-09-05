@@ -110,7 +110,7 @@ export class OtpService {
     }
 
     // Atomic consume: a concurrent verification of the same code fails.
-    const consumed = await (client as any).getdel?.(key);
+    const consumed = await client.call('GETDEL', key);
     if (!consumed) {
       throw new BadRequestException('OTP already used');
     }
