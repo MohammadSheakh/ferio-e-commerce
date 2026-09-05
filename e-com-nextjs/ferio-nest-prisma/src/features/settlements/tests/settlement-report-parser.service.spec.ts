@@ -37,17 +37,13 @@ describe('SettlementReportParserService', () => {
       content: `\uFEFF${headers},unused_column\r\nrow-1,TRK-1,1500.50,50,0,"Delivered, verified",ignored`,
     });
 
-    expect(result).toEqual(
-      expect.objectContaining({
-        provider: 'STEADFAST',
-        ready: true,
-        rowCount: 1,
-        acceptedRowCount: 1,
-        rejectedLineCount: 0,
-        sourceChecksum: expect.stringMatching(/^[a-f0-9]{64}$/),
-        warnings: ['Ignored unsupported headers: unused_column'],
-      }),
-    );
+    expect(result.provider).toBe('STEADFAST');
+    expect(result.ready).toBe(true);
+    expect(result.rowCount).toBe(1);
+    expect(result.acceptedRowCount).toBe(1);
+    expect(result.rejectedLineCount).toBe(0);
+    expect(result.sourceChecksum).toMatch(/^[a-f0-9]{64}$/);
+    expect(result.warnings).toEqual(['Ignored unsupported headers: unused_column']);
     expect(result.rows).toEqual([
       {
         providerRowReference: 'row-1',
