@@ -86,6 +86,14 @@ describe('SocketRoomService tenant isolation', () => {
     );
   });
 
+  it('skips malformed activity entries without failing the feed', async () => {
+    redis.lrange.mockResolvedValueOnce(['{"action":"valid"}', '{broken']);
+
+    await expect(
+      service().getActivityFeed('family-1', 10, 'org-a'),
+    ).resolves.toEqual([{ action: 'valid' }]);
+  });
+
   it('resolves family membership inside the signed organization', async () => {
     process.env.TENANCY_ENABLED = 'true';
     const tenantUser = {

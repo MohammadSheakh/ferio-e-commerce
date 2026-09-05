@@ -318,7 +318,14 @@ export class SocketRoomService {
   ): Promise<unknown[]> {
     const activityKey = this.key(this.KEYS.ACTIVITY_FEED, groupId, organizationId);
     const activities = await this.redisClient.lrange(activityKey, 0, limit - 1);
-    return activities.map((activity) => JSON.parse(activity) as unknown);
+    return activities.flatMap((activity) => {
+      try {
+        return [JSON.parse(activity)];
+      } catch (error) {
+        this.logger.warn(`Ignoring malformed activity feed entry: ${errorMessage(error)}`);
+        return [];
+      }
+    });
   }
 
   async clearActivityFeed(groupId: string, organizationId?: string): Promise<void> {

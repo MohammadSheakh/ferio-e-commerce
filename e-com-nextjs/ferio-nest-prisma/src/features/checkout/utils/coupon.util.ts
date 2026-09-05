@@ -11,6 +11,21 @@ export type CouponRule = {
   active?: boolean;
 };
 
+function isCouponRule(value: unknown): value is CouponRule {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const rule = value as Record<string, unknown>;
+  return (
+    typeof rule.code === 'string' &&
+    (rule.type === 'FIXED' || rule.type === 'PERCENT') &&
+    typeof rule.value === 'number' &&
+    (rule.minimumSubtotal === undefined || typeof rule.minimumSubtotal === 'number') &&
+    (rule.maximumDiscount === undefined || typeof rule.maximumDiscount === 'number') &&
+    (rule.startsAt === undefined || typeof rule.startsAt === 'string') &&
+    (rule.endsAt === undefined || typeof rule.endsAt === 'string') &&
+    (rule.active === undefined || typeof rule.active === 'boolean')
+  );
+}
+
 export function calculateCouponDiscount(
   rawRules: string | undefined,
   requestedCode: string | undefined,
@@ -20,12 +35,16 @@ export function calculateCouponDiscount(
   const code = requestedCode?.normalize('NFKC').trim().toUpperCase();
   if (!code) return { couponCode: null, discountTotal: 0 };
 
-  let rules: CouponRule[];
+  let parsedRules: unknown;
   try {
-    rules = JSON.parse(rawRules || '[]') as CouponRule[];
+    parsedRules = JSON.parse(rawRules || '[]');
   } catch {
     throw new Error('CHECKOUT_COUPONS_JSON must contain valid JSON');
   }
+  if (!Array.isArray(parsedRules) || !parsedRules.every(isCouponRule)) {
+    throw new Error('CHECKOUT_COUPONS_JSON contains an invalid coupon rule');
+  }
+  const rules = parsedRules;
   const rule = rules.find(
     (item) => item.code?.normalize('NFKC').trim().toUpperCase() === code,
   );

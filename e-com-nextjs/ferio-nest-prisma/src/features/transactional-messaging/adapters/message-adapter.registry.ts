@@ -18,7 +18,8 @@ export class MessageAdapterRegistry {
   }
 
   readiness() {
-    return (['WHATSAPP', 'SMS', 'EMAIL'] as CommerceMessageChannel[]).map(
+    const channels: CommerceMessageChannel[] = ['WHATSAPP', 'SMS', 'EMAIL'];
+    return channels.map(
       (channel) => {
         const adapter = this.adapters.get(channel);
         return {

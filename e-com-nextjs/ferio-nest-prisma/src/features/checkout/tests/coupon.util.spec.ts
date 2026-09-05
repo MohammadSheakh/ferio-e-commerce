@@ -65,4 +65,14 @@ describe('calculateCouponDiscount', () => {
       discountTotal: 0,
     });
   });
+
+  it('rejects malformed coupon configuration instead of trusting parsed JSON', () => {
+    expect(() =>
+      calculateCouponDiscount(
+        JSON.stringify([{ code: 'BROKEN', type: 'PERCENT', value: '10' }]),
+        'BROKEN',
+        1000,
+      ),
+    ).toThrow('CHECKOUT_COUPONS_JSON contains an invalid coupon rule');
+  });
 });

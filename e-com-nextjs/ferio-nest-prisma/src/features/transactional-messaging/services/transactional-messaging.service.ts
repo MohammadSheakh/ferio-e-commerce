@@ -6,7 +6,7 @@ import {
   Optional,
 } from '@nestjs/common';
 import type { PrismaClient } from '@prisma/client';
-import { CommerceMessageChannel, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { StructuredLogger, type UserPayload } from '@app/common';
 import { PrismaService } from '@app/database';
 import { TenantDbService } from '../../../tenancy/tenant-db.service';
@@ -315,7 +315,7 @@ export class TransactionalMessagingService {
         where: { id: 'transactional-default' },
         data: {
           enabled,
-          channelPriority: priority as CommerceMessageChannel[],
+          channelPriority: priority,
           fallbackOnDefinitiveFailure:
             dto.fallbackOnDefinitiveFailure ??
             current.fallbackOnDefinitiveFailure,
