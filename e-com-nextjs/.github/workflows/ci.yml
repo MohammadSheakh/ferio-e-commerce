@@ -65,6 +65,8 @@ jobs:
         run: pnpm prisma:generate
       - name: Strict typecheck (incl. specs)
         run: pnpm exec tsc --noEmit -p tsconfig.json
+      - name: Active application dependency-graph typecheck
+        run: pnpm typecheck:application
       - name: Production build
         run: pnpm build
       - name: Unit tests

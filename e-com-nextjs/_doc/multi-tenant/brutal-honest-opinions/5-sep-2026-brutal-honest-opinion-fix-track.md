@@ -15,7 +15,7 @@ and must not be modified to make the project look better.
 
 | ID | Finding | Status | Evidence / next action |
 | --- | --- | --- | --- |
-| BO-01 | Backend typecheck excludes production runtime modules and `any` remains widespread. | TODO | Build a full typecheck boundary, then remove exclusions incrementally with typed adapters and module-level tests. |
+| BO-01 | Backend typecheck excludes production runtime modules and `any` remains widespread. | IN PROGRESS | Added an entrypoint-based application typecheck and CI gate; remaining `any` reduction and isolated legacy trees are still open. |
 | BO-02 | ESLint permits explicit and unsafe `any` usage. | TODO | Establish a measurable baseline, enable errors for new production `any`, then reduce the legacy baseline. |
 | BO-03 | Docker compose is development-oriented and unsafe as a production deployment. | TODO | Separate local compose from a hardened deployment configuration; remove insecure defaults and public infrastructure exposure. |
 | BO-04 | Legacy database/Mongoose fallback paths remain in active backend modules. | TODO | Inventory every fallback, define migration exit criteria, then remove or isolate each path. |
@@ -32,3 +32,6 @@ and must not be modified to make the project look better.
 - Created this tracker; the audit document remains unchanged.
 - Started BO-06 by separating read-only lint validation from auto-formatting.
 - Read-only backend lint currently fails with 1,566 errors and 21,563 warnings, including project-service parsing failures for integration tests. A CI gate was not kept in a known-red state.
+- Added `ferio-nest-prisma/tsconfig.application.json` as a full runtime typecheck boundary; the existing default build/typecheck configuration remains unchanged until newly exposed modules are repaired.
+- Refined the application typecheck to follow `src/main.ts`, `src/app.module.ts`, and `src/platform/platform.module.ts`; it passes without compiling orphaned legacy duplicate trees.
+- Added `pnpm typecheck:application` and its CI gate. This verifies the active dependency graph but does not close the explicit-`any` work.

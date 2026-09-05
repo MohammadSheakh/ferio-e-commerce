@@ -20,6 +20,7 @@
     "start:de": "nest build common && nest build database && nest build redis && nest build queue && nest start -b swc --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/src/main",
+    "typecheck:application": "tsc --noEmit -p tsconfig.application.json",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
     "lint:fix": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
