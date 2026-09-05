@@ -148,6 +148,14 @@ jobs:
             echo 'Production Redis healthcheck must receive REDISCLI_AUTH in-container.' >&2
             exit 1
           fi
+      - name: Assert web runtime images are non-root
+        run: |
+          for dockerfile in ferio-customer-web/Dockerfile ferio-admin-dashboard/ferio-admin/Dockerfile ferio-platform-admin/Dockerfile; do
+            if ! grep -q '^USER node$' "$dockerfile"; then
+              echo "$dockerfile must declare USER node for its runtime stage." >&2
+              exit 1
+            fi
+          done
 
   dependency-audit:
     name: Dependency audit (backend + web apps)
