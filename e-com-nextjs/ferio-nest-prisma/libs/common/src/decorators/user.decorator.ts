@@ -1,4 +1,5 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
+import type { Request } from 'express';
 import type { UserPayload as UserPayloadType } from '../types/user-payload.type';
 /**
  * User Decorator
@@ -24,8 +25,8 @@ import type { UserPayload as UserPayloadType } from '../types/user-payload.type'
 // Single decorator alias so @User() works
 export const UserDecorator = createParamDecorator(
   (data: keyof UserPayloadType | undefined, ctx: ExecutionContext) => {
-    const request = ctx.switchToHttp().getRequest();
-    const user: UserPayloadType = request.user;
+    const request = ctx.switchToHttp().getRequest<Request>();
+    const user = request.user;
 
     if (!user) return null;
     if (data) return user[data];

@@ -10,6 +10,7 @@ import { sanitizeLogText, sanitizeUrlForLogs } from '../utils/log-sanitizer';
 import { getCorrelationId } from '../utils/request-context';
 import { resolveErrorCode } from '../utils/error-code';
 import { StructuredLogger } from '../utils/structured-logger';
+import type { UserPayload } from '../types/user-payload.type';
 
 interface ExceptionResponseBody {
   message?: string | string[];
@@ -18,7 +19,7 @@ interface ExceptionResponseBody {
 }
 
 interface AuthenticatedRequest extends Request {
-  user?: { userId?: string };
+  user?: UserPayload;
 }
 
 /**

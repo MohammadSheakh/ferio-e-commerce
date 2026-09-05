@@ -1,4 +1,4 @@
-import{
+import {
   Injectable,
   NestInterceptor,
   ExecutionContext,
@@ -7,6 +7,11 @@ import{
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
+import type { Request } from 'express';
+
+interface UploadRequest extends Request {
+  files?: Record<string, Express.Multer.File[]>;
+}
 
 /**
  * File Upload Processing Interceptor
@@ -21,7 +26,7 @@ import { map } from 'rxjs/operators';
  * Usage:
  * @UseInterceptors(FileFieldsInterceptor([...]))
  * @UseInterceptors(new FileUploadProcessingInterceptor('attachments', 'folder'))
- * async upload(@UploadedFiles() files: ..., @Request() req: any) {
+ * async upload(@UploadedFiles() files: ...) {
  *   // req.uploadedFiles contains URLs
  * }
  */
@@ -32,11 +37,11 @@ export class FileUploadProcessingInterceptor implements NestInterceptor {
     private folder: string = 'attachments',
   ) {}
 
-  async intercept(
+  intercept(
     context: ExecutionContext,
     next: CallHandler,
-  ): Promise<Observable<any>> {
-    const request = context.switchToHttp().getRequest();
+  ): Observable<unknown> {
+    const request = context.switchToHttp().getRequest<UploadRequest>();
     const files = request.files?.[this.fieldName] as Express.Multer.File[];
 
     if (!files || files.length === 0) {
@@ -54,8 +59,8 @@ export class FileUploadProcessingInterceptor implements NestInterceptor {
       request.body[this.fieldName] = files;
 
       return next.handle().pipe(
-        map((data) => ({
-          ...data,
+        map((data: unknown) => ({
+          ...(typeof data === 'object' && data !== null ? data : { data }),
           uploadedFiles: request.uploadedFiles,
         })),
       );

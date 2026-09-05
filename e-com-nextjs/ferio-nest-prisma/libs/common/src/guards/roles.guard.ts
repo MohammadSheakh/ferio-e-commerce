@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 
 import { Reflector } from '@nestjs/core';
+import type { Request } from 'express';
 import { ROLES_KEY } from '../decorators/roles.decorator';
 import { PERMISSIONS_KEY } from '../decorators/permissions.decorator';
 import type { UserPayload } from '../types/user-payload.type';
@@ -41,8 +42,8 @@ export class RolesGuard implements CanActivate {
     }
 
     // Get user from request (attached by AuthGuard)
-    const request = context.switchToHttp().getRequest();
-    const user: UserPayload = request.user;
+    const request = context.switchToHttp().getRequest<Request>();
+    const user = request.user;
 
     // User not authenticated (shouldn't happen if AuthGuard is first)
     if (!user) {
