@@ -131,8 +131,17 @@ jobs:
         run: docker compose -f docker-compose.yml -f docker-compose.production.yml config --quiet
       - name: Assert production services are not host-published
         run: |
-          if docker compose -f docker-compose.yml -f docker-compose.production.yml config | grep -q 'published:'; then
+          rendered="$(docker compose -f docker-compose.yml -f docker-compose.production.yml config)"
+          if grep -q 'published:' <<<"$rendered"; then
             echo 'Production overlay must not publish container ports directly.' >&2
+            exit 1
+          fi
+          if ! grep -Eq 'NODE_ENV: production' <<<"$rendered"; then
+            echo 'Production overlay must set NODE_ENV=production.' >&2
+            exit 1
+          fi
+          if ! grep -Eq 'TENANCY_ENABLED: "?true"?' <<<"$rendered"; then
+            echo 'Production overlay must set TENANCY_ENABLED=true.' >&2
             exit 1
           fi
 
