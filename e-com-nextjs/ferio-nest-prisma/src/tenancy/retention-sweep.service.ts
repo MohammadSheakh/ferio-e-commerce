@@ -32,6 +32,8 @@ interface TenantClient {
   auditLog: RetentionDelegate;
 }
 
+type TenantDatabaseMaterial = Parameters<TenantDatabaseManager['getClient']>[0];
+
 function envDays(key: string, fallback: number): number {
   const value = Number(process.env[key] ?? fallback);
   return Number.isFinite(value) && value > 0 ? Math.floor(value) : 0;
@@ -117,10 +119,9 @@ export class RetentionSweepService {
       throw new Error(`TENANT_DATABASE_NOT_READY:${organizationId}`);
     }
 
-    return this.manager.runTransient(registry as never, async () => {
-      const db = (await this.manager.getClient(
-        registry as never,
-      )) as unknown as TenantClient;
+    const material: TenantDatabaseMaterial = registry;
+    return this.manager.runTransient(material, async () => {
+      const db = (await this.manager.getClient(material)) as unknown as TenantClient;
       const results: RetentionRuleResult[] = [];
       for (const rule of this.rules(now)) {
         if (rule.days <= 0) {

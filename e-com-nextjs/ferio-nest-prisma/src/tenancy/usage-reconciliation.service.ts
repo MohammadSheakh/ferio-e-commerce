@@ -59,7 +59,7 @@ export class UsageReconciliationService {
     const periodStart = periodKeyStart(periodKey);
     const tenantFacts = new Map<string, number>();
 
-    const db = await this.manager.getClient(registry as never);
+    const db = await this.manager.getClient(registry);
     tenantFacts.set(
       'orders_per_month',
       await db.order.count({ where: { createdAt: { gte: periodStart } } }),

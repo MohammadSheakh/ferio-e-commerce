@@ -51,7 +51,7 @@ import { TenantReturnOriginService } from './tenant-return-origin.service';
     {
       provide: TenantMembershipService,
       useFactory: async (platform: PlatformPrismaService, redis: RedisService) => {
-        const service = new TenantMembershipService(platform.client as never, redis);
+        const service = new TenantMembershipService(platform.client, redis);
         await service.initCrossInstanceInvalidation();
         return service;
       },
