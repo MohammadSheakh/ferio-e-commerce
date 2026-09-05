@@ -17,6 +17,7 @@ const TERMINAL_SHIPMENT_STATUSES = [
   'CANCELLED',
   'RTO',
 ] as const;
+const TERMINAL_SHIPMENT_STATUS_SET = new Set<string>(TERMINAL_SHIPMENT_STATUSES);
 
 @Injectable()
 export class ShippingPollingService {
@@ -82,7 +83,7 @@ export class ShippingPollingService {
       include: { provider: true },
     });
     if (!shipment) throw new NotFoundException('Shipment not found');
-    if (TERMINAL_SHIPMENT_STATUSES.includes(shipment.status as never)) {
+    if (TERMINAL_SHIPMENT_STATUS_SET.has(shipment.status)) {
       throw new ConflictException('Terminal shipments do not need polling');
     }
     if (!shipment.externalShipmentId && !shipment.trackingNumber) {
@@ -155,9 +156,7 @@ export class ShippingPollingService {
         throw new ConflictException('Courier poll produced no status evidence');
       }
       const completedAt = new Date();
-      const terminal = TERMINAL_SHIPMENT_STATUSES.includes(
-        result.normalizedStatus as never,
-      );
+      const terminal = TERMINAL_SHIPMENT_STATUS_SET.has(result.normalizedStatus);
       await db.$transaction([
         db.shipmentPollAttempt.update({
           where: { id: attempt.id },
