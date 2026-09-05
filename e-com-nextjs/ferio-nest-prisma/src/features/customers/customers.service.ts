@@ -1,7 +1,4 @@
-import {
-  Injectable, NotFoundException,
-  Optional,
-} from '@nestjs/common';
+import { Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { PrismaClient } from '@prisma/client';
 import { PrismaService } from '@app/database';
@@ -26,9 +23,7 @@ export class CustomersService {
    * database client; outside one it explicitly falls back to the legacy DB.
    */
   private async db(): Promise<PrismaClient> {
-    return this.tenantDb
-      ? this.tenantDb.getOrLegacy(this.prisma)
-      : this.prisma;
+    return this.tenantDb ? this.tenantDb.getOrLegacy(this.prisma) : this.prisma;
   }
   async list(query: CustomerQueryDto) {
     const db = await this.db();
@@ -69,7 +64,9 @@ export class CustomersService {
     }
 
     // Sorting
-    let orderBy: Prisma.CustomerOrderByWithRelationInput = { updatedAt: 'desc' };
+    let orderBy: Prisma.CustomerOrderByWithRelationInput = {
+      updatedAt: 'desc',
+    };
     if (query.sort === 'OLDEST_ONLINE') {
       orderBy = { updatedAt: 'asc' };
     } else if (query.sort === 'NAME_ASC') {
@@ -108,7 +105,9 @@ export class CustomersService {
 
     const unlinkedEmails = customers
       .filter((c) => !c.user && c.email)
-      .map((c) => c.email!.toLowerCase());
+      .map((c) => c.email)
+      .filter((email): email is string => Boolean(email))
+      .map((email) => email.toLowerCase());
 
     const userByEmailMap = new Map<
       string,
@@ -116,8 +115,16 @@ export class CustomersService {
     >();
     if (unlinkedEmails.length > 0) {
       const usersByEmail = await db.user.findMany({
-        where: { email: { in: unlinkedEmails, mode: 'insensitive' }, isDeleted: false },
-        select: { email: true, profileImageUrl: true, phoneNumber: true, updatedAt: true },
+        where: {
+          email: { in: unlinkedEmails, mode: 'insensitive' },
+          isDeleted: false,
+        },
+        select: {
+          email: true,
+          profileImageUrl: true,
+          phoneNumber: true,
+          updatedAt: true,
+        },
       });
       for (const u of usersByEmail) {
         if (u.email) {
@@ -126,21 +133,28 @@ export class CustomersService {
       }
     }
 
-    const metrics = await this.metrics(customers.map((customer) => customer.id));
+    const metrics = await this.metrics(
+      customers.map((customer) => customer.id),
+    );
     const totalPages = Math.ceil(total / query.limit) || 1;
     const itemsList = customers.map((customer) => {
       const customerMetrics = metrics.get(customer.id)!;
       const matchedUser =
         customer.user ||
-        (customer.email ? userByEmailMap.get(customer.email.toLowerCase()) : null);
-      const effectivePhone = matchedUser?.phoneNumber || customer.phoneNormalized;
+        (customer.email
+          ? userByEmailMap.get(customer.email.toLowerCase())
+          : null);
+      const effectivePhone =
+        matchedUser?.phoneNumber || customer.phoneNormalized;
       return {
         id: customer.id,
         name: customer.name,
         phone: maskCustomerPhone(effectivePhone),
         email: maskCustomerEmail(customer.email),
         avatarUrl: matchedUser?.profileImageUrl || null,
-        lastOnlineAt: matchedUser?.updatedAt?.toISOString() || customer.updatedAt?.toISOString(),
+        lastOnlineAt:
+          matchedUser?.updatedAt?.toISOString() ||
+          customer.updatedAt?.toISOString(),
         createdAt: customer.createdAt,
         ...customerMetrics,
         latestAttribution: customer.orders[0] ?? null,
@@ -224,57 +238,69 @@ export class CustomersService {
     const empty = new Map<string, CustomerMetrics>();
     for (const id of customerIds) empty.set(id, this.emptyMetrics());
     if (!customerIds.length) return empty;
-    const [totals, delivered, cancelled, returned, rto] =
-      await Promise.all([
-        db.order.groupBy({
-          by: ['customerId'],
-          orderBy: { customerId: 'asc' },
-          where: { customerId: { in: customerIds } },
-          _count: { id: true },
-        }),
-        db.order.groupBy({
-          by: ['customerId'],
-          orderBy: { customerId: 'asc' },
-          where: {
-            customerId: { in: customerIds },
-            status: { in: ['DELIVERED', 'COMPLETED'] },
-          },
-          _count: { id: true },
-          _sum: { total: true },
-          _max: { createdAt: true },
-        }),
-        db.order.groupBy({
-          by: ['customerId'],
-          orderBy: { customerId: 'asc' },
-          where: { customerId: { in: customerIds }, status: 'CANCELLED' },
-          _count: { id: true },
-        }),
-        db.order.groupBy({
-          by: ['customerId'],
-          orderBy: { customerId: 'asc' },
-          where: {
-            customerId: { in: customerIds },
-            returnStatus: { not: 'NONE' },
-          },
-          _count: { id: true },
-        }),
-        db.order.groupBy({
-          by: ['customerId'],
-          orderBy: { customerId: 'asc' },
-          where: { customerId: { in: customerIds }, shipmentStatus: 'RTO' },
-          _count: { id: true },
-        }),
-      ]);
-    for (const row of totals) empty.get(row.customerId)!.totalOrderCount = row._count.id;
+    const [totals, delivered, cancelled, returned, rto] = await Promise.all([
+      db.order.groupBy({
+        by: ['customerId'],
+        orderBy: { customerId: 'asc' },
+        where: { customerId: { in: customerIds } },
+        _count: { id: true },
+      }),
+      db.order.groupBy({
+        by: ['customerId'],
+        orderBy: { customerId: 'asc' },
+        where: {
+          customerId: { in: customerIds },
+          status: { in: ['DELIVERED', 'COMPLETED'] },
+        },
+        _count: { id: true },
+        _sum: { total: true },
+        _max: { createdAt: true },
+      }),
+      db.order.groupBy({
+        by: ['customerId'],
+        orderBy: { customerId: 'asc' },
+        where: { customerId: { in: customerIds }, status: 'CANCELLED' },
+        _count: { id: true },
+      }),
+      db.order.groupBy({
+        by: ['customerId'],
+        orderBy: { customerId: 'asc' },
+        where: {
+          customerId: { in: customerIds },
+          returnStatus: { not: 'NONE' },
+        },
+        _count: { id: true },
+      }),
+      db.order.groupBy({
+        by: ['customerId'],
+        orderBy: { customerId: 'asc' },
+        where: { customerId: { in: customerIds }, shipmentStatus: 'RTO' },
+        _count: { id: true },
+      }),
+    ]);
+    for (const row of totals) {
+      const result = empty.get(row.customerId);
+      if (result) result.totalOrderCount = row._count.id;
+    }
     for (const row of delivered) {
-      const result = empty.get(row.customerId)!;
+      const result = empty.get(row.customerId);
+      if (!result) continue;
       result.deliveredOrderCount = row._count.id;
       result.deliveredSpend = row._sum.total ?? 0;
       result.lastPurchaseAt = row._max.createdAt ?? null;
     }
-    for (const row of cancelled) empty.get(row.customerId)!.cancelledOrderCount = row._count.id;
-    for (const row of returned) empty.get(row.customerId)!.returnedOrderCount = row._count.id;
-    for (const row of rto) empty.get(row.customerId)!.rtoOrderCount = row._count.id;
+    for (const row of cancelled) {
+      const result = empty.get(row.customerId);
+      if (result) result.cancelledOrderCount = row._count.id;
+    }
+    for (const row of returned) {
+      const result = empty.get(row.customerId);
+      if (result) result.returnedOrderCount = row._count.id;
+    }
+    for (const row of rto) {
+      const result = empty.get(row.customerId);
+      if (result) result.rtoOrderCount = row._count.id;
+    }
     return empty;
   }
 

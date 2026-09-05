@@ -33,11 +33,14 @@ type TenantMembershipRequest = Request & {
   tenantMembership?: TenantMembershipInfo;
 };
 
-function isMembershipInvalidation(value: unknown): value is MembershipInvalidation {
+function isMembershipInvalidation(
+  value: unknown,
+): value is MembershipInvalidation {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const record = value as Record<string, unknown>;
   return (
-    (record.organizationId === undefined || typeof record.organizationId === 'string') &&
+    (record.organizationId === undefined ||
+      typeof record.organizationId === 'string') &&
     (record.email === undefined || typeof record.email === 'string')
   );
 }
@@ -51,7 +54,7 @@ function isMembershipInvalidation(value: unknown): value is MembershipInvalidati
  *   and their authorization model are untouched.
  * - Tenancy on: requires BOTH an authenticated principal AND an active
  *   OrganizationMember row for the request's organization. A valid session
-   * from tenant A is worthless against tenant B — different databases hold
+ * from tenant A is worthless against tenant B — different databases hold
  *   the commerce data and this gate holds the roster.
  *
  * Apply AFTER AuthGuard/RolesGuard on tenant-admin controllers. Riders and
@@ -129,7 +132,10 @@ export class TenantMembershipService {
       select: { id: true, email: true, isActive: true, role: true },
     });
 
-    this.cache.set(key, { value: row, expiresAt: Date.now() + this.CACHE_TTL_MS });
+    this.cache.set(key, {
+      value: row,
+      expiresAt: Date.now() + this.CACHE_TTL_MS,
+    });
     return row ? { membershipId: row.id, role: row.role } : null;
   }
 
@@ -137,10 +143,11 @@ export class TenantMembershipService {
    * locally AND on every peer instance via the Redis channel. */
   invalidate(organizationId?: string, email?: string): void {
     this.clearLocal(organizationId, email);
-    if (!this.redis) return;
+    const redis = this.redis;
+    if (!redis) return;
     void (async () => {
       try {
-        const client = await this.redis!.getClient();
+        const client = await redis.getClient();
         if (!client) return;
         await client.publish(
           this.CHANNEL,
@@ -169,11 +176,15 @@ export class TenantMembershipGuard implements CanActivate {
     if ((process.env.TENANCY_ENABLED || 'false') !== 'true') {
       return true;
     }
-    const request = context.switchToHttp().getRequest<TenantMembershipRequest>();
+    const request = context
+      .switchToHttp()
+      .getRequest<TenantMembershipRequest>();
     const { organizationId } = getTenantContext();
 
     const principal = request.user ?? request.platformPrincipal;
-    const email = String(principal?.email ?? '').trim().toLowerCase();
+    const email = String(principal?.email ?? '')
+      .trim()
+      .toLowerCase();
     if (!email) {
       throw new ForbiddenException('TENANT_MEMBERSHIP_REQUIRED');
     }
