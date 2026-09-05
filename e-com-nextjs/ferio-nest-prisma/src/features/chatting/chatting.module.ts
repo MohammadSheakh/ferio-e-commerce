@@ -13,10 +13,7 @@ import { ChatNotificationProcessor } from './processors/chat-notification.proces
 import { SocketModule } from '../socket.gateway/socket.module';
 import { RedisModule } from '@app/redis';
 import { TenancyModule } from '../../tenancy/tenancy.module';
-import {
-  BULLMQ_NOTIFY_PARTICIPANTS_QUEUE,
-  QUEUE_NAMES,
-} from '@app/queue';
+import { BULLMQ_NOTIFY_PARTICIPANTS_QUEUE, QUEUE_NAMES } from '@app/queue';
 
 /**
  * Chatting Module
@@ -26,7 +23,7 @@ import {
 @Module({
   imports: [
     JwtModule.register({
-      secret: process.env.JWT_ACCESS_SECRET as string,
+      secret: process.env.JWT_ACCESS_SECRET ?? '',
       signOptions: { expiresIn: '7d' },
     }),
 
@@ -41,20 +38,15 @@ import {
     forwardRef(() => SocketModule),
 
     // BullMQ Queues
-    BullModule.registerQueue(
-      {
-        name: QUEUE_NAMES.NOTIFY_PARTICIPANTS,
-        connection: {
-          host: process.env.REDIS_HOST || 'localhost',
-          port: parseInt(process.env.REDIS_PORT || '6379'),
-        },
+    BullModule.registerQueue({
+      name: QUEUE_NAMES.NOTIFY_PARTICIPANTS,
+      connection: {
+        host: process.env.REDIS_HOST || 'localhost',
+        port: parseInt(process.env.REDIS_PORT || '6379'),
       },
-    ),
+    }),
   ],
-  controllers: [
-    ConversationController,
-    MessageController,
-  ],
+  controllers: [ConversationController, MessageController],
   providers: [
     ConversationService,
     MessageService,
@@ -67,9 +59,6 @@ import {
       inject: [getQueueToken(QUEUE_NAMES.NOTIFY_PARTICIPANTS)],
     },
   ],
-  exports: [
-    ConversationService,
-    MessageService,
-  ],
+  exports: [ConversationService, MessageService],
 })
 export class ChattingModule {}

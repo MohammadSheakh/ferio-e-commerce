@@ -1,5 +1,10 @@
 import {
-  Injectable, Logger, Inject, NotFoundException, BadRequestException, ForbiddenException,
+  Injectable,
+  Logger,
+  Inject,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
   Optional,
 } from '@nestjs/common';
 import { Queue } from 'bullmq';
@@ -8,9 +13,7 @@ import type { Prisma, PrismaClient } from '@prisma/client';
 import { PrismaService } from '@app/database';
 import { TenantDbService } from '../../../tenancy/tenant-db.service';
 import { SocketGateway } from '../../socket.gateway/gateway/socket.gateway';
-import {
-  BULLMQ_NOTIFY_PARTICIPANTS_QUEUE,
-} from '@app/queue';
+import { BULLMQ_NOTIFY_PARTICIPANTS_QUEUE } from '@app/queue';
 import { SendMessageDto } from './dto/message.dto';
 import { tryGetTenantContext } from '../../../tenancy/tenant-context';
 import { errorMessage } from '@app/common';
@@ -29,7 +32,8 @@ export class MessageService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly socketGateway: SocketGateway,
-    @Inject(BULLMQ_NOTIFY_PARTICIPANTS_QUEUE) private notifyParticipantsQueue: Queue,
+    @Inject(BULLMQ_NOTIFY_PARTICIPANTS_QUEUE)
+    private notifyParticipantsQueue: Queue,
     @Optional() private readonly tenantDb?: TenantDbService,
   ) {}
 
@@ -38,9 +42,7 @@ export class MessageService {
    * database client; outside one it explicitly falls back to the legacy DB.
    */
   private async db(): Promise<PrismaClient> {
-    return this.tenantDb
-      ? this.tenantDb.getOrLegacy(this.prisma)
-      : this.prisma;
+    return this.tenantDb ? this.tenantDb.getOrLegacy(this.prisma) : this.prisma;
   }
   /**
    * Send Message
@@ -70,7 +72,9 @@ export class MessageService {
     });
 
     if (!isParticipant) {
-      throw new BadRequestException('You are not a participant in this conversation');
+      throw new BadRequestException(
+        'You are not a participant in this conversation',
+      );
     }
 
     const message = await db.$transaction(async (tx) => {
@@ -83,12 +87,18 @@ export class MessageService {
       });
       await tx.conversation.update({
         where: { id: conversationId },
-        data: { lastMessageId: created.id, lastMessageText: text, lastMessageCreatedAt: created.createdAt },
+        data: {
+          lastMessageId: created.id,
+          lastMessageText: text,
+          lastMessageCreatedAt: created.createdAt,
+        },
       });
       return created;
     });
 
-    this.logger.log(`✅ Message created: ${message.id} in conversation ${conversationId}`);
+    this.logger.log(
+      `✅ Message created: ${message.id} in conversation ${conversationId}`,
+    );
 
     // Notify participants (async via BullMQ)
     await this.notifyParticipantsInConversation(conversationId, message);
@@ -122,9 +132,9 @@ export class MessageService {
       },
       include: {
         sender: {
-          select: { name: true, profileImageUrl: true, role: true }
+          select: { name: true, profileImageUrl: true, role: true },
         },
-        attachments: true
+        attachments: true,
       },
       orderBy: { createdAt: 'desc' },
       skip,
@@ -141,8 +151,12 @@ export class MessageService {
     // Mark messages as read if userId provided
     if (userId) {
       try {
-        await this.markMessagesAsRead(conversationId, userId, messages.map(m => m.id));
-      } catch (err) {
+        await this.markMessagesAsRead(
+          conversationId,
+          userId,
+          messages.map((m) => m.id),
+        );
+      } catch {
         // Non-blocking fallback
       }
     }
@@ -181,23 +195,28 @@ export class MessageService {
     const createdAtFilter: Prisma.DateTimeFilter = {};
 
     if (before) {
-      const beforeMessage = await db.message.findUnique({ where: { id: before } });
+      const beforeMessage = await db.message.findUnique({
+        where: { id: before },
+      });
       if (beforeMessage) createdAtFilter.lt = beforeMessage.createdAt;
     }
 
     if (after) {
-      const afterMessage = await db.message.findUnique({ where: { id: after } });
+      const afterMessage = await db.message.findUnique({
+        where: { id: after },
+      });
       if (afterMessage) createdAtFilter.gt = afterMessage.createdAt;
     }
-    if (Object.keys(createdAtFilter).length > 0) query.createdAt = createdAtFilter;
+    if (Object.keys(createdAtFilter).length > 0)
+      query.createdAt = createdAtFilter;
 
     const messages = await db.message.findMany({
       where: query,
       include: {
         sender: {
-          select: { name: true, profileImageUrl: true, role: true }
+          select: { name: true, profileImageUrl: true, role: true },
         },
-        attachments: true
+        attachments: true,
       },
       orderBy: { createdAt: before ? 'desc' : 'asc' },
       take: boundedLimit + 1,
@@ -210,7 +229,7 @@ export class MessageService {
     await this.markMessagesAsRead(
       conversationId,
       userId,
-      resultMessages.map(m => m.id),
+      resultMessages.map((m) => m.id),
     );
 
     return {
@@ -227,7 +246,11 @@ export class MessageService {
     role?: string,
   ) {
     const db = await this.db();
-    if (['admin', 'super_admin', 'super-admin'].includes(String(role || '').toLowerCase())) {
+    if (
+      ['admin', 'super_admin', 'super-admin'].includes(
+        String(role || '').toLowerCase(),
+      )
+    ) {
       return;
     }
     if (!userId) throw new ForbiddenException('Conversation access denied');
@@ -256,11 +279,7 @@ export class MessageService {
   /**
    * Update Message
    */
-  async updateMessage(
-    messageId: string,
-    userId: string,
-    text: string,
-  ) {
+  async updateMessage(messageId: string, userId: string, text: string) {
     const db = await this.db();
     const message = await db.message.findFirst({
       where: {
@@ -271,7 +290,9 @@ export class MessageService {
     });
 
     if (!message) {
-      throw new NotFoundException('Message not found or you do not have permission to edit it');
+      throw new NotFoundException(
+        'Message not found or you do not have permission to edit it',
+      );
     }
 
     const updatedMessage = await db.message.update({
@@ -282,11 +303,15 @@ export class MessageService {
     this.logger.log(`✅ Message updated: ${messageId}`);
 
     // Emit update event
-    await this.socketGateway.emitToRoom(message.conversationId, 'message-updated', {
-      messageId,
-      text,
-      updatedAt: updatedMessage.updatedAt,
-    });
+    await this.socketGateway.emitToRoom(
+      message.conversationId,
+      'message-updated',
+      {
+        messageId,
+        text,
+        updatedAt: updatedMessage.updatedAt,
+      },
+    );
 
     return updatedMessage;
   }
@@ -305,7 +330,9 @@ export class MessageService {
     });
 
     if (!message) {
-      throw new NotFoundException('Message not found or you do not have permission to delete it');
+      throw new NotFoundException(
+        'Message not found or you do not have permission to delete it',
+      );
     }
 
     await db.message.update({
@@ -316,10 +343,14 @@ export class MessageService {
     this.logger.log(`✅ Message deleted: ${messageId}`);
 
     // Emit delete event
-    await this.socketGateway.emitToRoom(message.conversationId, 'message-deleted', {
-      messageId,
-      conversationId: message.conversationId,
-    });
+    await this.socketGateway.emitToRoom(
+      message.conversationId,
+      'message-deleted',
+      {
+        messageId,
+        conversationId: message.conversationId,
+      },
+    );
   }
 
   /**
@@ -334,7 +365,9 @@ export class MessageService {
     if (!messageIds || messageIds.length === 0) return;
 
     const latestMessageId = messageIds[messageIds.length - 1];
-    const latestMessage = await db.message.findUnique({ where: { id: latestMessageId } });
+    const latestMessage = await db.message.findUnique({
+      where: { id: latestMessageId },
+    });
 
     if (!latestMessage) return;
 
@@ -350,7 +383,9 @@ export class MessageService {
       },
     });
 
-    this.logger.debug(`✅ Messages marked as read for user ${userId} in conversation ${conversationId}`);
+    this.logger.debug(
+      `✅ Messages marked as read for user ${userId} in conversation ${conversationId}`,
+    );
   }
 
   /**
@@ -370,7 +405,7 @@ export class MessageService {
         select: { userId: true },
       });
 
-      const participantIds = participants.map(p => p.userId);
+      const participantIds = participants.map((p) => p.userId);
       const sender = message.sender;
 
       await this.notifyParticipantsQueue.add(
@@ -391,9 +426,13 @@ export class MessageService {
         { removeOnComplete: true },
       );
 
-      this.logger.log(`📬 Queued notification for ${participantIds.length} participants`);
+      this.logger.log(
+        `📬 Queued notification for ${participantIds.length} participants`,
+      );
     } catch (error) {
-      this.logger.error(`❌ Failed to notify participants: ${errorMessage(error)}`);
+      this.logger.error(
+        `❌ Failed to notify participants: ${errorMessage(error)}`,
+      );
     }
   }
 
@@ -407,27 +446,38 @@ export class MessageService {
     try {
       const sender = message.sender;
 
-      await this.socketGateway.emitToRoom(conversationId, 'new-message-received', {
-        _messageId: message.id,
+      await this.socketGateway.emitToRoom(
         conversationId,
-        text: message.text,
-        senderId: message.senderId,
-        senderName: sender?.name || 'User',
-        senderProfileImage: sender?.profileImageUrl,
-        createdAt: message.createdAt,
-        attachments: message.attachments,
-      });
+        'new-message-received',
+        {
+          _messageId: message.id,
+          conversationId,
+          text: message.text,
+          senderId: message.senderId,
+          senderName: sender?.name || 'User',
+          senderProfileImage: sender?.profileImageUrl,
+          createdAt: message.createdAt,
+          attachments: message.attachments,
+        },
+      );
 
-      this.logger.debug(`📡 Emitted new-message-received to room ${conversationId}`);
+      this.logger.debug(
+        `📡 Emitted new-message-received to room ${conversationId}`,
+      );
     } catch (error) {
-      this.logger.error(`❌ Failed to emit new message event: ${errorMessage(error)}`);
+      this.logger.error(
+        `❌ Failed to emit new message event: ${errorMessage(error)}`,
+      );
     }
   }
 
   /**
    * Get Unread Message Count
    */
-  async getUnreadCount(userId: string, conversationId: string): Promise<number> {
+  async getUnreadCount(
+    userId: string,
+    conversationId: string,
+  ): Promise<number> {
     const db = await this.db();
     const participent = await db.conversationParticipents.findFirst({
       where: {
