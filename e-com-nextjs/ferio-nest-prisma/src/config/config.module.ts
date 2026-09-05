@@ -55,6 +55,22 @@ import { ConfigModule as NestConfigModule } from '@nestjs/config';
             'TENANCY_ENABLED=true is required when NODE_ENV=production; refusing to start in legacy single-tenant mode',
           );
         }
+        if (nodeEnv === 'production') {
+          const productionRequired = [
+            'PLATFORM_DATABASE_URL',
+            'PLATFORM_JWT_SECRET',
+            'PLATFORM_DB_CREDENTIAL_KEY',
+            'REDIS_PASSWORD',
+          ];
+          const missingProduction = productionRequired.filter(
+            (key) => !config[key],
+          );
+          if (missingProduction.length > 0) {
+            throw new Error(
+              `Missing required production environment variables: ${missingProduction.join(', ')}`,
+            );
+          }
+        }
         config.NODE_ENV = nodeEnv;
         config.TENANCY_ENABLED = tenancyEnabled;
 
