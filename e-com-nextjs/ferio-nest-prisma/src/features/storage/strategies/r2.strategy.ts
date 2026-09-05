@@ -166,8 +166,7 @@ export class R2Strategy implements StorageStrategy {
       .replace(/^[\\/]+|[\\/]+$/g, '');
     const safeName = filename.replace(/\s+/g, '-');
     const key = tenantObjectKey(safeFolder, `${Date.now()}-${safeName}`);
-    const presign = this.presigner();
-    const url = await presign(
+    const url = await s3Presign(
       this.s3Client,
       new PutObjectCommand({
         Bucket: this.bucket,
@@ -184,21 +183,10 @@ export class R2Strategy implements StorageStrategy {
    * R2_PRESIGN_EXPIRES_SECONDS (default 1h).
    */
   async getSignedUrl(key: string): Promise<string> {
-    return this.presigner()(
+    return s3Presign(
       this.s3Client,
       new GetObjectCommand({ Bucket: this.bucket, Key: key }),
       { expiresIn: this.presignExpiresSeconds },
     );
-  }
-
-  private presigner() {
-    // The installed AWS packages resolve duplicate @smithy/types versions,
-    // so the SDK's generic client type is not assignable to S3Client here.
-    // Keep this adapter narrow and local until the dependency graph is deduped.
-    return s3Presign as unknown as (
-      client: S3Client,
-      command: PutObjectCommand | GetObjectCommand,
-      options?: { expiresIn?: number },
-    ) => Promise<string>;
   }
 }
