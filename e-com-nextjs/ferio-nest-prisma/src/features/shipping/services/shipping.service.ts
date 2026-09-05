@@ -15,6 +15,7 @@ import {
 import type { PrismaClient } from '@prisma/client';
 import { PrismaService } from '@app/database';
 import { TenantDbService } from '../../../tenancy/tenant-db.service';
+import { toTenantJsonInput } from '../../../core/database/json-input.util';
 import type { UserPayload } from '@app/common';
 import type { CourierAdapter } from '../adapters/courier-adapter.interface';
 import { PathaoAdapter } from '../adapters/pathao.adapter';
@@ -53,8 +54,9 @@ export class ShippingService {
     public readonly courierRouter: CourierRouterService,
     private readonly messages: TransactionalMessagingService,
     private readonly audit: AuditService,
-  
-    @Optional() private readonly tenantDb?: TenantDbService,) {}
+
+    @Optional() private readonly tenantDb?: TenantDbService,
+  ) {}
 
   /**
    * MT-7/MT-8: inside a tenant-resolved request or worker fan-out this
@@ -329,64 +331,62 @@ export class ShippingService {
         providerId: provider.id,
         weightGrams,
         codAmount: order.total,
-        requestPayload: request as Prisma.InputJsonValue,
+        requestPayload: toTenantJsonInput(request) ?? {},
         createdByActorId: actor.userId,
       },
     });
     try {
       const result = await adapter.createShipment(request);
-      const createdShipment = await db.$transaction(
-        async (transaction) => {
-          await transaction.shipmentEvent.create({
-            data: {
-              shipmentId: shipment.id,
-              deduplicationKey: this.hash(
-                `${provider.code}:create:${result.externalShipmentId}`,
-              ),
-              rawStatus: result.rawStatus,
-              normalizedStatus: result.normalizedStatus,
-              payload: result.response as Prisma.InputJsonValue,
-              occurredAt: new Date(),
+      const createdShipment = await db.$transaction(async (transaction) => {
+        await transaction.shipmentEvent.create({
+          data: {
+            shipmentId: shipment.id,
+            deduplicationKey: this.hash(
+              `${provider.code}:create:${result.externalShipmentId}`,
+            ),
+            rawStatus: result.rawStatus,
+            normalizedStatus: result.normalizedStatus,
+            payload: toTenantJsonInput(result.response) ?? {},
+            occurredAt: new Date(),
+          },
+        });
+        await transaction.order.update({
+          where: { id: orderId },
+          data: { shipmentStatus: result.normalizedStatus },
+        });
+        const created = await transaction.shipment.update({
+          where: { id: shipment.id },
+          data: {
+            status: result.normalizedStatus,
+            externalShipmentId: result.externalShipmentId,
+            trackingNumber: result.trackingNumber,
+            trackingUrl: result.trackingUrl,
+            labelUrl: result.labelUrl,
+            shippingCharge: result.shippingCharge,
+            responsePayload: toTenantJsonInput(result.response) ?? {},
+            lastRawStatus: result.rawStatus,
+          },
+          include: shipmentInclude,
+        });
+        await this.audit.record(
+          {
+            action: 'SHIPMENT_CREATED',
+            entityType: 'Shipment',
+            entityId: shipment.id,
+            actor,
+            newValue: {
+              orderId,
+              provider: provider.code,
+              status: created.status,
+              trackingNumber: created.trackingNumber,
+              weightGrams,
+              codAmount: order.total,
             },
-          });
-          await transaction.order.update({
-            where: { id: orderId },
-            data: { shipmentStatus: result.normalizedStatus },
-          });
-          const created = await transaction.shipment.update({
-            where: { id: shipment.id },
-            data: {
-              status: result.normalizedStatus,
-              externalShipmentId: result.externalShipmentId,
-              trackingNumber: result.trackingNumber,
-              trackingUrl: result.trackingUrl,
-              labelUrl: result.labelUrl,
-              shippingCharge: result.shippingCharge,
-              responsePayload: result.response as Prisma.InputJsonValue,
-              lastRawStatus: result.rawStatus,
-            },
-            include: shipmentInclude,
-          });
-          await this.audit.record(
-            {
-              action: 'SHIPMENT_CREATED',
-              entityType: 'Shipment',
-              entityId: shipment.id,
-              actor,
-              newValue: {
-                orderId,
-                provider: provider.code,
-                status: created.status,
-                trackingNumber: created.trackingNumber,
-                weightGrams,
-                codAmount: order.total,
-              },
-            },
-            transaction,
-          );
-          return created;
-        },
-      );
+          },
+          transaction,
+        );
+        return created;
+      });
       await this.messages.enqueueAfterCommit({
         eventType: 'SHIPMENT_CREATED',
         recipient: order.address.phoneNormalized,
@@ -493,7 +493,7 @@ export class ShippingService {
             `${provider}:invalid-auth:${randomBytes(16).toString('hex')}`,
           ),
           headers: this.sanitizedHeaders(headers),
-          body: body as Prisma.InputJsonValue,
+          body: toTenantJsonInput(body) ?? {},
           authValid: false,
           attemptCount: 1,
           lastAttemptAt: attemptedAt,
@@ -555,7 +555,7 @@ export class ShippingService {
             source,
             deduplicationKey,
             headers: this.sanitizedHeaders(headers ?? {}),
-            body: body as Prisma.InputJsonValue,
+            body: toTenantJsonInput(body) ?? {},
             authValid: true,
           },
         });
@@ -666,7 +666,7 @@ export class ShippingService {
             providerEventId: event.providerEventId,
             rawStatus: event.rawStatus,
             normalizedStatus: event.normalizedStatus,
-            payload: body as Prisma.InputJsonValue,
+            payload: toTenantJsonInput(body) ?? {},
             occurredAt,
             isOutOfOrder: outOfOrder,
             ignoredReason: applicable
@@ -909,13 +909,19 @@ export class ShippingService {
     return providers.map((provider) => {
       const pShipments = shipments.filter((s) => s.providerId === provider.id);
       const total = pShipments.length;
-      const delivered = pShipments.filter((s) => s.status === 'DELIVERED').length;
-      const rto = pShipments.filter((s) => s.status === 'RTO' || s.status === 'RETURNED').length;
+      const delivered = pShipments.filter(
+        (s) => s.status === 'DELIVERED',
+      ).length;
+      const rto = pShipments.filter(
+        (s) => s.status === 'RTO' || s.status === 'RETURNED',
+      ).length;
       const pickedUp = pShipments.filter((s) => s.pickedUpAt !== null).length;
 
-      const deliveryRate = total > 0 ? Math.round((delivered / total) * 100) : 0;
+      const deliveryRate =
+        total > 0 ? Math.round((delivered / total) * 100) : 0;
       const rtoRate = total > 0 ? Math.round((rto / total) * 100) : 0;
-      const pickupSlaRate = total > 0 ? Math.round((pickedUp / total) * 100) : 0;
+      const pickupSlaRate =
+        total > 0 ? Math.round((pickedUp / total) * 100) : 0;
 
       return {
         providerCode: provider.code,

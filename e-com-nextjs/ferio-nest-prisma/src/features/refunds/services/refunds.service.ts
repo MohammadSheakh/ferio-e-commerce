@@ -11,6 +11,7 @@ import { Prisma } from '@prisma/client';
 import type { UserPayload } from '@app/common';
 import { PrismaService } from '@app/database';
 import { TenantDbService } from '../../../tenancy/tenant-db.service';
+import { toTenantJsonInput } from '../../../core/database/json-input.util';
 import { AuditService } from '../../audit/services/audit.service';
 import { CreateRefundDto, RecordRefundResultDto } from '../dto/refund.dto';
 
@@ -36,8 +37,9 @@ export class RefundsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
-  
-    @Optional() private readonly tenantDb?: TenantDbService,) {}
+
+    @Optional() private readonly tenantDb?: TenantDbService,
+  ) {}
 
   /**
    * MT-7: inside a tenant-resolved request this returns the resolved tenant
@@ -232,7 +234,7 @@ export class RefundsService {
           externalReference: dto.externalReference
             ? this.clean(dto.externalReference)
             : null,
-          result: dto.result as Prisma.InputJsonValue | undefined,
+          result: toTenantJsonInput(dto.result),
           failureReason: dto.failureReason
             ? this.clean(dto.failureReason)
             : null,
@@ -248,7 +250,7 @@ export class RefundsService {
           providerRefundId: dto.externalReference
             ? this.clean(dto.externalReference)
             : refund.providerRefundId,
-          providerResult: dto.result as Prisma.InputJsonValue | undefined,
+          providerResult: toTenantJsonInput(dto.result),
           failureReason:
             dto.outcome === 'FAILED' ? this.clean(dto.failureReason!) : null,
           processedAt: now,

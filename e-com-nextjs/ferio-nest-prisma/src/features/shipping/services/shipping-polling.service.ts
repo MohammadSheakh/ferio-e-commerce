@@ -9,6 +9,7 @@ import { Prisma } from '@prisma/client';
 import type { PrismaClient } from '@prisma/client';
 import { PrismaService } from '@app/database';
 import { TenantDbService } from '../../../tenancy/tenant-db.service';
+import { toTenantJsonInput } from '../../../core/database/json-input.util';
 import { ShippingService } from './shipping.service';
 
 const TERMINAL_SHIPMENT_STATUSES = [
@@ -17,15 +18,18 @@ const TERMINAL_SHIPMENT_STATUSES = [
   'CANCELLED',
   'RTO',
 ] as const;
-const TERMINAL_SHIPMENT_STATUS_SET = new Set<string>(TERMINAL_SHIPMENT_STATUSES);
+const TERMINAL_SHIPMENT_STATUS_SET = new Set<string>(
+  TERMINAL_SHIPMENT_STATUSES,
+);
 
 @Injectable()
 export class ShippingPollingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly shipping: ShippingService,
-  
-    @Optional() private readonly tenantDb?: TenantDbService,) {}
+
+    @Optional() private readonly tenantDb?: TenantDbService,
+  ) {}
 
   /**
    * MT-7/MT-8: inside a tenant-resolved request or worker fan-out this
@@ -156,13 +160,15 @@ export class ShippingPollingService {
         throw new ConflictException('Courier poll produced no status evidence');
       }
       const completedAt = new Date();
-      const terminal = TERMINAL_SHIPMENT_STATUS_SET.has(result.normalizedStatus);
+      const terminal = TERMINAL_SHIPMENT_STATUS_SET.has(
+        result.normalizedStatus,
+      );
       await db.$transaction([
         db.shipmentPollAttempt.update({
           where: { id: attempt.id },
           data: {
             status: 'SUCCEEDED',
-            rawResponse: response as Prisma.InputJsonValue,
+            rawResponse: toTenantJsonInput(response) ?? {},
             normalizedStatus: result.normalizedStatus,
             evidenceLogId: result.evidenceLogId,
             finishedAt: completedAt,

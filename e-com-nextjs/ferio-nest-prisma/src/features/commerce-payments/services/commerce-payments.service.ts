@@ -10,6 +10,7 @@ import { createHash, randomBytes } from 'crypto';
 import { PrismaService } from '@app/database';
 import type { PrismaClient } from '@prisma/client';
 import { TenantDbService } from '../../../tenancy/tenant-db.service';
+import { toTenantJsonInput } from '../../../core/database/json-input.util';
 import {
   buildCallbackToken,
   verifyCallbackToken,
@@ -197,7 +198,7 @@ export class CommercePaymentsService {
             status: 'PENDING',
             redirectUrl: result.redirectUrl,
             providerSessionId: result.providerSessionId,
-            initiationResponse: result.raw as Prisma.InputJsonValue,
+            initiationResponse: toTenantJsonInput(result.raw) ?? {},
           },
         }),
       );
@@ -258,7 +259,7 @@ export class CommercePaymentsService {
           deduplicationKey: key,
           provider,
           eventType,
-          payload: payload as Prisma.InputJsonValue,
+          payload: toTenantJsonInput(payload) ?? {},
         },
       }));
 
@@ -316,7 +317,7 @@ export class CommercePaymentsService {
                 status: 'SUCCEEDED',
                 providerTransactionId: validation.providerTransactionId,
                 providerValidationId: validation.validationId,
-                validatedResponse: validation.raw as Prisma.InputJsonValue,
+                validatedResponse: toTenantJsonInput(validation.raw) ?? {},
                 completedAt: new Date(),
               },
             });
@@ -385,7 +386,7 @@ export class CommercePaymentsService {
           where: { id: attempt.id },
           data: {
             status,
-            validatedResponse: validation.raw as Prisma.InputJsonValue,
+            validatedResponse: toTenantJsonInput(validation.raw) ?? {},
             completedAt: ['FAILED', 'CANCELLED'].includes(status)
               ? new Date()
               : undefined,
