@@ -4,6 +4,31 @@ import {
 } from './tenant-errors';
 import { TenantResolverService } from './tenant-resolver.service';
 
+type TenantResolverPlatformDouble = {
+  client: {
+    tenantDomain: { findUnique: jest.Mock };
+    tenantDatabase: { findUnique: jest.Mock };
+  };
+};
+
+type TenantResolverRedisDouble = { getClient: jest.Mock };
+
+function expectTenantCode(
+  action: () => unknown,
+  code: TenantResolutionException['code'],
+): void {
+  let caught: unknown;
+  try {
+    action();
+  } catch (error: unknown) {
+    caught = error;
+  }
+  expect(caught).toBeInstanceOf(TenantResolutionException);
+  if (caught instanceof TenantResolutionException) {
+    expect(caught.code).toBe(code);
+  }
+}
+
 describe('normalizeTenantHost (ADR-0002 security boundary)', () => {
   it('canonicalizes ordinary hosts', () => {
     expect(normalizeTenantHost('Acme.Ferio.Local:6733')).toBe(
@@ -24,17 +49,17 @@ describe('normalizeTenantHost (ADR-0002 security boundary)', () => {
     ['a'.repeat(300) + '.com'],
     ['under_score.example.com'],
   ])('rejects %j with TENANT_HOST_INVALID', (input) => {
-    expect(() => normalizeTenantHost(input as string)).toThrow(
-      TenantResolutionException,
-    );
+    expect(() => normalizeTenantHost(input)).toThrow(TenantResolutionException);
   });
 });
 
 describe('TenantResolverService fail-closed resolution (MT-2 gate)', () => {
   const originalEnv = { ...process.env };
-  let service: any;
-  let platform: { client: any };
-  const redis = { getClient: jest.fn().mockResolvedValue(null) };
+  let service: TenantResolverService;
+  let platform: TenantResolverPlatformDouble;
+  const redis: TenantResolverRedisDouble = {
+    getClient: jest.fn().mockResolvedValue(null),
+  };
 
   beforeEach(() => {
     platform = {
@@ -45,7 +70,6 @@ describe('TenantResolverService fail-closed resolution (MT-2 gate)', () => {
     };
     // Constructed manually to avoid Nest DI in tests.
     service = new TenantResolverService(platform as never, redis as never);
-    jest.spyOn(service, 'writeCache').mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -79,52 +103,56 @@ describe('TenantResolverService fail-closed resolution (MT-2 gate)', () => {
     process.env.NODE_ENV = 'production';
     process.env.TENANT_TRUSTED_PROXY_CIDRS = '172.16.0.0/12';
 
-    expect(() =>
-      service.effectiveHostFrom({
-        headers: { 'x-forwarded-host': 'victim.example.com' },
-        hostname: 'attacker.example.com',
-        remoteAddress: '203.0.113.10',
-      }),
-    ).toThrow(
-      expect.objectContaining({ code: 'TENANT_FORWARDED_HOST_UNTRUSTED' }),
+    expectTenantCode(
+      () =>
+        service.effectiveHostFrom({
+          headers: { 'x-forwarded-host': 'victim.example.com' },
+          hostname: 'attacker.example.com',
+          remoteAddress: '203.0.113.10',
+        }),
+      'TENANT_FORWARDED_HOST_UNTRUSTED',
     );
   });
 
   it('fails closed on ambiguous forwarded-host chains', () => {
     process.env.TENANT_TRUSTED_PROXY_CIDRS = '127.0.0.1/32';
 
-    expect(() =>
-      service.effectiveHostFrom({
-        headers: {
-          'x-forwarded-host': 'attacker.example.com, store.example.com',
-        },
-        hostname: 'backend.internal',
-        remoteAddress: '127.0.0.1',
-      }),
-    ).toThrow(expect.objectContaining({ code: 'TENANT_HOST_INVALID' }));
-    expect(() =>
-      service.effectiveHostFrom({
-        headers: {
-          'x-forwarded-host': ['attacker.example.com', 'store.example.com'],
-        },
-        hostname: 'backend.internal',
-        remoteAddress: '127.0.0.1',
-      }),
-    ).toThrow(expect.objectContaining({ code: 'TENANT_HOST_INVALID' }));
+    expectTenantCode(
+      () =>
+        service.effectiveHostFrom({
+          headers: {
+            'x-forwarded-host': 'attacker.example.com, store.example.com',
+          },
+          hostname: 'backend.internal',
+          remoteAddress: '127.0.0.1',
+        }),
+      'TENANT_HOST_INVALID',
+    );
+    expectTenantCode(
+      () =>
+        service.effectiveHostFrom({
+          headers: {
+            'x-forwarded-host': ['attacker.example.com', 'store.example.com'],
+          },
+          hostname: 'backend.internal',
+          remoteAddress: '127.0.0.1',
+        }),
+      'TENANT_HOST_INVALID',
+    );
   });
 
   it('trusts no forwarded proxy by default in production', () => {
     process.env.NODE_ENV = 'production';
     delete process.env.TENANT_TRUSTED_PROXY_CIDRS;
 
-    expect(() =>
-      service.effectiveHostFrom({
-        headers: { 'x-forwarded-host': 'store.example.com' },
-        hostname: 'backend.internal',
-        remoteAddress: '127.0.0.1',
-      }),
-    ).toThrow(
-      expect.objectContaining({ code: 'TENANT_FORWARDED_HOST_UNTRUSTED' }),
+    expectTenantCode(
+      () =>
+        service.effectiveHostFrom({
+          headers: { 'x-forwarded-host': 'store.example.com' },
+          hostname: 'backend.internal',
+          remoteAddress: '127.0.0.1',
+        }),
+      'TENANT_FORWARDED_HOST_UNTRUSTED',
     );
   });
 
