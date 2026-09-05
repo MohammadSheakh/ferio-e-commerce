@@ -69,6 +69,10 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Generate Prisma clients (tenant + platform)
         run: pnpm prisma:generate
+      - name: Apply tenant database migrations
+        run: pnpm prisma:migrate:deploy
+      - name: Apply platform database migrations
+        run: pnpm prisma:migrate:platform
       - name: Verify committed backend OpenAPI contract
         run: pnpm openapi:check
       - name: Strict typecheck (incl. specs)
