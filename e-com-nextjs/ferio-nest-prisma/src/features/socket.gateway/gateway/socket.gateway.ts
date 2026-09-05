@@ -25,6 +25,22 @@ import { REDIS_PUB_CLIENT, REDIS_SUB_CLIENT } from '@app/redis';
 import { FirebaseService } from '@app/notification';
 import { errorMessage } from '@app/common';
 
+type SocketPayload = Record<string, unknown>;
+
+function asSocketPayload(value: unknown): SocketPayload {
+  return typeof value === 'object' && value !== null
+    ? (value as SocketPayload)
+    : {};
+}
+
+function asStringPayload(value: unknown): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(asSocketPayload(value)).filter(
+      (entry): entry is [string, string] => typeof entry[1] === 'string',
+    ),
+  );
+}
+
 const socketAllowedOrigins = [
   process.env.CUSTOMER_WEB_URL || 'http://localhost:3000',
   process.env.ADMIN_WEB_URL || 'http://localhost:3001',
@@ -976,7 +992,7 @@ export class SocketGateway
    */
   async emitNotificationToUser(
     userId: string,
-    notification: any,
+    notification: unknown,
   ): Promise<boolean> {
     try {
       const eventName = `notification::${userId}`;
@@ -1027,7 +1043,7 @@ export class SocketGateway
    * @param event - Event name
    * @param data - Data to emit
    */
-  async broadcastToRole(role: string, event: string, data: any): Promise<void> {
+  async broadcastToRole(role: string, event: string, data: unknown): Promise<void> {
     try {
       const roomName = `role::${role}`;
 
@@ -1063,7 +1079,7 @@ export class SocketGateway
    * @param event - Event name
    * @param data - Data to emit
    */
-  async emitToUser(userId: string, event: string, data: any): Promise<boolean> {
+  async emitToUser(userId: string, event: string, data: unknown): Promise<boolean> {
     try {
       const isOnline = await this.isUserOnline(userId);
       if (isOnline) {
@@ -1077,12 +1093,15 @@ export class SocketGateway
       // Offline: push notification
       const user = await this.socketAuthService.getUserProfile(userId);
       const fcmToken = user?.devices[0]?.fcmToken;
+      const payload = asSocketPayload(data);
       if (fcmToken) {
         await this.firebaseService.sendPushNotification(
           fcmToken,
-          data.title || 'New Notification',
-          data.message || 'You have a new message',
-          data,
+          typeof payload.title === 'string' ? payload.title : 'New Notification',
+          typeof payload.message === 'string'
+            ? payload.message
+            : 'You have a new message',
+          asStringPayload(data),
         );
         this.logger.log(`📱 Push notification sent to offline user ${userId}`);
         return true;
@@ -1102,7 +1121,7 @@ export class SocketGateway
    * @param event - Event name
    * @param data - Data to emit
    */
-  async emitToRoom(roomId: string, event: string, data: any): Promise<boolean> {
+  async emitToRoom(roomId: string, event: string, data: unknown): Promise<boolean> {
     try {
       for (const room of this.ambientRooms(roomId)) {
         this.server.to(room).emit(event, data);
