@@ -1075,10 +1075,11 @@ export class SocketGateway
       }
 
       // Offline: push notification
-      const user: any = await this.socketAuthService.getUserProfile(userId);
-      if (user?.fcmToken) {
+      const user = await this.socketAuthService.getUserProfile(userId);
+      const fcmToken = user?.devices[0]?.fcmToken;
+      if (fcmToken) {
         await this.firebaseService.sendPushNotification(
-          user.fcmToken,
+          fcmToken,
           data.title || 'New Notification',
           data.message || 'You have a new message',
           data,

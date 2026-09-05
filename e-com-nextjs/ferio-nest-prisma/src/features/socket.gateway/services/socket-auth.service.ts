@@ -18,6 +18,12 @@ export interface SocketUser {
   organizationId?: string;
 }
 
+export interface SocketSystemStats {
+  totalOnlineUsers: number;
+  onlineUsers: string[];
+  timestamp: number;
+}
+
 /** Tenant-scoped room names (MT-8 §11.3): identical room identifiers across
  * tenants can never share a channel. Legacy sockets keep historical names. */
 export function scopedSocketRoom(user: { organizationId?: string } | null | undefined, room: string): string {
@@ -276,7 +282,15 @@ export class SocketAuthService {
     const db = await this.db();
     return await db.user.findUnique({
       where: { id: userId },
-      select: { name: true },
+      select: {
+        name: true,
+        devices: {
+          where: { isDeleted: false, pushEnabled: true },
+          orderBy: { lastActive: 'desc' },
+          take: 1,
+          select: { fcmToken: true },
+        },
+      },
     });
   }
 
@@ -292,7 +306,7 @@ export class SocketAuthService {
     userId: string,
     socketId: string,
     workerId: string,
-    userInfo?: any,
+    userInfo?: SocketUser,
   ): Promise<void> {
     const organizationId = (userInfo as SocketUser | undefined)?.organizationId;
     const keys = this.keysFor(organizationId);
@@ -444,7 +458,7 @@ export class SocketAuthService {
   /**
    * Get System Stats
    */
-  async getSystemStats(organizationId?: string): Promise<any> {
+  async getSystemStats(organizationId?: string): Promise<SocketSystemStats> {
     return {
       totalOnlineUsers: await this.getOnlineUsersCount(organizationId),
       onlineUsers: await this.getAllOnlineUsers(organizationId),
