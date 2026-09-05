@@ -99,6 +99,39 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  production-compose:
+    name: Production Compose — render and exposure checks
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: e-com-nextjs
+    env:
+      POSTGRES_IMAGE: postgres:16@sha256:1111111111111111111111111111111111111111111111111111111111111111
+      REDIS_IMAGE: redis:7@sha256:2222222222222222222222222222222222222222222222222222222222222222
+      MINIO_IMAGE: minio/minio:latest@sha256:3333333333333333333333333333333333333333333333333333333333333333
+      MINIO_MC_IMAGE: minio/mc:latest@sha256:4444444444444444444444444444444444444444444444444444444444444444
+      POSTGRES_PASSWORD: ci-postgres-password
+      REDIS_PASSWORD: ci-redis-password
+      MINIO_ROOT_USER: ci-minio-user
+      MINIO_ROOT_PASSWORD: ci-minio-password
+      JWT_ACCESS_SECRET: ci-compose-access-secret
+      JWT_REFRESH_SECRET: ci-compose-refresh-secret
+      PLATFORM_JWT_SECRET: ci-compose-platform-secret
+      PLATFORM_DB_CREDENTIAL_KEY: ci-compose-db-key
+      PUBLIC_FERIO_API_URL: https://api.example.test
+      PUBLIC_SOCKET_URL: https://api.example.test
+      PUBLIC_CUSTOMER_URL: https://shop.example.test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Render production Compose overlay
+        run: docker compose -f docker-compose.yml -f docker-compose.production.yml config --quiet
+      - name: Assert production services are not host-published
+        run: |
+          if docker compose -f docker-compose.yml -f docker-compose.production.yml config | grep -q 'published:'; then
+            echo 'Production overlay must not publish container ports directly.' >&2
+            exit 1
+          fi
+
   dependency-audit:
     name: Dependency audit (backend + web apps)
     runs-on: ubuntu-latest
