@@ -18,6 +18,7 @@ import {
   SettlementReportParserService,
 } from './settlement-report-parser.service';
 import { SettlementsService } from './settlements.service';
+import { toTenantJsonInput } from '../../../core/database/json-input.util';
 
 const importInclude = {
   provider: true,
@@ -373,9 +374,8 @@ export class SettlementImportsService {
             rowCount: input.rows.length,
             appliedCount: input.rows.length - exceptionCount,
             exceptionCount,
-            rawPayload: this.immutableImportPayload(
-              input.dto,
-            ) as unknown as Prisma.InputJsonValue,
+            rawPayload:
+              toTenantJsonInput(this.immutableImportPayload(input.dto)) ?? {},
             recordedByActorId: input.actor.userId,
             sourceFileName: input.parserEvidence?.sourceFileName,
             sourceFileChecksum: input.parserEvidence?.sourceFileChecksum,
@@ -403,7 +403,7 @@ export class SettlementImportsService {
                 matchedShipmentId: row.matchedShipmentId,
                 matchedCollectionId: row.matchedCollectionId,
                 duplicateOfRowId: row.duplicateOfRowId,
-                rawPayload: row.input as unknown as Prisma.InputJsonValue,
+                rawPayload: toTenantJsonInput(row.input) ?? {},
               })),
             },
           },
