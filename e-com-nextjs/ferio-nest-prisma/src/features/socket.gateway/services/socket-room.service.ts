@@ -1,5 +1,6 @@
 import { Injectable, Inject, Logger, Optional } from '@nestjs/common';
 import { Redis } from 'ioredis';
+import type { Socket } from 'socket.io';
 
 import { REDIS_CLIENT } from '@app/redis';
 import { PrismaService } from '@app/database';
@@ -248,7 +249,7 @@ export class SocketRoomService {
    * Auto-join Family Room
    */
   async autoJoinFamilyRoom(
-    socket: any,
+    socket: Pick<Socket, 'join'>,
     userId: string,
     organizationId?: string,
   ): Promise<void> {
@@ -258,7 +259,7 @@ export class SocketRoomService {
   }
 
   private async autoJoinFamilyRoomInContext(
-    socket: any,
+    socket: Pick<Socket, 'join'>,
     userId: string,
     organizationId?: string,
   ): Promise<void> {
@@ -297,7 +298,7 @@ export class SocketRoomService {
 
   async addActivityToFeed(
     groupId: string,
-    activity: any,
+    activity: unknown,
     maxActivities: number = 50,
     organizationId?: string,
   ): Promise<void> {
@@ -314,10 +315,10 @@ export class SocketRoomService {
     groupId: string,
     limit: number = 10,
     organizationId?: string,
-  ): Promise<any[]> {
+  ): Promise<unknown[]> {
     const activityKey = this.key(this.KEYS.ACTIVITY_FEED, groupId, organizationId);
     const activities = await this.redisClient.lrange(activityKey, 0, limit - 1);
-    return activities.map(activity => JSON.parse(activity));
+    return activities.map((activity) => JSON.parse(activity) as unknown);
   }
 
   async clearActivityFeed(groupId: string, organizationId?: string): Promise<void> {

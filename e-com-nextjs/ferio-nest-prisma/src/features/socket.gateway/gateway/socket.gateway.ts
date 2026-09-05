@@ -730,7 +730,7 @@ export class SocketGateway
             ? `conv-${linkedUser.customerId}`
             : prefConvId;
 
-        let validSenderUser: any = null;
+        let validSenderUser: { id: string } | null = null;
 
         if (payload.isGuest) {
           validSenderUser = await db.user.upsert({
@@ -743,10 +743,12 @@ export class SocketGateway
               role: 'user',
               isDeleted: false,
             },
+            select: { id: true },
           });
         } else {
           validSenderUser = await db.user.findFirst({
             where: { id: payload.senderId, isDeleted: false },
+            select: { id: true },
           });
         }
 
