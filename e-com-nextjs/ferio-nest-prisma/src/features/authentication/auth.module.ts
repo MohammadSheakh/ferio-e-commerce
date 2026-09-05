@@ -12,6 +12,7 @@ import { EmailService } from './email/email.service';
 import { OAuthVerificationService } from './oauth/oauth-verification.service';
 import { TwoFactorService } from './two-factor/two-factor.service';
 import { TenancyModule } from '../../tenancy/tenancy.module';
+import { jwtExpirySeconds } from '../../config/jwt-expiry.util';
 
 /**
  * Auth Module
@@ -33,10 +34,10 @@ import { TenancyModule } from '../../tenancy/tenancy.module';
       useFactory: (configService: ConfigService) => ({
         secret: configService.getOrThrow<string>('JWT_ACCESS_SECRET'),
         signOptions: {
-          expiresIn: configService.get<string>(
-            'JWT_ACCESS_EXPIRY',
+          expiresIn: jwtExpirySeconds(
+            configService.get<string>('JWT_ACCESS_EXPIRY', '15m'),
             '15m',
-          ) as never,
+          ),
         },
       }),
     }),

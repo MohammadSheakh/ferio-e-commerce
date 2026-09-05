@@ -30,6 +30,7 @@ import { StructuredLogger } from '@app/common';
 import { TwoFactorService } from '../two-factor/two-factor.service';
 import { TenantDbService } from '../../../tenancy/tenant-db.service';
 import { tryGetTenantContext } from '../../../tenancy/tenant-context';
+import { jwtExpirySeconds } from '../../../config/jwt-expiry.util';
 
 const authUserSelect = {
   id: true,
@@ -597,23 +598,23 @@ export class AuthService {
       ...(organizationId ? { organizationId } : {}),
     };
 
-    const accessExpiry = this.configService.get<string>(
-      'JWT_ACCESS_EXPIRY',
+    const accessExpiry = jwtExpirySeconds(
+      this.configService.get<string>('JWT_ACCESS_EXPIRY', '15m'),
       '15m',
     );
-    const refreshExpiry = this.configService.get<string>(
-      'JWT_REFRESH_EXPIRY',
+    const refreshExpiry = jwtExpirySeconds(
+      this.configService.get<string>('JWT_REFRESH_EXPIRY', '7d'),
       '7d',
     );
 
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(payload, {
         secret: this.configService.getOrThrow<string>('JWT_ACCESS_SECRET'),
-        expiresIn: accessExpiry as never,
+        expiresIn: accessExpiry,
       }),
       this.jwtService.signAsync(payload, {
         secret: this.configService.getOrThrow<string>('JWT_REFRESH_SECRET'),
-        expiresIn: refreshExpiry as never,
+        expiresIn: refreshExpiry,
       }),
     ]);
 

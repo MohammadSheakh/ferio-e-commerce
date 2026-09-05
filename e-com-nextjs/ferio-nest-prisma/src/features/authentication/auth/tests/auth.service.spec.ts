@@ -69,16 +69,16 @@ describe('AuthService token lifecycle', () => {
       get: jest.fn((_key: string, fallback: string) => fallback),
       getOrThrow: jest.fn((key: string) => key),
     };
-  const twoFactorService = { verifyLogin: jest.fn() };
+    const twoFactorService = { verifyLogin: jest.fn() };
     const service = new AuthService(
-      {} as never,                    // prisma
-      { signAsync } as never,         // jwt
-      {} as never,                    // otp
-      {} as never,                    // email
-      {} as never,                    // oauth
-      { getClient: jest.fn() } as never,       // redis
-      configService as never,         // config
-      twoFactorService as never,      // 2fa
+      {} as never, // prisma
+      { signAsync } as never, // jwt
+      {} as never, // otp
+      {} as never, // email
+      {} as never, // oauth
+      { getClient: jest.fn() } as never, // redis
+      configService as never, // config
+      twoFactorService as never, // 2fa
     );
 
     await (
@@ -98,12 +98,12 @@ describe('AuthService token lifecycle', () => {
     expect(signAsync).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({ sub: 'user-1' }),
-      expect.objectContaining({ expiresIn: '15m' }),
+      expect.objectContaining({ expiresIn: 15 * 60 }),
     );
     expect(signAsync).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({ sub: 'user-1' }),
-      expect.objectContaining({ expiresIn: '7d' }),
+      expect.objectContaining({ expiresIn: 7 * 24 * 60 * 60 }),
     );
   });
 
