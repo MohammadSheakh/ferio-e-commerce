@@ -8,8 +8,21 @@
  */
 import { runWithTenantContext, type TenantContext } from './tenant-context';
 import { scopedRedisKey } from './redis-keys.util';
+import { TenantResolverService } from './tenant-resolver.service';
+import { SettingsService } from '../features/settings/services/settings.service';
+import { OtpService } from '../features/authentication/otp/otp.service';
 
-function tenantContext(organizationId: string, hostname: string): TenantContext {
+type CollisionPlatformDouble = {
+  client: {
+    tenantDomain: { findUnique: jest.Mock };
+    tenantDatabase: { findUnique: jest.Mock };
+  };
+};
+
+function tenantContext(
+  organizationId: string,
+  hostname: string,
+): TenantContext {
   return Object.freeze({
     organizationId,
     tenantDatabaseId: `tdb-${organizationId}`,
@@ -24,45 +37,57 @@ function tenantContext(organizationId: string, hostname: string): TenantContext 
     domainId: `dom-${organizationId}`,
     hostname,
     subscriptionStatus: 'ACTIVE' as const,
-  }) as TenantContext;
+  });
 }
 
 describe('MT-2 gate: two hosts resolve deterministically to two organizations', () => {
   function resolverWithOrganizations() {
-    const platform = {
+    const platform: CollisionPlatformDouble = {
       client: {
         tenantDomain: {
-          findUnique: jest.fn().mockImplementation(({ where: { hostname } }: any) => {
-            const slug = hostname.split('.')[0];
-            if (!['tenant-a', 'tenant-b'].includes(slug)) return null;
-            return Promise.resolve({
-              id: `dom-${slug}`,
-              hostname,
-              status: 'ACTIVE',
-              organization: {
-                id: `org-${slug}`,
-                status: 'ACTIVE',
-                subscription: { status: 'ACTIVE' },
+          findUnique: jest
+            .fn()
+            .mockImplementation(
+              ({ where: { hostname } }: { where: { hostname: string } }) => {
+                const slug = hostname.split('.')[0];
+                if (!['tenant-a', 'tenant-b'].includes(slug)) return null;
+                return Promise.resolve({
+                  id: `dom-${slug}`,
+                  hostname,
+                  status: 'ACTIVE',
+                  organization: {
+                    id: `org-${slug}`,
+                    status: 'ACTIVE',
+                    subscription: { status: 'ACTIVE' },
+                  },
+                });
               },
-            });
-          }),
+            ),
         },
         tenantDatabase: {
-          findUnique: jest.fn().mockImplementation(({ where: { organizationId } }: any) =>
-            Promise.resolve({
-              id: `tdb-${organizationId}`,
-              organizationId,
-              status: 'READY',
-              schemaVersion: 'current',
-            }),
-          ),
+          findUnique: jest
+            .fn()
+            .mockImplementation(
+              ({
+                where: { organizationId },
+              }: {
+                where: { organizationId: string };
+              }) =>
+                Promise.resolve({
+                  id: `tdb-${organizationId}`,
+                  organizationId,
+                  status: 'READY',
+                  schemaVersion: 'current',
+                }),
+            ),
         },
       },
     };
     const redis = { getClient: jest.fn().mockResolvedValue(null) };
-    const { TenantResolverService } = require('./tenant-resolver.service');
-    const service = new TenantResolverService(platform as never, redis as never);
-    jest.spyOn(service as any, 'writeCache').mockResolvedValue(undefined);
+    const service = new TenantResolverService(
+      platform as never,
+      redis as never,
+    );
     return { service, redis };
   }
 
@@ -82,7 +107,13 @@ describe('MT-2 gate: two hosts resolve deterministically to two organizations', 
 
     const first = await service.resolveFromHost('tenant-a.ferio.test');
     // Second call hits the positive cache.
-    redis.getClient.mockResolvedValueOnce(JSON.stringify(first));
+    redis.getClient.mockResolvedValueOnce({
+      get: jest
+        .fn()
+        .mockImplementation((key: string) =>
+          key.includes(':neg:') ? null : JSON.stringify(first),
+        ),
+    });
     const second = await service.resolveFromHost('tenant-a.ferio.test');
     const third = await service.resolveFromHost('tenant-a.ferio.test');
 
@@ -127,26 +158,26 @@ describe('MT-8 §11.1: identical record identifiers cannot collide across tenant
   });
 
   it('settings cache keys isolate the same settings type per organization', () => {
-    process.env.PLATFORM_DB_CREDENTIAL_KEY ??= 'ci-platform-db-credential-key-at-least-32-chars';
-    const {
-      SettingsService,
-    } = require('../features/settings/services/settings.service');
-
+    process.env.PLATFORM_DB_CREDENTIAL_KEY ??=
+      'ci-platform-db-credential-key-at-least-32-chars';
     const service = new SettingsService({} as never, {} as never, {} as never);
-    const keyFor = async (organizationId: string) =>
-      runWithTenantContext(tenantContext(organizationId, `${organizationId}.ferio.test`), () =>
-        (service as unknown as { getCacheKey(type: string): string }).getCacheKey('hero_showcase'),
+    const keyFor = (organizationId: string) =>
+      runWithTenantContext(
+        tenantContext(organizationId, `${organizationId}.ferio.test`),
+        () =>
+          (
+            service as unknown as { getCacheKey(type: string): string }
+          ).getCacheKey('hero_showcase'),
       );
 
-    return Promise.all([keyFor('org-a'), keyFor('org-b')]).then(([keyA, keyB]) => {
-      expect(keyA).toBe('settings:org-a:hero_showcase');
-      expect(keyB).toBe('settings:org-b:hero_showcase');
-      expect(keyA).not.toBe(keyB);
-    });
+    const keyA = keyFor('org-a');
+    const keyB = keyFor('org-b');
+    expect(keyA).toBe('settings:org-a:hero_showcase');
+    expect(keyB).toBe('settings:org-b:hero_showcase');
+    expect(keyA).not.toBe(keyB);
   });
 
   it('OTP keys isolate the same email per organization', () => {
-    const { OtpService } = require('../features/authentication/otp/otp.service');
     const otp = new OtpService({} as never);
 
     const keyInA = runWithTenantContext(
