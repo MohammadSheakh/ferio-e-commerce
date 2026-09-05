@@ -1,6 +1,7 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PlatformPrismaService } from '../platform-prisma.service';
 import { PlatformAuditService } from './platform-audit.service';
+import { toPlatformJsonInput } from '../utils/json-input.util';
 
 /**
  * Support access is never implicit (ADR-0004): every grant is reason-bound,
@@ -31,7 +32,7 @@ export class SupportAccessService {
         organizationId: input.organizationId,
         platformUserId: input.platformUserId,
         reason: input.reason.trim(),
-        scope: (input.scope ?? {}) as never,
+        scope: toPlatformJsonInput(input.scope ?? {}),
         expiresAt: new Date(Date.now() + ttl * 60 * 1000),
       },
     });
