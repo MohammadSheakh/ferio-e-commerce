@@ -3,6 +3,8 @@ import { Redis } from 'ioredis';
 import { REDIS_CLIENT } from './redis.constants';
 import { errorMessage } from '@app/common';
 
+export type CacheValueParser<T> = (value: unknown) => T | undefined;
+
 @Injectable()
 export class RedisService {
   private readonly logger = new Logger(RedisService.name);
@@ -21,6 +23,7 @@ export class RedisService {
     key: string,
     fetchFn: () => Promise<T>,
     ttl: number,
+    parseCached: CacheValueParser<T>,
   ): Promise<T> {
     if (!this.redisClient) {
       return await fetchFn();
@@ -29,7 +32,9 @@ export class RedisService {
     try {
       const cached = await this.redisClient.get(key);
       if (cached) {
-        return JSON.parse(cached) as T;
+        const parsed: unknown = JSON.parse(cached);
+        const value = parseCached(parsed);
+        if (value !== undefined) return value;
       }
     } catch (err) {
       this.logger.error(`Redis get error for key ${key}: ${errorMessage(err)}`);

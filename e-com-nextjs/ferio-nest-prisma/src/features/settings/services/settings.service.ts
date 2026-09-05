@@ -38,6 +38,18 @@ function isSettingsSortField(value: string): value is SettingsSortField {
   return (SETTINGS_SORT_FIELDS as readonly string[]).includes(value);
 }
 
+function isSettingsCacheItem(value: unknown): value is Settings {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  return typeof record.id === 'string' && typeof record.type === 'string';
+}
+
+function parseSettingsCache(value: unknown): Settings[] | undefined {
+  return Array.isArray(value) && value.every(isSettingsCacheItem)
+    ? value
+    : undefined;
+}
+
 @Injectable()
 export class SettingsService {
   private readonly logger = new Logger(SettingsService.name);
@@ -120,6 +132,7 @@ export class SettingsService {
       this.getCacheKey(type),
       () => this.fetchSettings(type),
       SETTINGS_CACHE_CONFIG.TTL,
+      parseSettingsCache,
     );
   }
 

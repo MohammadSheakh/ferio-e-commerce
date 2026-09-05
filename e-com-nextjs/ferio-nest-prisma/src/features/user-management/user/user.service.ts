@@ -42,6 +42,38 @@ type UserWithPasswordRecord = Prisma.UserGetPayload<{
   select: typeof userWithPasswordSelect;
 }>;
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isPublicUserCache(value: unknown): value is PublicUserRecord {
+  return isRecord(value) &&
+    typeof value.email === 'string' &&
+    typeof value.role === 'string' &&
+    typeof value.id === 'string' &&
+    typeof value.isDeleted === 'boolean';
+}
+
+function parsePublicUserCache(value: unknown): PublicUserRecord | null | undefined {
+  if (value === null) return null;
+  return isPublicUserCache(value) ? value : undefined;
+}
+
+function isUserStatisticsCache(
+  value: unknown,
+): value is { totalChildren: number } {
+  if (!isRecord(value) || typeof value.totalChildren !== 'number') {
+    return false;
+  }
+  return true;
+}
+
+function parseUserStatisticsCache(
+  value: unknown,
+): { totalChildren: number } | undefined {
+  return isUserStatisticsCache(value) ? value : undefined;
+}
+
 @Injectable()
 export class UserService {
   private readonly logger = new Logger(UserService.name);
@@ -127,6 +159,7 @@ export class UserService {
       this.getCacheKey('profile', id),
       () => this.fetchUserById(id),
       USER_CACHE_CONFIG.PROFILE,
+      parsePublicUserCache,
     );
   }
 
@@ -159,6 +192,7 @@ export class UserService {
       this.getCacheKey('stats', userId),
       () => this.fetchUserStatistics(userId),
       USER_CACHE_CONFIG.STATISTICS,
+      parseUserStatisticsCache,
     );
   }
 

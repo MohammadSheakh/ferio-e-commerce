@@ -37,6 +37,21 @@ type UserProfileWithUser = Prisma.UserProfileGetPayload<{
   };
 }>;
 
+function isUserProfileCache(value: unknown): value is UserProfile {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return false;
+  }
+  const record = value as Record<string, unknown>;
+  return typeof record.id === 'string' &&
+    typeof record.userId === 'string' &&
+    typeof record.isDeleted === 'boolean';
+}
+
+function parseUserProfileCache(value: unknown): UserProfile | null | undefined {
+  if (value === null) return null;
+  return isUserProfileCache(value) ? value : undefined;
+}
+
 /**
  * UserProfile Service
  */
@@ -68,6 +83,7 @@ export class UserProfileService {
       this.getCacheKey(userId),
       () => this.fetchProfileByUserId(userId),
       USER_CACHE_CONFIG.PROFILE,
+      parseUserProfileCache,
     );
   }
 
