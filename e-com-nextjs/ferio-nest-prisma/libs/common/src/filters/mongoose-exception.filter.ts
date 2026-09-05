@@ -5,7 +5,34 @@ import {
   HttpStatus,
   Logger,
 } from '@nestjs/common';
-import { Response } from 'express';
+import { Request, Response } from 'express';
+
+type ErrorRecord = Record<string, unknown>;
+type AuthenticatedRequest = Request & {
+  user?: { userId?: unknown };
+};
+type ErrorResponseBody = {
+  success: false;
+  statusCode: number;
+  message: string;
+  error: string;
+  timestamp: string;
+  path: string;
+  stack?: string;
+};
+
+function asRecord(value: unknown): ErrorRecord {
+  return typeof value === 'object' && value !== null
+    ? (value as ErrorRecord)
+    : {};
+}
+
+function firstObjectKey(value: unknown): string | undefined {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return undefined;
+  }
+  return Object.keys(value)[0];
+}
 
 /**
  * Database Exception Filter
@@ -26,31 +53,34 @@ export class MongooseExceptionFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
-    const request = ctx.getRequest<Request>();
+    const request = ctx.getRequest<AuthenticatedRequest>();
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let message = 'Database error occurred';
     let error = 'Database Error';
 
-    const errorObject = exception as any;
+    const errorObject = asRecord(exception);
+    const code = errorObject.code;
+    const name = errorObject.name;
 
     // Prisma databases often surface structured errors with a code field.
-    if (errorObject?.code === 'P2002' || errorObject?.code === 11000) {
+    if (code === 'P2002' || code === 11000) {
       status = HttpStatus.CONFLICT;
-      const field = Object.keys(errorObject?.meta?.target || errorObject?.keyValue || {})[0];
+      const meta = asRecord(errorObject.meta);
+      const field = firstObjectKey(meta.target) ?? firstObjectKey(errorObject.keyValue);
       message = field ? `${field} already exists` : 'Record already exists';
       error = 'Duplicate Key Error';
     }
 
-    if (errorObject?.code === 'P2025') {
+    if (code === 'P2025') {
       status = HttpStatus.NOT_FOUND;
       message = 'Record not found';
       error = 'Not Found';
     }
 
-    if (errorObject?.name === 'PrismaClientKnownRequestError') {
+    if (name === 'PrismaClientKnownRequestError') {
       status = HttpStatus.BAD_REQUEST;
-      message = errorObject?.message || message;
+      if (typeof errorObject.message === 'string') message = errorObject.message;
       error = 'Database Error';
     }
 
@@ -59,27 +89,28 @@ export class MongooseExceptionFilter implements ExceptionFilter {
       error = exception.name || error;
     }
 
-    if (errorObject?.name === 'MongoServerError') {
+    if (name === 'MongoServerError') {
       status = HttpStatus.SERVICE_UNAVAILABLE;
       message = 'Database service unavailable';
       error = 'Database Unavailable';
     }
 
-    if (errorObject?.name === 'MongoNetworkError') {
+    if (name === 'MongoNetworkError') {
       status = HttpStatus.SERVICE_UNAVAILABLE;
       message = 'Cannot connect to database';
       error = 'Network Error';
     }
 
-    if (errorObject?.name === 'MongoTimeoutError') {
+    if (name === 'MongoTimeoutError') {
       status = HttpStatus.GATEWAY_TIMEOUT;
       message = 'Database operation timed out';
       error = 'Timeout Error';
     }
 
     // Get user ID if authenticated
-    const user = request as any;
-    const userId = user.user?.userId || 'anonymous';
+    const userId = typeof request.user?.userId === 'string'
+      ? request.user.userId
+      : 'anonymous';
 
     // Log error with context
     this.logger.error(
@@ -88,7 +119,7 @@ export class MongooseExceptionFilter implements ExceptionFilter {
     );
 
     // Build response body
-    const responseBody: any = {
+    const responseBody: ErrorResponseBody = {
       success: false,
       statusCode: status,
       message,
@@ -99,7 +130,9 @@ export class MongooseExceptionFilter implements ExceptionFilter {
 
     // Include stack trace in development mode
     if (process.env.NODE_ENV === 'development') {
-      responseBody.stack = exception instanceof Error ? exception.stack : undefined;
+      if (exception instanceof Error && exception.stack) {
+        responseBody.stack = exception.stack;
+      }
     }
 
     response.status(status).json(responseBody);
