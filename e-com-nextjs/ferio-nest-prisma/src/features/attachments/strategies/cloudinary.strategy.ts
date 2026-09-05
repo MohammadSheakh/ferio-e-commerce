@@ -3,6 +3,14 @@ import { v2 as cloudinary } from 'cloudinary';
 import type { UploadApiResponse } from 'cloudinary';
 import { errorMessage } from '@app/common';
 
+type CloudinaryDestroyResult = { result?: unknown };
+
+function isCloudinaryDestroyResult(
+  value: unknown,
+): value is CloudinaryDestroyResult {
+  return typeof value === 'object' && value !== null;
+}
+
 export interface FileUploadResult {
   url: string;
   publicId?: string;
@@ -62,7 +70,9 @@ export class CloudinaryStrategy {
           },
           (error, result) => {
             if (error) {
-              reject(error);
+              const normalizedError = new Error(errorMessage(error));
+              if (error instanceof Error) normalizedError.cause = error;
+              reject(normalizedError);
             } else if (!result) {
               reject(new Error('Cloudinary returned no upload result'));
             } else {
@@ -102,10 +112,15 @@ export class CloudinaryStrategy {
         }
       }
 
-      const result = await cloudinary.uploader.destroy(publicId);
+      const rawResult: unknown = await cloudinary.uploader.destroy(publicId);
+      if (!isCloudinaryDestroyResult(rawResult)) {
+        throw new Error('Cloudinary returned an invalid deletion result');
+      }
 
-      if (result.result !== 'ok') {
-        throw new Error(`Cloudinary deletion failed: ${result.result}`);
+      if (rawResult.result !== 'ok') {
+        throw new Error(
+          `Cloudinary deletion failed: ${String(rawResult.result)}`,
+        );
       }
 
       this.logger.log(`File deleted from Cloudinary: ${publicId}`);

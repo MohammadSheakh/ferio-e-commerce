@@ -156,7 +156,7 @@ function createReportAccumulator(): ReportOrderAcc & {
 
   return {
     ...acc,
-    add(order: ReportOrder): void {
+    add(this: ReportOrderAcc, order: ReportOrder): void {
       if (!this.currency) this.currency = order.currency;
       this.placed += 1;
       if (isConfirmed(order)) {
@@ -266,9 +266,7 @@ export class ReportsService {
    * explicit legacy fallback otherwise. Never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    return this.tenantDb
-      ? this.tenantDb.getOrLegacy(this.prisma)
-      : this.prisma;
+    return this.tenantDb ? this.tenantDb.getOrLegacy(this.prisma) : this.prisma;
   }
   async overview(query: ReportQueryDto) {
     const db = await this.db();
