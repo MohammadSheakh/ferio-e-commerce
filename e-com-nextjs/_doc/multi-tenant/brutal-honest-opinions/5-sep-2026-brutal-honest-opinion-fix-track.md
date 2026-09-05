@@ -47,3 +47,4 @@ and must not be modified to make the project look better.
 - Extended production validation to require the platform database URL, platform JWT secret, platform credential-encryption key, and Redis password. Development/test defaults remain available only outside production.
 - Added `TenantDbService.getOrLegacy()` as the single fail-closed policy for legacy database access. Migrated catalog, customer-account, and refunds services to use it, with regression coverage for legacy mode, missing tenant context, and resolved tenant context. Remaining feature services still need migration.
 - Continued BO-04 migration across checkout, order, and cart services. These commerce paths now use the centralized fail-closed tenant database policy instead of silently falling back when tenancy is enabled.
+- Migrated authentication and user-management database selection to the same centralized policy, removing duplicate environment-based fallback logic from the identity boundary.
