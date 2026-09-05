@@ -14,6 +14,7 @@ import {
 import {
   normalizeCourierStatus,
   secureWebhookCredentialEquals,
+  shippingText,
 } from '../utils/shipping.util';
 
 @Injectable()
@@ -48,10 +49,10 @@ export class PathaoAdapter implements CourierAdapter {
       method: 'POST',
       headers: correlationHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({
-        client_id: this.config.getOrThrow('PATHAO_CLIENT_ID'),
-        client_secret: this.config.getOrThrow('PATHAO_CLIENT_SECRET'),
-        username: this.config.getOrThrow('PATHAO_USERNAME'),
-        password: this.config.getOrThrow('PATHAO_PASSWORD'),
+        client_id: this.config.getOrThrow<string>('PATHAO_CLIENT_ID'),
+        client_secret: this.config.getOrThrow<string>('PATHAO_CLIENT_SECRET'),
+        username: this.config.getOrThrow<string>('PATHAO_USERNAME'),
+        password: this.config.getOrThrow<string>('PATHAO_PASSWORD'),
         grant_type: 'password',
       }),
       signal: AbortSignal.timeout(15000),
@@ -116,11 +117,11 @@ export class PathaoAdapter implements CourierAdapter {
         payload.message || 'Pathao rejected shipment creation',
       );
     }
-    const externalShipmentId = String(payload.data.consignment_id ?? '');
+    const externalShipmentId = shippingText(payload.data.consignment_id);
     if (!externalShipmentId) {
       throw new BadGatewayException('Pathao returned no consignment ID');
     }
-    const rawStatus = String(payload.data.status ?? 'order.created');
+    const rawStatus = shippingText(payload.data.status, 'order.created');
     return {
       externalShipmentId,
       trackingNumber: externalShipmentId,
@@ -148,19 +149,19 @@ export class PathaoAdapter implements CourierAdapter {
   }
 
   parseWebhook(payload: Record<string, unknown>): CourierWebhookEvent {
-    const rawStatus = String(payload.event ?? payload.status ?? 'unknown');
+    const rawStatus = shippingText(payload.event ?? payload.status, 'unknown');
     return {
-      providerEventId: payload.event_id ? String(payload.event_id) : undefined,
+      providerEventId: payload.event_id ? shippingText(payload.event_id) : undefined,
       externalShipmentId: payload.consignment_id
-        ? String(payload.consignment_id)
+        ? shippingText(payload.consignment_id)
         : undefined,
       orderReference: payload.merchant_order_id
-        ? String(payload.merchant_order_id)
+        ? shippingText(payload.merchant_order_id)
         : undefined,
       rawStatus,
       normalizedStatus: normalizeCourierStatus('PATHAO', rawStatus),
       occurredAt: payload.updated_at
-        ? new Date(String(payload.updated_at))
+        ? new Date(shippingText(payload.updated_at))
         : new Date(),
     };
   }

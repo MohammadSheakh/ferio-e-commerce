@@ -10,6 +10,14 @@ export function secureWebhookCredentialEquals(
   return timingSafeEqual(providedDigest, expectedDigest);
 }
 
+export function shippingText(value: unknown, fallback = ''): string {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+  return fallback;
+}
+
 const steadfastStatuses: Record<string, OrderShipmentStatus> = {
   in_review: 'CREATED',
   pending: 'CREATED',

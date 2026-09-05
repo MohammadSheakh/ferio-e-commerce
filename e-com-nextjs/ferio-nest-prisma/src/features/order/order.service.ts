@@ -9,7 +9,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { createHash, randomBytes, randomInt, timingSafeEqual } from 'crypto';
 import type { PrismaClient } from '@prisma/client';
-import { CodVerificationMode, OrderStatus, Prisma } from '@prisma/client';
+import { OrderStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '@app/database';
 import { TenantDbService } from '../../tenancy/tenant-db.service';
 import { tryGetTenantContext } from '../../tenancy/tenant-context';
@@ -738,7 +738,7 @@ export class OrderService {
       const orderId = await db.$transaction(
         async (transaction) => {
           const cart = await transaction.cart.findUnique({
-            where: { id: validatedCart.id! },
+            where: { id: validatedCart.id },
             include: {
               checkoutDraft: { include: { deliveryZone: true } },
               items: {

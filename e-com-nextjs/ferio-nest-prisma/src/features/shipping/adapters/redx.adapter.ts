@@ -15,6 +15,7 @@ import {
 import {
   normalizeCourierStatus,
   secureWebhookCredentialEquals,
+  shippingText,
 } from '../utils/shipping.util';
 
 @Injectable()
@@ -124,21 +125,21 @@ export class RedxAdapter implements CourierAdapter {
   }
 
   parseWebhook(payload: Record<string, unknown>): CourierWebhookEvent {
-    const rawStatus = String(payload.status || payload.event || 'unknown');
+    const rawStatus = shippingText(payload.status || payload.event, 'unknown');
     return {
-      providerEventId: payload.event_id ? String(payload.event_id) : undefined,
+      providerEventId: payload.event_id ? shippingText(payload.event_id) : undefined,
       externalShipmentId:
         payload.tracking_number || payload.tracking_id
-          ? String(payload.tracking_number || payload.tracking_id)
+          ? shippingText(payload.tracking_number || payload.tracking_id)
           : undefined,
       orderReference:
         payload.invoice_number || payload.merchant_invoice_id
-          ? String(payload.invoice_number || payload.merchant_invoice_id)
+          ? shippingText(payload.invoice_number || payload.merchant_invoice_id)
           : undefined,
       rawStatus,
       normalizedStatus: normalizeCourierStatus('REDX', rawStatus),
       occurredAt: payload.timestamp
-        ? new Date(String(payload.timestamp))
+        ? new Date(shippingText(payload.timestamp))
         : new Date(),
     };
   }

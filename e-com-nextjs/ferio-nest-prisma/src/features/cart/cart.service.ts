@@ -1,6 +1,5 @@
 import {
   ConflictException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -49,19 +48,30 @@ type SellableVariant = Prisma.ProductVariantGetPayload<{
   };
 }>;
 
-const savedCartItemInclude = {
-  inventory: true,
-  product: {
-    include: {
-      category: true,
-      media: { orderBy: { sortOrder: 'asc' as const } },
-    },
-  },
-} satisfies Prisma.ProductVariantInclude;
-
-type SavedCartItemRecord = Prisma.SavedCartItemGetPayload<{
-  include: { variant: { include: typeof savedCartItemInclude } };
-}>;
+type SavedCartItemRecord = {
+  id: string;
+  variantId: string;
+  quantity: number;
+  variant: {
+    name: string;
+    price: number;
+    isActive: boolean;
+    inventory: Array<{
+      onHand: number;
+      reserved: number;
+      damaged: number;
+    }>;
+    product: {
+      id: string;
+      slug: string;
+      name: string;
+      status: string;
+      publishedAt: Date | null;
+      category: { isActive: boolean } | null;
+      media: Array<{ type: string; url: string }>;
+    } | null;
+  } | null;
+};
 
 type SavedCartRecord = {
   id: string;

@@ -15,6 +15,7 @@ import {
 import {
   normalizeCourierStatus,
   secureWebhookCredentialEquals,
+  shippingText,
 } from '../utils/shipping.util';
 
 @Injectable()
@@ -95,7 +96,7 @@ export class EcourierAdapter implements CourierAdapter {
       throw new BadGatewayException('eCourier returned no tracking ID');
     }
 
-    const rawStatus = String(payload.status || 'pending');
+    const rawStatus = shippingText(payload.status, 'pending');
     const trackingUrl = `https://ecourier.com.bd/track-parcel?tracking_id=${externalShipmentId}`;
 
     return {
@@ -123,20 +124,20 @@ export class EcourierAdapter implements CourierAdapter {
   }
 
   parseWebhook(payload: Record<string, unknown>): CourierWebhookEvent {
-    const rawStatus = String(payload.status || payload.event || 'unknown');
+    const rawStatus = shippingText(payload.status || payload.event, 'unknown');
     return {
-      providerEventId: payload.event_id ? String(payload.event_id) : undefined,
+      providerEventId: payload.event_id ? shippingText(payload.event_id) : undefined,
       externalShipmentId: payload.tracking_id
-        ? String(payload.tracking_id)
+        ? shippingText(payload.tracking_id)
         : undefined,
       orderReference:
         payload.product_id || payload.package_code
-          ? String(payload.product_id || payload.package_code)
+          ? shippingText(payload.product_id || payload.package_code)
           : undefined,
       rawStatus,
       normalizedStatus: normalizeCourierStatus('ECOURIER', rawStatus),
       occurredAt: payload.updated_at
-        ? new Date(String(payload.updated_at))
+        ? new Date(shippingText(payload.updated_at))
         : new Date(),
     };
   }

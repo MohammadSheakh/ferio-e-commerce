@@ -8,7 +8,6 @@ import {
 } from '@nestjs/common';
 import { createHash, randomBytes } from 'crypto';
 import {
-  OrderShipmentStatus,
   Prisma,
   ShipmentProviderCode,
 } from '@prisma/client';
