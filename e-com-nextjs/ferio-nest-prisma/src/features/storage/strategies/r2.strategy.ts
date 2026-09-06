@@ -53,6 +53,23 @@ import {
   tenantObjectKey,
 } from '../../../tenancy/object-keys.util';
 
+export function sanitizeStoragePath(value: string, fallback = 'misc'): string {
+  const segments = value
+    .normalize('NFKC')
+    .split(/[\\/]+/)
+    .map((segment) => sanitizeStorageSegment(segment))
+    .filter((segment) => segment.length > 0 && segment !== '.');
+  return segments.join('/') || fallback;
+}
+
+function sanitizeStorageSegment(value: string): string {
+  return value
+    .replace(/\.+/g, '.')
+    .replace(/[^A-Za-z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 120);
+}
+
 /**
  * Cloudflare R2 storage strategy (PO-017 / owner decision #6).
  *
@@ -166,10 +183,10 @@ export class R2Strategy implements StorageStrategy {
     filename: string,
     contentType: string,
   ): Promise<{ key: string; url: string }> {
-    const safeFolder = folder
-      .replace(/\.+/g, '.')
-      .replace(/^[\\/]+|[\\/]+$/g, '');
-    const safeName = filename.replace(/\s+/g, '-');
+    const safeFolder = sanitizeStoragePath(folder);
+    const safeName =
+      sanitizeStorageSegment(filename.replace(/[\\/]+/g, '-')) ||
+      'upload.bin';
     const key = tenantObjectKey(safeFolder, `${Date.now()}-${safeName}`);
     const url = await s3Presign(
       this.s3Client,
