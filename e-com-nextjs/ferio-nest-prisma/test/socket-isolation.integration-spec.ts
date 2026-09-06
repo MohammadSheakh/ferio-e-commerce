@@ -435,4 +435,49 @@ describe('Two-tenant live socket isolation (§10.11 multi-client E2E)', () => {
     await adminB.expectSilence('new-message-received');
     await guestB.client.expectSilence('new-message-received');
   });
+
+  it('measures tenant-scoped fanout without cross-tenant delivery', async () => {
+    const listenersPerTenant = 25;
+    const connectStarted = performance.now();
+    const [orgA, orgB] = await Promise.all([
+      Promise.all(
+        Array.from({ length: listenersPerTenant }, () => connectAdmin('org-a')),
+      ),
+      Promise.all(
+        Array.from({ length: listenersPerTenant }, () => connectAdmin('org-b')),
+      ),
+    ]);
+    const connectMs = Math.round(performance.now() - connectStarted);
+
+    const event = 'notification::admin-shared';
+    const fanoutStarted = performance.now();
+    await runWithTenantContext(tenantContext('org-a'), () =>
+      gateway.emitNotificationToUser('admin-shared', {
+        from: 'org-a',
+        capacityProbe: true,
+      }),
+    );
+    const ownTenantMessages = await Promise.all(
+      orgA.map((client) => client.waitFor<{ from: string }>(event)),
+    );
+    const fanoutMs = Math.round(performance.now() - fanoutStarted);
+
+    expect(ownTenantMessages).toHaveLength(listenersPerTenant);
+    expect(ownTenantMessages.every((message) => message.from === 'org-a')).toBe(
+      true,
+    );
+    await Promise.all(orgB.map((client) => client.expectSilence(event)));
+
+    console.log(
+      JSON.stringify({
+        event: 'perf_socket_tenant_fanout',
+        listenersPerTenant,
+        totalConnections: listenersPerTenant * 2,
+        connectMs,
+        fanoutMs,
+        deliveredToOwnTenant: ownTenantMessages.length,
+        deliveredToForeignTenant: 0,
+      }),
+    );
+  });
 });
