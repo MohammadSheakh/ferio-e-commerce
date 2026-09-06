@@ -15,6 +15,7 @@ describe('StaffAccessService', () => {
       user: { create: jest.fn(), update: jest.fn() },
       staffAccessToken: { update: jest.fn(), updateMany: jest.fn() },
     };
+    type TransactionOperation = (value: typeof transaction) => Promise<unknown>;
     const prisma = {
       user: {
         findUnique: jest.fn(),
@@ -26,11 +27,15 @@ describe('StaffAccessService', () => {
         create: jest.fn(),
         findUnique: jest.fn(),
       },
-      $transaction: jest.fn(async (operation) => operation(transaction)),
+      $transaction: jest.fn((operation: TransactionOperation) =>
+        operation(transaction),
+      ),
     };
     const audit = { record: jest.fn() };
     const email = { sendStaffAccessEmail: jest.fn() };
-    const config = { get: jest.fn((_key, fallback) => fallback) };
+    const config = {
+      get: jest.fn((_key: string, fallback: unknown) => fallback),
+    };
     return {
       service: new StaffAccessService(
         prisma as never,
@@ -49,11 +54,10 @@ describe('StaffAccessService', () => {
     const { service, prisma, email } = createService();
     prisma.user.findUnique.mockResolvedValue(null);
     prisma.staffAccessToken.updateMany.mockResolvedValue({ count: 0 });
-    prisma.staffAccessToken.create.mockImplementation(async ({ data }) => ({
-      id: 'invite-1',
-      ...data,
-      createdAt: new Date(),
-    }));
+    prisma.staffAccessToken.create.mockImplementation(
+      ({ data }: { data: Record<string, unknown> }) =>
+        Promise.resolve({ id: 'invite-1', ...data, createdAt: new Date() }),
+    );
 
     await service.invite(
       {
@@ -64,8 +68,12 @@ describe('StaffAccessService', () => {
       actor,
     );
 
-    const rawToken = email.sendStaffAccessEmail.mock.calls[0][1];
-    const stored = prisma.staffAccessToken.create.mock.calls[0][0].data;
+    const emailCall = (email.sendStaffAccessEmail.mock.calls as unknown[][])[0];
+    const rawToken = emailCall?.[1] as string;
+    const createCall = (
+      prisma.staffAccessToken.create.mock.calls as unknown[][]
+    )[0]?.[0] as { data: { tokenHash: string; email: string } };
+    const stored = createCall.data;
     expect(rawToken).toHaveLength(43);
     expect(stored.tokenHash).toMatch(/^[a-f0-9]{64}$/);
     expect(stored.tokenHash).not.toBe(rawToken);
@@ -88,20 +96,25 @@ describe('StaffAccessService', () => {
 
     await service.acceptInvite('raw-token', 'strong-password');
 
-    expect(transaction.staffAccessToken.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({ id: 'invite-1', consumedAt: null }),
-      }),
-    );
-    expect(transaction.user.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          role: 'staff',
-          staffAccessStatus: 'active',
-          staffPermissions: [PERMISSIONS.ORDERS_READ],
-        }),
-      }),
-    );
+    const consumeCall = (
+      transaction.staffAccessToken.updateMany.mock.calls as unknown[][]
+    )[0]?.[0] as { where: { id: string; consumedAt: null } };
+    expect(consumeCall.where.id).toBe('invite-1');
+    expect(consumeCall.where.consumedAt).toBeNull();
+    const userCreateCall = (
+      transaction.user.create.mock.calls as unknown[][]
+    )[0]?.[0] as {
+      data: {
+        role: string;
+        staffAccessStatus: string;
+        staffPermissions: string[];
+      };
+    };
+    expect(userCreateCall.data).toMatchObject({
+      role: 'staff',
+      staffAccessStatus: 'active',
+      staffPermissions: [PERMISSIONS.ORDERS_READ],
+    });
   });
 
   it('rejects a token lost to a concurrent consumer', async () => {
@@ -157,15 +170,20 @@ describe('StaffAccessService', () => {
       actor,
     );
 
-    expect(prisma.user.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          staffAccessStatus: 'inactive',
-          staffPermissions: [PERMISSIONS.CUSTOMERS_READ],
-          staffSessionVersion: { increment: 1 },
-        }),
-      }),
-    );
+    const updateCall = (
+      prisma.user.update.mock.calls as unknown[][]
+    )[0]?.[0] as {
+      data: {
+        staffAccessStatus: string;
+        staffPermissions: string[];
+        staffSessionVersion: { increment: number };
+      };
+    };
+    expect(updateCall.data.staffAccessStatus).toBe('inactive');
+    expect(updateCall.data.staffPermissions).toEqual([
+      PERMISSIONS.CUSTOMERS_READ,
+    ]);
+    expect(updateCall.data.staffSessionVersion).toEqual({ increment: 1 });
     expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'STAFF_ACCESS_UPDATED' }),
     );
