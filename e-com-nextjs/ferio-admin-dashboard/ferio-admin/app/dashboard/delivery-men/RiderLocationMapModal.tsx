@@ -2,6 +2,11 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
+import type {
+  LeafletApi,
+  LeafletLayerGroup,
+  LeafletMap,
+} from "@/lib/leaflet-types";
 
 type LocationHistoryItem = {
   id: string;
@@ -23,53 +28,12 @@ type RiderMapItem = {
   locationHistory: LocationHistoryItem[];
 };
 
-type LeafletMap = {
-  setView(center: [number, number], zoom: number): LeafletMap;
-  invalidateSize(): void;
-  fitBounds(bounds: [number, number][], options: { padding: [number, number] }): void;
+type RiderMapResponse = {
+  data?: {
+    riders?: RiderMapItem[];
+  };
+  message?: string;
 };
-
-interface LeafletLayer {
-  addTo(target: LeafletMap | LeafletLayerGroup): this;
-}
-
-type LeafletLayerGroup = LeafletLayer & {
-  clearLayers(): void;
-};
-
-type LeafletMarker = LeafletLayer & {
-  bindPopup(content: string): LeafletMarker;
-  bindTooltip(content: string, options: { direction: string; offset: [number, number] }): LeafletMarker;
-  on(event: string, handler: () => void | Promise<void>): LeafletMarker;
-  setPopupContent(content: string): LeafletMarker;
-  setTooltipContent(content: string): LeafletMarker;
-};
-
-type LeafletApi = {
-  map(element: HTMLElement): LeafletMap;
-  tileLayer(url: string, options: { attribution: string; maxZoom: number }): LeafletLayer;
-  layerGroup(): LeafletLayerGroup;
-  divIcon(options: {
-    html: string;
-    className: string;
-    iconSize: [number, number];
-    iconAnchor: [number, number];
-  }): unknown;
-  marker(
-    point: [number, number],
-    options: { icon: unknown },
-  ): LeafletMarker;
-  polyline(
-    points: [number, number][],
-    options: { color: string; weight: number; opacity: number; dashArray: string },
-  ): LeafletLayer;
-};
-
-declare global {
-  interface Window {
-    L?: LeafletApi;
-  }
-}
 
 function escapeHtml(value: unknown) {
   return String(value ?? "")
@@ -215,13 +179,11 @@ export default function RiderLocationMapModal({
       const res = await fetch("/api/delivery-personnel/map-data", {
         cache: "no-store",
       });
-      const payload = await res.json();
+      const payload = (await res.json()) as RiderMapResponse;
       if (!res.ok || !payload.data) {
         throw new Error(payload.message || "Failed to load location data.");
       }
-      const found = (payload.data.riders || []).find(
-        (r: any) => r.id === riderId,
-      );
+      const found = (payload.data.riders || []).find((rider) => rider.id === riderId);
       if (found) {
         setRider(found);
       } else {
