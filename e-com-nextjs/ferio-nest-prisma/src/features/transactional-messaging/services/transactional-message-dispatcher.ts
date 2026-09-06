@@ -1,7 +1,6 @@
 import { Injectable, Optional } from '@nestjs/common';
 import {
   CommerceMessageAttemptStatus,
-  CommerceMessageChannel,
   Prisma,
   PrismaClient,
 } from '@prisma/client';
@@ -37,7 +36,11 @@ export class TransactionalMessageDispatcher {
     ]);
 
     if (!policy?.enabled || policy.channelPriority.length === 0) {
-      return this.block(db, messageId, 'Transactional routing policy is disabled');
+      return this.block(
+        db,
+        messageId,
+        'Transactional routing policy is disabled',
+      );
     }
 
     const channelPlan =
@@ -148,9 +151,7 @@ export class TransactionalMessageDispatcher {
   }
 
   private async db(): Promise<PrismaClient> {
-    return this.tenantDb
-      ? this.tenantDb.getOrLegacy(this.prisma)
-      : this.prisma;
+    return this.tenantDb ? this.tenantDb.getOrLegacy(this.prisma) : this.prisma;
   }
 
   private block(db: PrismaClient, messageId: string, reason: string) {

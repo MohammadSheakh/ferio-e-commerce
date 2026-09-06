@@ -30,9 +30,7 @@ export class CustomerAccountService {
    * outside resolved requests. Never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    return this.tenantDb
-      ? this.tenantDb.getOrLegacy(this.prisma)
-      : this.prisma;
+    return this.tenantDb ? this.tenantDb.getOrLegacy(this.prisma) : this.prisma;
   }
   async link(dto: LinkCustomerAccountDto, actor: UserPayload) {
     const db = await this.db();
@@ -225,7 +223,9 @@ export class CustomerAccountService {
     let phoneNormalized = phone;
     try {
       phoneNormalized = normalizeBangladeshPhone(phone);
-    } catch {}
+    } catch {
+      // Keep the original phone value when normalization rejects it.
+    }
 
     const existing = await db.customer.findFirst({
       where: {
@@ -278,7 +278,9 @@ export class CustomerAccountService {
     let phoneNormalized = dto.phone ? dto.phone.trim() : '01700000000';
     try {
       phoneNormalized = normalizeBangladeshPhone(dto.phone);
-    } catch {}
+    } catch {
+      // Keep the DTO fallback when normalization rejects the supplied phone.
+    }
 
     await db.customerAddress.create({
       data: {

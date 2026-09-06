@@ -1,15 +1,8 @@
 import { Body, Controller, Get, Inject, Post, UseGuards } from '@nestjs/common';
-import {
-  AuthGuard,
-  PermissionsGuard,
-  Roles,
-  RolesGuard,
-  type UserPayload,
-} from '@app/common';
+import { AuthGuard, PermissionsGuard, Roles, RolesGuard } from '@app/common';
 import { TenantMembershipGuard } from '../../tenancy/tenant-membership.guard';
 import { tryGetTenantContext } from '../../tenancy/tenant-context';
 import type { StorageStrategy } from './strategies/r2.strategy';
-
 
 /**
  * MT-10 storage surface (owner decision #6): presigned direct-to-bucket
@@ -24,7 +17,9 @@ import type { StorageStrategy } from './strategies/r2.strategy';
 @UseGuards(AuthGuard, RolesGuard, PermissionsGuard, TenantMembershipGuard)
 @Roles('admin')
 export class StorageController {
-  constructor(@Inject('STORAGE_STRATEGY') private readonly strategy: StorageStrategy) {}
+  constructor(
+    @Inject('STORAGE_STRATEGY') private readonly strategy: StorageStrategy,
+  ) {}
 
   private assertOwnNamespace(key: string): void {
     const context = tryGetTenantContext();
@@ -44,7 +39,11 @@ export class StorageController {
   @Post('presign-put')
   async presignPut(
     @Body()
-    body: { folder: string; filename: string; contentType: string },
+    body: {
+      folder: string;
+      filename: string;
+      contentType: string;
+    },
   ) {
     // The strategy builds the server-side tenant-scoped key; clients cannot
     // rename paths or escape their own prefix.

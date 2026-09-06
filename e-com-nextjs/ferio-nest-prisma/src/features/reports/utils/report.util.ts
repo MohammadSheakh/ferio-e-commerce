@@ -32,9 +32,16 @@ export function maskExportName(name: string) {
 }
 
 export function csvCell(value: unknown) {
-  const normalized = String(value ?? '')
-    .replace(/\r?\n/g, ' ')
-    .trim();
+  const scalar =
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean' ||
+    typeof value === 'bigint'
+      ? value.toString()
+      : value instanceof Date
+        ? value.toISOString()
+        : '';
+  const normalized = scalar.replace(/\r?\n/g, ' ').trim();
   const formulaSafe = /^[=+\-@]/.test(normalized)
     ? `'${normalized}`
     : normalized;

@@ -58,7 +58,8 @@ export class CatalogService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     @Optional() private readonly tenantDb?: TenantDbService,
-    @Optional() private readonly entitlements?: import('../../platform/services/entitlements.service').EntitlementsService,
+    @Optional()
+    private readonly entitlements?: import('../../platform/services/entitlements.service').EntitlementsService,
   ) {}
 
   /**
@@ -68,9 +69,7 @@ export class CatalogService {
    * The fallback is EXPLICIT here — TenantDbService.tryGet() never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    return this.tenantDb
-      ? this.tenantDb.getOrLegacy(this.prisma)
-      : this.prisma;
+    return this.tenantDb ? this.tenantDb.getOrLegacy(this.prisma) : this.prisma;
   }
 
   private slugify(value: string): string {
@@ -109,7 +108,10 @@ export class CatalogService {
         'Second-hand products require a condition grade',
       );
     }
-    if (condition === 'SECOND_HAND' && (conditionNote?.trim().length ?? 0) < 10) {
+    if (
+      condition === 'SECOND_HAND' &&
+      (conditionNote?.trim().length ?? 0) < 10
+    ) {
       throw new BadRequestException(
         'Second-hand products require a condition disclosure of at least 10 characters',
       );
@@ -142,10 +144,7 @@ export class CatalogService {
         'Receipts and customer returns must increase stock',
       );
     }
-    if (
-      dto.adjustmentReason === 'DAMAGE_WRITE_OFF' &&
-      dto.quantityDelta > 0
-    ) {
+    if (dto.adjustmentReason === 'DAMAGE_WRITE_OFF' && dto.quantityDelta > 0) {
       throw new BadRequestException('Damage write-offs must reduce stock');
     }
     if (
@@ -189,8 +188,8 @@ export class CatalogService {
       const id =
         parsed.hostname === 'youtu.be'
           ? parsed.pathname.slice(1)
-          : parsed.searchParams.get('v') ??
-            parsed.pathname.match(/^\/shorts\/([^/]+)/)?.[1];
+          : (parsed.searchParams.get('v') ??
+            parsed.pathname.match(/^\/shorts\/([^/]+)/)?.[1]);
       if (!id || !/^[A-Za-z0-9_-]{6,20}$/.test(id)) {
         throw new BadRequestException('Valid YouTube video link required');
       }
@@ -547,10 +546,7 @@ export class CatalogService {
           ? {
               products: {
                 some: {
-                  OR: [
-                    { categoryId },
-                    { category: { parentId: categoryId } },
-                  ],
+                  OR: [{ categoryId }, { category: { parentId: categoryId } }],
                 },
               },
             }
@@ -658,9 +654,7 @@ export class CatalogService {
               create: dto.variants.map((variant) => ({
                 name: variant.name.trim(),
                 sku: variant.sku.trim().toUpperCase(),
-                attributes: variant.attributes as
-                  | Prisma.InputJsonValue
-                  | undefined,
+                attributes: variant.attributes,
                 price: variant.price,
                 compareAtPrice: variant.compareAtPrice,
                 isActive: variant.isActive ?? true,
@@ -851,8 +845,10 @@ export class CatalogService {
             slug: dto.slug,
             description: dto.description?.trim(),
             categoryId: dto.categoryId,
-            brand: resolvedBrandName !== undefined ? resolvedBrandName : undefined,
-            brandId: resolvedBrandId !== undefined ? resolvedBrandId : undefined,
+            brand:
+              resolvedBrandName !== undefined ? resolvedBrandName : undefined,
+            brandId:
+              resolvedBrandId !== undefined ? resolvedBrandId : undefined,
             isFeatured: dto.isFeatured,
             codAvailable: dto.codAvailable,
             deliveryNote: dto.deliveryNote?.trim(),

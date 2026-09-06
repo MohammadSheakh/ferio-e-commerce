@@ -1,7 +1,6 @@
 import {
   BadRequestException,
   ConflictException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
   Optional,
@@ -29,17 +28,16 @@ export class WalletService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly notifications: CustomerNotificationsService,
-  
-    @Optional() private readonly tenantDb?: TenantDbService,) {}
+
+    @Optional() private readonly tenantDb?: TenantDbService,
+  ) {}
 
   /**
    * MT-7: inside a tenant-resolved request this returns the resolved tenant
    * database client; outside one it explicitly falls back to the legacy DB.
    */
   private async db(): Promise<PrismaClient> {
-    return this.tenantDb
-      ? this.tenantDb.getOrLegacy(this.prisma)
-      : this.prisma;
+    return this.tenantDb ? this.tenantDb.getOrLegacy(this.prisma) : this.prisma;
   }
   private idempotencyHash(raw?: string) {
     const value = raw?.trim();
@@ -163,7 +161,9 @@ export class WalletService {
           .trim()
           .toUpperCase();
         if (customerReference.length < 4) {
-          throw new BadRequestException('A valid transaction reference is required');
+          throw new BadRequestException(
+            'A valid transaction reference is required',
+          );
         }
         const duplicate = await transaction.walletTopUp.findFirst({
           where: {
@@ -174,7 +174,9 @@ export class WalletService {
           },
         });
         if (duplicate) {
-          throw new ConflictException('This top-up reference was already submitted');
+          throw new ConflictException(
+            'This top-up reference was already submitted',
+          );
         }
         const wallet = await this.ensureWallet(transaction, userId);
         return transaction.walletTopUp.create({
@@ -238,7 +240,9 @@ export class WalletService {
         if (!topUp) throw new NotFoundException('Wallet top-up not found');
         if (topUp.status === dto.status) return topUp;
         if (topUp.status !== 'PENDING_REVIEW') {
-          throw new ConflictException(`Top-up is already ${topUp.status.toLowerCase()}`);
+          throw new ConflictException(
+            `Top-up is already ${topUp.status.toLowerCase()}`,
+          );
         }
         if (dto.status === 'COMPLETED') {
           // Prisma returns the post-update row: derive an exact audit trail
@@ -331,7 +335,8 @@ export class WalletService {
       where: { id: wallet.id, amount: { gte: amount }, status: 'active' },
       data: { amount: { decrement: amount } },
     });
-    if (!changed.count) throw new ConflictException('Insufficient wallet balance');
+    if (!changed.count)
+      throw new ConflictException('Insufficient wallet balance');
     // Re-read inside this transaction for the authoritative post-debit value.
     const walletAfterDebit = await transaction.wallet.findUniqueOrThrow({
       where: { id: wallet.id },
@@ -368,9 +373,11 @@ export class WalletService {
     if (existing) return existing;
     // Fail closed against over-crediting: a refund can never exceed the
     // wallet debit recorded for this order.
-    const originalDebit = await transaction.walletTransactionHistory.findUnique({
-      where: { idempotencyKey: `order:${orderId}:debit` },
-    });
+    const originalDebit = await transaction.walletTransactionHistory.findUnique(
+      {
+        where: { idempotencyKey: `order:${orderId}:debit` },
+      },
+    );
     if (
       !originalDebit ||
       originalDebit.type !== 'debit' ||
@@ -384,11 +391,15 @@ export class WalletService {
       where: { customerId },
       select: { id: true },
     });
-    if (!user) throw new ConflictException('Wallet owner could not be resolved');
+    if (!user)
+      throw new ConflictException('Wallet owner could not be resolved');
     const wallet = await this.ensureWallet(transaction, user.id);
     const updatedWallet = await transaction.wallet.update({
       where: { id: wallet.id },
-      data: { amount: { increment: amount }, totalBalance: { increment: amount } },
+      data: {
+        amount: { increment: amount },
+        totalBalance: { increment: amount },
+      },
     });
     return transaction.walletTransactionHistory.create({
       data: {

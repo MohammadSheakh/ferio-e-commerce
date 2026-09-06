@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Prisma, Settings } from '@prisma/client';
 import { PrismaService } from '@app/database';
 import { RedisService } from '@app/redis';
@@ -75,9 +75,7 @@ export class SettingsService {
 
   /** Tenant client inside resolved requests; legacy DB otherwise (MT-7). */
   private async db(): Promise<PrismaClient> {
-    return this.tenantDb
-      ? this.tenantDb.getOrLegacy(this.prisma)
-      : this.prisma;
+    return this.tenantDb ? this.tenantDb.getOrLegacy(this.prisma) : this.prisma;
   }
 
   async createOrUpdateSettings(
@@ -148,7 +146,9 @@ export class SettingsService {
     return db.settings.findMany({ orderBy: { type: 'asc' } });
   }
 
-  private settingsWhere(filters: Record<string, unknown>): Prisma.SettingsWhereInput {
+  private settingsWhere(
+    filters: Record<string, unknown>,
+  ): Prisma.SettingsWhereInput {
     const value = cleanFilters(filters).type;
     return isSettingsType(value) ? { type: value } : {};
   }

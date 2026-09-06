@@ -161,7 +161,17 @@ export function renderMessageTemplate(
     /{{\s*([A-Za-z][A-Za-z0-9_]*)\s*}}/g,
     (_token, variable: string) => {
       const value = payload[variable];
-      return value === null || value === undefined ? '' : String(value);
+      if (value === null || value === undefined) return '';
+      if (
+        typeof value === 'string' ||
+        typeof value === 'number' ||
+        typeof value === 'boolean' ||
+        typeof value === 'bigint'
+      ) {
+        return value.toString();
+      }
+      if (value instanceof Date) return value.toISOString();
+      return '';
     },
   );
 }

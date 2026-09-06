@@ -108,6 +108,7 @@ export class R2Strategy implements StorageStrategy {
 
   /** Tenant-scoped object key; folder/legacy handling mirrors PO-017. */
   private keyFor(publicIdOrKeyOrFolder: string, filename?: string): string {
+    void filename;
     // A stored publicId IS the full key for R2.
     return publicIdOrKeyOrFolder;
   }
