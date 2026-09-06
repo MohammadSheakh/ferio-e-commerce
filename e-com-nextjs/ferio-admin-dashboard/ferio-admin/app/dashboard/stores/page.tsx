@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Topbar from "@/components/Topbar";
 import Pagination from "@/components/Pagination";
 import CopyableId from "@/components/CopyableId";
+import { getErrorMessage } from "@/lib/backend";
 
 interface StoreLocation {
   id: string;
@@ -72,8 +73,8 @@ export default function StoresPage() {
       setStores(items);
       setTotalItems(total);
       setTotalPages(pages);
-    } catch (err: any) {
-      setError(err.message || "Failed to load store locations");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Failed to load store locations"));
     } finally {
       setLoading(false);
     }
@@ -170,8 +171,8 @@ export default function StoresPage() {
 
       setShowModal(false);
       loadStores();
-    } catch (err: any) {
-      setError(err.message || "Failed to save store location");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Failed to save store location"));
     } finally {
       setSaving(false);
     }
@@ -188,8 +189,8 @@ export default function StoresPage() {
       });
       if (!res.ok) throw new Error("Failed to update store status");
       loadStores();
-    } catch (err: any) {
-      alert(err.message);
+    } catch (err: unknown) {
+      alert(getErrorMessage(err, "Failed to update store status"));
     }
   };
 

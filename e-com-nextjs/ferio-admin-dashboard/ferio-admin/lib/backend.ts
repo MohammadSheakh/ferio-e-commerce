@@ -29,3 +29,12 @@ export function getApiMessage(payload: unknown): string {
 
   return correlationId ? `${text} Support reference: ${correlationId}.` : text;
 }
+
+export function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === "object" && error !== null) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string" && message) return message;
+  }
+  return fallback;
+}
