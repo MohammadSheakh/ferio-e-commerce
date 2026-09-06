@@ -108,4 +108,54 @@ describe('BullMQ queue capacity smoke', () => {
       await worker.close();
     }
   }, 45_000);
+
+  it('keeps concurrent multi-instance scheduler registration idempotent', async () => {
+    const schedulerQueueName = `scheduler-capacity-${process.pid}`;
+    const schedulerId = `${queuePrefix}:scheduler:${process.pid}`;
+    const firstInstance = new Queue(schedulerQueueName, {
+      connection,
+      prefix: queuePrefix,
+    });
+    const secondInstance = new Queue(schedulerQueueName, {
+      connection,
+      prefix: queuePrefix,
+    });
+
+    try {
+      await Promise.all([
+        firstInstance.waitUntilReady(),
+        secondInstance.waitUntilReady(),
+      ]);
+      await firstInstance.obliterate({ force: true });
+      await Promise.all([
+        firstInstance.upsertJobScheduler(
+          schedulerId,
+          { every: 60_000 },
+          { name: 'scheduler-capacity-probe', data: {} },
+        ),
+        secondInstance.upsertJobScheduler(
+          schedulerId,
+          { every: 60_000 },
+          { name: 'scheduler-capacity-probe', data: {} },
+        ),
+      ]);
+
+      const schedulers = await firstInstance.getJobSchedulers();
+      const matching = schedulers.filter(
+        (scheduler) => scheduler.id === schedulerId,
+      );
+      expect(matching).toHaveLength(1);
+      console.log(
+        JSON.stringify({
+          event: 'perf_queue_scheduler_idempotence',
+          instances: 2,
+          schedulerId,
+          matchingSchedulers: matching.length,
+        }),
+      );
+    } finally {
+      await firstInstance.obliterate({ force: true }).catch(() => undefined);
+      await Promise.all([firstInstance.close(), secondInstance.close()]);
+    }
+  }, 30_000);
 });
