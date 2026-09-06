@@ -9,7 +9,13 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiParam,
+} from '@nestjs/swagger';
 
 import { UserDevicesService } from './userDevices.service';
 import { RegisterDeviceDto } from './dto/register-device.dto';
@@ -18,7 +24,7 @@ import type { UserPayload } from '@app/common';
 
 /**
  * UserDevices Controller
- * 
+ *
  * Manages user devices for push notifications
  */
 @ApiTags('User Devices')
@@ -34,7 +40,7 @@ export class UserDevicesController {
    * Register or update device
    */
   @Post('register')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Register device',
     description: 'Register or update device for push notifications',
   })
@@ -56,7 +62,7 @@ export class UserDevicesController {
    * Get all user devices
    */
   @Get()
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get my devices',
     description: 'Get all registered devices for current user',
   })
@@ -70,7 +76,7 @@ export class UserDevicesController {
    * Remove device
    */
   @Delete(':deviceId')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Remove device',
     description: 'Remove a registered device',
   })
@@ -89,12 +95,15 @@ export class UserDevicesController {
    * Update push notification settings
    */
   @Put(':deviceId/push')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Update push settings',
     description: 'Enable/disable push notifications for device',
   })
   @ApiParam({ name: 'deviceId', description: 'Device ID' })
-  @ApiResponse({ status: 200, description: 'Push settings updated successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Push settings updated successfully',
+  })
   async updatePushSettings(
     @User() user: UserPayload,
     @Param('deviceId') deviceId: string,
@@ -112,7 +121,7 @@ export class UserDevicesController {
    * Remove device by FCM token
    */
   @Post('remove-by-token')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Remove device by token',
     description: 'Remove device using FCM token',
   })

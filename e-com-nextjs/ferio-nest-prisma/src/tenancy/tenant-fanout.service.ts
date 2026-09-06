@@ -10,7 +10,9 @@ export interface FanoutOutcome<T> {
   failures: Array<{ organizationId: string; error: string }>;
 }
 
-type TenantDatabaseMaterial = Parameters<TenantDatabaseManager['runTransient']>[0] & {
+type TenantDatabaseMaterial = Parameters<
+  TenantDatabaseManager['runTransient']
+>[0] & {
   organizationId: string;
 };
 
@@ -48,7 +50,11 @@ export class TenantFanoutService {
       return { processed: 1, results: [], failures: [] };
     }
 
-    const outcome: FanoutOutcome<void> = { processed: 0, results: [], failures: [] };
+    const outcome: FanoutOutcome<void> = {
+      processed: 0,
+      results: [],
+      failures: [],
+    };
 
     let cursor: string | undefined;
     do {
@@ -68,16 +74,24 @@ export class TenantFanoutService {
             );
             outcome.processed += 1;
           } catch (error) {
-            const message = error instanceof Error ? error.message : String(error);
-            outcome.failures.push({ organizationId: registry.organizationId, error: message });
+            const message =
+              error instanceof Error ? error.message : String(error);
+            outcome.failures.push({
+              organizationId: registry.organizationId,
+              error: message,
+            });
             TenantMetrics.increment('queue_tenant_failure', {
               label: options.label ?? 'unlabeled',
               organizationId: registry.organizationId,
             });
-            this.logger.error('tenant_fanout_failure', error instanceof Error ? error : new Error(message), {
-              label: options.label,
-              organizationId: registry.organizationId,
-            });
+            this.logger.error(
+              'tenant_fanout_failure',
+              error instanceof Error ? error : new Error(message),
+              {
+                label: options.label,
+                organizationId: registry.organizationId,
+              },
+            );
           }
         }
       };

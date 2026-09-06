@@ -14,7 +14,9 @@ const SSLC_SANDBOX = 'https://sandbox.sslcommerz.com';
 const SSLC_LIVE = 'https://securepay.sslcommerz.com';
 
 function providerText(value: unknown, fallback = ''): string {
-  return typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'
+  return typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean'
     ? String(value)
     : fallback;
 }
@@ -49,7 +51,11 @@ export class PlatformBillingService {
     private readonly audit: PlatformAuditService,
   ) {}
 
-  private credentials(): { storeId: string; password: string; baseUrl: string } | null {
+  private credentials(): {
+    storeId: string;
+    password: string;
+    baseUrl: string;
+  } | null {
     const storeId =
       process.env.PLATFORM_SSLCOMMERZ_STORE_ID ||
       process.env.SSL_STORE_ID ||
@@ -63,7 +69,9 @@ export class PlatformBillingService {
     return {
       storeId,
       password,
-      baseUrl: isLive ? SSLC_LIVE : process.env.PLATFORM_SSLCOMMERZ_BASE_URL || SSLC_SANDBOX,
+      baseUrl: isLive
+        ? SSLC_LIVE
+        : process.env.PLATFORM_SSLCOMMERZ_BASE_URL || SSLC_SANDBOX,
     };
   }
 
@@ -93,7 +101,9 @@ export class PlatformBillingService {
     });
     if (existing && !existing.paid) return existing;
 
-    const number = `SI-${new Date().toISOString().slice(0, 7).replace('-', '')}-${randomBytes(4)
+    const number = `SI-${new Date().toISOString().slice(0, 7).replace('-', '')}-${randomBytes(
+      4,
+    )
       .toString('hex')
       .toUpperCase()}`;
     return this.platform.client.saasInvoice.create({
@@ -114,9 +124,12 @@ export class PlatformBillingService {
    * redirect URL. The attempt record is created BEFORE the gateway call and
    * carries the unguessable reference that callbacks must present.
    */
-  async initiatePayment(invoiceId: string): Promise<{ redirectUrl?: string; reference: string }> {
+  async initiatePayment(
+    invoiceId: string,
+  ): Promise<{ redirectUrl?: string; reference: string }> {
     const creds = this.credentials();
-    if (!creds) throw new BadRequestException('PLATFORM_BILLING_NOT_CONFIGURED');
+    if (!creds)
+      throw new BadRequestException('PLATFORM_BILLING_NOT_CONFIGURED');
 
     const invoice = await this.platform.client.saasInvoice.findUnique({
       where: { id: invoiceId },
@@ -127,7 +140,9 @@ export class PlatformBillingService {
       throw new BadRequestException('INVOICE_AMOUNT_INVALID');
     }
 
-    const reference = `SAAS-${invoice.number}-${Date.now().toString(36).toUpperCase()}-${randomBytes(4)
+    const reference = `SAAS-${invoice.number}-${Date.now().toString(36).toUpperCase()}-${randomBytes(
+      4,
+    )
       .toString('hex')
       .toUpperCase()}`;
 
@@ -174,12 +189,15 @@ export class PlatformBillingService {
     try {
       const response = await fetch(`${creds.baseUrl}/gwprocess/v4/api.php`, {
         method: 'POST',
-        headers: correlationHeaders({ 'Content-Type': 'application/x-www-form-urlencoded' }),
+        headers: correlationHeaders({
+          'Content-Type': 'application/x-www-form-urlencoded',
+        }),
         body,
       });
       const raw = (await response.json()) as Record<string, unknown>;
       redirectUrl = providerText(raw.GatewayPageURL);
-      if (!redirectUrl) throw new Error(providerText(raw.failedreason, 'session failed'));
+      if (!redirectUrl)
+        throw new Error(providerText(raw.failedreason, 'session failed'));
       await this.platform.client.saasPaymentAttempt.updateMany({
         where: { reference, status: 'INITIATED' },
         data: { raw: toPlatformJsonInput(raw) },
@@ -234,14 +252,18 @@ export class PlatformBillingService {
     if (input.outcome === 'success') {
       if (!input.valId) {
         // A success claim without a verifiable val_id is rejected outright.
-        await this.markFailed(attempt.reference, 'success claim without val_id');
+        await this.markFailed(
+          attempt.reference,
+          'success claim without val_id',
+        );
         throw new BadRequestException('PAYMENT_VALIDATION_REQUIRED');
       }
       const validation = await this.validateWithSslcommerz(input.valId);
-      if (
-        validation.status !== 'VALID' && validation.status !== 'VALIDATED'
-      ) {
-        await this.markFailed(attempt.reference, `validation ${validation.status}`);
+      if (validation.status !== 'VALID' && validation.status !== 'VALIDATED') {
+        await this.markFailed(
+          attempt.reference,
+          `validation ${validation.status}`,
+        );
         return { applied: true };
       }
       if (validation.tranId !== attempt.reference) {
@@ -283,7 +305,8 @@ export class PlatformBillingService {
     // fail / cancel / unknown-ipn outcomes are terminal evidence only.
     if (input.outcome !== 'ipn') {
       const alreadyFinal = attempt.status !== 'INITIATED';
-      if (!alreadyFinal) await this.markFailed(attempt.reference, `gateway ${input.outcome}`);
+      if (!alreadyFinal)
+        await this.markFailed(attempt.reference, `gateway ${input.outcome}`);
       return { applied: !alreadyFinal, duplicate: alreadyFinal };
     }
     return { applied: false };
@@ -308,7 +331,8 @@ export class PlatformBillingService {
     currency: string;
   }> {
     const creds = this.credentials();
-    if (!creds) throw new BadRequestException('PLATFORM_BILLING_NOT_CONFIGURED');
+    if (!creds)
+      throw new BadRequestException('PLATFORM_BILLING_NOT_CONFIGURED');
     const qs = new URLSearchParams({
       val_id: valId,
       store_id: creds.storeId,
@@ -351,7 +375,13 @@ export class PlatformBillingService {
     return this.platform.client.saasPaymentAttempt.findMany({
       where: { invoiceId },
       orderBy: { createdAt: 'desc' },
-      select: { reference: true, provider: true, status: true, amountMinor: true, createdAt: true },
+      select: {
+        reference: true,
+        provider: true,
+        status: true,
+        amountMinor: true,
+        createdAt: true,
+      },
     });
   }
 }

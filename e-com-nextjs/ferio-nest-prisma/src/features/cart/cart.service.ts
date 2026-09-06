@@ -416,61 +416,59 @@ export class CartService {
       throw new ConflictException('This cart belongs to another account');
     }
 
-    const mergedCartCount = await db.$transaction(
-      async (transaction) => {
-        const sources = await transaction.cart.findMany({
-          where: {
-            userId,
-            status: 'ACTIVE',
-            expiresAt: { gt: new Date() },
-            id: { not: target.id },
-          },
-          include: cartInclude,
-        });
-        const quantities = new Map(
-          target.items.map((item) => [item.variantId, item.quantity]),
-        );
-        for (const source of sources) {
-          for (const item of source.items) {
-            const quantity = Math.min(
-              this.availableStock(item.variant),
-              (quantities.get(item.variantId) ?? 0) + item.quantity,
-            );
-            if (quantity <= 0) continue;
-            await transaction.cartItem.upsert({
-              where: {
-                cartId_variantId: {
-                  cartId: target.id,
-                  variantId: item.variantId,
-                },
-              },
-              update: { quantity, addedUnitPrice: item.variant.price },
-              create: {
+    const mergedCartCount = await db.$transaction(async (transaction) => {
+      const sources = await transaction.cart.findMany({
+        where: {
+          userId,
+          status: 'ACTIVE',
+          expiresAt: { gt: new Date() },
+          id: { not: target.id },
+        },
+        include: cartInclude,
+      });
+      const quantities = new Map(
+        target.items.map((item) => [item.variantId, item.quantity]),
+      );
+      for (const source of sources) {
+        for (const item of source.items) {
+          const quantity = Math.min(
+            this.availableStock(item.variant),
+            (quantities.get(item.variantId) ?? 0) + item.quantity,
+          );
+          if (quantity <= 0) continue;
+          await transaction.cartItem.upsert({
+            where: {
+              cartId_variantId: {
                 cartId: target.id,
                 variantId: item.variantId,
-                quantity,
-                addedUnitPrice: item.variant.price,
               },
-            });
-            quantities.set(item.variantId, quantity);
-          }
-        }
-        await transaction.checkoutDraft.deleteMany({
-          where: { cartId: target.id },
-        });
-        await transaction.cart.update({
-          where: { id: target.id },
-          data: { userId, expiresAt: this.expiresAt() },
-        });
-        if (sources.length) {
-          await transaction.cart.updateMany({
-            where: { id: { in: sources.map((source) => source.id) } },
-            data: { status: 'ABANDONED' },
+            },
+            update: { quantity, addedUnitPrice: item.variant.price },
+            create: {
+              cartId: target.id,
+              variantId: item.variantId,
+              quantity,
+              addedUnitPrice: item.variant.price,
+            },
           });
+          quantities.set(item.variantId, quantity);
         }
-        return sources.length;
-      },
-    );
+      }
+      await transaction.checkoutDraft.deleteMany({
+        where: { cartId: target.id },
+      });
+      await transaction.cart.update({
+        where: { id: target.id },
+        data: { userId, expiresAt: this.expiresAt() },
+      });
+      if (sources.length) {
+        await transaction.cart.updateMany({
+          where: { id: { in: sources.map((source) => source.id) } },
+          data: { status: 'ABANDONED' },
+        });
+      }
+      return sources.length;
+    });
 
     return {
       ...this.serializeCart(await this.loadCart(target.id)),
@@ -605,7 +603,8 @@ export class CartService {
       const availableStock = item.variant
         ? item.variant.inventory.reduce(
             (total, stock) =>
-              total + Math.max(0, stock.onHand - stock.reserved - stock.damaged),
+              total +
+              Math.max(0, stock.onHand - stock.reserved - stock.damaged),
             0,
           )
         : 0;
@@ -620,7 +619,9 @@ export class CartService {
         new Date(product.publishedAt) <= now &&
         availableStock > 0;
 
-      const image = product?.media?.find((media) => media.type === 'IMAGE')?.url;
+      const image = product?.media?.find(
+        (media) => media.type === 'IMAGE',
+      )?.url;
 
       return {
         id: item.id,
@@ -641,10 +642,7 @@ export class CartService {
       (total, item) => total + item.price * item.quantity,
       0,
     );
-    const itemCount = items.reduce(
-      (total, item) => total + item.quantity,
-      0,
-    );
+    const itemCount = items.reduce((total, item) => total + item.quantity, 0);
 
     return {
       id: savedCart.id,
@@ -664,7 +662,9 @@ export class CartService {
     const db = await this.db();
     const cart = await this.findActiveCart(token, userId);
     if (!cart || cart.items.length === 0) {
-      throw new ConflictException('Your cart is empty. Add items before saving.');
+      throw new ConflictException(
+        'Your cart is empty. Add items before saving.',
+      );
     }
 
     const defaultName = `Saved Cart (${new Date().toLocaleDateString('en-US', {

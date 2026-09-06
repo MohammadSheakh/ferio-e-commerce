@@ -45,7 +45,9 @@ const MAX_THRESHOLD = 25;
  */
 @Injectable()
 export class MigrationOrchestratorService {
-  private readonly logger = new StructuredLogger(MigrationOrchestratorService.name);
+  private readonly logger = new StructuredLogger(
+    MigrationOrchestratorService.name,
+  );
 
   constructor(
     private readonly platform: PlatformPrismaService,
@@ -53,13 +55,15 @@ export class MigrationOrchestratorService {
     private readonly bootstrapper: TenantSchemaBootstrapper,
     @Inject(getQueueToken(QUEUE_NAMES.TENANT_MIGRATION))
     private readonly migrationQueue: {
-      add: (name: string, data: TenantMigrationJobData, opts?: unknown) => Promise<unknown>;
+      add: (
+        name: string,
+        data: TenantMigrationJobData,
+        opts?: unknown,
+      ) => Promise<unknown>;
     },
   ) {}
 
-  async start(
-    input: StartMigrationInput,
-  ): Promise<{ runId: string }> {
+  async start(input: StartMigrationInput): Promise<{ runId: string }> {
     const concurrencyLimit = Math.min(
       Math.max(input.concurrencyLimit ?? DEFAULT_BATCH, 1),
       10,
@@ -78,8 +82,7 @@ export class MigrationOrchestratorService {
     }
     const run = await this.platform.client.tenantMigrationRun.create({
       data: {
-        targetSchemaVersion:
-          input.canaryOrganizationId ? 'pending' : 'fleet',
+        targetSchemaVersion: input.canaryOrganizationId ? 'pending' : 'fleet',
         status: 'PENDING',
         concurrencyLimit,
         failureThreshold,
@@ -113,13 +116,13 @@ export class MigrationOrchestratorService {
     });
     if (!run) throw new NotFoundException('MIGRATION_RUN_NOT_FOUND');
     if (['COMPLETED', 'PAUSED', 'FAILED'].includes(run.status)) {
-      const successes = run.results.filter((r) => r.success).map((r) => r.tenantDatabaseId);
+      const successes = run.results
+        .filter((r) => r.success)
+        .map((r) => r.tenantDatabaseId);
       return { status: run.status, migrated: successes, failures: [] };
     }
 
-    const doneOrgs = new Set(
-      run.results.map((r) => r.tenantDatabaseId),
-    );
+    const doneOrgs = new Set(run.results.map((r) => r.tenantDatabaseId));
 
     const registries = (
       await this.platform.client.tenantDatabase.findMany({
@@ -159,10 +162,15 @@ export class MigrationOrchestratorService {
         where: { id: run.id },
         data: { status: 'FAILED' },
       });
-      await this.auditNote('TENANT_MIGRATION_CANARY_FAILED', run.id, undefined, {
-        organizationId: first.organizationId,
-        error: message,
-      });
+      await this.auditNote(
+        'TENANT_MIGRATION_CANARY_FAILED',
+        run.id,
+        undefined,
+        {
+          organizationId: first.organizationId,
+          error: message,
+        },
+      );
       return { status: 'FAILED', migrated, failures };
     }
 
@@ -181,8 +189,12 @@ export class MigrationOrchestratorService {
           migrated.push(registry.organizationId);
           consecutiveFailures = 0;
         } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          failures.push({ organizationId: registry.organizationId, error: message });
+          const message =
+            error instanceof Error ? error.message : String(error);
+          failures.push({
+            organizationId: registry.organizationId,
+            error: message,
+          });
           consecutiveFailures += 1;
           if (consecutiveFailures >= run.failureThreshold) {
             await this.platform.client.tenantMigrationRun.update({
@@ -253,15 +265,25 @@ export class MigrationOrchestratorService {
     });
   }
 
-  private async migrateOne(runId: string, tenantDatabaseId: string): Promise<void> {
-    const connection = await this.databases.getDecryptedConnection(tenantDatabaseId);
+  private async migrateOne(
+    runId: string,
+    tenantDatabaseId: string,
+  ): Promise<void> {
+    const connection =
+      await this.databases.getDecryptedConnection(tenantDatabaseId);
     const before = await this.databases.publicView(tenantDatabaseId);
     try {
       const outcome = await this.bootstrapper.bootstrap(connection);
-      await this.databases.setSchemaVersion(tenantDatabaseId, outcome.schemaVersion);
+      await this.databases.setSchemaVersion(
+        tenantDatabaseId,
+        outcome.schemaVersion,
+      );
       await this.platform.client.tenantMigrationResult.upsert({
         where: {
-          migrationRunId_tenantDatabaseId: { migrationRunId: runId, tenantDatabaseId },
+          migrationRunId_tenantDatabaseId: {
+            migrationRunId: runId,
+            tenantDatabaseId,
+          },
         },
         create: {
           migrationRunId: runId,
@@ -281,7 +303,10 @@ export class MigrationOrchestratorService {
       const message = error instanceof Error ? error.message : String(error);
       await this.platform.client.tenantMigrationResult.upsert({
         where: {
-          migrationRunId_tenantDatabaseId: { migrationRunId: runId, tenantDatabaseId },
+          migrationRunId_tenantDatabaseId: {
+            migrationRunId: runId,
+            tenantDatabaseId,
+          },
         },
         create: {
           migrationRunId: runId,
@@ -308,7 +333,12 @@ export class MigrationOrchestratorService {
     });
   }
 
-  private auditNote(action: string, entityId: string, actorId?: string, metadata?: unknown) {
+  private auditNote(
+    action: string,
+    entityId: string,
+    actorId?: string,
+    metadata?: unknown,
+  ) {
     return this.platform.client.platformAuditLog
       .create({
         data: {

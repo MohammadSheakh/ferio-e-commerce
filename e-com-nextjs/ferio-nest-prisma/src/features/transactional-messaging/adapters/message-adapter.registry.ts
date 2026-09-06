@@ -19,16 +19,14 @@ export class MessageAdapterRegistry {
 
   readiness() {
     const channels: CommerceMessageChannel[] = ['WHATSAPP', 'SMS', 'EMAIL'];
-    return channels.map(
-      (channel) => {
-        const adapter = this.adapters.get(channel);
-        return {
-          channel,
-          provider: adapter?.provider ?? null,
-          configured: adapter?.isConfigured() ?? false,
-        };
-      },
-    );
+    return channels.map((channel) => {
+      const adapter = this.adapters.get(channel);
+      return {
+        channel,
+        provider: adapter?.provider ?? null,
+        configured: adapter?.isConfigured() ?? false,
+      };
+    });
   }
 
   isConfigured(channel: CommerceMessageChannel) {

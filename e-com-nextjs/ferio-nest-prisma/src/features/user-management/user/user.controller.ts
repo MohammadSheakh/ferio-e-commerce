@@ -7,9 +7,20 @@ import {
   UseInterceptors,
   NotFoundException,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 
-import { AuthGuard, User as CurrentUser, TransformResponseInterceptor, SlidingWindowRateLimitGuard, RateLimit } from '@app/common';
+import {
+  AuthGuard,
+  User as CurrentUser,
+  TransformResponseInterceptor,
+  SlidingWindowRateLimitGuard,
+  RateLimit,
+} from '@app/common';
 import { UserService } from './user.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import type { UserPayload } from '@app/common';
@@ -17,7 +28,7 @@ import { USER_RATE_LIMITS } from './user.constants';
 
 /**
  * User Controller
- * 
+ *
  * Features:
  * ✅ Explicit endpoint definitions
  * ✅ Sliding Window Rate Limiting per endpoint
@@ -38,14 +49,14 @@ export class UserController {
    */
   @Get('profile')
   @RateLimit(USER_RATE_LIMITS.PROFILE_ACCESS)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get my profile',
     description: 'Get current authenticated user profile with statistics',
   })
   @ApiResponse({ status: 200, description: 'Profile retrieved successfully' })
   async getProfile(@CurrentUser() user: UserPayload) {
     const userProfile = await this.userService.findByIdWithCache(user.userId);
-    
+
     if (!userProfile) {
       throw new NotFoundException('User not found');
     }
@@ -65,7 +76,7 @@ export class UserController {
    */
   @Put('profile')
   @RateLimit(USER_RATE_LIMITS.PROFILE_UPDATE)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Update my profile',
     description: 'Update current authenticated user profile information',
   })
@@ -92,16 +103,23 @@ export class UserController {
    */
   @Put('preferred-time')
   @RateLimit(USER_RATE_LIMITS.PROFILE_UPDATE)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Update preferred time',
-    description: 'Update user preferred time for task scheduling (HH:mm format)',
+    description:
+      'Update user preferred time for task scheduling (HH:mm format)',
   })
-  @ApiResponse({ status: 200, description: 'Preferred time updated successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Preferred time updated successfully',
+  })
   async updatePreferredTime(
     @CurrentUser() user: UserPayload,
     @Body('preferredTime') preferredTime: string,
   ) {
-    return await this.userService.updatePreferredTime(user.userId, preferredTime);
+    return await this.userService.updatePreferredTime(
+      user.userId,
+      preferredTime,
+    );
   }
 
   /**
@@ -110,11 +128,14 @@ export class UserController {
    */
   @Get('statistics')
   @RateLimit(USER_RATE_LIMITS.PROFILE_ACCESS)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get my statistics',
     description: 'Get current user task statistics',
   })
-  @ApiResponse({ status: 200, description: 'Statistics retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Statistics retrieved successfully',
+  })
   async getStatistics(@CurrentUser() user: UserPayload) {
     return await this.userService.getUserStatistics(user.userId);
   }
@@ -125,7 +146,7 @@ export class UserController {
    */
   @Get('me')
   @RateLimit(USER_RATE_LIMITS.PROFILE_ACCESS)
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get current user',
     description: 'Get current authenticated user information',
   })
