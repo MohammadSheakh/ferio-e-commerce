@@ -95,7 +95,7 @@ jobs:
           DB_POOL_MAX=2
           TENANT_DB_MAX_CLIENTS=5
           TENANT_DB_POOL_MAX=2
-          pnpm check:connection-budget
+          pnpm check:connection-budget | tee /tmp/ferio-connection-budget.jsonl
       - name: HTTP capacity smoke against built backend
         run: |
           set -euo pipefail
@@ -128,10 +128,22 @@ jobs:
 
           CAPACITY_BASE_URLS=http://127.0.0.1:6733/api/v1/health,http://127.0.0.1:6735/api/v1/health \
             CAPACITY_REQUESTS=500 CAPACITY_CONCURRENCY=25 \
-            pnpm test:http-capacity
+            pnpm test:http-capacity | tee /tmp/ferio-http-capacity.jsonl
           CAPACITY_BASE_URLS=http://127.0.0.1:6733/api/v1/ready,http://127.0.0.1:6735/api/v1/ready \
             CAPACITY_REQUESTS=100 CAPACITY_CONCURRENCY=10 \
-            pnpm test:http-capacity
+            pnpm test:http-capacity | tee -a /tmp/ferio-http-capacity.jsonl
+      - name: Upload scalability evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-scalability-${{ github.run_id }}
+          path: |
+            /tmp/ferio-connection-budget.jsonl
+            /tmp/ferio-http-capacity.jsonl
+            /tmp/ferio-backend-capacity-a.log
+            /tmp/ferio-backend-capacity-b.log
+          if-no-files-found: warn
+          retention-days: 14
       - name: Unit tests
         run: pnpm test
       - name: Cross-tenant isolation + bootstrap integration tests
