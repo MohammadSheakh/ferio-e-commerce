@@ -5,22 +5,25 @@ class FakeRedis {
   private handlers: Array<(channel: string, payload: string) => void> = [];
   published: Array<string> = [];
 
-  async getClient() {
-    const self = this;
+  getClient() {
     return {
-      duplicate() {
+      duplicate: () => {
         return {
-          on(_event: 'message', handler: (channel: string, payload: string) => void) {
-            self.handlers.push(handler);
+          on: (
+            _event: 'message',
+            handler: (channel: string, payload: string) => void,
+          ) => {
+            this.handlers.push(handler);
           },
-          subscribe(_channel: string) {
+          subscribe: (channel: string) => {
+            void channel;
             return Promise.resolve();
           },
         };
       },
-      publish(channel: string, payload: string) {
-        self.published.push(`${channel}|${payload}`);
-        for (const handler of self.handlers) {
+      publish: (channel: string, payload: string) => {
+        this.published.push(`${channel}|${payload}`);
+        for (const handler of this.handlers) {
           handler(channel, payload);
         }
         return Promise.resolve(1);
@@ -33,17 +36,25 @@ function serviceWith(redis?: FakeRedis) {
   const platformClient = {
     organizationMember: { findFirst: jest.fn().mockResolvedValue(null) },
   };
-  const service = new TenantMembershipService(platformClient as never, redis as never);
+  const service = new TenantMembershipService(
+    platformClient as never,
+    redis as never,
+  );
   // Seed a local cache entry directly to observe invalidation.
   const cache = (service as unknown as { cache: Map<string, unknown> }).cache;
-  cache.set(
-    'org-a:fired@ferio.test',
-    { value: { id: 'm1', email: 'fired@ferio.test', isActive: true, role: 'STAFF' }, expiresAt: Date.now() + 60_000 },
-  );
-  cache.set(
-    'org-b:other@ferio.test',
-    { value: null, expiresAt: Date.now() + 60_000 },
-  );
+  cache.set('org-a:fired@ferio.test', {
+    value: {
+      id: 'm1',
+      email: 'fired@ferio.test',
+      isActive: true,
+      role: 'STAFF',
+    },
+    expiresAt: Date.now() + 60_000,
+  });
+  cache.set('org-b:other@ferio.test', {
+    value: null,
+    expiresAt: Date.now() + 60_000,
+  });
   return { service, platformClient, cache };
 }
 
@@ -66,10 +77,12 @@ describe('TenantMembershipService cross-instance invalidation (MT-13)', () => {
     expect(peer.cache.has('org-a:fired@ferio.test')).toBe(false);
     // Untouched identity survives.
     expect(peer.cache.has('org-b:other@ferio.test')).toBe(true);
-    expect(bus.published.some((p) => p.includes('tenancy:membership:invalidate'))).toBe(true);
+    expect(
+      bus.published.some((p) => p.includes('tenancy:membership:invalidate')),
+    ).toBe(true);
   });
 
-  it('keeps local-only semantics when Redis is absent', async () => {
+  it('keeps local-only semantics when Redis is absent', () => {
     const { service, cache } = serviceWith(undefined);
     service.invalidate('org-a', 'fired@ferio.test');
     expect(cache.has('org-a:fired@ferio.test')).toBe(false);
