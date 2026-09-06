@@ -104,7 +104,6 @@ export default function CategoryNav({
   categories?: CatalogCategory[];
 }) {
   const pathname = usePathname();
-  if (pathname?.startsWith("/delivery")) return null;
 
   const [categoriesList, setCategoriesList] = useState<CatalogCategory[]>(initialCategories);
   const [tree, setTree] = useState<CategoryNode[]>([]);
@@ -174,7 +173,7 @@ export default function CategoryNav({
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
   };
 
-  if (tree.length === 0) return null;
+  if (pathname?.startsWith("/delivery") || tree.length === 0) return null;
 
   return (
     <div

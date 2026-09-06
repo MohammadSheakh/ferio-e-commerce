@@ -21,8 +21,7 @@ export default function PageTracker() {
     socketRef.current = socket;
 
     function handleConnect() {
-      const currentPath =
-        typeof window !== "undefined" ? window.location.pathname : pathname;
+      const currentPath = window.location.pathname;
       socket.emit("page-view", { page: currentPath });
     }
 

@@ -42,12 +42,14 @@ export default function LocationPickerModal({
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<LeafletMap | null>(null);
   const markerRef = useRef<LeafletMarker | null>(null);
+  const selectedLocationRef = useRef({ lat: defaultLat, lng: defaultLng });
 
   // Update internal coordinates when props change
   useEffect(() => {
     if (isOpen) {
       const lat = initialLat && !isNaN(initialLat) ? initialLat : 23.8103;
       const lng = initialLng && !isNaN(initialLng) ? initialLng : 90.4125;
+      selectedLocationRef.current = { lat, lng };
       setSelectedLat(lat);
       setSelectedLng(lng);
       reverseGeocode(lat, lng);
@@ -118,10 +120,11 @@ export default function LocationPickerModal({
     const initLeafletMap = () => {
       const L = window.L;
       if (!L || !mapContainerRef.current) return;
+      const { lat, lng } = selectedLocationRef.current;
 
       if (!mapInstanceRef.current) {
         const map = L.map(mapContainerRef.current, {
-          center: [selectedLat, selectedLng],
+          center: [lat, lng],
           zoom: 15,
         });
 
@@ -138,13 +141,14 @@ export default function LocationPickerModal({
           iconAnchor: [14, 28],
         });
 
-        const marker = L.marker([selectedLat, selectedLng], {
+        const marker = L.marker([lat, lng], {
           draggable: true,
           icon: customPinIcon,
         }).addTo(map);
 
         marker.on("dragend", (e) => {
           const coord = e.target.getLatLng();
+          selectedLocationRef.current = { lat: coord.lat, lng: coord.lng };
           setSelectedLat(coord.lat);
           setSelectedLng(coord.lng);
           reverseGeocode(coord.lat, coord.lng);
@@ -153,6 +157,7 @@ export default function LocationPickerModal({
         map.on("click", (e) => {
           const { lat, lng } = e.latlng;
           marker.setLatLng([lat, lng]);
+          selectedLocationRef.current = { lat, lng };
           setSelectedLat(lat);
           setSelectedLng(lng);
           reverseGeocode(lat, lng);
@@ -161,9 +166,9 @@ export default function LocationPickerModal({
         mapInstanceRef.current = map;
         markerRef.current = marker;
       } else {
-        mapInstanceRef.current.setView([selectedLat, selectedLng], 15);
+        mapInstanceRef.current.setView([lat, lng], 15);
         if (markerRef.current) {
-          markerRef.current.setLatLng([selectedLat, selectedLng]);
+          markerRef.current.setLatLng([lat, lng]);
         }
       }
 
@@ -202,6 +207,7 @@ export default function LocationPickerModal({
   const updateMapPosition = (lat: number, lng: number) => {
     setSelectedLat(lat);
     setSelectedLng(lng);
+    selectedLocationRef.current = { lat, lng };
     reverseGeocode(lat, lng);
 
     if (mapInstanceRef.current && markerRef.current) {
