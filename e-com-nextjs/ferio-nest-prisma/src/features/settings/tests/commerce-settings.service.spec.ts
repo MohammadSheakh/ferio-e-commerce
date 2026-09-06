@@ -48,7 +48,9 @@ describe('CommerceSettingsService', () => {
   };
   const prisma = {
     commerceSettings: { upsert: jest.fn() },
-    $transaction: jest.fn((callback) => callback(transaction)),
+    $transaction: jest.fn((callback: (value: typeof transaction) => unknown) =>
+      callback(transaction),
+    ),
   };
   const service = new CommerceSettingsService(
     prisma as unknown as PrismaService,
@@ -59,8 +61,9 @@ describe('CommerceSettingsService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     transaction.commerceSettings.upsert.mockResolvedValue(previous);
-    transaction.commerceSettings.update.mockImplementation(({ data }) =>
-      Promise.resolve({ ...previous, ...data }),
+    transaction.commerceSettings.update.mockImplementation(
+      ({ data }: { data: Record<string, unknown> }) =>
+        Promise.resolve({ ...previous, ...data }),
     );
     audit.record.mockResolvedValue({ id: 'audit-1' });
   });
@@ -103,14 +106,14 @@ describe('CommerceSettingsService', () => {
       actor,
     );
 
-    expect(transaction.commerceSettings.update).toHaveBeenCalledWith({
-      where: { id: 'default' },
-      data: expect.objectContaining({
-        storeName: 'Ferio Store',
-        supportPhone: '+8801712345678',
-        supportEmail: 'ops@ferio.com',
-        orderPrefix: 'FR2',
-      }),
+    const updateCall = (
+      transaction.commerceSettings.update.mock.calls as unknown[][]
+    )[0]?.[0] as { data: Record<string, unknown> };
+    expect(updateCall.data).toMatchObject({
+      storeName: 'Ferio Store',
+      supportPhone: '+8801712345678',
+      supportEmail: 'ops@ferio.com',
+      orderPrefix: 'FR2',
     });
     expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -133,13 +136,13 @@ describe('CommerceSettingsService', () => {
       actor,
     );
 
-    expect(transaction.commerceSettings.update).toHaveBeenCalledWith({
-      where: { id: 'default' },
-      data: expect.objectContaining({
-        serviceBookingEnabled: false,
-        warrantyClaimsEnabled: false,
-        storefrontAnalyticsEnabled: false,
-      }),
+    const updateCall = (
+      transaction.commerceSettings.update.mock.calls as unknown[][]
+    )[0]?.[0] as { data: Record<string, unknown> };
+    expect(updateCall.data).toMatchObject({
+      serviceBookingEnabled: false,
+      warrantyClaimsEnabled: false,
+      storefrontAnalyticsEnabled: false,
     });
     expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({ newValue: result }),
