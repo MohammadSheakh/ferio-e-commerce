@@ -44,7 +44,7 @@ export default function ServicesScreen() {
         <Text style={styles.eyebrow}>BOOK A SERVICE</Text>
         <Text style={styles.title}>Services</Text>
         <Text style={styles.copy}>
-          Elevate your space with Ferio's white-glove assembly, interior design consultation, and custom crafting.
+          Elevate your space with Ferio&apos;s white-glove assembly, interior design consultation, and custom crafting.
         </Text>
 
         {loading ? (

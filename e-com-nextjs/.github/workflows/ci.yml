@@ -311,5 +311,7 @@ jobs:
           cache-dependency-path: ferio-mobile-expo54/pnpm-lock.yaml
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: ESLint (read-only)
+        run: pnpm lint
       - name: TypeScript check
         run: pnpm typecheck

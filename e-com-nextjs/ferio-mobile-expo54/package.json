@@ -8,6 +8,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
+    "lint": "eslint . --quiet",
     "typecheck": "tsc --noEmit",
     "doctor": "expo-doctor",
     "fix-deps": "expo install --fix"
@@ -33,6 +34,8 @@
   },
   "devDependencies": {
     "@types/react": "^19.1.17",
+    "eslint": "9.39.4",
+    "eslint-config-expo": "10.0.0",
     "typescript": "^5.9.0"
   }
 }

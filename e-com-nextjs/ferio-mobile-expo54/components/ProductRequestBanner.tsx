@@ -85,7 +85,7 @@ export function ProductRequestBanner() {
   return (
     <>
       <View style={styles.wrap}>
-        <Text style={styles.eyebrow}>CAN'T FIND IT?</Text>
+        <Text style={styles.eyebrow}>CAN&apos;T FIND IT?</Text>
         <Text style={styles.title}>Request products.</Text>
         <Text style={styles.copy}>
           Tell Ferio what products or model specifications you are looking for.
