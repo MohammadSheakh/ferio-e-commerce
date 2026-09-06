@@ -24,7 +24,7 @@ describe('tenant-aware queue worker boundaries', () => {
     else process.env.TENANCY_ENABLED = originalTenancy;
   });
 
-  it('rejects payment recovery without organization context in tenant mode', async () => {
+  it('rejects payment recovery without organization context in tenant mode', () => {
     process.env.TENANCY_ENABLED = 'true';
     const payments = { expireAttempt: jest.fn() };
     const recovery = { enqueueDue: jest.fn() };
@@ -34,21 +34,26 @@ describe('tenant-aware queue worker boundaries', () => {
       { forOrganization: jest.fn() } as never,
     );
 
-    expect(() => processor.process({
+    expect(() =>
+      processor.process({
         name: PAYMENT_EXPIRY_JOB,
         data: { attemptId: 'attempt-1' },
         id: 'job-1',
-      } as unknown as Job<PaymentRecoveryJobData>)).toThrow(
-      'TENANT_CONTEXT_REQUIRED_FOR_PAYMENT_RECOVERY',
-    );
+      } as unknown as Job<PaymentRecoveryJobData>),
+    ).toThrow('TENANT_CONTEXT_REQUIRED_FOR_PAYMENT_RECOVERY');
     expect(payments.expireAttempt).not.toHaveBeenCalled();
   });
 
   it('executes payment recovery inside the stamped tenant fanout', async () => {
     process.env.TENANCY_ENABLED = 'true';
-    const payments = { expireAttempt: jest.fn().mockResolvedValue({ expired: true }) };
+    const payments = {
+      expireAttempt: jest.fn().mockResolvedValue({ expired: true }),
+    };
     const fanout = {
-      forOrganization: jest.fn((_organizationId: string, operation: () => Promise<unknown>) => operation()),
+      forOrganization: jest.fn(
+        (_organizationId: string, operation: () => Promise<unknown>) =>
+          operation(),
+      ),
     };
     const processor = new PaymentRecoveryProcessor(
       payments as never,
@@ -62,11 +67,14 @@ describe('tenant-aware queue worker boundaries', () => {
       id: 'job-1',
     } as unknown as Job<PaymentRecoveryJobData>);
 
-    expect(fanout.forOrganization).toHaveBeenCalledWith('org-a', expect.any(Function));
+    expect(fanout.forOrganization).toHaveBeenCalledWith(
+      'org-a',
+      expect.any(Function),
+    );
     expect(payments.expireAttempt).toHaveBeenCalledWith('attempt-1');
   });
 
-  it('rejects transactional dispatch without organization context in tenant mode', async () => {
+  it('rejects transactional dispatch without organization context in tenant mode', () => {
     process.env.TENANCY_ENABLED = 'true';
     const dispatcher = { execute: jest.fn() };
     const processor = new TransactionalMessageProcessor(
@@ -75,13 +83,13 @@ describe('tenant-aware queue worker boundaries', () => {
       { forOrganization: jest.fn() } as never,
     );
 
-    expect(() => processor.process({
+    expect(() =>
+      processor.process({
         name: TRANSACTIONAL_MESSAGE_JOB,
         data: { messageId: 'message-1' },
         id: 'job-1',
-      } as unknown as Job<TransactionalMessageJobData>)).toThrow(
-      'TRANSACTIONAL_MESSAGE_ORGANIZATION_REQUIRED',
-    );
+      } as unknown as Job<TransactionalMessageJobData>),
+    ).toThrow('TRANSACTIONAL_MESSAGE_ORGANIZATION_REQUIRED');
     expect(dispatcher.execute).not.toHaveBeenCalled();
   });
 
@@ -89,7 +97,10 @@ describe('tenant-aware queue worker boundaries', () => {
     process.env.TENANCY_ENABLED = 'true';
     const dispatcher = { execute: jest.fn().mockResolvedValue({ sent: true }) };
     const fanout = {
-      forOrganization: jest.fn((_organizationId: string, operation: () => Promise<unknown>) => operation()),
+      forOrganization: jest.fn(
+        (_organizationId: string, operation: () => Promise<unknown>) =>
+          operation(),
+      ),
     };
     const processor = new TransactionalMessageProcessor(
       dispatcher as never,
@@ -103,7 +114,10 @@ describe('tenant-aware queue worker boundaries', () => {
       id: 'job-1',
     } as unknown as Job<TransactionalMessageJobData>);
 
-    expect(fanout.forOrganization).toHaveBeenCalledWith('org-a', expect.any(Function));
+    expect(fanout.forOrganization).toHaveBeenCalledWith(
+      'org-a',
+      expect.any(Function),
+    );
     expect(dispatcher.execute).toHaveBeenCalledWith('message-1');
   });
 
