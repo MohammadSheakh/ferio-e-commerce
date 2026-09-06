@@ -1,14 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import type { UserPayload } from '@app/common';
 import { StoreLocationsService } from '../store-locations.service';
 import { PrismaService } from '@app/database';
 import { AuditService } from '../../audit/services/audit.service';
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { ConflictException } from '@nestjs/common';
 
 describe('StoreLocationsService', () => {
   let service: StoreLocationsService;
-  let prisma: PrismaService;
-  let audit: AuditService;
 
   const mockAdminActor = {
     userId: 'admin-1',
@@ -25,9 +22,7 @@ describe('StoreLocationsService', () => {
     phone: '+8801700000001',
     address: 'House 42, Road 11/A, Dhanmondi, Dhaka',
     operatingHours: '10:00 AM - 08:30 PM',
-    inventory: [
-      { variantId: 'var-1', onHand: 10, reserved: 2, damaged: 0 },
-    ],
+    inventory: [{ variantId: 'var-1', onHand: 10, reserved: 2, damaged: 0 }],
   };
 
   const mockPrisma = {
@@ -57,8 +52,6 @@ describe('StoreLocationsService', () => {
     }).compile();
 
     service = module.get<StoreLocationsService>(StoreLocationsService);
-    prisma = module.get<PrismaService>(PrismaService);
-    audit = module.get<AuditService>(AuditService);
     jest.clearAllMocks();
   });
 
