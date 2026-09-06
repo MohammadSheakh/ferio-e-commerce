@@ -1,6 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type {
+  LeafletMap,
+  LeafletMarker,
+} from "@/lib/leaflet-types";
 
 interface LocationPickerModalProps {
   isOpen: boolean;
@@ -36,8 +40,8 @@ export default function LocationPickerModal({
   } | null>(null);
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<any>(null);
-  const markerRef = useRef<any>(null);
+  const mapInstanceRef = useRef<LeafletMap | null>(null);
+  const markerRef = useRef<LeafletMarker | null>(null);
 
   // Update internal coordinates when props change
   useEffect(() => {
@@ -112,7 +116,7 @@ export default function LocationPickerModal({
     }
 
     const initLeafletMap = () => {
-      const L = (window as any).L;
+      const L = window.L;
       if (!L || !mapContainerRef.current) return;
 
       if (!mapInstanceRef.current) {
@@ -139,14 +143,14 @@ export default function LocationPickerModal({
           icon: customPinIcon,
         }).addTo(map);
 
-        marker.on("dragend", (e: any) => {
+        marker.on("dragend", (e) => {
           const coord = e.target.getLatLng();
           setSelectedLat(coord.lat);
           setSelectedLng(coord.lng);
           reverseGeocode(coord.lat, coord.lng);
         });
 
-        map.on("click", (e: any) => {
+        map.on("click", (e) => {
           const { lat, lng } = e.latlng;
           marker.setLatLng([lat, lng]);
           setSelectedLat(lat);
@@ -170,7 +174,7 @@ export default function LocationPickerModal({
       }, 200);
     };
 
-    if ((window as any).L) {
+    if (window.L) {
       initLeafletMap();
     } else {
       const existingScript = document.getElementById("leaflet-js");

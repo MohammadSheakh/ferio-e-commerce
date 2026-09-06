@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { LeafletMap, LeafletMarker } from "@/lib/leaflet-types";
 
 interface MiniAddressMapProps {
   lat: number;
@@ -26,8 +27,8 @@ export default function MiniAddressMap({
   onToggleAddressSource,
 }: MiniAddressMapProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<any>(null);
-  const markerRef = useRef<any>(null);
+  const mapInstanceRef = useRef<LeafletMap | null>(null);
+  const markerRef = useRef<LeafletMarker | null>(null);
 
   const [geoInfo, setGeoInfo] = useState<string>("");
   const [showGeocoded, setShowGeocoded] = useState<boolean>(useGeocodedText);
@@ -74,7 +75,7 @@ export default function MiniAddressMap({
     }
 
     const initMiniMap = () => {
-      const L = (window as any).L;
+      const L = window.L;
       if (!L || !mapContainerRef.current) return;
 
       if (!mapInstanceRef.current) {
@@ -119,7 +120,7 @@ export default function MiniAddressMap({
       }, 150);
     };
 
-    if ((window as any).L) {
+    if (window.L) {
       initMiniMap();
     } else {
       const existingScript = document.getElementById("leaflet-js");
