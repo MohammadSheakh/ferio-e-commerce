@@ -17,6 +17,10 @@ import { PlatformAuditService } from './services/platform-audit.service';
 import { SupportAccessService } from './services/support-access.service';
 import { ProvisioningService } from './services/provisioning.service';
 import { PlatformAdminController } from './platform.controller';
+import { PlatformAuthController } from './platform-auth.controller';
+import { PlatformCatalogController } from './platform-catalog.controller';
+import { PlatformMigrationsController } from './platform-migrations.controller';
+import { PlatformSupportAccessController } from './platform-support-access.controller';
 import { PlatformAuthService } from './services/platform-auth.service';
 import { PlatformPlanSeedService } from './services/platform-plan-seed.service';
 import { MigrationOrchestratorService } from './services/migration-orchestrator.service';
@@ -60,6 +64,10 @@ import {
   ],
   controllers: [
     PlatformAdminController,
+    PlatformAuthController,
+    PlatformCatalogController,
+    PlatformMigrationsController,
+    PlatformSupportAccessController,
     PlatformBillingController,
     PlatformBillingCallbackController,
   ],
