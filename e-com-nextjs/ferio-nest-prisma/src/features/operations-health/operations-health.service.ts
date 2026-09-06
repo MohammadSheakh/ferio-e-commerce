@@ -31,6 +31,13 @@ type CourierReadinessItem = CourierReadiness[number];
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+function processInstanceId(): string {
+  const configured = process.env.INSTANCE_ID?.trim();
+  if (configured) return configured;
+  const hostname = process.env.HOSTNAME?.trim();
+  return hostname || `pid-${process.pid}`;
+}
+
 @Injectable()
 export class OperationsHealthService {
   private readonly queues: Array<{ name: string; queue: Queue }>;
@@ -108,6 +115,7 @@ export class OperationsHealthService {
       launchReady: runtimeStatus === 'HEALTHY' && launchBlockers.length === 0,
       launchBlockers,
       process: {
+        instanceId: processInstanceId(),
         uptimeSeconds: Math.floor(process.uptime()),
         memory: {
           rssBytes: process.memoryUsage().rss,

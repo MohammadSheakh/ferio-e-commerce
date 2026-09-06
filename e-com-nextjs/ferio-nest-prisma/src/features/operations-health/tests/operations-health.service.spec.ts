@@ -85,6 +85,7 @@ describe('OperationsHealthService', () => {
     expect(health.runtimeStatus).toBe('HEALTHY');
     expect(health.launchReady).toBe(true);
     expect(health.launchBlockers).toEqual([]);
+    expect(health.process.instanceId).toEqual(expect.any(String));
     expect(health.requests).toMatchObject({ total: 1, p95DurationMs: 12 });
     expect(health.commerce).toMatchObject({ available: true, ordersPlaced: 2 });
     expect(health.backup).toMatchObject({
