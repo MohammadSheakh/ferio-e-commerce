@@ -8,30 +8,45 @@ const audit = { record: jest.fn() } as unknown as AuditService;
 
 describe('CatalogService', () => {
   it('creates a category with a normalized slug', async () => {
-    const create = jest.fn().mockImplementation(({ data }) => ({
-      id: 'category-1',
-      ...data,
-    }));
+    const create = jest
+      .fn()
+      .mockImplementation(({ data }: { data: Record<string, unknown> }) => ({
+        id: 'category-1',
+        ...data,
+      }));
+    const transaction = {
+      category: { create },
+      auditLog: { create: jest.fn() },
+    };
     const prisma = {
       category: { create },
-      $transaction: jest.fn((callback) => callback({
-        category: { create },
-        auditLog: { create: jest.fn() },
-      })),
+      $transaction: jest.fn(
+        (callback: (value: typeof transaction) => unknown) =>
+          callback(transaction),
+      ),
     } as unknown as PrismaService;
     const service = new CatalogService(prisma, audit);
 
-    const category = await service.createCategory({
-      name: '  Home & Living  ',
-    }, actor);
+    const category = (await service.createCategory(
+      {
+        name: '  Home & Living  ',
+      },
+      actor,
+    )) as { slug: string };
 
-    expect(create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        name: 'Home & Living',
-        slug: 'home-living',
-        isActive: true,
-        sortOrder: 0,
-      }),
+    const createCall = (create.mock.calls as unknown[][])[0]?.[0] as {
+      data: {
+        name: string;
+        slug: string;
+        isActive: boolean;
+        sortOrder: number;
+      };
+    };
+    expect(createCall.data).toMatchObject({
+      name: 'Home & Living',
+      slug: 'home-living',
+      isActive: true,
+      sortOrder: 0,
     });
     expect(category.slug).toBe('home-living');
   });
@@ -39,9 +54,9 @@ describe('CatalogService', () => {
   it('requires an explicit slug when a name cannot create a safe URL', async () => {
     const prisma = {
       category: { create: jest.fn() },
-      $transaction: jest.fn((callback) => callback({
-        category: { create: jest.fn() },
-      })),
+      $transaction: jest.fn((callback: (value: unknown) => unknown) =>
+        callback({ category: { create: jest.fn() } }),
+      ),
     } as unknown as PrismaService;
     const service = new CatalogService(prisma, audit);
 
@@ -89,7 +104,10 @@ describe('CatalogService', () => {
       inventoryMovement: { create: jest.fn() },
     };
     const prisma = {
-      $transaction: jest.fn((callback) => callback(transaction)),
+      $transaction: jest.fn(
+        (callback: (value: typeof transaction) => unknown) =>
+          callback(transaction),
+      ),
     } as unknown as PrismaService;
     const service = new CatalogService(prisma, audit);
 
@@ -192,7 +210,10 @@ describe('CatalogService', () => {
     };
     const prisma = {
       category: { findUnique: jest.fn().mockResolvedValue(category) },
-      $transaction: jest.fn((callback) => callback(transaction)),
+      $transaction: jest.fn(
+        (callback: (value: typeof transaction) => unknown) =>
+          callback(transaction),
+      ),
     } as unknown as PrismaService;
     const service = new CatalogService(prisma, audit);
 
