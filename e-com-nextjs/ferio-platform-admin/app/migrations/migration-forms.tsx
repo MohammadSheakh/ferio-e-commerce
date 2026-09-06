@@ -1,5 +1,10 @@
 "use client";
 import { useState, FormEvent } from "react";
+import {
+  readJsonRecord,
+  responseDataString,
+  responseMessage,
+} from "@/lib/client-response";
 
 export function StartMigrationForm() {
   const [working, setWorking] = useState(false);
@@ -20,12 +25,12 @@ export function StartMigrationForm() {
       }),
     });
     setWorking(false);
-    const data = await res.json().catch(() => ({}));
+    const data = await readJsonRecord(res);
     if (res.ok) {
-      setMessage(`Run ${data.data?.runId ?? ""} queued.`);
+      setMessage(`Run ${responseDataString(data, "runId")} queued.`);
       setTimeout(() => window.location.reload(), 800);
     } else {
-      setMessage(data.message || "Failed to start.");
+      setMessage(responseMessage(data, "Failed to start."));
     }
   }
 
@@ -56,7 +61,11 @@ export function MigrationActions({ runId, status }: { runId: string; status: str
   const [working, setWorking] = useState<string | null>(null);
   async function call(action: string) {
     setWorking(action);
-    await fetch(`/api/platform/migrations/${runId}/${action.toLowerCase()}`, { method: "POST" });
+    const response = await fetch(`/api/platform/migrations/${runId}/${action.toLowerCase()}`, { method: "POST" });
+    if (!response.ok) {
+      setWorking(null);
+      return;
+    }
     window.location.reload();
   }
   return (

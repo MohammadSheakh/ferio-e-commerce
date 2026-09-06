@@ -1,5 +1,6 @@
 "use client";
 import { useState, FormEvent } from "react";
+import { readJsonRecord, responseMessage } from "@/lib/client-response";
 
 export default function LoginPage() {
   const [error, setError] = useState("");
@@ -22,8 +23,8 @@ export default function LoginPage() {
       window.location.assign("/");
       return;
     }
-    const data = await response.json().catch(() => ({}));
-    setError(data.message || "Platform sign-in failed.");
+    const data = await readJsonRecord(response);
+    setError(responseMessage(data, "Platform sign-in failed."));
     setWorking(false);
   }
 

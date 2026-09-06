@@ -1,5 +1,6 @@
 "use client";
 import { useState, FormEvent } from "react";
+import { readJsonRecord, responseMessage } from "@/lib/client-response";
 
 export function CreatePlanForm() {
   const [message, setMessage] = useState("");
@@ -35,10 +36,10 @@ export function CreatePlanForm() {
         entitlements,
       }),
     });
-    const data = await response.json().catch(() => ({}));
+    const data = await readJsonRecord(response);
     setWorking(false);
     if (response.ok) window.location.reload();
-    else setMessage(data.message || "Plan creation failed.");
+    else setMessage(responseMessage(data, "Plan creation failed."));
   }
 
   return (

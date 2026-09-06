@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { readJsonRecord, responseMessage } from "@/lib/client-response";
 
 type Entitlement = {
   featureKey: string;
@@ -99,9 +100,9 @@ export function PlanEditor({ plan }: { plan: EditablePlan }) {
         entitlements,
       }),
     });
-    const data = await response.json().catch(() => ({}));
+    const data = await readJsonRecord(response);
     setSaving(false);
-    setMessage(response.ok ? "Saved" : data.message || "Unable to save changes.");
+    setMessage(response.ok ? "Saved" : responseMessage(data, "Unable to save changes."));
   }
 
   return (

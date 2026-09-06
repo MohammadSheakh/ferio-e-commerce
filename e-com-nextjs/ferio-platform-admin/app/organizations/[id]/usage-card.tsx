@@ -1,6 +1,11 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  readJsonRecord,
+  responseDataNumber,
+  responseMessage,
+} from "@/lib/client-response";
 
 export interface UsageMetricRow {
   metric: string;
@@ -34,14 +39,15 @@ export function UsageCard({
       `/api/platform/organizations/${organizationId}/usage/reconcile`,
       { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" },
     );
-    const data = await res.json().catch(() => ({}));
+    const data = await readJsonRecord(res);
     setWorking(false);
     if (res.ok) {
-      const drifted = data?.data?.drifted ?? "?";
-      setMessage(`Reconciled — ${drifted} counter(s) corrected.`);
+      const drifted = responseDataNumber(data, "drifted", NaN);
+      const driftedLabel = Number.isNaN(drifted) ? "?" : String(drifted);
+      setMessage(`Reconciled — ${driftedLabel} counter(s) corrected.`);
       router.refresh();
     } else {
-      setMessage(data.message || "Reconciliation failed.");
+      setMessage(responseMessage(data, "Reconciliation failed."));
     }
   }
 
