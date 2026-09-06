@@ -6,6 +6,21 @@ import Topbar from "@/components/Topbar";
 import CopyableId from "@/components/CopyableId";
 import RiderLocationMapModal from "./RiderLocationMapModal";
 
+const vehicleTypes = [
+  "BIKE",
+  "BICYCLE",
+  "E_BIKE",
+  "BUS",
+  "CUSTOM",
+  "WALK",
+] as const;
+
+type VehicleType = (typeof vehicleTypes)[number];
+
+function isVehicleType(value: string): value is VehicleType {
+  return vehicleTypes.includes(value as VehicleType);
+}
+
 type DeliveryPersonnel = {
   id: string;
   name: string;
@@ -13,7 +28,7 @@ type DeliveryPersonnel = {
   phoneNormalized: string;
   email: string | null;
   nidNumber: string | null;
-  vehicleType: "BIKE" | "BICYCLE" | "E_BIKE" | "BUS" | "CUSTOM" | "WALK";
+  vehicleType: VehicleType;
   operatingZone: string | null;
   drivingLicense: string | null;
   emergencyPhone: string | null;
@@ -33,7 +48,7 @@ type CreateForm = {
   email: string;
   password: string;
   nidNumber: string;
-  vehicleType: "BIKE" | "BICYCLE" | "E_BIKE" | "BUS" | "CUSTOM" | "WALK";
+  vehicleType: VehicleType;
   operatingZone: string;
   emergencyPhone: string;
 };
@@ -45,7 +60,7 @@ type EditForm = {
   email: string;
   password: string; // Leave blank to keep unchanged
   nidNumber: string;
-  vehicleType: "BIKE" | "BICYCLE" | "E_BIKE" | "BUS" | "CUSTOM" | "WALK";
+  vehicleType: VehicleType;
   operatingZone: string;
   emergencyPhone: string;
   status: "PENDING_APPROVAL" | "APPROVED" | "REJECTED" | "SUSPENDED";
@@ -599,7 +614,9 @@ export default function DeliveryMenPage() {
                   onChange={(e) =>
                     setEditingForm({
                       ...editingForm,
-                      vehicleType: e.target.value as any,
+                      ...(isVehicleType(e.target.value)
+                        ? { vehicleType: e.target.value }
+                        : {}),
                     })
                   }
                   className={inputClass}
@@ -807,9 +824,11 @@ export default function DeliveryMenPage() {
                 Vehicle Type
                 <select
                   value={form.vehicleType}
-                  onChange={(e) =>
-                    setForm({ ...form, vehicleType: e.target.value as any })
-                  }
+                  onChange={(e) => {
+                    if (isVehicleType(e.target.value)) {
+                      setForm({ ...form, vehicleType: e.target.value });
+                    }
+                  }}
                   className={inputClass}
                 >
                   <option value="BIKE">Motorcycle</option>

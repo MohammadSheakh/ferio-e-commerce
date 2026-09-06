@@ -53,6 +53,17 @@ export interface SavedAddressItem {
   isDefault: boolean;
 }
 
+type PublicStore = {
+  id: string;
+  code: string;
+  name: string;
+  district?: string;
+  area?: string;
+  address?: string;
+  operatingHours?: string;
+  phone?: string;
+};
+
 const emptyForm: CheckoutForm = {
   name: "",
   phone: "",
@@ -117,7 +128,7 @@ export default function CheckoutPage() {
   const [saveAddressToAccount, setSaveAddressToAccount] = useState(false);
   const [userLoggedIn, setUserLoggedIn] = useState(false);
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
-  const [publicStores, setPublicStores] = useState<any[]>([]);
+  const [publicStores, setPublicStores] = useState<PublicStore[]>([]);
 
   useEffect(() => {
     trackStorefrontEvent(
@@ -180,8 +191,15 @@ export default function CheckoutPage() {
           data?: PaymentOptions;
         };
         if (publicStoresResponse.ok) {
-          const storesPayload = await publicStoresResponse.json();
-          const stores = storesPayload.data || storesPayload;
+          const storesPayload: unknown = await publicStoresResponse.json();
+          const stores =
+            Array.isArray(storesPayload)
+              ? (storesPayload as PublicStore[])
+              : typeof storesPayload === "object" && storesPayload !== null &&
+                  "data" in storesPayload &&
+                  Array.isArray(storesPayload.data)
+                ? (storesPayload.data as PublicStore[])
+                : [];
           if (Array.isArray(stores) && stores.length > 0) {
             setPublicStores(stores);
             setForm((prev) => ({
