@@ -170,7 +170,7 @@ services:
     entrypoint: ["/usr/local/bin/docker-entrypoint.sh"]
     command: ["node", "dist/src/main.js"]
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:6733/api/v1/health || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:6733/api/v1/ready || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5
