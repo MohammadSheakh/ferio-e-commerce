@@ -232,7 +232,7 @@ describe('Two-tenant live socket isolation (§10.11 multi-client E2E)', () => {
   let httpServer: ReturnType<typeof createServer>;
   let io: IoServer;
   let port: number;
-  let clients: WireClient[] = [];
+  const clients: WireClient[] = [];
   let gateway: SocketGateway;
 
   const jwt = new JwtService({ secret: SECRET });

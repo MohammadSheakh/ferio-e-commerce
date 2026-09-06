@@ -13,7 +13,6 @@
  *      intact (§9.2 data-preservation requirement).
  */
 import { Pool } from 'pg';
-import { ForbiddenException } from '@nestjs/common';
 
 import { TenantSchemaBootstrapper } from '../src/tenancy/tenant-schema.bootstrapper';
 import { TenantDatabaseManager } from '../src/tenancy/tenant-database.manager';
