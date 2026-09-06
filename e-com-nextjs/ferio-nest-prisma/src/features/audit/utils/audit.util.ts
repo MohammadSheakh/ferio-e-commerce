@@ -1,11 +1,13 @@
 import { Prisma } from '@prisma/client';
 import { toTenantJsonInput } from '../../../core/database/json-input.util';
 
-const sensitiveKey = /(password|secret|token|authorization|cookie|credential|signature|api[-_]?key)/i;
+const sensitiveKey =
+  /(password|secret|token|authorization|cookie|credential|signature|api[-_]?key)/i;
 
 function sanitize(value: unknown, depth: number): unknown {
   if (depth > 8) return '[TRUNCATED]';
-  if (Array.isArray(value)) return value.map((item) => sanitize(item, depth + 1));
+  if (Array.isArray(value))
+    return value.map((item) => sanitize(item, depth + 1));
   if (value && typeof value === 'object') {
     return Object.fromEntries(
       Object.entries(value).map(([key, item]) => [
@@ -20,7 +22,9 @@ function sanitize(value: unknown, depth: number): unknown {
   return value;
 }
 
-export function safeAuditJson(value: unknown): Prisma.InputJsonValue | undefined {
+export function safeAuditJson(
+  value: unknown,
+): Prisma.InputJsonValue | undefined {
   if (value === undefined || value === null) return undefined;
   return toTenantJsonInput(sanitize(value, 0));
 }

@@ -86,7 +86,8 @@ export class AamarpayGateway extends PaymentGateway {
       // Trust only provider-reported values at this trust boundary; falling
       // back to callback payload would let callers influence amount/currency
       // comparisons. Missing provider values fail the equality check closed.
-      amount: raw.amount !== undefined ? this.minorAmount(raw.amount) : undefined,
+      amount:
+        raw.amount !== undefined ? this.minorAmount(raw.amount) : undefined,
       currency: this.text(raw.currency ?? raw.currency_merchant),
       providerTransactionId: this.text(raw.pg_txnid ?? raw.bank_txn),
       raw,

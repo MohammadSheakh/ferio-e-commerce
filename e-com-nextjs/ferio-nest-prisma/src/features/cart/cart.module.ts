@@ -9,7 +9,7 @@ import {
 import { CartService } from './cart.service';
 
 @Module({
-  imports: [ TenancyModule,PrismaModule, AuthModule],
+  imports: [TenancyModule, PrismaModule, AuthModule],
   controllers: [CartController, AdminCartEligibilityController],
   providers: [CartService],
   exports: [CartService],

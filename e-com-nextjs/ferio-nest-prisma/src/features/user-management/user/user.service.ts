@@ -1,8 +1,4 @@
-import {
-  Injectable,
-  Logger,
-  Optional,
-} from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { Prisma, PrismaClient } from '@prisma/client';
 
 import { RedisService } from '@app/redis';
@@ -50,14 +46,18 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isPublicUserCache(value: unknown): value is PublicUserRecord {
-  return isRecord(value) &&
+  return (
+    isRecord(value) &&
     typeof value.email === 'string' &&
     typeof value.role === 'string' &&
     typeof value.id === 'string' &&
-    typeof value.isDeleted === 'boolean';
+    typeof value.isDeleted === 'boolean'
+  );
 }
 
-function parsePublicUserCache(value: unknown): PublicUserRecord | null | undefined {
+function parsePublicUserCache(
+  value: unknown,
+): PublicUserRecord | null | undefined {
   if (value === null) return null;
   return isPublicUserCache(value) ? value : undefined;
 }

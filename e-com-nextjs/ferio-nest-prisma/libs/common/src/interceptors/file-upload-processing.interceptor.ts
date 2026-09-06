@@ -11,14 +11,14 @@ import type { UploadRequest } from '../types/http-request.type';
 
 /**
  * File Upload Processing Interceptor
- * 
+ *
  * 📚 INDUSTRY STANDARD IMPLEMENTATION
- * 
+ *
  * Processes uploaded files:
  * - Uploads to Cloudinary/S3
  * - Stores URLs in request object
  * - Makes URLs available to controller
- * 
+ *
  * Usage:
  * @UseInterceptors(FileFieldsInterceptor([...]))
  * @UseInterceptors(new FileUploadProcessingInterceptor('attachments', 'folder'))
@@ -33,10 +33,7 @@ export class FileUploadProcessingInterceptor implements NestInterceptor {
     private folder: string = 'attachments',
   ) {}
 
-  intercept(
-    context: ExecutionContext,
-    next: CallHandler,
-  ): Observable<unknown> {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const request = context.switchToHttp().getRequest<UploadRequest>();
     const files = request.files?.[this.fieldName] as Express.Multer.File[];
 

@@ -27,12 +27,20 @@ export interface TenantContext {
   readonly database: TenantDatabaseMaterial;
   readonly domainId: string;
   readonly hostname: string;
-  readonly subscriptionStatus: 'TRIALING' | 'ACTIVE' | 'PAST_DUE' | 'SUSPENDED' | 'CANCELLED';
+  readonly subscriptionStatus:
+    | 'TRIALING'
+    | 'ACTIVE'
+    | 'PAST_DUE'
+    | 'SUSPENDED'
+    | 'CANCELLED';
 }
 
 const storage = new AsyncLocalStorage<TenantContext>();
 
-export function runWithTenantContext<T>(context: TenantContext, callback: () => T): T {
+export function runWithTenantContext<T>(
+  context: TenantContext,
+  callback: () => T,
+): T {
   return storage.run(Object.freeze({ ...context }), callback);
 }
 

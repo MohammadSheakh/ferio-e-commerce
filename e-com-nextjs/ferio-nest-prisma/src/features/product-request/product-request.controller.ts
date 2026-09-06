@@ -52,7 +52,6 @@ export class PublicProductRequestController {
       data: result,
     };
   }
-
 }
 
 @ApiTags('Product Requests')

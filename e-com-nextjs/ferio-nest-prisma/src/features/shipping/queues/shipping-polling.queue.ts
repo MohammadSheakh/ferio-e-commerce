@@ -29,7 +29,7 @@ export class ShippingPollingQueue implements OnModuleInit {
     private readonly polling: ShippingPollingService,
     private readonly audit: AuditService,
     @Optional() private readonly fanout?: TenantFanoutService,
-) {}
+  ) {}
 
   async onModuleInit() {
     if (!this.scheduleEnabled()) return;

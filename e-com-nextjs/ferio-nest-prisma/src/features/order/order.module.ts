@@ -15,7 +15,8 @@ import { CustomerNotificationsModule } from '../customer-notifications/customer-
 import { WalletModule } from '../wallet/wallet.module';
 
 @Module({
-  imports: [ TenancyModule,
+  imports: [
+    TenancyModule,
     PrismaModule,
     AuthModule,
     CartModule,

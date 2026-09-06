@@ -6,7 +6,8 @@ import {
   Optional,
 } from '@nestjs/common';
 import { randomBytes, timingSafeEqual } from 'crypto';
-import type { PrismaClient } from '@prisma/client';import { Prisma } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '@app/database';
 import {
   resolveTenantDatabase,
@@ -49,7 +50,8 @@ export class WarrantyService {
    */
   private async db(): Promise<PrismaClient> {
     return resolveTenantDatabase(this.tenantDb, this.prisma);
-  }  private async verifiedOrder(dto: VerifyWarrantyOrderDto) {
+  }
+  private async verifiedOrder(dto: VerifyWarrantyOrderDto) {
     const db = await this.db();
     const reference = dto.reference.trim().toUpperCase();
     const phone = normalizeBangladeshPhone(dto.phone);

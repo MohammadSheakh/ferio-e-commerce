@@ -10,13 +10,18 @@ import { createHmac, timingSafeEqual } from 'crypto';
  * the server-side secret, so browser-supplied values are untrusted input
  * that fails verification.
  */
-export function buildCallbackToken(organizationId: string, secret: string | undefined): string {
+export function buildCallbackToken(
+  organizationId: string,
+  secret: string | undefined,
+): string {
   if (!secret || secret.length < 24) {
     throw new Error(
       'PLATFORM_CALLBACK_SECRET must be set (>= 24 chars) before tenant payment callbacks can be minted.',
     );
   }
-  const signature = createHmac('sha256', secret).update(organizationId).digest('base64url');
+  const signature = createHmac('sha256', secret)
+    .update(organizationId)
+    .digest('base64url');
   return `${organizationId}.${signature}`;
 }
 

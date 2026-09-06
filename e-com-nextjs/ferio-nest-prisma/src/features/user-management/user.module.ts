@@ -38,8 +38,23 @@ import { TenancyModule } from '../../tenancy/tenancy.module';
     // Auth Module (required for AuthGuard / JwtService)
     AuthModule,
   ],
-  controllers: [UserController, UserProfileController, UserDevicesController, OAuthAccountController],
-  providers: [UserService, UserProfileService, UserDevicesService, OAuthAccountService],
-  exports: [UserService, UserProfileService, UserDevicesService, OAuthAccountService],
+  controllers: [
+    UserController,
+    UserProfileController,
+    UserDevicesController,
+    OAuthAccountController,
+  ],
+  providers: [
+    UserService,
+    UserProfileService,
+    UserDevicesService,
+    OAuthAccountService,
+  ],
+  exports: [
+    UserService,
+    UserProfileService,
+    UserDevicesService,
+    OAuthAccountService,
+  ],
 })
 export class UserModule {}

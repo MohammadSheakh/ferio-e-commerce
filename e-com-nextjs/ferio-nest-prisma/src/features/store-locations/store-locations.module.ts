@@ -10,11 +10,9 @@ import {
 } from './store-locations.controller';
 
 @Module({
-  imports: [ TenancyModule,PrismaModule, AuthModule, AuditModule],
+  imports: [TenancyModule, PrismaModule, AuthModule, AuditModule],
   controllers: [PublicStoreLocationsController, AdminStoreLocationsController],
   providers: [StoreLocationsService],
   exports: [StoreLocationsService],
 })
 export class StoreLocationsModule {}
-
-

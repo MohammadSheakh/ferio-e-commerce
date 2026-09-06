@@ -7,7 +7,7 @@ import { RtoController } from './rto.controller';
 import { RtoService } from './rto.service';
 
 @Module({
-  imports: [ TenancyModule,PrismaModule, AuthModule, AuditModule],
+  imports: [TenancyModule, PrismaModule, AuthModule, AuditModule],
   controllers: [RtoController],
   providers: [RtoService],
 })

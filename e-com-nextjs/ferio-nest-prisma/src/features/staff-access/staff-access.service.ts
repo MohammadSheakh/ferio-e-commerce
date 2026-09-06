@@ -30,11 +30,16 @@ export class StaffAccessService {
     private readonly email: EmailService,
     private readonly config: ConfigService,
     @Optional() private readonly tenantDb?: TenantDbService,
-    @Optional() @Inject('PLAN_GATE')
+    @Optional()
+    @Inject('PLAN_GATE')
     private readonly planGate?: {
-      assertStaffSeat(organizationId: string, currentMemberCount: number): Promise<void>;
+      assertStaffSeat(
+        organizationId: string,
+        currentMemberCount: number,
+      ): Promise<void>;
     },
-    @Optional() @Inject('ORG_MEMBERS_COUNTER')
+    @Optional()
+    @Inject('ORG_MEMBERS_COUNTER')
     private readonly orgMembers?: {
       countActiveMembers(organizationId: string): Promise<number>;
     },

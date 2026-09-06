@@ -11,7 +11,7 @@ import {
 import { WarrantyService } from './warranty.service';
 
 @Module({
-  imports: [ TenancyModule,PrismaModule, AuthModule, SettingsModule],
+  imports: [TenancyModule, PrismaModule, AuthModule, SettingsModule],
   controllers: [WarrantyController, AdminWarrantyController],
   providers: [WarrantyService, CloudinaryStrategy],
 })

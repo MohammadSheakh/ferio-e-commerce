@@ -8,7 +8,13 @@ import { OperationsHealthController } from './operations-health.controller';
 import { OperationsHealthService } from './operations-health.service';
 
 @Module({
-  imports: [ TenancyModule,PrismaModule, AuthModule, CommercePaymentsModule, ShippingModule],
+  imports: [
+    TenancyModule,
+    PrismaModule,
+    AuthModule,
+    CommercePaymentsModule,
+    ShippingModule,
+  ],
   controllers: [OperationsHealthController],
   providers: [OperationsHealthService],
 })

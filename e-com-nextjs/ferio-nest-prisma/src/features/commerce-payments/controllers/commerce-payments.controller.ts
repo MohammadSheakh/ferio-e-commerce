@@ -58,7 +58,12 @@ export class PublicCommercePaymentsController {
   @UseGuards(SlidingWindowRateLimitGuard)
   @RateLimit(GLOBAL_RATE_LIMITS.strict)
   initiate(@Body() dto: InitiateCommercePaymentDto) {
-    return this.payments.initiate(dto.orderId, dto.reference, dto.phone, dto.provider);
+    return this.payments.initiate(
+      dto.orderId,
+      dto.reference,
+      dto.phone,
+      dto.provider,
+    );
   }
 
   @Post('retry')
@@ -140,7 +145,6 @@ export class PublicCommercePaymentsController {
     response: Response,
     customerOrigin?: string,
   ) {
-
     // IPN background notifications do not redirect browser
     if (eventType === 'ipn') return response.status(200).json(result);
 

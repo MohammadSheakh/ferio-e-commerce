@@ -34,9 +34,11 @@ function isUserProfileCache(value: unknown): value is UserProfile {
     return false;
   }
   const record = value as Record<string, unknown>;
-  return typeof record.id === 'string' &&
+  return (
+    typeof record.id === 'string' &&
     typeof record.userId === 'string' &&
-    typeof record.isDeleted === 'boolean';
+    typeof record.isDeleted === 'boolean'
+  );
 }
 
 function parseUserProfileCache(value: unknown): UserProfile | null | undefined {

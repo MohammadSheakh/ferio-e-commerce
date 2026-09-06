@@ -7,10 +7,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { createHash, randomBytes } from 'crypto';
-import {
-  Prisma,
-  ShipmentProviderCode,
-} from '@prisma/client';
+import { Prisma, ShipmentProviderCode } from '@prisma/client';
 import type { PrismaClient } from '@prisma/client';
 import { PrismaService } from '@app/database';
 import {

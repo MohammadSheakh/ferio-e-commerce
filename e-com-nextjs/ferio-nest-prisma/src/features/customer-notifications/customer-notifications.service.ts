@@ -24,8 +24,9 @@ export type CreateCustomerNotificationInput = {
 export class CustomerNotificationsService {
   constructor(
     private readonly prisma: PrismaService,
-  
-    @Optional() private readonly tenantDb?: TenantDbService,) {}
+
+    @Optional() private readonly tenantDb?: TenantDbService,
+  ) {}
 
   /**
    * MT-7: inside a tenant-resolved request this returns the resolved tenant

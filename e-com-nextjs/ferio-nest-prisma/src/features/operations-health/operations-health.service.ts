@@ -68,7 +68,11 @@ export class OperationsHealthService {
     const [database, redis, queues, commerce, couriers] = await Promise.all([
       this.databaseProbe(),
       this.redisProbe(),
-      Promise.all(this.queues.map((queue: { name: string; queue: Queue }) => this.queueEvidence(queue))),
+      Promise.all(
+        this.queues.map((queue: { name: string; queue: Queue }) =>
+          this.queueEvidence(queue),
+        ),
+      ),
       this.commerceEvidence(),
       this.shipping.getProviders().catch(() => [] as CourierReadiness),
     ]);
@@ -84,7 +88,10 @@ export class OperationsHealthService {
       ...(payments.some((provider) => provider.configured)
         ? []
         : ['No prepaid payment provider is configured.']),
-      ...(couriers.some((provider: CourierReadinessItem) => provider.isActive && provider.configured)
+      ...(couriers.some(
+        (provider: CourierReadinessItem) =>
+          provider.isActive && provider.configured,
+      )
         ? []
         : ['No active courier has verified runtime configuration.']),
       ...(backup.status === 'CURRENT'

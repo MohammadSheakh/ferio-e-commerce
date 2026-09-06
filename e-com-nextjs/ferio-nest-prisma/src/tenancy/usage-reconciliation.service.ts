@@ -124,9 +124,7 @@ export class UsageReconciliationService {
   }
 
   /** Reconcile every READY tenant; one failure never blocks the fleet. */
-  async reconcileAllReady(
-    periodKey = currentPeriodKey(),
-  ): Promise<{
+  async reconcileAllReady(periodKey = currentPeriodKey()): Promise<{
     reconciled: number;
     failures: Array<{ organizationId: string; error: string }>;
   }> {

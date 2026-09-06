@@ -1,4 +1,12 @@
-import { IsEnum, IsNotEmpty, IsOptional, IsString, IsNumber, Min, Max } from 'class-validator';
+import {
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsNumber,
+  Min,
+  Max,
+} from 'class-validator';
 
 export enum DeliveryVehicleTypeEnum {
   BIKE = 'BIKE',
@@ -156,7 +164,12 @@ export class AssignOrderDto {
 export class UpdateDeliveryOrderStatusDto {
   @IsString()
   @IsNotEmpty()
-  status: 'PICKED_UP' | 'IN_TRANSIT' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'DELIVERY_FAILED';
+  status:
+    | 'PICKED_UP'
+    | 'IN_TRANSIT'
+    | 'OUT_FOR_DELIVERY'
+    | 'DELIVERED'
+    | 'DELIVERY_FAILED';
 
   @IsString()
   @IsOptional()

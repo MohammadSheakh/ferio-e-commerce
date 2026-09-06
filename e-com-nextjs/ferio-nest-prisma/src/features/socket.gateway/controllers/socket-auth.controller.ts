@@ -14,7 +14,9 @@ import { tryGetTenantContext } from '../../../tenancy/tenant-context';
 
 class GuestSocketTicketDto {
   @IsString()
-  @Matches(/^gst_[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i)
+  @Matches(
+    /^gst_[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+  )
   guestId: string;
 }
 
@@ -39,7 +41,8 @@ export class SocketAuthController {
       dto.guestId,
       tryGetTenantContext()?.organizationId,
     );
-    if (!token) throw new BadRequestException('A valid guest chat ID is required');
+    if (!token)
+      throw new BadRequestException('A valid guest chat ID is required');
     return { token, expiresInSeconds: 300 };
   }
 }

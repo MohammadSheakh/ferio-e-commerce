@@ -62,7 +62,9 @@ export class PublicOrderController {
   @Post('wallet')
   @UseGuards(AuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Pay for a valid checkout draft from customer wallet' })
+  @ApiOperation({
+    summary: 'Pay for a valid checkout draft from customer wallet',
+  })
   placeWalletOrder(
     @Headers('x-cart-token') cartToken: string | undefined,
     @Headers('idempotency-key') idempotencyKey: string | undefined,

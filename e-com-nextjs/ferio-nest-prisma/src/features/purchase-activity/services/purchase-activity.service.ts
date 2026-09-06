@@ -1,7 +1,4 @@
-import {
-  Injectable,
-  Optional,
-} from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { PrismaClient } from '@prisma/client';
 import { PrismaService } from '@app/database';
@@ -111,9 +108,9 @@ export class PurchaseActivityService {
             order.address?.recipientName ?? '',
           ),
           location: settings.purchaseActivityShowArea
-            ? order.address?.area ?? null
+            ? (order.address?.area ?? null)
             : settings.purchaseActivityShowDistrict
-              ? order.address?.district ?? null
+              ? (order.address?.district ?? null)
               : null,
           purchasedAt: order.createdAt,
           verifiedPurchase: true as const,

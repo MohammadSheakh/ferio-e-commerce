@@ -1,6 +1,6 @@
 /**
  * Redis Constants
- * 
+ *
  * 📚 INDUSTRY STANDARD IMPLEMENTATION
  */
 

@@ -17,7 +17,7 @@ export class TransactionalMessageProcessor extends WorkerHost {
   constructor(
     private readonly dispatcher: TransactionalMessageDispatcher,
     private readonly queue: TransactionalMessageQueue,
-      @Optional() private readonly fanout?: TenantFanoutService,
+    @Optional() private readonly fanout?: TenantFanoutService,
   ) {
     super();
   }

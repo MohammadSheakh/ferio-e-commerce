@@ -41,7 +41,11 @@ export class CustomerWalletController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
-    return this.wallet.summary(actor.userId, Number(page) || 1, Number(limit) || 20);
+    return this.wallet.summary(
+      actor.userId,
+      Number(page) || 1,
+      Number(limit) || 20,
+    );
   }
 
   @Post('top-ups')

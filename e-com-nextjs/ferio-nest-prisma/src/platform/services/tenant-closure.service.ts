@@ -69,7 +69,10 @@ export class TenantClosureService {
       entityType: 'Organization',
       entityId: organizationId,
       actorId: options.actorId,
-      metadata: { reason: options.reason, domainsRevoked: organization.domains.length },
+      metadata: {
+        reason: options.reason,
+        domainsRevoked: organization.domains.length,
+      },
     });
   }
 
@@ -128,7 +131,9 @@ export class TenantClosureService {
 
     await this.organizations.transition(organizationId, 'CLOSED', {
       actorId: options.actorId,
-      reason: options.retentionAcknowledged ? 'retention acknowledged' : undefined,
+      reason: options.retentionAcknowledged
+        ? 'retention acknowledged'
+        : undefined,
     });
   }
 }

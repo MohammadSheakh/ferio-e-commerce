@@ -12,7 +12,10 @@ import { CommercePaymentsService } from '../services/commerce-payments.service';
 export const PAYMENT_EXPIRY_JOB = 'expire-prepaid-attempt';
 export const PAYMENT_EXPIRY_SWEEP_JOB = 'sweep-expired-prepaid-attempts';
 export const PAYMENT_RECOVERY_SCHEDULER_ID = 'ferio-payment-expiry-recovery';
-export type PaymentRecoveryJobData = { attemptId?: string; organizationId?: string };
+export type PaymentRecoveryJobData = {
+  attemptId?: string;
+  organizationId?: string;
+};
 
 @Injectable()
 export class PaymentRecoveryQueue implements OnModuleInit {

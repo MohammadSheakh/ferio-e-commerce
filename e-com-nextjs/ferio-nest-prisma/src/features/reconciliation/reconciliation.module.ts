@@ -9,7 +9,7 @@ import { ReconciliationQueue } from './queues/reconciliation.queue';
 import { ReconciliationService } from './services/reconciliation.service';
 
 @Module({
-  imports: [ TenancyModule,PrismaModule, AuthModule, AuditModule],
+  imports: [TenancyModule, PrismaModule, AuthModule, AuditModule],
   controllers: [ReconciliationController],
   providers: [
     ReconciliationService,

@@ -136,7 +136,9 @@ export class PaperflyAdapter implements CourierAdapter {
   parseWebhook(payload: Record<string, unknown>): CourierWebhookEvent {
     const rawStatus = shippingText(payload.status || payload.event, 'unknown');
     return {
-      providerEventId: payload.event_id ? shippingText(payload.event_id) : undefined,
+      providerEventId: payload.event_id
+        ? shippingText(payload.event_id)
+        : undefined,
       externalShipmentId:
         payload.tracking_id || payload.trackingNumber || payload.order_id
           ? shippingText(

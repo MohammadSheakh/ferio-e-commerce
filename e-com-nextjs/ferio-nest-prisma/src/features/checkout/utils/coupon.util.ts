@@ -18,8 +18,10 @@ function isCouponRule(value: unknown): value is CouponRule {
     typeof rule.code === 'string' &&
     (rule.type === 'FIXED' || rule.type === 'PERCENT') &&
     typeof rule.value === 'number' &&
-    (rule.minimumSubtotal === undefined || typeof rule.minimumSubtotal === 'number') &&
-    (rule.maximumDiscount === undefined || typeof rule.maximumDiscount === 'number') &&
+    (rule.minimumSubtotal === undefined ||
+      typeof rule.minimumSubtotal === 'number') &&
+    (rule.maximumDiscount === undefined ||
+      typeof rule.maximumDiscount === 'number') &&
     (rule.startsAt === undefined || typeof rule.startsAt === 'string') &&
     (rule.endsAt === undefined || typeof rule.endsAt === 'string') &&
     (rule.active === undefined || typeof rule.active === 'boolean')

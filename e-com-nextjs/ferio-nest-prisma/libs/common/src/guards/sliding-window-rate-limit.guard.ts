@@ -161,7 +161,10 @@ export class SlidingWindowRateLimitGuard implements CanActivate {
     }
   }
 
-  private handleUnavailable(options: RateLimitOptions, reason: string): boolean {
+  private handleUnavailable(
+    options: RateLimitOptions,
+    reason: string,
+  ): boolean {
     const keyPrefix = options.keyPrefix || 'default';
     const failOpen =
       process.env.NODE_ENV !== 'production' ||

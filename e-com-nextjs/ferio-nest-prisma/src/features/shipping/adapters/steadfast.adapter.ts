@@ -118,7 +118,9 @@ export class SteadfastAdapter implements CourierAdapter {
       trackingNumber: payload.tracking_code
         ? shippingText(payload.tracking_code)
         : undefined,
-      orderReference: payload.invoice ? shippingText(payload.invoice) : undefined,
+      orderReference: payload.invoice
+        ? shippingText(payload.invoice)
+        : undefined,
       rawStatus,
       normalizedStatus: normalizeCourierStatus('STEADFAST', rawStatus),
       occurredAt: payload.updated_at

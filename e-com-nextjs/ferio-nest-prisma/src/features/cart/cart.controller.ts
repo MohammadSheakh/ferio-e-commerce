@@ -110,7 +110,9 @@ export class CartController {
   }
 
   @Post('saved/share/:shareToken/import')
-  @ApiOperation({ summary: 'Import available items from a shared cart to active cart' })
+  @ApiOperation({
+    summary: 'Import available items from a shared cart to active cart',
+  })
   importSharedCart(
     @Param('shareToken') shareToken: string,
     @Headers('x-cart-token') token?: string,
@@ -137,7 +139,10 @@ export class CartController {
 
   @Post('reorder/:orderId')
   @UseGuards(AuthGuard)
-  @ApiOperation({ summary: 'Reorder available items from one of your past orders into active cart' })
+  @ApiOperation({
+    summary:
+      'Reorder available items from one of your past orders into active cart',
+  })
   reorder(
     @Param('orderId') orderId: string,
     @Body() dto: ReorderDto,

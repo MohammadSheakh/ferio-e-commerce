@@ -60,8 +60,9 @@ export class ReturnsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
-  
-    @Optional() private readonly tenantDb?: TenantDbService,) {}
+
+    @Optional() private readonly tenantDb?: TenantDbService,
+  ) {}
 
   /**
    * MT-7: inside a tenant-resolved request this returns the resolved tenant

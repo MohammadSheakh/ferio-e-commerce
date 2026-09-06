@@ -40,10 +40,11 @@ export type TenantMetricsSnapshot = {
   counters: TenantMetricSeries[];
 };
 
-function stableLabelKey(name: TenantMetricName, labels: TenantMetricLabels): string {
-  const keys = Object.keys(labels)
-    .sort()
-    .slice(0, MAX_LABEL_KEYS);
+function stableLabelKey(
+  name: TenantMetricName,
+  labels: TenantMetricLabels,
+): string {
+  const keys = Object.keys(labels).sort().slice(0, MAX_LABEL_KEYS);
   const parts = keys.map(
     (key) =>
       `${key}=${String(labels[key] ?? '')
@@ -57,7 +58,10 @@ export class TenantMetrics {
   private static observedSince = new Date();
   private static totalIncrements = 0;
   private static readonly counts = new Map<string, number>();
-  private static readonly labelSets = new Map<string, { name: TenantMetricName; labels: TenantMetricLabels }>();
+  private static readonly labelSets = new Map<
+    string,
+    { name: TenantMetricName; labels: TenantMetricLabels }
+  >();
 
   static increment(
     name: TenantMetricName,

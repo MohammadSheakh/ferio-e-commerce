@@ -68,5 +68,7 @@ export function periodKeyStart(periodKey: string, now = new Date()): Date {
   }
   // Unknown/custom key shapes fall back to the current month start so a
   // malformed key can never widen the counted window.
-  return periodKeyStart(`${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`);
+  return periodKeyStart(
+    `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`,
+  );
 }

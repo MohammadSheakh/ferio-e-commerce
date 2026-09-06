@@ -14,9 +14,7 @@ import {
   TenantDbService,
 } from '../../../tenancy/tenant-db.service';
 import { toTenantJsonInput } from '../../../core/database/json-input.util';
-import {
-  buildCallbackToken,
-} from '../../../tenancy/callback-tenant.util';
+import { buildCallbackToken } from '../../../tenancy/callback-tenant.util';
 import { tryGetTenantContext } from '../../../tenancy/tenant-context';
 import { OrderService } from '../../order/order.service';
 import { normalizeBangladeshPhone } from '../../checkout/utils/checkout.util';

@@ -6,7 +6,7 @@ import { AuditController } from './controllers/audit.controller';
 import { AuditService } from './services/audit.service';
 
 @Module({
-  imports: [ TenancyModule,PrismaModule, AuthModule],
+  imports: [TenancyModule, PrismaModule, AuthModule],
   controllers: [AuditController],
   providers: [AuditService],
   exports: [AuditService],

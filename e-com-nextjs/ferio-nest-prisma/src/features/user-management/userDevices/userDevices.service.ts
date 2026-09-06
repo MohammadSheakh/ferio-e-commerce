@@ -1,8 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-  Optional,
-} from '@nestjs/common';
+import { Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { PrismaClient, UserDevices } from '@prisma/client';
 import { PrismaService } from '@app/database';
 import { DeviceType } from './enums/TDevice.enum';
@@ -13,7 +9,7 @@ import {
 
 /**
  * UserDevices Service
- * 
+ *
  * Manages user devices for push notifications through the tenant-aware
  * Prisma boundary.
  */
@@ -99,7 +95,10 @@ export class UserDevicesService {
   /**
    * Remove device (soft delete)
    */
-  async removeDevice(userId: string, deviceId: string): Promise<UserDevices | null> {
+  async removeDevice(
+    userId: string,
+    deviceId: string,
+  ): Promise<UserDevices | null> {
     const db = await this.db();
     const device = await db.userDevices.findFirst({
       where: { id: deviceId, userId, isDeleted: false },

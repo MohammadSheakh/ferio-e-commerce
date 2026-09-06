@@ -29,7 +29,9 @@ export class AppController {
   @Get('ready')
   async getReadiness() {
     if (!this.prisma || !this.redis) {
-      throw new ServiceUnavailableException('READINESS_DEPENDENCIES_UNAVAILABLE');
+      throw new ServiceUnavailableException(
+        'READINESS_DEPENDENCIES_UNAVAILABLE',
+      );
     }
 
     const redisClient = await this.redis.getClient();
@@ -38,10 +40,7 @@ export class AppController {
     }
 
     try {
-      await Promise.all([
-        this.prisma.$queryRaw`SELECT 1`,
-        redisClient.ping(),
-      ]);
+      await Promise.all([this.prisma.$queryRaw`SELECT 1`, redisClient.ping()]);
     } catch {
       throw new ServiceUnavailableException('READINESS_CHECK_FAILED');
     }

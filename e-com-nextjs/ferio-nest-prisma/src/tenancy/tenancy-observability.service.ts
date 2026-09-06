@@ -20,8 +20,12 @@ const DEFAULT_LOG_INTERVAL_MS = 60_000;
  *   pipeline without requiring a metrics-stack decision first.
  */
 @Injectable()
-export class TenancyObservabilityService implements OnModuleInit, OnModuleDestroy {
-  private readonly logger = new StructuredLogger(TenancyObservabilityService.name);
+export class TenancyObservabilityService
+  implements OnModuleInit, OnModuleDestroy
+{
+  private readonly logger = new StructuredLogger(
+    TenancyObservabilityService.name,
+  );
   private snapshotTimer?: ReturnType<typeof setInterval>;
 
   onModuleInit(): void {

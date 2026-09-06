@@ -11,7 +11,7 @@ import { CheckoutService } from './checkout.service';
 import { AuditModule } from '../audit/audit.module';
 
 @Module({
-  imports: [ TenancyModule,PrismaModule, AuthModule, CartModule, AuditModule],
+  imports: [TenancyModule, PrismaModule, AuthModule, CartModule, AuditModule],
   controllers: [PublicCheckoutController, AdminDeliveryController],
   providers: [CheckoutService],
   exports: [CheckoutService],

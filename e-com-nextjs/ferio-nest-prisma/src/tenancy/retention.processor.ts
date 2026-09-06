@@ -3,10 +3,7 @@ import type { Job } from 'bullmq';
 import { QUEUE_NAMES } from '@app/queue';
 import { runWithCorrelationId, StructuredLogger } from '@app/common';
 import { Optional } from '@nestjs/common';
-import {
-  RETENTION_SWEEP_JOB,
-  type RetentionJobData,
-} from './retention.queue';
+import { RETENTION_SWEEP_JOB, type RetentionJobData } from './retention.queue';
 import { RetentionSweepService } from './retention-sweep.service';
 
 @Processor(QUEUE_NAMES.RETENTION)

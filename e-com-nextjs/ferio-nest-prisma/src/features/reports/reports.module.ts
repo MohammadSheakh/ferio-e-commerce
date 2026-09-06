@@ -7,7 +7,7 @@ import { ReportsService } from './services/reports.service';
 import { AuditModule } from '../audit/audit.module';
 
 @Module({
-  imports: [ TenancyModule,PrismaModule, AuthModule, AuditModule],
+  imports: [TenancyModule, PrismaModule, AuthModule, AuditModule],
   controllers: [ReportsController],
   providers: [ReportsService],
 })

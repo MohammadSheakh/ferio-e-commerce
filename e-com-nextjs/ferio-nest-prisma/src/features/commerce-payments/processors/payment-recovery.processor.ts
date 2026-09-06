@@ -19,7 +19,7 @@ export class PaymentRecoveryProcessor extends WorkerHost {
   constructor(
     private readonly payments: CommercePaymentsService,
     private readonly recovery: PaymentRecoveryQueue,
-      @Optional() private readonly fanout?: TenantFanoutService,
+    @Optional() private readonly fanout?: TenantFanoutService,
   ) {
     super();
   }
@@ -36,7 +36,10 @@ export class PaymentRecoveryProcessor extends WorkerHost {
         throw new Error(`Unsupported payment recovery job: ${job.name}`);
       const attemptId = job.data.attemptId;
       const organizationId = job.data.organizationId;
-      if (!organizationId && (process.env.TENANCY_ENABLED || 'false') === 'true') {
+      if (
+        !organizationId &&
+        (process.env.TENANCY_ENABLED || 'false') === 'true'
+      ) {
         throw new Error('TENANT_CONTEXT_REQUIRED_FOR_PAYMENT_RECOVERY');
       }
       if (!organizationId) {

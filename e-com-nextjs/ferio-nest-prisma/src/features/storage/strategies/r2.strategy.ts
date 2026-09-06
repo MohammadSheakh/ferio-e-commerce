@@ -185,8 +185,7 @@ export class R2Strategy implements StorageStrategy {
   ): Promise<{ key: string; url: string }> {
     const safeFolder = sanitizeStoragePath(folder);
     const safeName =
-      sanitizeStorageSegment(filename.replace(/[\\/]+/g, '-')) ||
-      'upload.bin';
+      sanitizeStorageSegment(filename.replace(/[\\/]+/g, '-')) || 'upload.bin';
     const key = tenantObjectKey(safeFolder, `${Date.now()}-${safeName}`);
     const url = await s3Presign(
       this.s3Client,

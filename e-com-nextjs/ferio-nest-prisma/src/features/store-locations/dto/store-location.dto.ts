@@ -95,7 +95,9 @@ export class CreateStoreLocationDto {
   @IsString()
   operatingDays?: string;
 
-  @ApiPropertyOptional({ example: 'Show your pickup OTP at ground floor desk.' })
+  @ApiPropertyOptional({
+    example: 'Show your pickup OTP at ground floor desk.',
+  })
   @IsOptional()
   @IsString()
   pickupInstructions?: string;

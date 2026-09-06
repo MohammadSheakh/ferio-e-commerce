@@ -1,7 +1,21 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Put,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthGuard, User } from '@app/common';
 import type { UserPayload } from '@app/common';
-import { CreateCustomerAddressDto, LinkCustomerAccountDto, UpdateCustomerAddressDto, UpdateCustomerProfileDto } from './customer-account.dto';
+import {
+  CreateCustomerAddressDto,
+  LinkCustomerAccountDto,
+  UpdateCustomerAddressDto,
+  UpdateCustomerProfileDto,
+} from './customer-account.dto';
 import { CustomerAccountService } from './customer-account.service';
 
 @Controller('account/commerce')
@@ -45,10 +59,7 @@ export class CustomerAccountController {
   }
 
   @Delete('addresses/:id')
-  deleteAddress(
-    @Param('id') id: string,
-    @User() actor: UserPayload,
-  ) {
+  deleteAddress(@Param('id') id: string, @User() actor: UserPayload) {
     return this.account.deleteAddress(id, actor);
   }
 }

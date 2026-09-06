@@ -6,10 +6,18 @@ import { Inject } from '@nestjs/common';
 import { EMAIL_DELIVERY_SERVICE } from '../bullmq.constants';
 
 interface EmailDeliveryService {
-  sendOtpEmailNow(email: string, otp: string, type: 'verify' | 'reset'): Promise<void>;
+  sendOtpEmailNow(
+    email: string,
+    otp: string,
+    type: 'verify' | 'reset',
+  ): Promise<void>;
   sendWelcomeEmailNow(email: string, name: string): Promise<void>;
   sendPasswordResetConfirmationNow(email: string): Promise<void>;
-  sendStaffAccessEmailNow(email: string, token: string, purpose: 'INVITE' | 'RESET'): Promise<void>;
+  sendStaffAccessEmailNow(
+    email: string,
+    token: string,
+    purpose: 'INVITE' | 'RESET',
+  ): Promise<void>;
 }
 
 type EmailJobData = {

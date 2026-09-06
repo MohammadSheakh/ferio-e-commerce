@@ -19,7 +19,7 @@ export class ShippingWebhookProcessor extends WorkerHost {
   constructor(
     private readonly shipping: ShippingService,
     private readonly callbackQueue: ShippingWebhookQueue,
-      @Optional() private readonly fanout?: TenantFanoutService,
+    @Optional() private readonly fanout?: TenantFanoutService,
   ) {
     super();
   }
@@ -38,7 +38,10 @@ export class ShippingWebhookProcessor extends WorkerHost {
         throw new Error(`Unsupported courier callback job: ${job.name}`);
       }
       const organizationId = job.data.organizationId;
-      if (!organizationId && (process.env.TENANCY_ENABLED || 'false') === 'true') {
+      if (
+        !organizationId &&
+        (process.env.TENANCY_ENABLED || 'false') === 'true'
+      ) {
         throw new Error('TENANT_CONTEXT_REQUIRED_FOR_COURIER_CALLBACK');
       }
       if (!organizationId)
