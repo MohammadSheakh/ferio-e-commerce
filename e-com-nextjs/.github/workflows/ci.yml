@@ -89,6 +89,36 @@ jobs:
         run: pnpm typecheck:application
       - name: Production build
         run: pnpm build
+      - name: HTTP capacity smoke against built backend
+        run: |
+          set -euo pipefail
+          pnpm start:prod > /tmp/ferio-backend-capacity.log 2>&1 &
+          backend_pid=$!
+          cleanup() {
+            kill "$backend_pid" 2>/dev/null || true
+            wait "$backend_pid" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          ready=0
+          for _ in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:6733/api/v1/health >/dev/null; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then
+            cat /tmp/ferio-backend-capacity.log >&2
+            exit 1
+          fi
+
+          CAPACITY_BASE_URL=http://127.0.0.1:6733/api/v1/health \
+            CAPACITY_REQUESTS=500 CAPACITY_CONCURRENCY=25 \
+            pnpm test:http-capacity
+          CAPACITY_BASE_URL=http://127.0.0.1:6733/api/v1/ready \
+            CAPACITY_REQUESTS=100 CAPACITY_CONCURRENCY=10 \
+            pnpm test:http-capacity
       - name: Unit tests
         run: pnpm test
       - name: Cross-tenant isolation + bootstrap integration tests
