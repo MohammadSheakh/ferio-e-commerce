@@ -56,6 +56,32 @@ interface Conversation {
   isPromising: boolean;
 }
 
+type DatabaseConversation = {
+  id: string;
+  lastMessage?: string;
+  lastMessageAt?: string;
+};
+
+type DatabaseMessage = {
+  id: string;
+  senderId: string;
+  sender?: { role?: string; name?: string };
+  text: string;
+  createdAt: string;
+};
+
+type AdminSocketMessage = {
+  conversationId?: string;
+  text?: string;
+  senderId?: string;
+  senderName?: string;
+  email?: string;
+  isGuest?: boolean;
+  guestId?: string;
+  isAdmin?: boolean;
+  _messageId?: string;
+};
+
 export default function AdminLiveChatPage() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConvId, setActiveConvId] = useState<string>("");
@@ -260,7 +286,7 @@ export default function AdminLiveChatPage() {
           items = json.data?.items || [];
         }
 
-        let dbConvs: any[] = [];
+        let dbConvs: DatabaseConversation[] = [];
         if (resConvs.ok) {
           const json = await resConvs.json();
           dbConvs = json.data?.results || [];
@@ -306,7 +332,7 @@ export default function AdminLiveChatPage() {
           });
 
           // 2. Add DB conversations (especially guest visitor conversations)
-          dbConvs.forEach((conv: any) => {
+          dbConvs.forEach((conv) => {
             const convId = conv.id.startsWith("conv-")
               ? conv.id
               : `conv-${conv.id}`;
@@ -418,7 +444,7 @@ export default function AdminLiveChatPage() {
     });
 
     // Handle real-time incoming messages from any customer / room
-    socket.on("new-message-received", (data: any) => {
+    socket.on("new-message-received", (data: AdminSocketMessage) => {
       const {
         conversationId,
         text,
@@ -590,7 +616,7 @@ export default function AdminLiveChatPage() {
             const customerId = currentConv?.customer.id;
             const guestId = currentConv?.customer.guestId;
 
-            const formatted: MessageItem[] = rawMsgs.map((m: any) => {
+            const formatted: MessageItem[] = rawMsgs.map((m: DatabaseMessage) => {
               const isCustomerSender =
                 (customerId &&
                   (m.senderId === customerId ||
