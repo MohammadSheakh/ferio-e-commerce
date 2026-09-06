@@ -1,5 +1,6 @@
 import { Injectable, Inject, Logger, Optional } from '@nestjs/common';
 import { Socket } from 'socket.io';
+import type { DefaultEventsMap } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { Redis } from 'ioredis';
 import { REDIS_CLIENT } from '@app/redis';
@@ -18,6 +19,38 @@ export interface SocketUser {
   organizationId?: string;
 }
 
+export interface SocketData {
+  user?: SocketUser;
+  userId?: string;
+  currentPage?: string;
+}
+
+interface SocketJwtPayload {
+  userId?: string;
+  sub?: string;
+  id?: string;
+  role?: string;
+  organizationId?: string;
+  purpose?: string;
+}
+
+function stringValue(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined;
+}
+
+function recordValue(value: unknown): Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+export type AuthenticatedSocket = Socket<
+  DefaultEventsMap,
+  DefaultEventsMap,
+  DefaultEventsMap,
+  SocketData
+>;
+
 export interface SocketSystemStats {
   totalOnlineUsers: number;
   onlineUsers: string[];
@@ -26,12 +59,16 @@ export interface SocketSystemStats {
 
 /** Tenant-scoped room names (MT-8 §11.3): identical room identifiers across
  * tenants can never share a channel. Legacy sockets keep historical names. */
-export function scopedSocketRoom(user: { organizationId?: string } | null | undefined, room: string): string {
+export function scopedSocketRoom(
+  user: { organizationId?: string } | null | undefined,
+  room: string,
+): string {
   return user?.organizationId ? `org:${user.organizationId}:${room}` : room;
 }
 
 const ADMIN_ROLES = new Set(['admin', 'super_admin', 'super-admin']);
-const GUEST_ID_PATTERN = /^gst_[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const GUEST_ID_PATTERN =
+  /^gst_[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function socketPresenceKeys(organizationId?: string) {
   const scope = organizationId ? `org:${organizationId}` : 'legacy';
@@ -46,7 +83,7 @@ export function socketPresenceKeys(organizationId?: string) {
 
 /**
  * Socket Auth Service
- * 
+ *
  * 📚 SOCKET.IO AUTHENTICATION & USER TRACKING
  */
 @Injectable()
@@ -66,23 +103,27 @@ export class SocketAuthService {
    * fallback outside resolved requests. Never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    return this.tenantDb
-      ? this.tenantDb.getOrLegacy(this.prisma)
-      : this.prisma;
+    return this.tenantDb ? this.tenantDb.getOrLegacy(this.prisma) : this.prisma;
   }
 
   /**
    * Authenticate Socket Connection
    */
-  async authenticateSocket(socket: Socket): Promise<SocketUser | null> {
+  async authenticateSocket(
+    socket: AuthenticatedSocket,
+  ): Promise<SocketUser | null> {
     try {
-      const token = socket.handshake.auth?.token || (socket.handshake.headers?.token as string);
-      const guestId = socket.handshake.auth?.guestId || (socket.handshake.query?.guestId as string);
+      const auth = recordValue(socket.handshake.auth);
+      const query = recordValue(socket.handshake.query);
+      const token =
+        stringValue(auth.token) || stringValue(socket.handshake.headers?.token);
+      const guestId = stringValue(auth.guestId) || stringValue(query.guestId);
 
       if (!token) {
         if ((process.env.TENANCY_ENABLED || 'false') === 'true') return null;
         return {
-          userId: this.normalizeGuestId(guestId) || `guest_${socket.id.slice(0, 8)}`,
+          userId:
+            this.normalizeGuestId(guestId) || `guest_${socket.id.slice(0, 8)}`,
           role: 'guest',
           name: 'Guest Visitor',
         };
@@ -90,9 +131,12 @@ export class SocketAuthService {
 
       // Verify JWT token
       try {
-        const payload = await this.jwtService.verifyAsync(token, {
-          secret: process.env.JWT_ACCESS_SECRET as string,
-        });
+        const payload = await this.jwtService.verifyAsync<SocketJwtPayload>(
+          token,
+          {
+            secret: process.env.JWT_ACCESS_SECRET ?? '',
+          },
+        );
 
         const organizationId = String(payload?.organizationId || '');
         if (
@@ -102,7 +146,11 @@ export class SocketAuthService {
           return null;
         }
 
-        if (payload?.purpose === 'chat_socket' && payload.userId && payload.role === 'guest') {
+        if (
+          payload?.purpose === 'chat_socket' &&
+          payload.userId &&
+          payload.role === 'guest'
+        ) {
           const normalizedGuestId = this.normalizeGuestId(payload.userId);
           return {
             userId: normalizedGuestId || `guest_${socket.id.slice(0, 8)}`,
@@ -152,12 +200,15 @@ export class SocketAuthService {
       }
 
       return {
-        userId: this.normalizeGuestId(guestId) || `guest_${socket.id.slice(0, 8)}`,
+        userId:
+          this.normalizeGuestId(guestId) || `guest_${socket.id.slice(0, 8)}`,
         role: 'guest',
         name: 'Guest Visitor',
       };
     } catch (error) {
-      this.logger.warn(`⚠️ Socket authentication failed: ${errorMessage(error)}`);
+      this.logger.warn(
+        `⚠️ Socket authentication failed: ${errorMessage(error)}`,
+      );
       return null;
     }
   }
@@ -209,7 +260,10 @@ export class SocketAuthService {
     });
   }
 
-  async canAccessConversation(user?: SocketUser | null, conversationId?: string): Promise<boolean> {
+  async canAccessConversation(
+    user?: SocketUser | null,
+    conversationId?: string,
+  ): Promise<boolean> {
     if (!user || !conversationId) return false;
     if (this.isAdmin(user.role)) return true;
 
@@ -248,7 +302,10 @@ export class SocketAuthService {
   /**
    * Handle User Connection
    */
-  async handleUserConnection(socket: Socket, user: SocketUser): Promise<void> {
+  async handleUserConnection(
+    socket: AuthenticatedSocket,
+    user: SocketUser,
+  ): Promise<void> {
     const userId = user.userId;
     const socketId = socket.id;
     const workerId = process.pid.toString();
@@ -256,14 +313,18 @@ export class SocketAuthService {
     // Add new connection
     await this.addOnlineUser(userId, socketId, workerId, user);
 
-    this.logger.log(`✅ User ${userId} connected (Socket: ${socketId}, Worker: ${workerId})`);
-
+    this.logger.log(
+      `✅ User ${userId} connected (Socket: ${socketId}, Worker: ${workerId})`,
+    );
   }
 
   /**
    * Handle User Disconnection
    */
-  async handleUserDisconnection(socket: Socket, user: SocketUser): Promise<boolean> {
+  async handleUserDisconnection(
+    socket: AuthenticatedSocket,
+    user: SocketUser,
+  ): Promise<boolean> {
     const userId = user.userId;
     const socketId = socket.id;
 
@@ -273,7 +334,9 @@ export class SocketAuthService {
       // Remove from Redis state
       return await this.removeOnlineUser(user, socketId);
     } catch (error) {
-      this.logger.error(`❌ Error handling user disconnection: ${errorMessage(error)}`);
+      this.logger.error(
+        `❌ Error handling user disconnection: ${errorMessage(error)}`,
+      );
       return false;
     }
   }
@@ -308,7 +371,7 @@ export class SocketAuthService {
     workerId: string,
     userInfo?: SocketUser,
   ): Promise<void> {
-    const organizationId = (userInfo as SocketUser | undefined)?.organizationId;
+    const organizationId = userInfo?.organizationId;
     const keys = this.keysFor(organizationId);
     const pipeline = this.redisClient.multi();
 
@@ -335,13 +398,18 @@ export class SocketAuthService {
 
     await pipeline.exec();
 
-    this.logger.debug(`✅ User ${userId} added to Redis state (Worker: ${workerId})`);
+    this.logger.debug(
+      `✅ User ${userId} added to Redis state (Worker: ${workerId})`,
+    );
   }
 
   /**
    * Remove Online User from Redis
    */
-  private async removeOnlineUser(user: SocketUser, socketId: string): Promise<boolean> {
+  private async removeOnlineUser(
+    user: SocketUser,
+    socketId: string,
+  ): Promise<boolean> {
     const keys = this.keysFor(user.organizationId);
     const remaining = Number(
       await this.redisClient.eval(
@@ -364,14 +432,19 @@ export class SocketAuthService {
       ),
     );
     const offline = remaining === 0;
-    this.logger.debug(`User ${user.userId} socket removed; remaining=${remaining}`);
+    this.logger.debug(
+      `User ${user.userId} socket removed; remaining=${remaining}`,
+    );
     return offline;
   }
 
   /**
    * Check if User is Online
    */
-  async isUserOnline(userId: string, organizationId?: string): Promise<boolean> {
+  async isUserOnline(
+    userId: string,
+    organizationId?: string,
+  ): Promise<boolean> {
     const isMember = await this.redisClient.sismember(
       this.keysFor(organizationId).onlineUsers,
       userId,
@@ -383,12 +456,14 @@ export class SocketAuthService {
    * Get All Online Users
    */
   async getAllOnlineUsers(organizationId?: string): Promise<string[]> {
-    return await this.redisClient.smembers(this.keysFor(organizationId).onlineUsers);
+    return await this.redisClient.smembers(
+      this.keysFor(organizationId).onlineUsers,
+    );
   }
 
   /**
    * Get Related Online Users
-   * 
+   *
    * Returns online users that the current user is related to (family or conversations)
    */
   async getRelatedOnlineUsers(socketUser: SocketUser): Promise<string[]> {
@@ -396,54 +471,64 @@ export class SocketAuthService {
     try {
       return await this.inOrganization(socketUser.organizationId, async () => {
         const db = await this.db();
-        const allOnlineUsers = await this.getAllOnlineUsers(socketUser.organizationId);
+        const allOnlineUsers = await this.getAllOnlineUsers(
+          socketUser.organizationId,
+        );
         if (allOnlineUsers.length === 0) return [];
 
         const relatedUserIds = new Set<string>();
 
-      // 1. Get family-related users from Prisma
-      const user = await db.user.findUnique({
-        where: { id: userId },
-        select: { id: true, accountCreatorId: true, childAccounts: { select: { id: true } } },
-      });
-
-      if (user) {
-        if (user.accountCreatorId) relatedUserIds.add(user.accountCreatorId);
-        user.childAccounts.forEach(child => relatedUserIds.add(child.id));
-      }
-
-      // 2. Get conversation-related users from Prisma
-      const userParticipations = await db.conversationParticipents.findMany({
-        where: {
-          userId,
-          isDeleted: false,
-        },
-        select: { conversationId: true },
-      });
-
-      if (userParticipations.length > 0) {
-        const conversationIds = userParticipations.map((p) => p.conversationId);
-        const otherParticipants = await db.conversationParticipents.findMany({
-          where: {
-            conversationId: { in: conversationIds },
-            userId: { not: userId },
-            isDeleted: false,
+        // 1. Get family-related users from Prisma
+        const user = await db.user.findUnique({
+          where: { id: userId },
+          select: {
+            id: true,
+            accountCreatorId: true,
+            childAccounts: { select: { id: true } },
           },
-          select: { userId: true },
         });
 
-        otherParticipants.forEach((p) => relatedUserIds.add(p.userId));
-      }
+        if (user) {
+          if (user.accountCreatorId) relatedUserIds.add(user.accountCreatorId);
+          user.childAccounts.forEach((child) => relatedUserIds.add(child.id));
+        }
 
-      // Filter only those who are online
-      const relatedOnlineUsers = allOnlineUsers.filter(onlineId => 
-        relatedUserIds.has(onlineId) || onlineId === userId
-      );
+        // 2. Get conversation-related users from Prisma
+        const userParticipations = await db.conversationParticipents.findMany({
+          where: {
+            userId,
+            isDeleted: false,
+          },
+          select: { conversationId: true },
+        });
+
+        if (userParticipations.length > 0) {
+          const conversationIds = userParticipations.map(
+            (p) => p.conversationId,
+          );
+          const otherParticipants = await db.conversationParticipents.findMany({
+            where: {
+              conversationId: { in: conversationIds },
+              userId: { not: userId },
+              isDeleted: false,
+            },
+            select: { userId: true },
+          });
+
+          otherParticipants.forEach((p) => relatedUserIds.add(p.userId));
+        }
+
+        // Filter only those who are online
+        const relatedOnlineUsers = allOnlineUsers.filter(
+          (onlineId) => relatedUserIds.has(onlineId) || onlineId === userId,
+        );
 
         return relatedOnlineUsers;
       });
     } catch (error) {
-      this.logger.error(`❌ Error getting related online users: ${errorMessage(error)}`);
+      this.logger.error(
+        `❌ Error getting related online users: ${errorMessage(error)}`,
+      );
       return [];
     }
   }
@@ -452,7 +537,9 @@ export class SocketAuthService {
    * Get Online Users Count
    */
   async getOnlineUsersCount(organizationId?: string): Promise<number> {
-    return await this.redisClient.scard(this.keysFor(organizationId).onlineUsers);
+    return await this.redisClient.scard(
+      this.keysFor(organizationId).onlineUsers,
+    );
   }
 
   /**
@@ -467,7 +554,10 @@ export class SocketAuthService {
   }
 
   private keysFor(organizationId?: string) {
-    if ((process.env.TENANCY_ENABLED || 'false') === 'true' && !organizationId) {
+    if (
+      (process.env.TENANCY_ENABLED || 'false') === 'true' &&
+      !organizationId
+    ) {
       throw new Error('SOCKET_ORGANIZATION_REQUIRED');
     }
     return socketPresenceKeys(organizationId);

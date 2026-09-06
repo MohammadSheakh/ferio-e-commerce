@@ -45,7 +45,7 @@ describe('SocketRoomService tenant isolation', () => {
     await rooms.joinTaskRoom('user-1', 'task-1', 'org-a');
     await rooms.joinTaskRoom('user-1', 'task-1', 'org-b');
 
-    const keys = pipeline.sadd.mock.calls.map(([key]) => key);
+    const keys = (pipeline.sadd.mock.calls as unknown[][]).map(([key]) => key);
     expect(keys).toContain('org:org-a:chat:room_users:conversation-1');
     expect(keys).toContain('org:org-b:chat:room_users:conversation-1');
     expect(keys).toContain('org:org-a:task:rooms:task-1');
@@ -107,7 +107,9 @@ describe('SocketRoomService tenant isolation', () => {
       getOrLegacy: jest.fn().mockResolvedValue({ user: tenantUser }),
     };
     const fanout = {
-      forOrganization: jest.fn((_organizationId, operation) => operation()),
+      forOrganization: jest.fn(
+        <T>(_organizationId: string, operation: () => T): T => operation(),
+      ),
     };
     const socket = { join: jest.fn() };
 

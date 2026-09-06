@@ -1,14 +1,16 @@
-import type { Socket } from 'socket.io';
-
-import { SocketAuthService, socketPresenceKeys } from '../services/socket-auth.service';
+import type { AuthenticatedSocket } from '../services/socket-auth.service';
+import {
+  SocketAuthService,
+  socketPresenceKeys,
+} from '../services/socket-auth.service';
 
 const guestId = 'gst_123e4567-e89b-42d3-a456-426614174000';
 
-function socket(auth: Record<string, unknown>): Socket {
+function socket(auth: Record<string, unknown>): AuthenticatedSocket {
   return {
     id: 'socket-12345678',
     handshake: { auth, headers: {}, query: {} },
-  } as unknown as Socket;
+  } as unknown as AuthenticatedSocket;
 }
 
 describe('SocketAuthService', () => {
@@ -36,7 +38,11 @@ describe('SocketAuthService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new SocketAuthService(jwtService as never, redis as never, prisma as never);
+    service = new SocketAuthService(
+      jwtService as never,
+      redis as never,
+      prisma as never,
+    );
   });
 
   afterEach(() => {
@@ -60,7 +66,10 @@ describe('SocketAuthService', () => {
       name: 'Customer',
       organizationId: 'org-a',
     };
-    const secondSocket = { ...socket({}), id: 'socket-2' } as Socket;
+    const secondSocket = {
+      ...socket({}),
+      id: 'socket-2',
+    } as AuthenticatedSocket;
 
     await service.handleUserConnection(socket({}), user);
     await service.handleUserConnection(secondSocket, user);
@@ -85,8 +94,12 @@ describe('SocketAuthService', () => {
     };
     redis.eval.mockResolvedValueOnce(1).mockResolvedValueOnce(0);
 
-    await expect(service.handleUserDisconnection(socket({}), user)).resolves.toBe(false);
-    await expect(service.handleUserDisconnection(socket({}), user)).resolves.toBe(true);
+    await expect(
+      service.handleUserDisconnection(socket({}), user),
+    ).resolves.toBe(false);
+    await expect(
+      service.handleUserDisconnection(socket({}), user),
+    ).resolves.toBe(true);
   });
 
   it('rejects organization-free presence reads in strict mode', async () => {
@@ -100,11 +113,15 @@ describe('SocketAuthService', () => {
     process.env.TENANCY_ENABLED = 'true';
     const tenantDb = {
       getOrLegacy: jest.fn().mockResolvedValue({
-        user: { findUnique: jest.fn().mockResolvedValue({ customerId: 'customer-1' }) },
+        user: {
+          findUnique: jest.fn().mockResolvedValue({ customerId: 'customer-1' }),
+        },
       }),
     };
     const fanout = {
-      forOrganization: jest.fn((_organizationId, operation) => operation()),
+      forOrganization: jest.fn(
+        <T>(_organizationId: string, operation: () => T): T => operation(),
+      ),
     };
     const tenantService = new SocketAuthService(
       jwtService as never,
@@ -136,7 +153,9 @@ describe('SocketAuthService', () => {
     const tenantClient = { user: { findUnique: jest.fn() } };
     const tenantDb = { getOrLegacy: jest.fn().mockResolvedValue(tenantClient) };
     const fanout = {
-      forOrganization: jest.fn((_organizationId, operation) => operation()),
+      forOrganization: jest.fn(
+        <T>(_organizationId: string, operation: () => T): T => operation(),
+      ),
     };
     const tenantService = new SocketAuthService(
       jwtService as never,
@@ -177,12 +196,17 @@ describe('SocketAuthService', () => {
     jwtService.verifyAsync.mockRejectedValue(new Error('invalid'));
 
     await expect(
-      service.authenticateSocket(socket({ token: 'invalid', role: 'admin', guestId })),
+      service.authenticateSocket(
+        socket({ token: 'invalid', role: 'admin', guestId }),
+      ),
     ).resolves.toBeNull();
   });
 
   it('uses the database role for authenticated accounts', async () => {
-    jwtService.verifyAsync.mockResolvedValue({ userId: 'user-1', role: 'admin' });
+    jwtService.verifyAsync.mockResolvedValue({
+      userId: 'user-1',
+      role: 'admin',
+    });
     prisma.user.findUnique.mockResolvedValue({
       id: 'user-1',
       role: 'user',
@@ -197,10 +221,17 @@ describe('SocketAuthService', () => {
   it('limits guests to their own raw and prefixed conversation rooms', async () => {
     const user = { userId: guestId, role: 'guest', name: 'Guest Visitor' };
 
-    await expect(service.canAccessConversation(user, guestId)).resolves.toBe(true);
-    await expect(service.canAccessConversation(user, `conv-${guestId}`)).resolves.toBe(true);
+    await expect(service.canAccessConversation(user, guestId)).resolves.toBe(
+      true,
+    );
     await expect(
-      service.canAccessConversation(user, 'conv-gst_123e4567-e89b-42d3-a456-426614174999'),
+      service.canAccessConversation(user, `conv-${guestId}`),
+    ).resolves.toBe(true);
+    await expect(
+      service.canAccessConversation(
+        user,
+        'conv-gst_123e4567-e89b-42d3-a456-426614174999',
+      ),
     ).resolves.toBe(false);
   });
 
