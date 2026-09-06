@@ -1,4 +1,4 @@
-import { Injectable, Inject, Logger, Optional } from '@nestjs/common';
+import { Injectable, Inject, Logger } from '@nestjs/common';
 import { Redis } from 'ioredis';
 import type { Socket } from 'socket.io';
 
@@ -42,8 +42,8 @@ export class SocketRoomService {
   constructor(
     @Inject(REDIS_CLIENT) private redisClient: Redis,
     private prisma: PrismaService,
-    @Optional() private readonly tenantDb?: TenantDbService,
-    @Optional() private readonly fanout?: TenantFanoutService,
+    private readonly tenantDb?: TenantDbService,
+    private readonly fanout?: TenantFanoutService,
   ) {}
 
   /**

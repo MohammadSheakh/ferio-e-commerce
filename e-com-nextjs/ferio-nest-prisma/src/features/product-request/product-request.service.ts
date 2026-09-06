@@ -3,7 +3,7 @@ import {
   ProductRequestStatus,
   type PrismaClient,
 } from '@prisma/client';
-import { Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@app/database';
 import {
   resolveTenantDatabase,
@@ -19,7 +19,7 @@ import {
 export class ProductRequestService {
   constructor(
     private readonly prisma: PrismaService,
-    @Optional() private readonly tenantDb?: TenantDbService,
+    private readonly tenantDb?: TenantDbService,
   ) {}
 
   /**

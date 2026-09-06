@@ -3,6 +3,7 @@ import { StoreLocationsService } from '../store-locations.service';
 import { PrismaService } from '@app/database';
 import { AuditService } from '../../audit/services/audit.service';
 import { ConflictException } from '@nestjs/common';
+import { TenantDbService } from '../../../tenancy/services/tenant-db.service';
 
 describe('StoreLocationsService', () => {
   let service: StoreLocationsService;
@@ -42,12 +43,19 @@ describe('StoreLocationsService', () => {
     record: jest.fn().mockResolvedValue(true),
   };
 
+  const mockTenantDb = {
+    getOrLegacy: jest
+      .fn()
+      .mockImplementation((legacyClient: typeof mockPrisma) => legacyClient),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         StoreLocationsService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: AuditService, useValue: mockAudit },
+        { provide: TenantDbService, useValue: mockTenantDb },
       ],
     }).compile();
 

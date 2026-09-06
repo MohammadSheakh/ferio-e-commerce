@@ -1,7 +1,6 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import type { Job } from 'bullmq';
 import { QUEUE_NAMES } from '@app/queue';
-import { Optional } from '@nestjs/common';
 import { TenantFanoutService } from '../../../tenancy/services/tenant-fanout.service';
 import { runWithCorrelationId, StructuredLogger } from '@app/common';
 import { ShippingPollingService } from '../services/shipping-polling.service';
@@ -19,7 +18,7 @@ export class ShippingPollingProcessor extends WorkerHost {
   constructor(
     private readonly polling: ShippingPollingService,
     private readonly pollingQueue: ShippingPollingQueue,
-    @Optional() private readonly fanout?: TenantFanoutService,
+    private readonly fanout?: TenantFanoutService,
   ) {
     super();
   }

@@ -2,7 +2,6 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
-  Optional,
 } from '@nestjs/common';
 import type { PrismaClient } from '@prisma/client';
 import { Prisma } from '@prisma/client';
@@ -25,7 +24,7 @@ import {
 export class CustomerAccountService {
   constructor(
     private readonly prisma: PrismaService,
-    @Optional() private readonly tenantDb?: TenantDbService,
+    private readonly tenantDb?: TenantDbService,
   ) {}
 
   /**

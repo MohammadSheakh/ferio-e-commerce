@@ -3,7 +3,6 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
-  Optional,
 } from '@nestjs/common';
 import { createHash, randomBytes } from 'crypto';
 import { Prisma, ReconciliationFindingType } from '@prisma/client';
@@ -91,7 +90,7 @@ export class ReconciliationService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
 
-    @Optional() private readonly tenantDb?: TenantDbService,
+    private readonly tenantDb?: TenantDbService,
   ) {}
 
   /**

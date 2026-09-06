@@ -60,7 +60,7 @@ export class CatalogService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
-    @Optional() private readonly tenantDb?: TenantDbService,
+    private readonly tenantDb?: TenantDbService,
     @Optional()
     private readonly entitlements?: import('../../platform/services/entitlements.service').EntitlementsService,
   ) {}

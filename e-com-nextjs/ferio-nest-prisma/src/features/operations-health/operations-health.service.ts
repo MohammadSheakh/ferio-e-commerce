@@ -1,4 +1,4 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { ConfigService } from '@nestjs/config';
 import type { Queue } from 'bullmq';
@@ -55,7 +55,7 @@ export class OperationsHealthService {
     @InjectQueue(QUEUE_NAMES.TRANSACTIONAL_MESSAGE)
     transactionalMessageQueue: Queue,
     @InjectQueue(QUEUE_NAMES.PAYMENT_RECOVERY) paymentRecoveryQueue: Queue,
-    @Optional() private readonly tenantDb?: TenantDbService,
+    private readonly tenantDb?: TenantDbService,
   ) {
     this.queues = [
       { name: 'Authentication email', queue: emailQueue },

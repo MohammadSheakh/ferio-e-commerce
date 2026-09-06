@@ -2,7 +2,6 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
-  Optional,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { CommercePaymentProvider, Prisma } from '@prisma/client';
@@ -30,7 +29,7 @@ export class CommercePaymentsService {
     private readonly orders: OrderService,
     private readonly gateways: PaymentGatewayRegistry,
     private readonly audit: AuditService,
-    @Optional() private readonly tenantDb?: TenantDbService,
+    private readonly tenantDb?: TenantDbService,
   ) {}
 
   /**

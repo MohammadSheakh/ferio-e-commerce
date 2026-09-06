@@ -5,7 +5,6 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
-  Optional,
 } from '@nestjs/common';
 import { Queue } from 'bullmq';
 
@@ -37,7 +36,7 @@ export class MessageService {
     private readonly socketGateway: SocketGateway,
     @Inject(BULLMQ_NOTIFY_PARTICIPANTS_QUEUE)
     private notifyParticipantsQueue: Queue,
-    @Optional() private readonly tenantDb?: TenantDbService,
+    private readonly tenantDb?: TenantDbService,
   ) {}
 
   /**

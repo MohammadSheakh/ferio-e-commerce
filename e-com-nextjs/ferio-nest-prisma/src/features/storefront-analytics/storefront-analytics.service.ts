@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Optional } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma, StorefrontAnalyticsEventType } from '@prisma/client';
 import { createHmac } from 'node:crypto';
@@ -38,7 +38,7 @@ export class StorefrontAnalyticsService {
     private readonly config: ConfigService,
     private readonly settings: CommerceSettingsService,
 
-    @Optional() private readonly tenantDb?: TenantDbService,
+    private readonly tenantDb?: TenantDbService,
   ) {}
 
   /**

@@ -1,9 +1,4 @@
-import {
-  ConflictException,
-  Injectable,
-  OnModuleInit,
-  Optional,
-} from '@nestjs/common';
+import { ConflictException, Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { ConfigService } from '@nestjs/config';
 import type { Queue } from 'bullmq';
@@ -32,7 +27,7 @@ export class TransactionalMessageQueue implements OnModuleInit {
     private readonly config: ConfigService,
     private readonly messages: TransactionalMessagingService,
     private readonly audit: AuditService,
-    @Optional() private readonly fanout?: TenantFanoutService,
+    private readonly fanout?: TenantFanoutService,
   ) {}
 
   async onModuleInit() {

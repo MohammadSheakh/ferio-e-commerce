@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { RedisModule, RedisService } from '@app/redis';
 import { JwtModule } from '@nestjs/jwt';
 import { BullModule } from '@nestjs/bullmq';
@@ -31,6 +31,7 @@ import { TenantReturnOriginService } from './services/tenant-return-origin.servi
  * and bounded tenant database connection management. Depends only on the
  * control-plane module — never on tenant commerce services.
  */
+@Global()
 @Module({
   imports: [
     RedisModule,

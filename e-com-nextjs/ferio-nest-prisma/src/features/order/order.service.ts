@@ -77,7 +77,7 @@ export class OrderService {
     private readonly config: ConfigService,
     private readonly wallet: WalletService,
     private readonly customerNotifications: CustomerNotificationsService,
-    @Optional() private readonly tenantDb?: TenantDbService,
+    private readonly tenantDb?: TenantDbService,
     @Optional()
     private readonly entitlements?: import('../../platform/services/entitlements.service').EntitlementsService,
     @Optional()

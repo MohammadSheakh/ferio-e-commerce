@@ -1,6 +1,6 @@
 import { tryGetTenantContext } from '../../../tenancy/context/tenant-context';
 import { TenantFanoutService } from '../../../tenancy/services/tenant-fanout.service';
-import { Injectable, OnModuleInit, Optional } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { ConfigService } from '@nestjs/config';
 import type { Queue } from 'bullmq';
@@ -26,7 +26,7 @@ export class PaymentRecoveryQueue implements OnModuleInit {
     private readonly config: ConfigService,
     private readonly payments: CommercePaymentsService,
     private readonly audit: AuditService,
-    @Optional() private readonly fanout?: TenantFanoutService,
+    private readonly fanout?: TenantFanoutService,
   ) {}
 
   async onModuleInit() {

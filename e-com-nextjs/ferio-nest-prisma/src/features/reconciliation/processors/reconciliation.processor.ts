@@ -1,7 +1,6 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import type { Job } from 'bullmq';
 import { QUEUE_NAMES } from '@app/queue';
-import { Optional } from '@nestjs/common';
 import { TenantFanoutService } from '../../../tenancy/services/tenant-fanout.service';
 import { runWithCorrelationId, StructuredLogger } from '@app/common';
 import {
@@ -16,7 +15,7 @@ export class ReconciliationProcessor extends WorkerHost {
 
   constructor(
     private readonly reconciliation: ReconciliationService,
-    @Optional() private readonly fanout?: TenantFanoutService,
+    private readonly fanout?: TenantFanoutService,
   ) {
     super();
   }

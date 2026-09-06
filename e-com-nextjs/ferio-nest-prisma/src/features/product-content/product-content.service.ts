@@ -5,7 +5,6 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
-  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '@app/database';
 import {
@@ -27,7 +26,7 @@ export class ProductContentService {
   constructor(
     private prisma: PrismaService,
     private audit: AuditService,
-    @Optional() private readonly tenantDb?: TenantDbService,
+    private readonly tenantDb?: TenantDbService,
   ) {}
 
   /**

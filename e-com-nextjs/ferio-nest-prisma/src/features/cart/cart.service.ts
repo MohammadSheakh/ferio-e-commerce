@@ -6,7 +6,6 @@ import {
 import { createHash, randomBytes } from 'crypto';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '@app/database';
-import { Optional } from '@nestjs/common';
 import type { PrismaClient } from '@prisma/client';
 import { assertTenantCommerceWritable } from '../../tenancy/utils/commerce-write-guard.util';
 import {
@@ -107,7 +106,7 @@ export class CartService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config?: ConfigService,
-    @Optional() private readonly tenantDb?: TenantDbService,
+    private readonly tenantDb?: TenantDbService,
   ) {}
 
   /**

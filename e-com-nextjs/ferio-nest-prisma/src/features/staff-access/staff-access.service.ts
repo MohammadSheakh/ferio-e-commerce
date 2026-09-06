@@ -29,7 +29,7 @@ export class StaffAccessService {
     private readonly audit: AuditService,
     private readonly email: EmailService,
     private readonly config: ConfigService,
-    @Optional() private readonly tenantDb?: TenantDbService,
+    private readonly tenantDb?: TenantDbService,
     @Optional()
     @Inject('PLAN_GATE')
     private readonly planGate?: {

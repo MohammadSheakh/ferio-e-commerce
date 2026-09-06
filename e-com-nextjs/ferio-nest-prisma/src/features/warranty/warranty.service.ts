@@ -3,7 +3,6 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
-  Optional,
 } from '@nestjs/common';
 import { randomBytes, timingSafeEqual } from 'crypto';
 import type { PrismaClient } from '@prisma/client';
@@ -42,7 +41,7 @@ const adminClaimInclude = {
 export class WarrantyService {
   constructor(
     private prisma: PrismaService,
-    @Optional() private readonly tenantDb?: TenantDbService,
+    private readonly tenantDb?: TenantDbService,
   ) {}
 
   /**

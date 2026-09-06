@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaClient, UserDevices } from '@prisma/client';
 import { PrismaService } from '@app/database';
 import { DeviceType } from './enums/TDevice.enum';
@@ -17,7 +17,7 @@ import {
 export class UserDevicesService {
   constructor(
     private readonly prisma: PrismaService,
-    @Optional() private readonly tenantDb?: TenantDbService,
+    private readonly tenantDb?: TenantDbService,
   ) {}
 
   private async db(): Promise<PrismaClient> {

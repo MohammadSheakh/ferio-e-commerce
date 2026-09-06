@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  Logger,
-  NotFoundException,
-  Optional,
-} from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma, PrismaClient, UserProfile } from '@prisma/client';
 
 import { PrismaService } from '@app/database';
@@ -56,7 +51,7 @@ export class UserProfileService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly redisService: RedisService,
-    @Optional() private readonly tenantDb?: TenantDbService,
+    private readonly tenantDb?: TenantDbService,
   ) {}
 
   private async db(): Promise<PrismaClient> {

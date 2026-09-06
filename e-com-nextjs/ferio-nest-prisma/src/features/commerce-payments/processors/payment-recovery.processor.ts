@@ -1,7 +1,6 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import type { Job } from 'bullmq';
 import { QUEUE_NAMES } from '@app/queue';
-import { Optional } from '@nestjs/common';
 import { TenantFanoutService } from '../../../tenancy/services/tenant-fanout.service';
 import { runWithCorrelationId, StructuredLogger } from '@app/common';
 import { CommercePaymentsService } from '../services/commerce-payments.service';
@@ -19,7 +18,7 @@ export class PaymentRecoveryProcessor extends WorkerHost {
   constructor(
     private readonly payments: CommercePaymentsService,
     private readonly recovery: PaymentRecoveryQueue,
-    @Optional() private readonly fanout?: TenantFanoutService,
+    private readonly fanout?: TenantFanoutService,
   ) {
     super();
   }

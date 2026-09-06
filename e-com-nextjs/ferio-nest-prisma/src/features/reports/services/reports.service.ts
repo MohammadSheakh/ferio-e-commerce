@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Optional } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PERMISSIONS, roleHasPermission, type UserPayload } from '@app/common';
 import type { PrismaClient } from '@prisma/client';
@@ -261,7 +261,7 @@ export class ReportsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
 
-    @Optional() private readonly tenantDb?: TenantDbService,
+    private readonly tenantDb?: TenantDbService,
   ) {}
 
   /**

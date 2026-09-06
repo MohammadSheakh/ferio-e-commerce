@@ -7,7 +7,6 @@ import {
   Injectable,
   NotFoundException,
   OnModuleInit,
-  Optional,
 } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { ConfigService } from '@nestjs/config';
@@ -39,8 +38,8 @@ export class ShippingWebhookQueue implements OnModuleInit {
     private readonly config: ConfigService,
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
-    @Optional() private readonly tenantDb?: TenantDbService,
-    @Optional() private readonly fanout?: TenantFanoutService,
+    private readonly tenantDb?: TenantDbService,
+    private readonly fanout?: TenantFanoutService,
   ) {}
 
   async onModuleInit() {

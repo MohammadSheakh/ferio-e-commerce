@@ -1,4 +1,4 @@
-import { Injectable, Inject, Logger, Optional } from '@nestjs/common';
+import { Injectable, Inject, Logger } from '@nestjs/common';
 import { Socket } from 'socket.io';
 import type { DefaultEventsMap } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
@@ -97,8 +97,8 @@ export class SocketAuthService {
     private jwtService: JwtService,
     @Inject(REDIS_CLIENT) private redisClient: Redis,
     private prisma: PrismaService,
-    @Optional() private readonly tenantDb?: TenantDbService,
-    @Optional() private readonly fanout?: TenantFanoutService,
+    private readonly tenantDb?: TenantDbService,
+    private readonly fanout?: TenantFanoutService,
   ) {}
 
   /**

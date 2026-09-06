@@ -1,10 +1,4 @@
-import {
-  ForbiddenException,
-  Inject,
-  Injectable,
-  Logger,
-  Optional,
-} from '@nestjs/common';
+import { ForbiddenException, Inject, Injectable, Logger } from '@nestjs/common';
 import { Queue } from 'bullmq';
 
 import type { Prisma, PrismaClient } from '@prisma/client';
@@ -38,7 +32,7 @@ export class ConversationService {
     @Inject(BULLMQ_NOTIFY_PARTICIPANTS_QUEUE)
     private notifyParticipantsQueue: Queue,
 
-    @Optional() private readonly tenantDb?: TenantDbService,
+    private readonly tenantDb?: TenantDbService,
   ) {}
 
   /**

@@ -3,7 +3,6 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
-  Optional,
 } from '@nestjs/common';
 import { createHash, randomBytes } from 'crypto';
 import type { PrismaClient } from '@prisma/client';
@@ -38,7 +37,7 @@ export class SettlementsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
 
-    @Optional() private readonly tenantDb?: TenantDbService,
+    private readonly tenantDb?: TenantDbService,
   ) {}
 
   /**

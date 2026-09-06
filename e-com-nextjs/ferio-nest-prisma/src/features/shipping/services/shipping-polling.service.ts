@@ -2,7 +2,6 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
-  Optional,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import type { PrismaClient } from '@prisma/client';
@@ -30,7 +29,7 @@ export class ShippingPollingService {
     private readonly prisma: PrismaService,
     private readonly shipping: ShippingService,
 
-    @Optional() private readonly tenantDb?: TenantDbService,
+    private readonly tenantDb?: TenantDbService,
   ) {}
 
   /**

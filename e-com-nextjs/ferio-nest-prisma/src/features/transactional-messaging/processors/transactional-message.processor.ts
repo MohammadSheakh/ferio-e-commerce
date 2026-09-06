@@ -1,7 +1,6 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import type { Job } from 'bullmq';
 import { QUEUE_NAMES } from '@app/queue';
-import { Optional } from '@nestjs/common';
 import { TenantFanoutService } from '../../../tenancy/services/tenant-fanout.service';
 import { runWithCorrelationId } from '@app/common';
 import { TransactionalMessageDispatcher } from '../services/transactional-message-dispatcher';
@@ -17,7 +16,7 @@ export class TransactionalMessageProcessor extends WorkerHost {
   constructor(
     private readonly dispatcher: TransactionalMessageDispatcher,
     private readonly queue: TransactionalMessageQueue,
-    @Optional() private readonly fanout?: TenantFanoutService,
+    private readonly fanout?: TenantFanoutService,
   ) {
     super();
   }

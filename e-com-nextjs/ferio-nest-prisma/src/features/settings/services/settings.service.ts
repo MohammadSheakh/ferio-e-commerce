@@ -15,7 +15,6 @@ import { CreateOrUpdateSettingsDto } from '../dto/settings.dto';
 import { SETTINGS_CACHE_CONFIG } from '../constants/settings.cache.constants';
 import type { UserPayload } from '@app/common';
 import { AuditService } from '../../audit/services/audit.service';
-import { Optional } from '@nestjs/common';
 import {
   resolveTenantDatabase,
   TenantDbService,
@@ -61,7 +60,7 @@ export class SettingsService {
     private readonly prisma: PrismaService,
     private readonly redisService: RedisService,
     private readonly audit: AuditService,
-    @Optional() private readonly tenantDb?: TenantDbService,
+    private readonly tenantDb?: TenantDbService,
   ) {
     this.logger.log('✅ Settings Service (Prisma + Cache) initialized');
   }

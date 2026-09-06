@@ -2,7 +2,6 @@ import { Processor, WorkerHost } from '@nestjs/bullmq';
 import type { Job } from 'bullmq';
 import { QUEUE_NAMES } from '@app/queue';
 import { runWithCorrelationId, StructuredLogger } from '@app/common';
-import { Optional } from '@nestjs/common';
 import {
   RETENTION_SWEEP_JOB,
   type RetentionJobData,
@@ -15,7 +14,7 @@ export class RetentionProcessor extends WorkerHost {
 
   constructor(
     private readonly retention: RetentionSweepService,
-    @Optional() private readonly fanout?: unknown,
+    private readonly fanout?: unknown,
   ) {
     super();
   }

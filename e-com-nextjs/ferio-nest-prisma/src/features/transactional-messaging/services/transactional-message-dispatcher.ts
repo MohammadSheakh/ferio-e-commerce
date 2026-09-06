@@ -1,4 +1,4 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import {
   CommerceMessageAttemptStatus,
   Prisma,
@@ -17,7 +17,7 @@ export class TransactionalMessageDispatcher {
   constructor(
     private readonly prisma: PrismaService,
     private readonly adapters: MessageAdapterRegistry,
-    @Optional() private readonly tenantDb?: TenantDbService,
+    private readonly tenantDb?: TenantDbService,
   ) {}
 
   async execute(messageId: string) {
