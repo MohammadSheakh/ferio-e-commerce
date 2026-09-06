@@ -50,6 +50,6 @@ USER ferio
 EXPOSE 6733 6734
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-  CMD wget -qO- http://localhost:6733/api/v1/health || exit 1
+  CMD wget -qO- http://localhost:6733/api/v1/ready || exit 1
 
 CMD ["node", "dist/src/main.js"]
