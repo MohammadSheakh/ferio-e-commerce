@@ -25,6 +25,36 @@ interface ChatMessage {
   time: string;
 }
 
+type ChatHistoryItem = {
+  id?: unknown;
+  _messageId?: unknown;
+  conversationId?: unknown;
+  sender?: { role?: unknown } | null;
+  senderRole?: unknown;
+  isAdmin?: unknown;
+  senderId?: unknown;
+  targetUserId?: unknown;
+  guestId?: unknown;
+  senderName?: unknown;
+  text?: unknown;
+  message?: unknown;
+  createdAt?: unknown;
+};
+
+type ChatHistoryResponse = ChatHistoryItem[] | { results?: ChatHistoryItem[] };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function stringValue(value: unknown): string | undefined {
+  return typeof value === 'string' ? value : undefined;
+}
+
+function booleanValue(value: unknown): boolean {
+  return value === true;
+}
+
 const DEFAULT_MESSAGES: ChatMessage[] = [
   {
     id: '1',
@@ -139,8 +169,9 @@ export default function LiveChatWidget() {
         setIsConnected(false);
       };
 
-      const handleNewMessage = (data: any) => {
-        const targetConv = data.conversationId;
+      const handleNewMessage = (data: unknown) => {
+        if (!isRecord(data)) return;
+        const targetConv = stringValue(data.conversationId);
         const currentU = userRef.current;
         const currentG = guestIdRef.current;
         const usrId = currentU?.id;
@@ -154,21 +185,24 @@ export default function LiveChatWidget() {
           (usrId && data.targetUserId === usrId) ||
           data.senderId === activeUserId ||
           (currentG && (targetConv === `conv-${currentG}` || targetConv === currentG || data.guestId === currentG)) ||
-          Boolean(data.isAdmin);
+          booleanValue(data.isAdmin);
 
         if (matchConv) {
+          const senderName = stringValue(data.senderName);
+          const senderId = stringValue(data.senderId);
+          const text = stringValue(data.text) ?? stringValue(data.message) ?? '';
           const isAgent = Boolean(
-            data.isAdmin ||
-            data.senderName?.toLowerCase().includes('support') ||
-            data.senderName?.toLowerCase().includes('mohammad sheakh') ||
-            data.senderId === 'admin-current'
+            booleanValue(data.isAdmin) ||
+            senderName?.toLowerCase().includes('support') ||
+            senderName?.toLowerCase().includes('mohammad sheakh') ||
+            senderId === 'admin-current'
           );
 
           const newMsg: ChatMessage = {
-            id: data._messageId || data.id || Date.now().toString(),
+            id: stringValue(data._messageId) || stringValue(data.id) || Date.now().toString(),
             sender: isAgent ? 'agent' : 'user',
-            text: data.text || data.message || '',
-            time: new Date(data.createdAt || Date.now()).toLocaleTimeString([], {
+            text,
+            time: new Date(stringValue(data.createdAt) || Date.now()).toLocaleTimeString([], {
               hour: '2-digit',
               minute: '2-digit',
             }),
@@ -227,28 +261,28 @@ export default function LiveChatWidget() {
       try {
         const path = `/conversations/${encodeURIComponent(targetConvId)}/messages?limit=100`;
         const res = accessToken
-          ? await apiGet<{ results?: any[] } | any[]>(path)
+          ? await apiGet<ChatHistoryResponse>(path)
           : await apiPost<{ token: string }>('/socket-auth/guest-ticket', { guestId })
-              .then((ticket) => apiGetWithToken<{ results?: any[] } | any[]>(path, ticket.token));
+              .then((ticket) => apiGetWithToken<ChatHistoryResponse>(path, ticket.token));
 
         const rawResults = Array.isArray(res)
           ? res
-          : res && typeof res === 'object' && Array.isArray((res as any).results)
-          ? (res as any).results
+          : Array.isArray(res.results)
+          ? res.results
           : [];
 
         if (rawResults.length > 0) {
-          const formatted: ChatMessage[] = rawResults.map((m: any) => ({
-            id: m.id || m._messageId || Date.now().toString(),
+          const formatted: ChatMessage[] = rawResults.filter(isRecord).map((m) => ({
+            id: stringValue(m.id) || stringValue(m._messageId) || Date.now().toString(),
             sender:
-              m.sender?.role === 'admin' ||
+              (isRecord(m.sender) && m.sender.role === 'admin') ||
               m.senderRole === 'admin' ||
-              m.isAdmin ||
+              booleanValue(m.isAdmin) ||
               m.senderId === 'admin-current'
                 ? 'agent'
                 : 'user',
-            text: m.text,
-            time: new Date(m.createdAt || Date.now()).toLocaleTimeString([], {
+            text: stringValue(m.text) || stringValue(m.message) || '',
+            time: new Date(stringValue(m.createdAt) || Date.now()).toLocaleTimeString([], {
               hour: '2-digit',
               minute: '2-digit',
             }),

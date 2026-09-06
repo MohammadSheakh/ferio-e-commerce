@@ -30,17 +30,25 @@ function formatPath(path: string): string {
   return path.startsWith("/") ? path : `/${path}`;
 }
 
-function messageFromPayload(payload: any, fallback: string) {
-  const message = payload?.message;
-  return Array.isArray(message) ? message.join(" ") : message || fallback;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function messageFromPayload(payload: unknown, fallback: string): string {
+  if (!isRecord(payload)) return fallback;
+  const message = payload.message;
+  if (Array.isArray(message)) {
+    return message.filter((item): item is string => typeof item === "string").join(" ") || fallback;
+  }
+  return typeof message === "string" && message.length > 0 ? message : fallback;
 }
 
 async function parseResponse<T>(response: Response, path: string): Promise<T> {
-  const payload = await response.json();
+  const payload: unknown = await response.json().catch(() => null);
   if (!response.ok) {
     throw new Error(messageFromPayload(payload, `Ferio API ${response.status}: ${path}`));
   }
-  if (payload && typeof payload === "object" && "data" in payload && "success" in payload) {
+  if (isRecord(payload) && "data" in payload && "success" in payload) {
     return payload.data as T;
   }
   return payload as T;

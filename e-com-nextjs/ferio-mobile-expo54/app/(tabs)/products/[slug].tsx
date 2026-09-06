@@ -171,8 +171,8 @@ export default function ProductDetailScreen() {
         setYtModal(false);
         setYtMsg('');
       }, 2000);
-    } catch (err: any) {
-      setYtMsg(err.message || 'Failed to submit YouTube review.');
+    } catch (err: unknown) {
+      setYtMsg(err instanceof Error ? err.message : 'Failed to submit YouTube review.');
     } finally {
       setSubmittingYt(false);
     }
