@@ -16,7 +16,10 @@ import {
 } from 'node:crypto';
 import { PrismaService } from '@app/database';
 import type { PrismaClient } from '@prisma/client';
-import { TenantDbService } from '../../../tenancy/tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../../tenancy/tenant-db.service';
 
 const BASE32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 
@@ -29,9 +32,7 @@ export class TwoFactorService {
   ) {}
 
   private async db(): Promise<PrismaClient> {
-    return this.tenantDb
-      ? this.tenantDb.getOrLegacy(this.prisma)
-      : this.prisma;
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
 
   async status(userId: string) {

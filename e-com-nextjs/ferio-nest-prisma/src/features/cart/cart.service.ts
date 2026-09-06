@@ -9,7 +9,10 @@ import { PrismaService } from '@app/database';
 import { Optional } from '@nestjs/common';
 import type { PrismaClient } from '@prisma/client';
 import { assertTenantCommerceWritable } from '../../tenancy/commerce-write-guard.util';
-import { TenantDbService } from '../../tenancy/tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../tenancy/tenant-db.service';
 import { ConfigService } from '@nestjs/config';
 import { errorMessage } from '@app/common';
 import { AddCartItemDto, UpdateCartItemDto } from './cart.dto';
@@ -114,9 +117,7 @@ export class CartService {
    * requests the legacy single-tenant DB applies, unchanged.
    */
   private async db(): Promise<PrismaClient> {
-    return this.tenantDb
-      ? this.tenantDb.getOrLegacy(this.prisma)
-      : this.prisma;
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
 
   private tokenHash(token: string): string {

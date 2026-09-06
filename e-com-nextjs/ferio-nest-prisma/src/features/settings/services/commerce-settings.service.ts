@@ -9,7 +9,10 @@ import { Prisma } from '@prisma/client';
 import type { PrismaClient } from '@prisma/client';
 import type { UserPayload } from '@app/common';
 import { PrismaService } from '@app/database';
-import { TenantDbService } from '../../../tenancy/tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../../tenancy/tenant-db.service';
 import { AuditService } from '../../audit/services/audit.service';
 import { normalizeBangladeshPhone } from '../../checkout/utils/checkout.util';
 import { UpdateCommerceSettingsDto } from '../dto/commerce-settings.dto';
@@ -33,9 +36,7 @@ export class CommerceSettingsService {
 
   /** Tenant client inside resolved storefront requests; legacy otherwise. */
   private async db(): Promise<PrismaClient> {
-    return this.tenantDb
-      ? this.tenantDb.getOrLegacy(this.prisma)
-      : this.prisma;
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
 
   async get() {

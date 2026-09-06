@@ -5,7 +5,10 @@ import {
   Optional,
 } from '@nestjs/common';
 import { PrismaService } from '@app/database';
-import { TenantDbService } from '../../tenancy/tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../tenancy/tenant-db.service';
 import { Prisma, type PrismaClient } from '@prisma/client';
 import { AuditService } from '../audit/services/audit.service';
 import type { UserPayload } from '@app/common';
@@ -29,9 +32,7 @@ export class StoreLocationsService {
    * MT-7: tenant client inside resolved contexts; explicit legacy fallback.
    */
   private async db(): Promise<PrismaClient> {
-    return this.tenantDb
-      ? this.tenantDb.getOrLegacy(this.prisma)
-      : this.prisma;
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
   async listPublicStores() {
     const db = await this.db();

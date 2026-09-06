@@ -253,7 +253,14 @@ describe('CartService', () => {
       status: string;
       userId: { not: null };
       items: { some: Record<string, never> };
-      user: { is: { role: string; isDeleted: boolean; isEmailVerified: boolean } };
+      user: {
+        is: {
+          role: string;
+          isDeleted: boolean;
+          isEmailVerified: boolean;
+          email: { not: string };
+        };
+      };
       checkoutDraft: {
         is: {
           marketingConsent: boolean;
@@ -271,6 +278,7 @@ describe('CartService', () => {
       role: 'user',
       isDeleted: false,
       isEmailVerified: true,
+      email: { not: '' },
     });
     expect(where.checkoutDraft.is.marketingConsent).toBe(true);
     expect(where.checkoutDraft.is.marketingConsentAt.gte).toBeInstanceOf(Date);

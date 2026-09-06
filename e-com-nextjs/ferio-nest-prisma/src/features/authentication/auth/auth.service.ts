@@ -27,7 +27,10 @@ import { PrismaService } from '@app/database';
 import { OtpType } from '../otp/interfaces/otp-payload.interface';
 import { StructuredLogger } from '@app/common';
 import { TwoFactorService } from '../two-factor/two-factor.service';
-import { TenantDbService } from '../../../tenancy/tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../../tenancy/tenant-db.service';
 import { tryGetTenantContext } from '../../../tenancy/tenant-context';
 import { jwtExpirySeconds } from '../../../config/jwt-expiry.util';
 
@@ -77,9 +80,7 @@ export class AuthService {
   ) {}
 
   private async db(): Promise<PrismaClient> {
-    return this.tenantDb
-      ? this.tenantDb.getOrLegacy(this.prisma)
-      : this.prisma;
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
 
   /**
