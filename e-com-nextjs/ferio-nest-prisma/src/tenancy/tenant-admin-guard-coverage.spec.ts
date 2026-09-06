@@ -5,17 +5,18 @@ import { DeliveryPersonnelController } from '../features/delivery-personnel/deli
 import { SettingsController } from '../features/settings/controllers/settings.controller';
 
 function methodGuards(controller: object, method: string): unknown[] {
-  return Reflect.getMetadata(
+  const metadata: unknown = Reflect.getMetadata(
     GUARDS_METADATA,
     (controller as Record<string, object>)[method],
-  ) ?? [];
+  );
+  return Array.isArray(metadata) ? metadata : [];
 }
 
 describe('legacy tenant-admin membership coverage', () => {
   it('protects the admin conversation directory', () => {
-    expect(methodGuards(ConversationController.prototype, 'getAllConversations')).toContain(
-      TenantMembershipGuard,
-    );
+    expect(
+      methodGuards(ConversationController.prototype, 'getAllConversations'),
+    ).toContain(TenantMembershipGuard);
   });
 
   it.each([
@@ -40,8 +41,8 @@ describe('legacy tenant-admin membership coverage', () => {
     'findOne',
     'assignOrder',
   ])('protects DeliveryPersonnelController.%s', (method) => {
-    expect(methodGuards(DeliveryPersonnelController.prototype, method)).toContain(
-      TenantMembershipGuard,
-    );
+    expect(
+      methodGuards(DeliveryPersonnelController.prototype, method),
+    ).toContain(TenantMembershipGuard);
   });
 });

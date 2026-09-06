@@ -22,7 +22,7 @@ function tenantContext(organizationId: string): TenantContext {
     domainId: 'dom-test',
     hostname: `${organizationId}.ferio.test`,
     subscriptionStatus: 'ACTIVE' as const,
-  }) as TenantContext;
+  });
 }
 
 describe('TenantMetrics', () => {
@@ -107,13 +107,12 @@ describe('TenancyObservabilityService.emitSnapshot', () => {
   afterEach(() => resetTenantLogContextAccessor());
 
   it('emits counters as a structured event only when activity exists', () => {
-    const logged: Array<{ event: string; metadata: Record<string, unknown> }> = [];
+    const logged: Array<{ event: string; metadata: Record<string, unknown> }> =
+      [];
     const service = Object.create(
       TenancyObservabilityService.prototype,
     ) as TenancyObservabilityService;
-    (
-      service as unknown as { logger: Record<string, unknown> }
-    ).logger = {
+    (service as unknown as { logger: Record<string, unknown> }).logger = {
       log: (event: string, metadata: Record<string, unknown>) =>
         logged.push({ event, metadata }),
     };
@@ -127,7 +126,11 @@ describe('TenancyObservabilityService.emitSnapshot', () => {
     expect(logged).toHaveLength(1);
     expect(logged[0].event).toBe('tenant_metrics_snapshot');
     expect(logged[0].metadata.counters).toEqual([
-      { name: 'db_breaker_opened', labels: { tenantDatabaseId: 'tdb-1' }, value: 1 },
+      {
+        name: 'db_breaker_opened',
+        labels: { tenantDatabaseId: 'tdb-1' },
+        value: 1,
+      },
     ]);
   });
 });

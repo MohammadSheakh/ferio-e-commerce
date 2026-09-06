@@ -23,10 +23,9 @@ describe('AppController', () => {
     });
 
     it('returns an operational health response', () => {
-      expect(appController.getHealth()).toEqual({
-        status: 'ok',
-        timestamp: expect.any(String),
-      });
+      const health = appController.getHealth();
+      expect(health.status).toBe('ok');
+      expect(typeof health.timestamp).toBe('string');
     });
   });
 });

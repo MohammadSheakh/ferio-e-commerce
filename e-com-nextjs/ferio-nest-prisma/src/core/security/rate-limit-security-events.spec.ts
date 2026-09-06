@@ -1,6 +1,10 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { SlidingWindowRateLimitGuard } from '@app/common';
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
 describe('rate-limit security events', () => {
   const originalNodeEnv = process.env.NODE_ENV;
   const originalFailOpen = process.env.RATE_LIMIT_FAIL_OPEN;
@@ -49,7 +53,10 @@ describe('rate-limit security events', () => {
       reflector as never,
       { multi: jest.fn().mockReturnValue(pipeline) } as never,
     );
-    const logger = { warn: jest.fn(), error: jest.fn() };
+    const logger = {
+      warn: jest.fn<(event: string, payload: unknown) => void>(),
+      error: jest.fn<(event: string, payload: unknown) => void>(),
+    };
     (guard as unknown as { logger: typeof logger }).logger = logger;
     const response = { set: jest.fn() };
     const context = {
@@ -64,16 +71,18 @@ describe('rate-limit security events', () => {
       HttpException,
     );
 
-    expect(logger.warn).toHaveBeenCalledWith(
-      'authentication_rate_limit_exceeded',
-      expect.objectContaining({
-        keyPrefix: 'auth',
-        requestCount: 6,
-        requestLimit: 5,
-        windowMs: 15 * 60 * 1_000,
-        retryAfterSeconds: expect.any(Number),
-      }),
-    );
+    const warningCalls = logger.warn.mock.calls as unknown as Array<
+      [string, unknown]
+    >;
+    const warningCall = warningCalls.at(-1);
+    expect(warningCall?.[0]).toBe('authentication_rate_limit_exceeded');
+    expect(isRecord(warningCall?.[1])).toBe(true);
+    if (!isRecord(warningCall?.[1])) return;
+    expect(warningCall[1].keyPrefix).toBe('auth');
+    expect(warningCall[1].requestCount).toBe(6);
+    expect(warningCall[1].requestLimit).toBe(5);
+    expect(warningCall[1].windowMs).toBe(15 * 60 * 1_000);
+    expect(typeof warningCall[1].retryAfterSeconds).toBe('number');
     expect(JSON.stringify(logger.warn.mock.calls)).not.toContain(
       'private-client-address',
     );

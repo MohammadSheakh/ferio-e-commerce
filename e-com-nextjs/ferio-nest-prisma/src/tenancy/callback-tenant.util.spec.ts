@@ -26,7 +26,7 @@ describe('callback tenant binding (MT-7 §10.6)', () => {
     [''],
     [undefined],
   ])('rejects tampered/forged token %j', (token) => {
-    expect(verifyCallbackToken(token as string | undefined, SECRET)).toBeNull();
+    expect(verifyCallbackToken(token, SECRET)).toBeNull();
   });
 
   it('refuses to mint without a configured server-side secret', () => {
