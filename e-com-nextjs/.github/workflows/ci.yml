@@ -114,10 +114,6 @@ jobs:
       run:
         working-directory: e-com-nextjs
     env:
-      POSTGRES_IMAGE: postgres:16@sha256:1111111111111111111111111111111111111111111111111111111111111111
-      REDIS_IMAGE: redis:7@sha256:2222222222222222222222222222222222222222222222222222222222222222
-      MINIO_IMAGE: minio/minio:latest@sha256:3333333333333333333333333333333333333333333333333333333333333333
-      MINIO_MC_IMAGE: minio/mc:latest@sha256:4444444444444444444444444444444444444444444444444444444444444444
       POSTGRES_PASSWORD: ci-postgres-password
       REDIS_PASSWORD: ci-redis-password
       MINIO_ROOT_USER: ci-minio-user
@@ -131,11 +127,36 @@ jobs:
       PUBLIC_CUSTOMER_URL: https://shop.example.test
     steps:
       - uses: actions/checkout@v4
+      - name: Resolve immutable infrastructure image references
+        run: |
+          set -euo pipefail
+
+          resolve_image() {
+            local variable="$1"
+            local reference="$2"
+            local digest
+            digest="$(docker buildx imagetools inspect "$reference" | awk '$1 == "Digest:" { print $2; exit }')"
+            if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+              echo "Could not resolve an immutable digest for $reference" >&2
+              exit 1
+            fi
+            echo "${variable}=${reference}@${digest}" >> "$GITHUB_ENV"
+          }
+
+          resolve_image POSTGRES_IMAGE postgres:16
+          resolve_image REDIS_IMAGE redis:7
+          resolve_image MINIO_IMAGE minio/minio:latest
+          resolve_image MINIO_MC_IMAGE minio/mc:latest
       - name: Render production Compose overlay
         run: docker compose -f docker-compose.yml -f docker-compose.production.yml config --quiet
       - name: Assert production services are not host-published
         run: |
           rendered="$(docker compose -f docker-compose.yml -f docker-compose.production.yml config)"
+          immutable_images="$(grep -Ec 'image: [^[:space:]]+@sha256:[0-9a-f]{64}' <<<"$rendered" || true)"
+          if [ "$immutable_images" -lt 4 ]; then
+            echo 'Production infrastructure images must be pinned to real SHA-256 digests.' >&2
+            exit 1
+          fi
           if grep -q 'published:' <<<"$rendered"; then
             echo 'Production overlay must not publish container ports directly.' >&2
             exit 1
