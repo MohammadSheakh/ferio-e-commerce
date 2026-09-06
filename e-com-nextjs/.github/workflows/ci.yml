@@ -178,6 +178,12 @@ jobs:
             echo 'All production application services must enable no-new-privileges.' >&2
             exit 1
           fi
+          for service in backend customer-web admin-web platform-admin; do
+            if grep -A8 "^  $service:" <<<"$rendered" | grep -q 'container_name:'; then
+              echo "$service must not use a fixed container_name in production." >&2
+              exit 1
+            fi
+          done
       - name: Assert web runtime images are non-root
         run: |
           for dockerfile in ferio-customer-web/Dockerfile ferio-admin-dashboard/ferio-admin/Dockerfile ferio-platform-admin/Dockerfile; do

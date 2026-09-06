@@ -82,6 +82,8 @@ services:
       PLATFORM_DATABASE_URL: postgresql://ferio:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/ferio_platform
 
   backend:
+    # Allow an orchestrator or Compose scale operation to create replicas.
+    container_name: !reset null
     ports: !reset []
     expose:
       - "6733"
@@ -116,6 +118,7 @@ services:
     restart: unless-stopped
 
   customer-web:
+    container_name: !reset null
     depends_on:
       backend:
         condition: service_healthy
@@ -146,6 +149,7 @@ services:
     restart: unless-stopped
 
   admin-web:
+    container_name: !reset null
     depends_on:
       backend:
         condition: service_healthy
@@ -175,6 +179,7 @@ services:
     restart: unless-stopped
 
   platform-admin:
+    container_name: !reset null
     depends_on:
       backend:
         condition: service_healthy
