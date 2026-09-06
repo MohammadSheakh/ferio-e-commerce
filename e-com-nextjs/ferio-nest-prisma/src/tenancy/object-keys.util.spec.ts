@@ -1,6 +1,6 @@
 import { ServiceUnavailableException } from '@nestjs/common';
 import { runWithTenantContext } from './tenant-context';
-import { tenantObjectKey } from './object-keys.util';
+import { assertTenantObjectKey, tenantObjectKey } from './object-keys.util';
 
 describe('tenantObjectKey', () => {
   const originalTenancy = process.env.TENANCY_ENABLED;
@@ -52,5 +52,30 @@ describe('tenantObjectKey', () => {
         tenantObjectKey('products', 'image.png'),
       ),
     ).toBe('tenants/org-1/products/image.png');
+  });
+
+  it('rejects another organization key in the current tenant context', () => {
+    process.env.TENANCY_ENABLED = 'true';
+    const context = {
+      organizationId: 'org-1',
+      tenantDatabaseId: 'tdb-1',
+      database: {
+        id: 'tdb-1',
+        host: 'localhost',
+        port: 5432,
+        databaseName: 'tenant_org_1',
+        username: 'tenant',
+        credentialCipher: 'encrypted',
+      },
+      domainId: 'domain-1',
+      hostname: 'store.example.com',
+      subscriptionStatus: 'ACTIVE' as const,
+    };
+
+    expect(() =>
+      runWithTenantContext(context, () =>
+        assertTenantObjectKey('tenants/org-2/products/image.png'),
+      ),
+    ).toThrow('STORAGE_KEY_FORBIDDEN');
   });
 });

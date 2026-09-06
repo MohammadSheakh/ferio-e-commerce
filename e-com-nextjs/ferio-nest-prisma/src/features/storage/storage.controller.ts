@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Inject, Post, UseGuards } from '@nestjs/common';
 import { AuthGuard, PermissionsGuard, Roles, RolesGuard } from '@app/common';
 import { TenantMembershipGuard } from '../../tenancy/tenant-membership.guard';
-import { tryGetTenantContext } from '../../tenancy/tenant-context';
+import { assertTenantObjectKey } from '../../tenancy/object-keys.util';
 import type { StorageStrategy } from './strategies/r2.strategy';
 
 /**
@@ -21,18 +21,9 @@ export class StorageController {
     @Inject('STORAGE_STRATEGY') private readonly strategy: StorageStrategy,
   ) {}
 
-  private assertOwnNamespace(key: string): void {
-    const context = tryGetTenantContext();
-    if (!context) return; // legacy mode: no org namespaces exist
-    const required = `tenants/${context.organizationId}/`;
-    if (!key.startsWith(required)) {
-      throw new Error(`STORAGE_KEY_FORBIDDEN:key must start with ${required}`);
-    }
-  }
-
   @Get('presign-get')
   async presignGet(@Body() body: { key: string }) {
-    this.assertOwnNamespace(body.key);
+    assertTenantObjectKey(body.key);
     return { url: await this.strategy.getSignedUrl(body.key), key: body.key };
   }
 

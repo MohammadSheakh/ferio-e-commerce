@@ -48,7 +48,10 @@ interface FileUploadResult {
   publicId?: string;
 }
 
-import { tenantObjectKey } from '../../../tenancy/object-keys.util';
+import {
+  assertTenantObjectKey,
+  tenantObjectKey,
+} from '../../../tenancy/object-keys.util';
 
 /**
  * Cloudflare R2 storage strategy (PO-017 / owner decision #6).
@@ -146,6 +149,7 @@ export class R2Strategy implements StorageStrategy {
     const key = publicIdOrUrl.includes('/')
       ? publicIdOrUrl.replace(/^.*?tenants\//, 'tenants/').split('?')[0]
       : publicIdOrUrl;
+    assertTenantObjectKey(key);
 
     await this.s3Client.send(
       new DeleteObjectCommand({ Bucket: this.bucket, Key: key }),
@@ -184,6 +188,7 @@ export class R2Strategy implements StorageStrategy {
    * R2_PRESIGN_EXPIRES_SECONDS (default 1h).
    */
   async getSignedUrl(key: string): Promise<string> {
+    assertTenantObjectKey(key);
     return s3Presign(
       this.s3Client,
       new GetObjectCommand({ Bucket: this.bucket, Key: key }),
