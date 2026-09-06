@@ -15,14 +15,18 @@ const material = (id: string) => ({
   port: 5432,
   databaseName: `tenant_${id}`,
   username: 'tenant_user',
-  credentialCipher: encryptSecret('secret-password', process.env.PLATFORM_DB_CREDENTIAL_KEY),
+  credentialCipher: encryptSecret(
+    'secret-password',
+    process.env.PLATFORM_DB_CREDENTIAL_KEY,
+  ),
 });
 
 describe('TenantDatabaseManager (ADR-0003)', () => {
   const originalEnv = { ...process.env };
 
   beforeEach(() => {
-    process.env.PLATFORM_DB_CREDENTIAL_KEY = 'test-credential-key-at-least-32-chars!!';
+    process.env.PLATFORM_DB_CREDENTIAL_KEY =
+      'test-credential-key-at-least-32-chars!!';
     process.env.TENANT_DB_MAX_CLIENTS = '3';
     process.env.TENANT_DB_IDLE_TTL_SECONDS = '300';
     process.env.TENANT_DB_EVICTION_GRACE_MS = '0';
@@ -94,7 +98,10 @@ describe('TenantDatabaseManager (ADR-0003)', () => {
     await shutdown;
 
     expect(disconnect).toHaveBeenCalledTimes(1);
-    expect(manager.metrics()).toMatchObject({ activeClients: 0, pendingClients: 0 });
+    expect(manager.metrics()).toMatchObject({
+      activeClients: 0,
+      pendingClients: 0,
+    });
   });
 
   it('releases a cold transient fleet client after its operation', async () => {
@@ -116,7 +123,10 @@ describe('TenantDatabaseManager (ADR-0003)', () => {
     const operationGate = new Promise<void>((resolve) => {
       releaseOperation = resolve;
     });
-    const transient = manager.runTransient(material('tdb-shared'), () => operationGate);
+    const transient = manager.runTransient(
+      material('tdb-shared'),
+      () => operationGate,
+    );
     await Promise.resolve();
     await Promise.resolve();
 
@@ -139,10 +149,16 @@ describe('TenantDatabaseManager (ADR-0003)', () => {
       releaseSecond = resolve;
     });
 
-    const first = manager.runTransient(material('tdb-overlap'), () => firstGate);
+    const first = manager.runTransient(
+      material('tdb-overlap'),
+      () => firstGate,
+    );
     await Promise.resolve();
     await Promise.resolve();
-    const second = manager.runTransient(material('tdb-overlap'), () => secondGate);
+    const second = manager.runTransient(
+      material('tdb-overlap'),
+      () => secondGate,
+    );
     await Promise.resolve();
     await Promise.resolve();
 
@@ -181,20 +197,24 @@ describe('TenantDatabaseManager (ADR-0003)', () => {
       await expect(manager.getClient(broken)).rejects.toBeTruthy();
     }
 
-    await expect(manager.getClient(broken)).rejects.toThrow(
-      expect.objectContaining({
-        message: expect.stringContaining('TENANT_DATABASE_UNHEALTHY'),
-      }),
+    const failure = await manager
+      .getClient(broken)
+      .catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(Error);
+    expect(failure instanceof Error ? failure.message : '').toContain(
+      'TENANT_DATABASE_UNHEALTHY',
     );
     expect(manager.metrics().openBreakers).toBe(1);
     await manager.onModuleDestroy();
   });
 
-  it('keeps credentials out of plaintext anywhere but the decrypted moment', async () => {
+  it('keeps credentials out of plaintext anywhere but the decrypted moment', () => {
     const secret = 'PLATFORM_SECRET_AT_LEAST_32_CHARACTERS';
     const envelope = encryptSecret('super-secret-password', secret);
     expect(envelope).not.toContain('super-secret-password');
     expect(decryptSecret(envelope, secret)).toBe('super-secret-password');
-    expect(() => decryptSecret(envelope, 'wrong-key-at-least-thirty-two-characters!!')).toThrow();
+    expect(() =>
+      decryptSecret(envelope, 'wrong-key-at-least-thirty-two-characters!!'),
+    ).toThrow();
   });
 });
