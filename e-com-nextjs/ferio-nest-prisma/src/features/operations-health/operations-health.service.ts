@@ -8,7 +8,10 @@ import { QUEUE_NAMES } from '@app/queue';
 import { RequestMetrics } from '@app/common';
 import { PaymentGatewayRegistry } from '../commerce-payments/gateways/payment-gateway.registry';
 import { ShippingService } from '../shipping/services/shipping.service';
-import { TenantDbService } from '../../tenancy/tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../tenancy/tenant-db.service';
 import type { PrismaClient } from '@prisma/client';
 
 type DependencyProbe = {
@@ -58,9 +61,7 @@ export class OperationsHealthService {
   }
 
   private async db(): Promise<PrismaClient> {
-    return this.tenantDb
-      ? this.tenantDb.getOrLegacy(this.prisma)
-      : this.prisma;
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
 
   async getHealth() {

@@ -95,6 +95,8 @@ describe('OperationsHealthService', () => {
   });
 
   it('reports unavailable dependencies and missing launch evidence without throwing', async () => {
+    const previousTenancy = process.env.TENANCY_ENABLED;
+    process.env.TENANCY_ENABLED = 'true';
     const failingQueue = {
       getJobCounts: jest
         .fn()
@@ -134,12 +136,17 @@ describe('OperationsHealthService', () => {
       undefined,
     );
 
-    const health = await service.getHealth();
+    try {
+      const health = await service.getHealth();
 
-    expect(health.runtimeStatus).toBe('UNAVAILABLE');
-    expect(health.launchReady).toBe(false);
-    expect(health.launchBlockers).toHaveLength(4);
-    expect(health.dependencies.database.detail).toBe('PostgreSQL probe failed');
-    expect(JSON.stringify(health)).not.toContain('secret queue error');
+      expect(health.runtimeStatus).toBe('UNAVAILABLE');
+      expect(health.launchReady).toBe(false);
+      expect(health.launchBlockers).toHaveLength(4);
+      expect(health.dependencies.database.detail).toBe('PostgreSQL probe failed');
+      expect(JSON.stringify(health)).not.toContain('secret queue error');
+    } finally {
+      if (previousTenancy === undefined) delete process.env.TENANCY_ENABLED;
+      else process.env.TENANCY_ENABLED = previousTenancy;
+    }
   });
 });
