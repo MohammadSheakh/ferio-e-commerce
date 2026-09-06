@@ -59,9 +59,9 @@ import { tenantObjectKey } from '../../../tenancy/object-keys.util';
  *
  * Isolation rules (§11.4):
  * - Every object key is tenant-namespaced via tenantObjectKey()
- *   (`tenants/{organizationId}/…`, legacy fallback) — the organization
- *   comes from ambient server-side context and can never be supplied by a
- *   client.
+ *   (`tenants/{organizationId}/…`; legacy mode is explicit) — the
+ *   organization comes from ambient server-side context and can never be
+ *   supplied by a client. Tenant mode fails closed without that context.
  * - Private evidence stays private: nothing is ever public-read.
  */
 @Injectable()
