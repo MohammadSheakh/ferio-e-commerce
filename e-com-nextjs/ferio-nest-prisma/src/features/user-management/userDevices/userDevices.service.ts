@@ -6,7 +6,10 @@ import {
 import { PrismaClient, UserDevices } from '@prisma/client';
 import { PrismaService } from '@app/database';
 import { DeviceType } from './enums/TDevice.enum';
-import { TenantDbService } from '../../../tenancy/tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../../tenancy/tenant-db.service';
 
 /**
  * UserDevices Service
@@ -22,9 +25,7 @@ export class UserDevicesService {
   ) {}
 
   private async db(): Promise<PrismaClient> {
-    return this.tenantDb
-      ? this.tenantDb.getOrLegacy(this.prisma)
-      : this.prisma;
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
 
   /**

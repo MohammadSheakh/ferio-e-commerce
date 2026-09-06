@@ -10,7 +10,10 @@ import { PrismaService } from '@app/database';
 import { scopedRedisKey } from '../../../tenancy/redis-keys.util';
 import { RedisService } from '@app/redis';
 import { USER_CACHE_CONFIG } from '../user/user.constants';
-import { TenantDbService } from '../../../tenancy/tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../../tenancy/tenant-db.service';
 
 type UserProfileWithUser = Prisma.UserProfileGetPayload<{
   include: {
@@ -55,9 +58,7 @@ export class UserProfileService {
   ) {}
 
   private async db(): Promise<PrismaClient> {
-    return this.tenantDb
-      ? this.tenantDb.getOrLegacy(this.prisma)
-      : this.prisma;
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
 
   private getCacheKey(userId: string): string {

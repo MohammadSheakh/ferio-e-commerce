@@ -7,7 +7,10 @@ import {
 import { randomUUID } from 'crypto';
 import type { PrismaClient } from '@prisma/client';
 import { PrismaService } from '@app/database';
-import { TenantDbService } from '../../../tenancy/tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../../tenancy/tenant-db.service';
 import { toTenantJsonInput } from '../../../core/database/json-input.util';
 import { ShippingService } from './shipping.service';
 
@@ -36,9 +39,7 @@ export class ShippingPollingService {
    * falls back to the legacy single-tenant DB. Never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    return this.tenantDb
-      ? this.tenantDb.getOrLegacy(this.prisma)
-      : this.prisma;
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
   async getAttempts() {
     const db = await this.db();

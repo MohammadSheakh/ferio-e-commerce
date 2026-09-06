@@ -8,7 +8,10 @@ import {
 } from '@nestjs/common';
 import { randomBytes } from 'crypto';
 import { PrismaService } from '@app/database';
-import { TenantDbService } from '../../tenancy/tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../tenancy/tenant-db.service';
 import type { UserPayload } from '@app/common';
 import { normalizeBangladeshPhone } from '../checkout/utils/checkout.util';
 import { assertTenantCommerceWritable } from '../../tenancy/commerce-write-guard.util';
@@ -29,9 +32,7 @@ export class ServiceBookingService {
    * fallback outside resolved requests. Never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    return this.tenantDb
-      ? this.tenantDb.getOrLegacy(this.prisma)
-      : this.prisma;
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
   private slug(v: string) {
     return v

@@ -7,7 +7,10 @@ import {
 import { OAuthAccount, OAuthProvider, PrismaClient } from '@prisma/client';
 
 import { PrismaService } from '@app/database';
-import { TenantDbService } from '../../../tenancy/tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../../tenancy/tenant-db.service';
 
 /**
  * OAuthAccount Service
@@ -23,9 +26,7 @@ export class OAuthAccountService {
   ) {}
 
   private async db(): Promise<PrismaClient> {
-    return this.tenantDb
-      ? this.tenantDb.getOrLegacy(this.prisma)
-      : this.prisma;
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
 
   /**

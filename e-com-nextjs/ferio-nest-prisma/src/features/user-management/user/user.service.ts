@@ -10,7 +10,10 @@ import { PrismaService } from '@app/database';
 import { scopedRedisKey } from '../../../tenancy/redis-keys.util';
 import { USER_CACHE_CONFIG } from './user.constants';
 import { UpdateProfileDto } from './dto/update-profile.dto';
-import { TenantDbService } from '../../../tenancy/tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../../tenancy/tenant-db.service';
 
 const publicUserSelect = {
   id: true,
@@ -85,9 +88,7 @@ export class UserService {
   ) {}
 
   private async db(): Promise<PrismaClient> {
-    return this.tenantDb
-      ? this.tenantDb.getOrLegacy(this.prisma)
-      : this.prisma;
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
 
   private getCacheKey(type: 'profile' | 'stats', id: string): string {

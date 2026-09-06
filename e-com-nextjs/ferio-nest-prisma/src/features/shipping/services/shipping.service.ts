@@ -13,7 +13,10 @@ import {
 } from '@prisma/client';
 import type { PrismaClient } from '@prisma/client';
 import { PrismaService } from '@app/database';
-import { TenantDbService } from '../../../tenancy/tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../../tenancy/tenant-db.service';
 import { toTenantJsonInput } from '../../../core/database/json-input.util';
 import type { UserPayload } from '@app/common';
 import type { CourierAdapter } from '../adapters/courier-adapter.interface';
@@ -63,9 +66,7 @@ export class ShippingService {
    * falls back to the legacy single-tenant DB. Never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    return this.tenantDb
-      ? this.tenantDb.getOrLegacy(this.prisma)
-      : this.prisma;
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
   private adapter(code: ShipmentProviderCode): CourierAdapter {
     switch (code) {

@@ -1,7 +1,10 @@
 import { Injectable, Optional } from '@nestjs/common';
 import { ShipmentProviderCode } from '@prisma/client';
 import { PrismaService } from '@app/database';
-import { TenantDbService } from '../../../tenancy/tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../../tenancy/tenant-db.service';
 import type { PrismaClient } from '@prisma/client';
 import { ConfigService } from '@nestjs/config';
 import { StructuredLogger } from '@app/common';
@@ -42,9 +45,7 @@ export class CourierRouterService {
    * outside resolved requests. Never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    return this.tenantDb
-      ? this.tenantDb.getOrLegacy(this.prisma)
-      : this.prisma;
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
 
   /**

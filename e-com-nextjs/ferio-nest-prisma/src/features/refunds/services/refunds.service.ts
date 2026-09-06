@@ -10,7 +10,10 @@ import type { PrismaClient } from '@prisma/client';
 import { Prisma } from '@prisma/client';
 import type { UserPayload } from '@app/common';
 import { PrismaService } from '@app/database';
-import { TenantDbService } from '../../../tenancy/tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../../tenancy/tenant-db.service';
 import { toTenantJsonInput } from '../../../core/database/json-input.util';
 import { AuditService } from '../../audit/services/audit.service';
 import { CreateRefundDto, RecordRefundResultDto } from '../dto/refund.dto';
@@ -46,9 +49,7 @@ export class RefundsService {
    * database client; outside one it explicitly falls back to the legacy DB.
    */
   private async db(): Promise<PrismaClient> {
-    return this.tenantDb
-      ? this.tenantDb.getOrLegacy(this.prisma)
-      : this.prisma;
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
   async eligibility(returnCaseId: string) {
     const db = await this.db();
