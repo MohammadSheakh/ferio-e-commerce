@@ -5,7 +5,10 @@ import { JwtService } from '@nestjs/jwt';
 import { Redis } from 'ioredis';
 import { REDIS_CLIENT } from '@app/redis';
 import { PrismaService } from '@app/database';
-import { TenantDbService } from '../../../tenancy/tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../../tenancy/tenant-db.service';
 import type { PrismaClient } from '@prisma/client';
 import { TenantFanoutService } from '../../../tenancy/tenant-fanout.service';
 import { errorMessage } from '@app/common';
@@ -103,7 +106,7 @@ export class SocketAuthService {
    * fallback outside resolved requests. Never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    return this.tenantDb ? this.tenantDb.getOrLegacy(this.prisma) : this.prisma;
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
 
   /**

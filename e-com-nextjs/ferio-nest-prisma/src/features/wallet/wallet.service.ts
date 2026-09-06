@@ -10,7 +10,10 @@ import { Prisma } from '@prisma/client';
 import type { PrismaClient } from '@prisma/client';
 import { PrismaService } from '@app/database';
 import { assertTenantCommerceWritable } from '../../tenancy/commerce-write-guard.util';
-import { TenantDbService } from '../../tenancy/tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../tenancy/tenant-db.service';
 import type { UserPayload } from '@app/common';
 import { AuditService } from '../audit/services/audit.service';
 import { CustomerNotificationsService } from '../customer-notifications/customer-notifications.service';
@@ -37,7 +40,7 @@ export class WalletService {
    * database client; outside one it explicitly falls back to the legacy DB.
    */
   private async db(): Promise<PrismaClient> {
-    return this.tenantDb ? this.tenantDb.getOrLegacy(this.prisma) : this.prisma;
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
   private idempotencyHash(raw?: string) {
     const value = raw?.trim();

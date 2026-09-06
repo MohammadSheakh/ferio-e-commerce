@@ -9,7 +9,10 @@ import { Queue } from 'bullmq';
 
 import type { Prisma, PrismaClient } from '@prisma/client';
 import { PrismaService } from '@app/database';
-import { TenantDbService } from '../../../tenancy/tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../../tenancy/tenant-db.service';
 import { SocketGateway } from '../../socket.gateway/gateway/socket.gateway';
 import { SocketRoomService } from '../../socket.gateway/services/socket-room.service';
 import { BULLMQ_NOTIFY_PARTICIPANTS_QUEUE } from '@app/queue';
@@ -43,7 +46,7 @@ export class ConversationService {
    * database client; outside one it explicitly falls back to the legacy DB.
    */
   private async db(): Promise<PrismaClient> {
-    return this.tenantDb ? this.tenantDb.getOrLegacy(this.prisma) : this.prisma;
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
   /**
    * Create Conversation

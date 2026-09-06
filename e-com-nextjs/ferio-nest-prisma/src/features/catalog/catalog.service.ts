@@ -10,7 +10,10 @@ import { PrismaService } from '@app/database';
 import type { PrismaClient } from '@prisma/client';
 import { Optional } from '@nestjs/common';
 import { assertTenantCommerceWritable } from '../../tenancy/commerce-write-guard.util';
-import { TenantDbService } from '../../tenancy/tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../tenancy/tenant-db.service';
 import { tryGetTenantContext } from '../../tenancy/tenant-context';
 import type { UserPayload } from '@app/common';
 import { AuditService } from '../audit/services/audit.service';
@@ -69,7 +72,7 @@ export class CatalogService {
    * The fallback is EXPLICIT here — TenantDbService.tryGet() never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    return this.tenantDb ? this.tenantDb.getOrLegacy(this.prisma) : this.prisma;
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
 
   private slugify(value: string): string {

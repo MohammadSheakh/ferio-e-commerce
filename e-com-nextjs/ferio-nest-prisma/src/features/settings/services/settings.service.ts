@@ -16,7 +16,10 @@ import { SETTINGS_CACHE_CONFIG } from '../constants/settings.cache.constants';
 import type { UserPayload } from '@app/common';
 import { AuditService } from '../../audit/services/audit.service';
 import { Optional } from '@nestjs/common';
-import { TenantDbService } from '../../../tenancy/tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../../tenancy/tenant-db.service';
 import { tryGetTenantContext } from '../../../tenancy/tenant-context';
 import type { PrismaClient } from '@prisma/client';
 import { toTenantJsonInput } from '../../../core/database/json-input.util';
@@ -75,7 +78,7 @@ export class SettingsService {
 
   /** Tenant client inside resolved requests; legacy DB otherwise (MT-7). */
   private async db(): Promise<PrismaClient> {
-    return this.tenantDb ? this.tenantDb.getOrLegacy(this.prisma) : this.prisma;
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
 
   async createOrUpdateSettings(

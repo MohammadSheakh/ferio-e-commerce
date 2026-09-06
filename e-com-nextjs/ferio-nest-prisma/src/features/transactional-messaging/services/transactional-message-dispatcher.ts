@@ -6,7 +6,10 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '@app/database';
 import { MessageAdapterRegistry } from '../adapters/message-adapter.registry';
-import { TenantDbService } from '../../../tenancy/tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../../tenancy/tenant-db.service';
 import { toTenantJsonInput } from '../../../core/database/json-input.util';
 
 @Injectable()
@@ -151,7 +154,7 @@ export class TransactionalMessageDispatcher {
   }
 
   private async db(): Promise<PrismaClient> {
-    return this.tenantDb ? this.tenantDb.getOrLegacy(this.prisma) : this.prisma;
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
 
   private block(db: PrismaClient, messageId: string, reason: string) {

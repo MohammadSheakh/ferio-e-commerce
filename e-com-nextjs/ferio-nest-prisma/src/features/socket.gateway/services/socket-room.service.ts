@@ -4,7 +4,10 @@ import type { Socket } from 'socket.io';
 
 import { REDIS_CLIENT } from '@app/redis';
 import { PrismaService } from '@app/database';
-import { TenantDbService } from '../../../tenancy/tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../../tenancy/tenant-db.service';
 import type { PrismaClient } from '@prisma/client';
 import { tryGetTenantContext } from '../../../tenancy/tenant-context';
 import { TenantFanoutService } from '../../../tenancy/tenant-fanout.service';
@@ -48,7 +51,7 @@ export class SocketRoomService {
    * fallback outside resolved requests. Never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    return this.tenantDb ? this.tenantDb.getOrLegacy(this.prisma) : this.prisma;
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
 
   // =============================================

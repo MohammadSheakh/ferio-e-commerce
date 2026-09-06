@@ -3,7 +3,10 @@ import { Prisma } from '@prisma/client';
 import { PERMISSIONS, roleHasPermission, type UserPayload } from '@app/common';
 import type { PrismaClient } from '@prisma/client';
 import { PrismaService } from '@app/database';
-import { TenantDbService } from '../../../tenancy/tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../../tenancy/tenant-db.service';
 import { randomUUID } from 'node:crypto';
 import { ReportQueryDto } from '../dto/report-query.dto';
 import { csvCell, maskExportName, reportPeriod } from '../utils/report.util';
@@ -266,7 +269,7 @@ export class ReportsService {
    * explicit legacy fallback otherwise. Never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    return this.tenantDb ? this.tenantDb.getOrLegacy(this.prisma) : this.prisma;
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
   async overview(query: ReportQueryDto) {
     const db = await this.db();

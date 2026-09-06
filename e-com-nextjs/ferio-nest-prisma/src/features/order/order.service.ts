@@ -11,7 +11,10 @@ import { createHash, randomBytes, randomInt, timingSafeEqual } from 'crypto';
 import type { PrismaClient } from '@prisma/client';
 import { OrderStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '@app/database';
-import { TenantDbService } from '../../tenancy/tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../tenancy/tenant-db.service';
 import { tryGetTenantContext } from '../../tenancy/tenant-context';
 import type { UserPayload } from '@app/common';
 import { CartService } from '../cart/cart.service';
@@ -87,7 +90,7 @@ export class OrderService {
    * explicitly falls back to the legacy single-tenant DB. Never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    return this.tenantDb ? this.tenantDb.getOrLegacy(this.prisma) : this.prisma;
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
   private hashIdempotencyKey(value: string): string {
     return createHash('sha256').update(value).digest('hex');

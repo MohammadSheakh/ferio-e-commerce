@@ -14,7 +14,10 @@ import {
 } from '@prisma/client';
 import type { PrismaClient } from '@prisma/client';
 import { PrismaService } from '@app/database';
-import { TenantDbService } from '../../tenancy/tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../tenancy/tenant-db.service';
 import { AuditService } from '../audit/services/audit.service';
 import {
   ApplyDeliveryPersonnelDto,
@@ -67,7 +70,7 @@ export class DeliveryPersonnelService {
    * legacy fallback otherwise. Never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    return this.tenantDb ? this.tenantDb.getOrLegacy(this.prisma) : this.prisma;
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
   /**
    * Public Self-Registration for Bangladesh Candidates

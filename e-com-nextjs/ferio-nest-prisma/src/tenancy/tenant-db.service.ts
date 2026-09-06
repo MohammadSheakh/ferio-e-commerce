@@ -52,3 +52,18 @@ export class TenantDbService {
     return this.manager.metrics();
   }
 }
+
+/**
+ * Resolve an optionally injected tenant database without allowing a missing
+ * provider to become an implicit legacy-mode escape hatch.
+ */
+export async function resolveTenantDatabase(
+  tenantDb: TenantDbService | undefined,
+  legacyClient: PrismaClient,
+): Promise<PrismaClient> {
+  if (tenantDb) return tenantDb.getOrLegacy(legacyClient);
+  if (process.env.TENANCY_ENABLED === 'true') {
+    throw new ServiceUnavailableException('TENANT_DATABASE_SERVICE_REQUIRED');
+  }
+  return legacyClient;
+}

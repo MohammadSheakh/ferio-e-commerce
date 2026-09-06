@@ -1,5 +1,8 @@
 import type { PrismaClient } from '@prisma/client';
-import { TenantDbService } from './tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from './tenant-db.service';
 import { runWithTenantContext } from './tenant-context';
 
 describe('TenantDbService database selection', () => {
@@ -57,5 +60,21 @@ describe('TenantDbService database selection', () => {
         tenantClient,
       );
     });
+  });
+
+  it('fails closed when the optional provider is missing in tenancy mode', async () => {
+    process.env.TENANCY_ENABLED = 'true';
+
+    await expect(resolveTenantDatabase(undefined, legacyClient)).rejects.toThrow(
+      'TENANT_DATABASE_SERVICE_REQUIRED',
+    );
+  });
+
+  it('allows the legacy client when the provider is missing in legacy mode', async () => {
+    process.env.TENANCY_ENABLED = 'false';
+
+    await expect(resolveTenantDatabase(undefined, legacyClient)).resolves.toBe(
+      legacyClient,
+    );
   });
 });
