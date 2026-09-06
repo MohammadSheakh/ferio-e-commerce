@@ -89,6 +89,8 @@ jobs:
         run: pnpm typecheck:application
       - name: Production build
         run: pnpm build
+      - name: Verify PostgreSQL connection budget
+        run: pnpm check:connection-budget
       - name: HTTP capacity smoke against built backend
         run: |
           set -euo pipefail

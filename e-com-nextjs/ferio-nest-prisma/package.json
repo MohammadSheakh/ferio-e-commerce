@@ -35,6 +35,7 @@
     "test:performance": "node ./node_modules/jest/bin/jest.js --config ./test/jest-integration.json --runInBand --runTestsByPath test/performance-baseline.integration-spec.ts",
     "test:http-capacity": "node scripts/http-capacity-smoke.mjs",
     "test:queue-smoke": "node ./node_modules/jest/bin/jest.js --config ./test/jest-queue-smoke.json --runInBand",
+    "check:connection-budget": "node scripts/connection-budget-check.mjs",
     "prisma:generate:platform": "pnpm prisma generate --schema prisma/platform.prisma",
     "prisma:migrate:platform": "pnpm exec prisma migrate deploy --config prisma/platform.config.ts",
     "openapi:export": "TS_NODE_FILES=true OPENAPI_EXPORT=1 ts-node -r tsconfig-paths/register src/main.ts",
