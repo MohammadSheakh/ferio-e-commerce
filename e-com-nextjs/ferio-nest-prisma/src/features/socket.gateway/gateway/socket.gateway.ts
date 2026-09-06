@@ -11,6 +11,7 @@ import {
 import { Server } from 'socket.io';
 import { Logger, Inject } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { randomBytes } from 'node:crypto';
 import { createAdapter } from '@socket.io/redis-adapter';
 import { Redis } from 'ioredis';
 
@@ -561,7 +562,7 @@ export class SocketGateway
           (typeof input._messageId === 'string' && input._messageId.trim()
             ? input._messageId.trim()
             : undefined) ||
-          `msg_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+          `msg_${Date.now()}_${randomBytes(4).toString('hex')}`,
         conversationId: targetConvId,
         text: text || '',
         senderId: userId,

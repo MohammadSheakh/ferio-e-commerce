@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { randomBytes } from 'node:crypto';
 import { correlationHeaders } from '@app/common';
 import { StructuredLogger } from '@app/common';
 import { PlatformPrismaService } from '../platform-prisma.service';
@@ -92,9 +93,8 @@ export class PlatformBillingService {
     });
     if (existing && !existing.paid) return existing;
 
-    const number = `SI-${new Date().toISOString().slice(0, 7).replace('-', '')}-${Math.random()
-      .toString(36)
-      .slice(2, 7)
+    const number = `SI-${new Date().toISOString().slice(0, 7).replace('-', '')}-${randomBytes(4)
+      .toString('hex')
       .toUpperCase()}`;
     return this.platform.client.saasInvoice.create({
       data: {
@@ -127,9 +127,8 @@ export class PlatformBillingService {
       throw new BadRequestException('INVOICE_AMOUNT_INVALID');
     }
 
-    const reference = `SAAS-${invoice.number}-${Date.now().toString(36).toUpperCase()}${Math.random()
-      .toString(36)
-      .slice(2, 6)
+    const reference = `SAAS-${invoice.number}-${Date.now().toString(36).toUpperCase()}-${randomBytes(4)
+      .toString('hex')
       .toUpperCase()}`;
 
     await this.platform.client.saasPaymentAttempt.create({
