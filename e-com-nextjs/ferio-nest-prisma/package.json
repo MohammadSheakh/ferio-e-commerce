@@ -33,6 +33,7 @@
     "test:e2e": "node ./node_modules/jest/bin/jest.js --config ./test/jest-e2e.json",
     "test:integration": "node ./node_modules/jest/bin/jest.js --config ./test/jest-integration.json --runInBand",
     "test:performance": "node ./node_modules/jest/bin/jest.js --config ./test/jest-integration.json --runInBand --runTestsByPath test/performance-baseline.integration-spec.ts",
+    "test:http-capacity": "node scripts/http-capacity-smoke.mjs",
     "test:queue-smoke": "node ./node_modules/jest/bin/jest.js --config ./test/jest-queue-smoke.json --runInBand",
     "prisma:generate:platform": "pnpm prisma generate --schema prisma/platform.prisma",
     "prisma:migrate:platform": "pnpm exec prisma migrate deploy --config prisma/platform.config.ts",
