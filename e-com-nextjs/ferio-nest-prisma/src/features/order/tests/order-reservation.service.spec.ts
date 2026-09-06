@@ -16,6 +16,9 @@ function createService() {
     { get: jest.fn() } as unknown as ConfigService,
     {} as never, // wallet
     {} as never, // customer notifications
+    {} as never, // entitlements
+    {} as never, // usage
+    undefined, // tenant database
   );
 }
 

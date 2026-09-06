@@ -12,10 +12,7 @@ import { RetentionSweepService } from '../services/retention-sweep.service';
 export class RetentionProcessor extends WorkerHost {
   private readonly logger = new StructuredLogger(RetentionProcessor.name);
 
-  constructor(
-    private readonly retention: RetentionSweepService,
-    private readonly fanout?: unknown,
-  ) {
+  constructor(private readonly retention: RetentionSweepService) {
     super();
   }
 

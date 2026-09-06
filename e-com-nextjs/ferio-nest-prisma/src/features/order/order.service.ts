@@ -4,7 +4,6 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
-  Optional,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHash, randomBytes, randomInt, timingSafeEqual } from 'crypto';
@@ -46,6 +45,8 @@ import {
 import { buildOrderOperationalTimeline } from './utils/order-timeline.util';
 import { WalletService } from '../wallet/wallet.service';
 import { CustomerNotificationsService } from '../customer-notifications/customer-notifications.service';
+import { EntitlementsService } from '../../platform/services/entitlements.service';
+import { UsageService } from '../../platform/services/usage.service';
 
 const orderDetailInclude = {
   customer: true,
@@ -77,11 +78,9 @@ export class OrderService {
     private readonly config: ConfigService,
     private readonly wallet: WalletService,
     private readonly customerNotifications: CustomerNotificationsService,
-    private readonly tenantDb?: TenantDbService,
-    @Optional()
-    private readonly entitlements?: import('../../platform/services/entitlements.service').EntitlementsService,
-    @Optional()
-    private readonly usage?: import('../../platform/services/usage.service').UsageService,
+    private readonly entitlements: EntitlementsService,
+    private readonly usage: UsageService,
+    private readonly tenantDb: TenantDbService | undefined,
   ) {}
 
   /**

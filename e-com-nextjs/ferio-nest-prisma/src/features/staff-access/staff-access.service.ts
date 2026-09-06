@@ -4,7 +4,6 @@ import {
   Inject,
   Injectable,
   NotFoundException,
-  Optional,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { tryGetTenantContext } from '../../tenancy/context/tenant-context';
@@ -29,20 +28,18 @@ export class StaffAccessService {
     private readonly audit: AuditService,
     private readonly email: EmailService,
     private readonly config: ConfigService,
-    private readonly tenantDb?: TenantDbService,
-    @Optional()
     @Inject('PLAN_GATE')
-    private readonly planGate?: {
+    private readonly planGate: {
       assertStaffSeat(
         organizationId: string,
         currentMemberCount: number,
       ): Promise<void>;
     },
-    @Optional()
     @Inject('ORG_MEMBERS_COUNTER')
-    private readonly orgMembers?: {
+    private readonly orgMembers: {
       countActiveMembers(organizationId: string): Promise<number>;
     },
+    private readonly tenantDb: TenantDbService | undefined,
   ) {}
 
   /**

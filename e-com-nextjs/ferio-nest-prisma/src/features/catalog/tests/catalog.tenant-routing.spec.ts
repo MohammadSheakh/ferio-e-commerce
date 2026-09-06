@@ -40,6 +40,7 @@ describe('CatalogService tenant routing (MT-7 slice 1)', () => {
     const service = new CatalogService(
       legacyPrisma as unknown as PrismaService,
       audit as never,
+      {} as never,
       tenantDbFor(tenantClient),
     );
 
@@ -55,6 +56,7 @@ describe('CatalogService tenant routing (MT-7 slice 1)', () => {
     const service = new CatalogService(
       legacyPrisma as unknown as PrismaService,
       audit as never,
+      {} as never,
       tenantDbFor(undefined),
     );
 
@@ -68,6 +70,8 @@ describe('CatalogService tenant routing (MT-7 slice 1)', () => {
     const service = new CatalogService(
       legacyPrisma as unknown as PrismaService,
       audit as never,
+      {} as never,
+      undefined,
     );
 
     await service.getCategories(true);
@@ -79,6 +83,7 @@ describe('CatalogService tenant routing (MT-7 slice 1)', () => {
     const service = new CatalogService(
       legacyPrisma as unknown as PrismaService,
       audit as never,
+      {} as never,
       tenantDbFor(tenantClient),
     );
 

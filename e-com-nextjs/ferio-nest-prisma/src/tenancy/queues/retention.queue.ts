@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit, Optional } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import type { Queue } from 'bullmq';
 import { QUEUE_NAMES } from '@app/queue';
@@ -25,7 +25,6 @@ export class RetentionQueue implements OnModuleInit {
   constructor(
     @InjectQueue(QUEUE_NAMES.RETENTION)
     private readonly queue: Queue<RetentionJobData>,
-    @Optional() private readonly retention?: unknown,
   ) {}
 
   private scheduleEnabled(): boolean {

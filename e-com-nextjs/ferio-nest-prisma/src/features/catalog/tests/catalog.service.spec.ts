@@ -5,6 +5,7 @@ import { AuditService } from '../../audit/services/audit.service';
 
 const actor = { userId: 'admin-1', email: 'admin@ferio.test', role: 'admin' };
 const audit = { record: jest.fn() } as unknown as AuditService;
+const entitlements = {} as never;
 
 describe('CatalogService', () => {
   it('creates a category with a normalized slug', async () => {
@@ -25,7 +26,7 @@ describe('CatalogService', () => {
           callback(transaction),
       ),
     } as unknown as PrismaService;
-    const service = new CatalogService(prisma, audit);
+    const service = new CatalogService(prisma, audit, entitlements, undefined);
 
     const category = (await service.createCategory(
       {
@@ -58,7 +59,7 @@ describe('CatalogService', () => {
         callback({ category: { create: jest.fn() } }),
       ),
     } as unknown as PrismaService;
-    const service = new CatalogService(prisma, audit);
+    const service = new CatalogService(prisma, audit, entitlements, undefined);
 
     await expect(
       service.createCategory({ name: 'শাড়ি' }, actor),
@@ -69,7 +70,7 @@ describe('CatalogService', () => {
     const prisma = {
       category: { findFirst: jest.fn() },
     } as unknown as PrismaService;
-    const service = new CatalogService(prisma, audit);
+    const service = new CatalogService(prisma, audit, entitlements, undefined);
 
     await expect(
       service.createProduct(
@@ -109,7 +110,7 @@ describe('CatalogService', () => {
           callback(transaction),
       ),
     } as unknown as PrismaService;
-    const service = new CatalogService(prisma, audit);
+    const service = new CatalogService(prisma, audit, entitlements, undefined);
 
     await expect(
       service.adjustInventory(
@@ -129,7 +130,7 @@ describe('CatalogService', () => {
     const prisma = {
       category: { findFirst: jest.fn() },
     } as unknown as PrismaService;
-    const service = new CatalogService(prisma, audit);
+    const service = new CatalogService(prisma, audit, entitlements, undefined);
 
     await expect(
       service.createProduct(
@@ -147,7 +148,7 @@ describe('CatalogService', () => {
 
   it('rejects negative purchase receipts', async () => {
     const prisma = {} as PrismaService;
-    const service = new CatalogService(prisma, audit);
+    const service = new CatalogService(prisma, audit, entitlements, undefined);
 
     await expect(
       service.adjustInventory(
@@ -173,7 +174,7 @@ describe('CatalogService', () => {
       },
       product: { count: jest.fn().mockResolvedValue(2) },
     } as unknown as PrismaService;
-    const service = new CatalogService(prisma, audit);
+    const service = new CatalogService(prisma, audit, entitlements, undefined);
 
     await expect(
       service.updateCategory('category-1', { isActive: false }, actor),
@@ -190,7 +191,7 @@ describe('CatalogService', () => {
         }),
       },
     } as unknown as PrismaService;
-    const service = new CatalogService(prisma, audit);
+    const service = new CatalogService(prisma, audit, entitlements, undefined);
 
     await expect(
       service.deleteCategory('category-1', actor),
@@ -215,7 +216,7 @@ describe('CatalogService', () => {
           callback(transaction),
       ),
     } as unknown as PrismaService;
-    const service = new CatalogService(prisma, audit);
+    const service = new CatalogService(prisma, audit, entitlements, undefined);
 
     await expect(service.deleteCategory('category-1', actor)).resolves.toEqual({
       id: 'category-1',
@@ -238,7 +239,7 @@ describe('CatalogService', () => {
         update,
       },
     } as unknown as PrismaService;
-    const service = new CatalogService(prisma, audit);
+    const service = new CatalogService(prisma, audit, entitlements, undefined);
 
     await expect(
       service.updateProductStatus('product-1', { status: 'ACTIVE' }, actor),

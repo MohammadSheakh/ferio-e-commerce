@@ -8,7 +8,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '@app/database';
 import type { PrismaClient } from '@prisma/client';
-import { Optional } from '@nestjs/common';
+import { EntitlementsService } from '../../platform/services/entitlements.service';
 import { assertTenantCommerceWritable } from '../../tenancy/utils/commerce-write-guard.util';
 import {
   resolveTenantDatabase,
@@ -60,9 +60,8 @@ export class CatalogService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
-    private readonly tenantDb?: TenantDbService,
-    @Optional()
-    private readonly entitlements?: import('../../platform/services/entitlements.service').EntitlementsService,
+    private readonly entitlements: EntitlementsService,
+    private readonly tenantDb: TenantDbService | undefined,
   ) {}
 
   /**
