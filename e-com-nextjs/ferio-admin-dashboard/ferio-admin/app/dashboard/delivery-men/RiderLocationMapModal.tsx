@@ -23,6 +23,54 @@ type RiderMapItem = {
   locationHistory: LocationHistoryItem[];
 };
 
+type LeafletMap = {
+  setView(center: [number, number], zoom: number): LeafletMap;
+  invalidateSize(): void;
+  fitBounds(bounds: [number, number][], options: { padding: [number, number] }): void;
+};
+
+interface LeafletLayer {
+  addTo(target: LeafletMap | LeafletLayerGroup): this;
+}
+
+type LeafletLayerGroup = LeafletLayer & {
+  clearLayers(): void;
+};
+
+type LeafletMarker = LeafletLayer & {
+  bindPopup(content: string): LeafletMarker;
+  bindTooltip(content: string, options: { direction: string; offset: [number, number] }): LeafletMarker;
+  on(event: string, handler: () => void | Promise<void>): LeafletMarker;
+  setPopupContent(content: string): LeafletMarker;
+  setTooltipContent(content: string): LeafletMarker;
+};
+
+type LeafletApi = {
+  map(element: HTMLElement): LeafletMap;
+  tileLayer(url: string, options: { attribution: string; maxZoom: number }): LeafletLayer;
+  layerGroup(): LeafletLayerGroup;
+  divIcon(options: {
+    html: string;
+    className: string;
+    iconSize: [number, number];
+    iconAnchor: [number, number];
+  }): unknown;
+  marker(
+    point: [number, number],
+    options: { icon: unknown },
+  ): LeafletMarker;
+  polyline(
+    points: [number, number][],
+    options: { color: string; weight: number; opacity: number; dashArray: string },
+  ): LeafletLayer;
+};
+
+declare global {
+  interface Window {
+    L?: LeafletApi;
+  }
+}
+
 function escapeHtml(value: unknown) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -157,8 +205,8 @@ export default function RiderLocationMapModal({
   const [mapError, setMapError] = useState("");
 
   const mapRef = useRef<HTMLDivElement>(null);
-  const leafletInstanceRef = useRef<any>(null);
-  const layerGroupRef = useRef<any>(null);
+  const leafletInstanceRef = useRef<LeafletMap | null>(null);
+  const layerGroupRef = useRef<LeafletLayerGroup | null>(null);
 
   const fetchRiderData = useCallback(async () => {
     setLoading(true);
@@ -206,7 +254,7 @@ export default function RiderLocationMapModal({
     }
 
     const loadLeafletScript = () => {
-      if ((window as any).L) {
+      if (window.L) {
         initMap();
         return;
       }
@@ -227,7 +275,7 @@ export default function RiderLocationMapModal({
   }, []);
 
   const initMap = useCallback(() => {
-    const L = (window as any).L;
+    const L = window.L;
     if (!L || !mapRef.current) return;
 
     if (!leafletInstanceRef.current) {
@@ -256,10 +304,11 @@ export default function RiderLocationMapModal({
   }, [rider]);
 
   const renderRiderMap = () => {
-    const L = (window as any).L;
-    if (!L || !layerGroupRef.current || !rider) return;
+    const L = window.L;
+    const layerGroup = layerGroupRef.current;
+    if (!L || !layerGroup || !rider) return;
 
-    layerGroupRef.current.clearLayers();
+    layerGroup.clearLayers();
     const bounds: [number, number][] = [];
     const points: [number, number][] = [];
     const color = "#e11d48"; // Distinct red indicator
@@ -281,7 +330,7 @@ export default function RiderLocationMapModal({
       });
 
       const marker = L.marker([loc.latitude, loc.longitude], { icon }).addTo(
-        layerGroupRef.current,
+        layerGroup,
       );
 
       const timeStr = new Date(loc.createdAt).toLocaleTimeString();
@@ -312,7 +361,7 @@ export default function RiderLocationMapModal({
         weight: 4,
         opacity: 0.85,
         dashArray: "6, 8",
-      }).addTo(layerGroupRef.current);
+      }).addTo(layerGroup);
     }
 
     // Render Current Location Pin
@@ -329,7 +378,7 @@ export default function RiderLocationMapModal({
       });
 
       const currentMarker = L.marker([rider.currentLat, rider.currentLng], { icon }).addTo(
-        layerGroupRef.current,
+        layerGroup,
       );
 
       const timeStr = rider.lastLocationAt
