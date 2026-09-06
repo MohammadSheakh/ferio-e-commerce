@@ -72,7 +72,9 @@ export class TenantSchemaBootstrapper {
         )
       `);
       // Ledger upgrade for databases created before this column existed.
-      await pool.query(`ALTER TABLE _ferio_tenant_migrations ADD COLUMN IF NOT EXISTS non_transactional BOOLEAN NOT NULL DEFAULT false`);
+      await pool.query(
+        `ALTER TABLE _ferio_tenant_migrations ADD COLUMN IF NOT EXISTS non_transactional BOOLEAN NOT NULL DEFAULT false`,
+      );
       await pool.query(`
       `);
 
@@ -87,7 +89,10 @@ export class TenantSchemaBootstrapper {
 
       for (const name of migrations) {
         if (existing.has(name)) continue;
-        const sql = readFileSync(join(this.migrationsDir, name, 'migration.sql'), 'utf8');
+        const sql = readFileSync(
+          join(this.migrationsDir, name, 'migration.sql'),
+          'utf8',
+        );
         const client = await pool.connect();
         try {
           // Owner decision #14: bounded blast radius for every migration —
@@ -100,7 +105,9 @@ export class TenantSchemaBootstrapper {
           // CREATE INDEX CONCURRENTLY, which PostgreSQL forbids inside a
           // transaction) run outside BEGIN/COMMIT and are recorded
           // separately so a mid-file failure is visible in the ledger.
-          const nonTransactional = sql.startsWith('-- FERIO: NON_TRANSACTIONAL');
+          const nonTransactional = sql.startsWith(
+            '-- FERIO: NON_TRANSACTIONAL',
+          );
           if (!nonTransactional) await client.query('BEGIN');
           await client.query(sql);
           await client.query(
@@ -113,8 +120,11 @@ export class TenantSchemaBootstrapper {
           if (!sql.startsWith('-- FERIO: NON_TRANSACTIONAL')) {
             await client.query('ROLLBACK').catch(() => undefined);
           }
-          const message = error instanceof Error ? error.message : String(error);
-          throw new Error(`TENANT_MIGRATION_FAILED:${name}:${message.slice(0, 300)}`);
+          const message =
+            error instanceof Error ? error.message : String(error);
+          throw new Error(
+            `TENANT_MIGRATION_FAILED:${name}:${message.slice(0, 300)}`,
+          );
         } finally {
           client.release();
         }
@@ -159,7 +169,11 @@ export class TenantSchemaBootstrapper {
          ON CONFLICT ("id") DO UPDATE
          SET "storeName" = EXCLUDED."storeName", "updatedAt" = now()
          WHERE "CommerceSettings"."storeName" = $3`,
-        ['default', connection.organizationName ?? 'My Store', FACTORY_STORE_NAME],
+        [
+          'default',
+          connection.organizationName ?? 'My Store',
+          FACTORY_STORE_NAME,
+        ],
       );
       await pool.query(
         'INSERT INTO "CodVerificationPolicy" ("id", "mode", "createdAt", "updatedAt") VALUES ($1, $2, now(), now()) ON CONFLICT ("id") DO NOTHING',

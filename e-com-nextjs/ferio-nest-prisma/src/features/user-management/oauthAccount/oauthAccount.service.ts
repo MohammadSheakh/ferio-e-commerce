@@ -14,7 +14,7 @@ import {
 
 /**
  * OAuthAccount Service
- * 
+ *
  * Manages OAuth provider accounts linked to users through the tenant-aware
  * Prisma boundary.
  */
@@ -105,7 +105,9 @@ export class OAuthAccountService {
     });
 
     if (existing) {
-      throw new ConflictException('User already has this OAuth provider linked');
+      throw new ConflictException(
+        'User already has this OAuth provider linked',
+      );
     }
 
     // Create OAuth account
@@ -136,7 +138,10 @@ export class OAuthAccountService {
   /**
    * Unlink OAuth account from user
    */
-  async unlinkOAuthAccount(userId: string, authProvider: OAuthProvider): Promise<void> {
+  async unlinkOAuthAccount(
+    userId: string,
+    authProvider: OAuthProvider,
+  ): Promise<void> {
     const db = await this.db();
     const result = await db.oAuthAccount.updateMany({
       where: { userId, authProvider, isDeleted: false },
@@ -160,15 +165,18 @@ export class OAuthAccountService {
     const accounts = await this.findByUserId(userId);
 
     return {
-      google: accounts.some(acc => acc.authProvider === OAuthProvider.google),
-      apple: accounts.some(acc => acc.authProvider === OAuthProvider.apple),
+      google: accounts.some((acc) => acc.authProvider === OAuthProvider.google),
+      apple: accounts.some((acc) => acc.authProvider === OAuthProvider.apple),
     };
   }
 
   /**
    * Check if user has OAuth account
    */
-  async hasOAuthAccount(userId: string, authProvider: OAuthProvider): Promise<boolean> {
+  async hasOAuthAccount(
+    userId: string,
+    authProvider: OAuthProvider,
+  ): Promise<boolean> {
     const db = await this.db();
     const account = await db.oAuthAccount.findFirst({
       where: { userId, authProvider, isDeleted: false },

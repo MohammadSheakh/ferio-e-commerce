@@ -172,13 +172,23 @@ export class StructuredLogger {
       );
     }
 
-    const method = metadata.method ? sanitizeLogText(metadata.method).toUpperCase() : '';
+    const method = metadata.method
+      ? sanitizeLogText(metadata.method).toUpperCase()
+      : '';
     const path = metadata.path ? sanitizeLogText(metadata.path) : '';
-    const statusCode = metadata.statusCode ? sanitizeLogText(metadata.statusCode) : '';
+    const statusCode = metadata.statusCode
+      ? sanitizeLogText(metadata.statusCode)
+      : '';
     const duration =
-      metadata.durationMs !== undefined ? `${sanitizeLogText(metadata.durationMs)}ms` : '';
-    const userId = metadata.userId ? sanitizeLogText(metadata.userId) : 'anonymous';
-    const clientIp = metadata.clientIp ? sanitizeLogText(metadata.clientIp) : '';
+      metadata.durationMs !== undefined
+        ? `${sanitizeLogText(metadata.durationMs)}ms`
+        : '';
+    const userId = metadata.userId
+      ? sanitizeLogText(metadata.userId)
+      : 'anonymous';
+    const clientIp = metadata.clientIp
+      ? sanitizeLogText(metadata.clientIp)
+      : '';
 
     if (method && path) {
       if (level === 'error') {
@@ -199,9 +209,7 @@ export class StructuredLogger {
       metaKeys.length > 0
         ? ` ${JSON.stringify(sanitizeStructuredMetadata(metadata))}`
         : '';
-    const errStr = error
-      ? ` -> ${sanitizeLogText(error)}`
-      : '';
+    const errStr = error ? ` -> ${sanitizeLogText(error)}` : '';
 
     return `${event}${metaStr}${errStr}`;
   }

@@ -48,19 +48,22 @@ export class ServiceBookingService {
       include: { category: true },
       orderBy: { createdAt: 'desc' },
     });
-  }async service(slug: string) {
+  }
+  async service(slug: string) {
     const db = await this.db();
     return db.serviceOffering.findFirst({
       where: { slug, status: 'ACTIVE' },
       include: { category: true },
     });
-  }async adminServices() {
+  }
+  async adminServices() {
     const db = await this.db();
     return db.serviceOffering.findMany({
       include: { category: true, _count: { select: { bookings: true } } },
       orderBy: { createdAt: 'desc' },
     });
-  }async save(dto: SaveServiceDto, id?: string) {
+  }
+  async save(dto: SaveServiceDto, id?: string) {
     assertTenantCommerceWritable();
     const db = await this.db();
     const data = {
@@ -71,7 +74,8 @@ export class ServiceBookingService {
     return id
       ? db.serviceOffering.update({ where: { id }, data })
       : db.serviceOffering.create({ data });
-  }async delete(id: string) {
+  }
+  async delete(id: string) {
     assertTenantCommerceWritable();
     const db = await this.db();
     return db.serviceOffering.delete({ where: { id } });
@@ -112,7 +116,8 @@ export class ServiceBookingService {
       },
       include: { history: true },
     });
-  }async bookings() {
+  }
+  async bookings() {
     const db = await this.db();
     return db.serviceBooking.findMany({
       include: { service: true, history: { orderBy: { createdAt: 'asc' } } },

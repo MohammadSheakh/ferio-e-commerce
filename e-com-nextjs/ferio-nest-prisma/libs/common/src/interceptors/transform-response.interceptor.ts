@@ -14,22 +14,22 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 /**
  * Transform Response Interceptor
- * 
+ *
  * 📚 INDUSTRY STANDARD IMPLEMENTATION
- * 
+ *
  * Standardizes all API responses to a consistent format:
  * {
  *   success: true,
  *   data: { ... },
  *   message: 'Operation successful'
  * }
- * 
+ *
  * Features:
  * ✅ Consistent response structure
  * ✅ Automatic success flag
  * ✅ Optional message
  * ✅ Error handling passthrough
- * 
+ *
  * Usage:
  * @UseInterceptors(TransformResponseInterceptor)
  * async getData() {
@@ -44,9 +44,10 @@ export interface Response<T> {
 }
 
 @Injectable()
-export class TransformResponseInterceptor<T>
-  implements NestInterceptor<T, Response<T>>
-{
+export class TransformResponseInterceptor<T> implements NestInterceptor<
+  T,
+  Response<T>
+> {
   intercept(
     context: ExecutionContext,
     next: CallHandler<T>,
@@ -68,7 +69,8 @@ export class TransformResponseInterceptor<T>
           return {
             success: true,
             data,
-            message: typeof data.message === 'string' ? data.message : undefined,
+            message:
+              typeof data.message === 'string' ? data.message : undefined,
           };
         }
 

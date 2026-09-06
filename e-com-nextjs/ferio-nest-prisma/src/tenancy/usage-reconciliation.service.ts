@@ -3,7 +3,10 @@ import { StructuredLogger, TenantMetrics } from '@app/common';
 import { PlatformPrismaService } from '../platform/platform-prisma.service';
 import { TenantDatabaseManager } from './tenant-database.manager';
 import { tryGetTenantContext } from './tenant-context';
-import { UsageService, currentPeriodKey } from '../platform/services/usage.service';
+import {
+  UsageService,
+  currentPeriodKey,
+} from '../platform/services/usage.service';
 import {
   USAGE_METRICS,
   periodKeyStart,
@@ -37,7 +40,9 @@ export interface UsageReconciliationReport {
  */
 @Injectable()
 export class UsageReconciliationService {
-  private readonly logger = new StructuredLogger(UsageReconciliationService.name);
+  private readonly logger = new StructuredLogger(
+    UsageReconciliationService.name,
+  );
 
   constructor(
     private readonly platform: PlatformPrismaService,
@@ -80,7 +85,11 @@ export class UsageReconciliationService {
     let drifted = 0;
     for (const definition of USAGE_METRICS) {
       const counted = tenantFacts.get(definition.key) ?? 0;
-      const recorded = await this.usage.getValue(organizationId, definition.key, periodKey);
+      const recorded = await this.usage.getValue(
+        organizationId,
+        definition.key,
+        periodKey,
+      );
       const matches = recorded === BigInt(counted);
       if (!matches) {
         drifted += 1;
@@ -94,11 +103,17 @@ export class UsageReconciliationService {
           counted,
           recorded: recorded.toString(),
         });
-        await this.usage.setValue(organizationId, definition.key, BigInt(counted), periodKey);
+        await this.usage.setValue(
+          organizationId,
+          definition.key,
+          BigInt(counted),
+          periodKey,
+        );
       }
       entries.push({
         metric: definition.key,
-        source: definition.key === 'staff_seats' ? 'control_plane' : 'tenant_db',
+        source:
+          definition.key === 'staff_seats' ? 'control_plane' : 'tenant_db',
         counted,
         recorded: recorded.toString(),
         corrected: !matches,
@@ -111,7 +126,10 @@ export class UsageReconciliationService {
   /** Reconcile every READY tenant; one failure never blocks the fleet. */
   async reconcileAllReady(
     periodKey = currentPeriodKey(),
-  ): Promise<{ reconciled: number; failures: Array<{ organizationId: string; error: string }> }> {
+  ): Promise<{
+    reconciled: number;
+    failures: Array<{ organizationId: string; error: string }>;
+  }> {
     const registries = await this.platform.client.tenantDatabase.findMany({
       where: { status: 'READY' },
       select: { organizationId: true },

@@ -14,7 +14,10 @@ export type TenantErrorCode =
 export class TenantResolutionException extends HttpException {
   readonly code: TenantErrorCode;
 
-  constructor(code: TenantErrorCode, httpStatus: HttpStatus = HttpStatus.NOT_FOUND) {
+  constructor(
+    code: TenantErrorCode,
+    httpStatus: HttpStatus = HttpStatus.NOT_FOUND,
+  ) {
     super(
       // Never leak internal details (hosts checked, registry rows, credentials).
       { statusCode: httpStatus, code, message: TENANT_ERROR_MESSAGES[code] },
@@ -26,13 +29,16 @@ export class TenantResolutionException extends HttpException {
 
 const TENANT_ERROR_MESSAGES: Record<TenantErrorCode, string> = {
   TENANT_HOST_INVALID: 'This store address is not valid.',
-  TENANT_FORWARDED_HOST_UNTRUSTED: 'This store address was not received from a trusted proxy.',
+  TENANT_FORWARDED_HOST_UNTRUSTED:
+    'This store address was not received from a trusted proxy.',
   TENANT_RESOLUTION_FAILED: 'No store exists at this address.',
-  TENANT_UNAVAILABLE: 'This store is temporarily unavailable. Please try again later.',
+  TENANT_UNAVAILABLE:
+    'This store is temporarily unavailable. Please try again later.',
   TENANT_SUSPENDED: 'This store is currently unavailable.',
   TENANT_MIGRATION_REQUIRED:
     'This store is undergoing maintenance and will be back shortly.',
-  TENANT_DATABASE_UNHEALTHY: 'This store is temporarily unavailable. Please try again later.',
+  TENANT_DATABASE_UNHEALTHY:
+    'This store is temporarily unavailable. Please try again later.',
   TENANT_CONTEXT_MISSING: 'This request was not routed through a store.',
 };
 
@@ -50,7 +56,9 @@ export function normalizeTenantHost(rawHost: string | undefined): string {
   if (host.endsWith('.')) host = host.slice(0, -1);
 
   const valid =
-    /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/.test(host) &&
+    /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/.test(
+      host,
+    ) &&
     !host.includes('..') &&
     host.length <= 253 &&
     !/^\d{1,3}(\.\d{1,3}){3}$/.test(host) && // no IP-literal hosts
