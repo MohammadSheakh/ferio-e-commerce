@@ -1,5 +1,12 @@
 import { TenantFanoutService } from './tenant-fanout.service';
-import type { PlatformPrismaService } from '../platform/platform-prisma.service';
+import { getTenantContext } from './tenant-context';
+
+type Registry = ReturnType<typeof registry>;
+type TenantOperation = () => Promise<unknown>;
+type RunTransient = (
+  material: Registry,
+  operation: TenantOperation,
+) => Promise<unknown>;
 
 describe('TenantFanoutService (MT-8 §11.2)', () => {
   const originalEnv = { ...process.env };
@@ -18,22 +25,30 @@ describe('TenantFanoutService (MT-8 §11.2)', () => {
     credentialCipher: 'cipher',
   });
 
-  function build(registries: ReturnType<typeof registry>[]) {
+  function build(registries: Registry[]) {
+    type FindManyArgs = { cursor?: { id: string }; take: number };
+    const findMany = jest.fn<Promise<Registry[]>, [FindManyArgs]>();
+    findMany.mockImplementation(({ cursor, take }) => {
+      const start = cursor
+        ? registries.findIndex(({ id }) => id === cursor.id) + 1
+        : 0;
+      return Promise.resolve(registries.slice(start, start + take));
+    });
     const platform = {
       client: {
         tenantDatabase: {
-          findMany: jest.fn().mockImplementation(({ cursor, take }) => {
-            const start = cursor
-              ? registries.findIndex(({ id }) => id === cursor.id) + 1
-              : 0;
-            return Promise.resolve(registries.slice(start, start + take));
-          }),
+          findMany,
         },
       },
     };
+    const runTransient = jest.fn<
+      ReturnType<RunTransient>,
+      Parameters<RunTransient>
+    >();
+    runTransient.mockImplementation((_material, operation) => operation());
     const manager = {
       getClient: jest.fn().mockResolvedValue({}),
-      runTransient: jest.fn().mockImplementation((_material, operation) => operation()),
+      runTransient,
     };
     return {
       service: new TenantFanoutService(platform as never, manager as never),
@@ -46,9 +61,10 @@ describe('TenantFanoutService (MT-8 §11.2)', () => {
     process.env.TENANCY_ENABLED = 'false';
     const { service } = build([registry('org-1')]);
     const calls: string[] = [];
-    await service.forEachTenant(async () => {
-      calls.push('run');
-    }, { label: 'test' });
+    await service.forEachTenant(
+      () => Promise.resolve().then(() => calls.push('run')),
+      { label: 'test' },
+    );
     expect(calls).toEqual(['run']); // exactly one legacy run
   });
 
@@ -57,10 +73,10 @@ describe('TenantFanoutService (MT-8 §11.2)', () => {
     const { service } = build([registry('org-1'), registry('org-2')]);
     const seen: string[] = [];
     const outcome = await service.forEachTenant(
-      async () => {
-        const { getTenantContext } = require('./tenant-context');
-        seen.push(getTenantContext().organizationId);
-      },
+      () =>
+        Promise.resolve().then(() =>
+          seen.push(getTenantContext().organizationId),
+        ),
       { label: 'test' },
     );
     expect(seen.sort()).toEqual(['org-1', 'org-2']);
@@ -79,12 +95,14 @@ describe('TenantFanoutService (MT-8 §11.2)', () => {
       registry('org-5'),
     ]);
 
-    const outcome = await built.service.forEachTenant(async () => undefined, {
+    const outcome = await built.service.forEachTenant(() => Promise.resolve(), {
       label: 'paged-test',
     });
 
     expect(outcome.processed).toBe(5);
-    expect(built.platform.client.tenantDatabase.findMany).toHaveBeenCalledTimes(3);
+    expect(built.platform.client.tenantDatabase.findMany).toHaveBeenCalledTimes(
+      3,
+    );
     expect(built.manager.runTransient).toHaveBeenCalledTimes(5);
   });
 
@@ -99,7 +117,7 @@ describe('TenantFanoutService (MT-8 §11.2)', () => {
     ]);
     let active = 0;
     let maximumActive = 0;
-    (built.manager.runTransient as jest.Mock).mockImplementation(
+    built.manager.runTransient.mockImplementation(
       async (_material, operation) => {
         active += 1;
         maximumActive = Math.max(maximumActive, active);
@@ -110,7 +128,7 @@ describe('TenantFanoutService (MT-8 §11.2)', () => {
       },
     );
 
-    await built.service.forEachTenant(async () => undefined, {
+    await built.service.forEachTenant(() => Promise.resolve(), {
       label: 'concurrency-test',
     });
 
@@ -122,17 +140,17 @@ describe('TenantFanoutService (MT-8 §11.2)', () => {
     const built = build([registry('org-bad'), registry('org-good')]);
     // First getClient call (org-bad sorts first) explodes; second succeeds.
     let n = 0;
-    (built.manager.runTransient as jest.Mock).mockImplementation((_material, operation) => {
+    built.manager.runTransient.mockImplementation((_material, operation) => {
       n += 1;
       if (n === 1) throw new Error('connection refused');
       return operation();
     });
     const seen: string[] = [];
     const outcome = await built.service.forEachTenant(
-      async () => {
-        const { getTenantContext } = require('./tenant-context');
-        seen.push(getTenantContext().organizationId);
-      },
+      () =>
+        Promise.resolve().then(() =>
+          seen.push(getTenantContext().organizationId),
+        ),
       { label: 'test' },
     );
     expect(seen).toEqual(['org-good']);
