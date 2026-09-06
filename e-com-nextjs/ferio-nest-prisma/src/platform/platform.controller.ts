@@ -168,7 +168,6 @@ export class PlatformAdminController {
       orderBy: { createdAt: 'desc' },
       include: { invoice: { select: { number: true } } },
     });
-    const orgNames = await this.organizationNames();
     return {
       items: rows.map((row) => ({
         id: row.id,
@@ -454,9 +453,7 @@ export class PlatformAdminController {
   @PlatformPermissions() // public within the platform controller realm guard
   async login(@Body() body: { email?: string; password?: string }) {
     if (!body.email || !body.password) {
-      throw new (require('@nestjs/common').UnauthorizedException)(
-        'PLATFORM_CREDENTIALS_INVALID',
-      );
+      throw new UnauthorizedException('PLATFORM_CREDENTIALS_INVALID');
     }
     const principal = await this.platformAuth.verifyCredentials(
       body.email,

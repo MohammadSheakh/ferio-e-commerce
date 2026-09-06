@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { SubscriptionStatus } from '../generated/platform-client';
 import { PlatformPrismaService } from '../platform-prisma.service';
 import { PlatformAuditService } from './platform-audit.service';
@@ -7,7 +11,10 @@ import { PlatformAuditService } from './platform-audit.service';
 const GRACE_PERIOD_DAYS = 7;
 
 /** Subscription lifecycle state machine (ADR-0006). */
-const ALLOWED_SUBSCRIPTION_TRANSITIONS: Record<SubscriptionStatus, SubscriptionStatus[]> = {
+const ALLOWED_SUBSCRIPTION_TRANSITIONS: Record<
+  SubscriptionStatus,
+  SubscriptionStatus[]
+> = {
   TRIALING: ['ACTIVE', 'CANCELLED'],
   ACTIVE: ['PAST_DUE', 'CANCELLED'],
   PAST_DUE: ['ACTIVE', 'SUSPENDED', 'CANCELLED'], // grace period recovery
@@ -36,7 +43,9 @@ export class SubscriptionsService {
       where: { organizationId },
     });
     if (existing) throw new ConflictException('SUBSCRIPTION_ALREADY_EXISTS');
-    const plan = await this.platform.client.plan.findUnique({ where: { key: planKey } });
+    const plan = await this.platform.client.plan.findUnique({
+      where: { key: planKey },
+    });
     if (!plan || !plan.isActive) throw new NotFoundException('PLAN_NOT_FOUND');
     return this.platform.client.subscription.create({
       data: {
@@ -77,10 +86,11 @@ export class SubscriptionsService {
       to === 'SUSPENDED' &&
       input.overrideGracePeriod !== true
     ) {
-      const pastDueEvent = await this.platform.client.subscriptionEvent.findFirst({
-        where: { subscriptionId: subscription.id, toStatus: 'PAST_DUE' },
-        orderBy: { createdAt: 'desc' },
-      });
+      const pastDueEvent =
+        await this.platform.client.subscriptionEvent.findFirst({
+          where: { subscriptionId: subscription.id, toStatus: 'PAST_DUE' },
+          orderBy: { createdAt: 'desc' },
+        });
       const graceEndsAt =
         (pastDueEvent?.createdAt ?? new Date()).getTime() +
         GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000;
@@ -95,9 +105,14 @@ export class SubscriptionsService {
         data: {
           status: to,
           cancelledAt: to === 'CANCELLED' ? new Date() : null,
-          currentPeriodStart: input.currentPeriodStart ?? subscription.currentPeriodStart,
-          currentPeriodEnd: input.currentPeriodEnd ?? subscription.currentPeriodEnd,
-          planId: input.note === undefined ? subscription.planId : subscription.planId,
+          currentPeriodStart:
+            input.currentPeriodStart ?? subscription.currentPeriodStart,
+          currentPeriodEnd:
+            input.currentPeriodEnd ?? subscription.currentPeriodEnd,
+          planId:
+            input.note === undefined
+              ? subscription.planId
+              : subscription.planId,
         },
       });
       await tx.subscriptionEvent.create({
@@ -129,12 +144,16 @@ export class SubscriptionsService {
    * (key 'internal') with ACTIVE status — never faked as a paid subscription.
    */
   async startInternal(organizationId: string, actorId?: string) {
+    void actorId;
     const existing = await this.platform.client.subscription.findUnique({
       where: { organizationId },
     });
     if (existing) throw new ConflictException('SUBSCRIPTION_ALREADY_EXISTS');
-    const plan = await this.platform.client.plan.findUnique({ where: { key: 'internal' } });
-    if (!plan || !plan.isActive) throw new NotFoundException('INTERNAL_PLAN_NOT_SEEDED');
+    const plan = await this.platform.client.plan.findUnique({
+      where: { key: 'internal' },
+    });
+    if (!plan || !plan.isActive)
+      throw new NotFoundException('INTERNAL_PLAN_NOT_SEEDED');
     return this.platform.client.subscription.create({
       data: { organizationId, planId: plan.id, status: 'ACTIVE' },
     });
@@ -143,7 +162,9 @@ export class SubscriptionsService {
   /** Plan changes never destroy data; entitlements simply re-evaluate. */
   async changePlan(organizationId: string, planKey: string, actorId?: string) {
     const subscription = await this.getForOrganization(organizationId);
-    const plan = await this.platform.client.plan.findUnique({ where: { key: planKey } });
+    const plan = await this.platform.client.plan.findUnique({
+      where: { key: planKey },
+    });
     if (!plan || !plan.isActive) throw new NotFoundException('PLAN_NOT_FOUND');
     const updated = await this.platform.client.subscription.update({
       where: { id: subscription.id },

@@ -1,4 +1,9 @@
-import { HttpStatus, Injectable, type NestMiddleware, type OnModuleInit } from '@nestjs/common';
+import {
+  HttpStatus,
+  Injectable,
+  type NestMiddleware,
+  type OnModuleInit,
+} from '@nestjs/common';
 import { isIP } from 'node:net';
 import type { NextFunction, Request, Response } from 'express';
 import { RedisService } from '@app/redis';
@@ -7,7 +12,10 @@ import {
   normalizeTenantHost,
   TenantResolutionException,
 } from './tenant-errors';
-import { runWithTenantContext, type TenantDatabaseMaterial } from './tenant-context';
+import {
+  runWithTenantContext,
+  type TenantDatabaseMaterial,
+} from './tenant-context';
 import { setDomainCacheInvalidator } from '../platform/utils/domain-cache-invalidation';
 import { TenantMetrics } from '@app/common';
 
@@ -27,21 +35,31 @@ export interface ResolvedTenant {
   database: TenantDatabaseMaterial;
   domainId: string;
   hostname: string;
-  subscriptionStatus: 'TRIALING' | 'ACTIVE' | 'PAST_DUE' | 'SUSPENDED' | 'CANCELLED';
+  subscriptionStatus:
+    | 'TRIALING'
+    | 'ACTIVE'
+    | 'PAST_DUE'
+    | 'SUSPENDED'
+    | 'CANCELLED';
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-function isSubscriptionStatus(value: unknown): value is ResolvedTenant['subscriptionStatus'] {
+function isSubscriptionStatus(
+  value: unknown,
+): value is ResolvedTenant['subscriptionStatus'] {
   return (
     typeof value === 'string' &&
     (SUBSCRIPTION_STATUSES as readonly string[]).includes(value)
   );
 }
 
-function isResolvedTenant(value: unknown, hostname: string): value is ResolvedTenant {
+function isResolvedTenant(
+  value: unknown,
+  hostname: string,
+): value is ResolvedTenant {
   if (!isRecord(value) || value.hostname !== hostname) return false;
   if (
     typeof value.organizationId !== 'string' ||
@@ -110,13 +128,19 @@ export class TenantResolverService implements OnModuleInit {
 
   private singleForwardedHost(value: string | string[]): string {
     if (Array.isArray(value) && value.length !== 1) {
-      throw new TenantResolutionException('TENANT_HOST_INVALID', HttpStatus.BAD_REQUEST);
+      throw new TenantResolutionException(
+        'TENANT_HOST_INVALID',
+        HttpStatus.BAD_REQUEST,
+      );
     }
     const host = Array.isArray(value) ? value[0] : value;
     // Forwarded chains are ambiguous for tenant selection. The trusted edge
     // must overwrite, never append, this header.
     if (!host || host.includes(',')) {
-      throw new TenantResolutionException('TENANT_HOST_INVALID', HttpStatus.BAD_REQUEST);
+      throw new TenantResolutionException(
+        'TENANT_HOST_INVALID',
+        HttpStatus.BAD_REQUEST,
+      );
     }
     return host;
   }
@@ -125,7 +149,10 @@ export class TenantResolverService implements OnModuleInit {
     if (!remoteAddress) return false;
     const configured = process.env.TENANT_TRUSTED_PROXY_CIDRS?.trim();
     const ranges = configured
-      ? configured.split(',').map((value) => value.trim()).filter(Boolean)
+      ? configured
+          .split(',')
+          .map((value) => value.trim())
+          .filter(Boolean)
       : process.env.NODE_ENV === 'production'
         ? []
         : ['127.0.0.1/32', '::1/128'];
@@ -173,7 +200,9 @@ export class TenantResolverService implements OnModuleInit {
     return resolved;
   }
 
-  private async resolveFromControlPlane(hostname: string): Promise<ResolvedTenant> {
+  private async resolveFromControlPlane(
+    hostname: string,
+  ): Promise<ResolvedTenant> {
     const domain = await this.platform.client.tenantDomain.findUnique({
       where: { hostname },
       include: {
@@ -203,7 +232,10 @@ export class TenantResolverService implements OnModuleInit {
       )
     ) {
       TenantMetrics.increment('resolver_suspended', { hostname });
-      throw new TenantResolutionException('TENANT_SUSPENDED', HttpStatus_SERVICE_UNAVAILABLE);
+      throw new TenantResolutionException(
+        'TENANT_SUSPENDED',
+        HttpStatus_SERVICE_UNAVAILABLE,
+      );
     }
 
     const registry = await this.platform.client.tenantDatabase.findUnique({
@@ -211,7 +243,10 @@ export class TenantResolverService implements OnModuleInit {
     });
     if (!registry || registry.status === 'RETIRED') {
       TenantMetrics.increment('resolver_tenant_unavailable', { hostname });
-      throw new TenantResolutionException('TENANT_UNAVAILABLE', HttpStatus_SERVICE_UNAVAILABLE);
+      throw new TenantResolutionException(
+        'TENANT_UNAVAILABLE',
+        HttpStatus_SERVICE_UNAVAILABLE,
+      );
     }
     if (registry.status === 'MIGRATION_REQUIRED') {
       TenantMetrics.increment('resolver_migration_required', { hostname });
@@ -222,11 +257,17 @@ export class TenantResolverService implements OnModuleInit {
     }
     if (registry.status !== 'READY') {
       TenantMetrics.increment('resolver_tenant_unavailable', { hostname });
-      throw new TenantResolutionException('TENANT_UNAVAILABLE', HttpStatus_SERVICE_UNAVAILABLE);
+      throw new TenantResolutionException(
+        'TENANT_UNAVAILABLE',
+        HttpStatus_SERVICE_UNAVAILABLE,
+      );
     }
 
     const subscriptionStatus = organization.subscription?.status;
-    if (subscriptionStatus !== undefined && !isSubscriptionStatus(subscriptionStatus)) {
+    if (
+      subscriptionStatus !== undefined &&
+      !isSubscriptionStatus(subscriptionStatus)
+    ) {
       throw new TenantResolutionException('TENANT_RESOLUTION_FAILED');
     }
 
@@ -276,7 +317,9 @@ export class TenantResolverService implements OnModuleInit {
     }
   }
 
-  private async readCache(hostname: string): Promise<ResolvedTenant | null | undefined> {
+  private async readCache(
+    hostname: string,
+  ): Promise<ResolvedTenant | null | undefined> {
     try {
       const client = await this.redis.getClient();
       if (!client) return undefined;
@@ -293,7 +336,10 @@ export class TenantResolverService implements OnModuleInit {
     }
   }
 
-  private async writeCache(hostname: string, value: ResolvedTenant): Promise<void> {
+  private async writeCache(
+    hostname: string,
+    value: ResolvedTenant,
+  ): Promise<void> {
     try {
       const client = await this.redis.getClient();
       if (!client) return;
@@ -338,7 +384,7 @@ export class TenantContextMiddleware implements NestMiddleware {
       return;
     }
     const effectiveHost = this.resolver.effectiveHostFrom({
-      headers: request.headers as Record<string, string | string[] | undefined>,
+      headers: request.headers,
       hostname: request.hostname,
       // Read the TCP peer directly. Express trust-proxy settings must never
       // influence the decision about whether forwarding headers are trusted.
@@ -347,8 +393,9 @@ export class TenantContextMiddleware implements NestMiddleware {
     this.resolver
       .resolveFromHost(effectiveHost)
       .then((resolved) => {
-        (request as Request & { tenantOrganizationId?: string }).tenantOrganizationId =
-          resolved.organizationId;
+        (
+          request as Request & { tenantOrganizationId?: string }
+        ).tenantOrganizationId = resolved.organizationId;
         runWithTenantContext(
           {
             organizationId: resolved.organizationId,

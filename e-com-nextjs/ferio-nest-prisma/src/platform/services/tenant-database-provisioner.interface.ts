@@ -1,5 +1,3 @@
-import type { PlatformPrismaService } from '../platform-prisma.service';
-
 export interface CreateTenantDatabaseParams {
   organizationId: string;
   slug: string;

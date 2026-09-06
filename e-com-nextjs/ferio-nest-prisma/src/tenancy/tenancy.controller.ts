@@ -41,7 +41,7 @@ export class TenancyController {
     }
 
     const effectiveHost = this.resolver.effectiveHostFrom({
-      headers: request.headers as Record<string, string | string[] | undefined>,
+      headers: request.headers,
       hostname: request.hostname,
       remoteAddress: request.socket?.remoteAddress,
     });

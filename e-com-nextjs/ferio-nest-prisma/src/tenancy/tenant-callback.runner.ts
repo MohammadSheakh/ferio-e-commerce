@@ -16,7 +16,10 @@ export class TenantCallbackRunner {
     private readonly manager: TenantDatabaseManager,
   ) {}
 
-  async runForOrganization<T>(organizationId: string, fn: () => Promise<T>): Promise<T> {
+  async runForOrganization<T>(
+    organizationId: string,
+    fn: () => Promise<T>,
+  ): Promise<T> {
     const registry = await this.platform.client.tenantDatabase.findUnique({
       where: { organizationId },
     });
@@ -48,8 +51,7 @@ export class TenantCallbackRunner {
         },
         domainId: 'callback-binding',
         hostname: 'payment-callback',
-        subscriptionStatus:
-          'ACTIVE' as import('./tenant-context').TenantContext['subscriptionStatus'],
+        subscriptionStatus: 'ACTIVE',
       },
       fn,
     );

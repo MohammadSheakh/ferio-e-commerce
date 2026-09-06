@@ -433,7 +433,7 @@ export class ConversationService {
       data: { isDeleted: true },
     });
 
-    await this.socketGateway.emitToRoom(conversationId, 'participant-removed', {
+    this.socketGateway.emitToRoom(conversationId, 'participant-removed', {
       conversationId,
       participantId,
     });

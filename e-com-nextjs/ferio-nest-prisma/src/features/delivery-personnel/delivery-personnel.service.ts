@@ -58,17 +58,16 @@ export class DeliveryPersonnelService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
-  
-    @Optional() private readonly tenantDb?: TenantDbService,) {}
+
+    @Optional() private readonly tenantDb?: TenantDbService,
+  ) {}
 
   /**
    * MT-7: tenant client inside resolved storefront/worker contexts; explicit
    * legacy fallback otherwise. Never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    return this.tenantDb
-      ? this.tenantDb.getOrLegacy(this.prisma)
-      : this.prisma;
+    return this.tenantDb ? this.tenantDb.getOrLegacy(this.prisma) : this.prisma;
   }
   /**
    * Public Self-Registration for Bangladesh Candidates
@@ -176,9 +175,12 @@ export class DeliveryPersonnelService {
           email: emailNorm,
           nidNumber: dto.nidNumber?.trim() || existingRider.nidNumber,
           vehicleType: dto.vehicleType || existingRider.vehicleType,
-          operatingZone: dto.operatingZone?.trim() || existingRider.operatingZone,
-          drivingLicense: dto.drivingLicense?.trim() || existingRider.drivingLicense,
-          emergencyPhone: dto.emergencyPhone?.trim() || existingRider.emergencyPhone,
+          operatingZone:
+            dto.operatingZone?.trim() || existingRider.operatingZone,
+          drivingLicense:
+            dto.drivingLicense?.trim() || existingRider.drivingLicense,
+          emergencyPhone:
+            dto.emergencyPhone?.trim() || existingRider.emergencyPhone,
           status: 'APPROVED',
           userId,
         },
@@ -298,7 +300,7 @@ export class DeliveryPersonnelService {
     return db.deliveryPersonnel.update({
       where: { id },
       data: {
-        status: dto.status as DeliveryPersonnelStatus,
+        status: dto.status,
         notes: dto.notes ? dto.notes.trim() : personnel.notes,
       },
     });
@@ -327,11 +329,15 @@ export class DeliveryPersonnelService {
     if (dto.email !== undefined) {
       updateData.email = dto.email ? dto.email.toLowerCase().trim() : null;
     }
-    if (dto.nidNumber !== undefined) updateData.nidNumber = dto.nidNumber?.trim();
+    if (dto.nidNumber !== undefined)
+      updateData.nidNumber = dto.nidNumber?.trim();
     if (dto.vehicleType) updateData.vehicleType = dto.vehicleType;
-    if (dto.operatingZone !== undefined) updateData.operatingZone = dto.operatingZone?.trim();
-    if (dto.drivingLicense !== undefined) updateData.drivingLicense = dto.drivingLicense?.trim();
-    if (dto.emergencyPhone !== undefined) updateData.emergencyPhone = dto.emergencyPhone?.trim();
+    if (dto.operatingZone !== undefined)
+      updateData.operatingZone = dto.operatingZone?.trim();
+    if (dto.drivingLicense !== undefined)
+      updateData.drivingLicense = dto.drivingLicense?.trim();
+    if (dto.emergencyPhone !== undefined)
+      updateData.emergencyPhone = dto.emergencyPhone?.trim();
     if (dto.status) updateData.status = dto.status;
 
     let userId = personnel.userId;
@@ -351,7 +357,8 @@ export class DeliveryPersonnelService {
             password: hashedPassword,
             name: updateData.name || personnel.name,
             email: email,
-            phoneNumber: updateData.phoneNormalized || personnel.phoneNormalized,
+            phoneNumber:
+              updateData.phoneNormalized || personnel.phoneNormalized,
           },
         });
       } else {
@@ -360,7 +367,8 @@ export class DeliveryPersonnelService {
             name: updateData.name || personnel.name,
             email: email,
             password: hashedPassword,
-            phoneNumber: updateData.phoneNormalized || personnel.phoneNormalized,
+            phoneNumber:
+              updateData.phoneNormalized || personnel.phoneNormalized,
             role: 'delivery_man',
             isEmailVerified: true,
           },
@@ -368,7 +376,10 @@ export class DeliveryPersonnelService {
         userId = newUser.id;
         updateData.userId = userId;
       }
-    } else if (userId && (updateData.name || updateData.email || updateData.phoneNormalized)) {
+    } else if (
+      userId &&
+      (updateData.name || updateData.email || updateData.phoneNormalized)
+    ) {
       await db.user.update({
         where: { id: userId },
         data: {
@@ -498,7 +509,9 @@ export class DeliveryPersonnelService {
   private async resolveDeliveryPersonnel(userId: string) {
     const db = await this.db();
     if (!userId) {
-      throw new BadRequestException('User ID is missing from authorization token.');
+      throw new BadRequestException(
+        'User ID is missing from authorization token.',
+      );
     }
     let personnel = await db.deliveryPersonnel.findUnique({
       where: { userId },
@@ -511,7 +524,9 @@ export class DeliveryPersonnelService {
           where: {
             OR: [
               { email: { equals: user.email, mode: 'insensitive' } },
-              ...(user.phoneNumber ? [{ phoneNormalized: user.phoneNumber }] : []),
+              ...(user.phoneNumber
+                ? [{ phoneNormalized: user.phoneNumber }]
+                : []),
             ],
           },
         });
@@ -530,7 +545,9 @@ export class DeliveryPersonnelService {
     }
 
     if (!personnel || personnel.status !== 'APPROVED') {
-      throw new NotFoundException('No active rider profile is linked to this account.');
+      throw new NotFoundException(
+        'No active rider profile is linked to this account.',
+      );
     }
 
     return personnel;
@@ -573,7 +590,14 @@ export class DeliveryPersonnelService {
       orderBy: { createdAt: 'desc' },
       include: {
         address: true,
-        customer: { select: { id: true, name: true, phoneOriginal: true, phoneNormalized: true } },
+        customer: {
+          select: {
+            id: true,
+            name: true,
+            phoneOriginal: true,
+            phoneNormalized: true,
+          },
+        },
         items: true,
       },
     });
@@ -630,11 +654,7 @@ export class DeliveryPersonnelService {
           throw new NotFoundException('Assigned order not found.');
         }
 
-        const terminalOrBlocked = [
-          'CANCELLED',
-          'DELIVERED',
-          'COMPLETED',
-        ];
+        const terminalOrBlocked = ['CANCELLED', 'DELIVERED', 'COMPLETED'];
         const terminalShipmentStatuses: OrderShipmentStatus[] = [
           OrderShipmentStatus.DELIVERED,
           OrderShipmentStatus.RETURNED,
@@ -643,9 +663,7 @@ export class DeliveryPersonnelService {
         ];
         if (
           terminalOrBlocked.includes(order.status) ||
-          terminalShipmentStatuses.includes(
-            order.shipmentStatus as OrderShipmentStatus,
-          )
+          terminalShipmentStatuses.includes(order.shipmentStatus)
         ) {
           throw new ConflictException(
             `Order in status ${order.status}/${order.shipmentStatus} cannot be updated by a rider.`,
@@ -827,7 +845,11 @@ export class DeliveryPersonnelService {
       where: { deliveryPersonnelId: id },
     });
 
-    return { message: 'Location waypoint history cleared.', currentLat: personnel.currentLat, currentLng: personnel.currentLng };
+    return {
+      message: 'Location waypoint history cleared.',
+      currentLat: personnel.currentLat,
+      currentLng: personnel.currentLng,
+    };
   }
 
   /**
@@ -849,7 +871,13 @@ export class DeliveryPersonnelService {
           lastLocationAt: true,
           locationHistory: {
             orderBy: { sequence: 'asc' },
-            select: { id: true, latitude: true, longitude: true, sequence: true, createdAt: true },
+            select: {
+              id: true,
+              latitude: true,
+              longitude: true,
+              sequence: true,
+              createdAt: true,
+            },
           },
         },
       }),

@@ -182,7 +182,7 @@ export class TenantMembershipGuard implements CanActivate {
     const { organizationId } = getTenantContext();
 
     const principal = request.user ?? request.platformPrincipal;
-    const email = String(principal?.email ?? '')
+    const email = (typeof principal?.email === 'string' ? principal.email : '')
       .trim()
       .toLowerCase();
     if (!email) {

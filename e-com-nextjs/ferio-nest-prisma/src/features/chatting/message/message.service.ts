@@ -104,7 +104,7 @@ export class MessageService {
     await this.notifyParticipantsInConversation(conversationId, message);
 
     // Emit real-time event via Socket.IO
-    await this.emitNewMessageEvent(conversationId, message);
+    this.emitNewMessageEvent(conversationId, message);
 
     return message;
   }
@@ -303,15 +303,11 @@ export class MessageService {
     this.logger.log(`✅ Message updated: ${messageId}`);
 
     // Emit update event
-    await this.socketGateway.emitToRoom(
-      message.conversationId,
-      'message-updated',
-      {
-        messageId,
-        text,
-        updatedAt: updatedMessage.updatedAt,
-      },
-    );
+    this.socketGateway.emitToRoom(message.conversationId, 'message-updated', {
+      messageId,
+      text,
+      updatedAt: updatedMessage.updatedAt,
+    });
 
     return updatedMessage;
   }
@@ -343,14 +339,10 @@ export class MessageService {
     this.logger.log(`✅ Message deleted: ${messageId}`);
 
     // Emit delete event
-    await this.socketGateway.emitToRoom(
-      message.conversationId,
-      'message-deleted',
-      {
-        messageId,
-        conversationId: message.conversationId,
-      },
-    );
+    this.socketGateway.emitToRoom(message.conversationId, 'message-deleted', {
+      messageId,
+      conversationId: message.conversationId,
+    });
   }
 
   /**
@@ -439,27 +431,23 @@ export class MessageService {
   /**
    * Emit New Message Event via Socket.IO
    */
-  private async emitNewMessageEvent(
+  private emitNewMessageEvent(
     conversationId: string,
     message: ChatMessage,
-  ): Promise<void> {
+  ): void {
     try {
       const sender = message.sender;
 
-      await this.socketGateway.emitToRoom(
+      this.socketGateway.emitToRoom(conversationId, 'new-message-received', {
+        _messageId: message.id,
         conversationId,
-        'new-message-received',
-        {
-          _messageId: message.id,
-          conversationId,
-          text: message.text,
-          senderId: message.senderId,
-          senderName: sender?.name || 'User',
-          senderProfileImage: sender?.profileImageUrl,
-          createdAt: message.createdAt,
-          attachments: message.attachments,
-        },
-      );
+        text: message.text,
+        senderId: message.senderId,
+        senderName: sender?.name || 'User',
+        senderProfileImage: sender?.profileImageUrl,
+        createdAt: message.createdAt,
+        attachments: message.attachments,
+      });
 
       this.logger.debug(
         `📡 Emitted new-message-received to room ${conversationId}`,
