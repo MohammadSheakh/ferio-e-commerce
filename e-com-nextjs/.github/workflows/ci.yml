@@ -286,6 +286,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Verify committed OpenAPI client schema
         run: pnpm api:check
+      - name: ESLint (read-only)
+        run: pnpm lint
       - name: TypeScript check
         run: pnpm exec tsc --noEmit
       - name: Production build
