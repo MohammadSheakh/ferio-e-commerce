@@ -5,7 +5,10 @@ import {
 import { Prisma } from '@prisma/client';
 import type { PrismaClient } from '@prisma/client';
 import { PrismaService } from '@app/database';
-import { TenantDbService } from '../../../tenancy/tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../../tenancy/tenant-db.service';
 import { PurchaseActivityQueryDto } from '../purchase-activity.dto';
 import { maskPurchaseCustomerName } from '../utils/purchase-activity.util';
 
@@ -21,9 +24,7 @@ export class PurchaseActivityService {
    * explicit legacy fallback otherwise. Never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    return this.tenantDb
-      ? this.tenantDb.getOrLegacy(this.prisma)
-      : this.prisma;
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
   async getPublic(query: PurchaseActivityQueryDto) {
     const settings = await this.getSettings();

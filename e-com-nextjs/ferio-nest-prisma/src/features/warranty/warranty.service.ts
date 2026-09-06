@@ -8,7 +8,11 @@ import {
 import { randomBytes, timingSafeEqual } from 'crypto';
 import type { PrismaClient } from '@prisma/client';import { Prisma } from '@prisma/client';
 import { PrismaService } from '@app/database';
-import { TenantDbService } from '../../tenancy/tenant-db.service';import type { UserPayload } from '@app/common';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../tenancy/tenant-db.service';
+import type { UserPayload } from '@app/common';
 import { normalizeBangladeshPhone } from '../checkout/utils/checkout.util';
 import {
   CreateWarrantyClaimDto,
@@ -44,9 +48,7 @@ export class WarrantyService {
    * MT-7: tenant client inside resolved contexts; explicit legacy fallback.
    */
   private async db(): Promise<PrismaClient> {
-    return this.tenantDb
-      ? this.tenantDb.getOrLegacy(this.prisma)
-      : this.prisma;
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }  private async verifiedOrder(dto: VerifyWarrantyOrderDto) {
     const db = await this.db();
     const reference = dto.reference.trim().toUpperCase();
