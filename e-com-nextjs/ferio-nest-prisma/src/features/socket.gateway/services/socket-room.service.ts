@@ -401,7 +401,7 @@ export class SocketRoomService {
 
       if (familyRoomId) {
         await this.joinGroupRoom(userId, familyRoomId, organizationId);
-        socket.join(scopedSocketRoom({ organizationId }, familyRoomId));
+        await socket.join(scopedSocketRoom({ organizationId }, familyRoomId));
         this.logger.log(
           `✅ User ${userId} auto-joined family room ${familyRoomId}`,
         );

@@ -142,8 +142,8 @@ export class SocketGateway
       // MT-8 §11.3: every join is namespaced by the ticket's organization so
       // identical identifiers across tenants can never share a channel.
       const orgRoom = (room: string) => scopedSocketRoom(user, room);
-      client.join(orgRoom(user.userId));
-      client.join(orgRoom(`conv-${user.userId}`));
+      await client.join(orgRoom(user.userId));
+      await client.join(orgRoom(`conv-${user.userId}`));
       this.logger.log(
         `✅ User ${user.userId} joined rooms: ${user.userId}, conv-${user.userId}`,
       );
@@ -155,19 +155,19 @@ export class SocketGateway
           // MT-8 §11.3: tenant-bound admins join ONLY org-prefixed rooms so
           // one tenant's chats/notifications can never reach another's
           // console. Raw rooms exist solely for legacy (unbound) sockets.
-          client.join(orgRoom('role::admin'));
-          client.join(orgRoom('role::super-admin'));
-          client.join(orgRoom('admin-room'));
+          await client.join(orgRoom('role::admin'));
+          await client.join(orgRoom('role::super-admin'));
+          await client.join(orgRoom('admin-room'));
           if (!user.organizationId) {
-            client.join(`role::${user.role}`);
-            client.join(`role::${lowerRole}`);
+            await client.join(`role::${user.role}`);
+            await client.join(`role::${lowerRole}`);
           }
           this.logger.log(
             `✅ Admin user ${user.userId} joined admin role rooms`,
           );
         } else if (!user.organizationId) {
-          client.join(`role::${user.role}`);
-          client.join(`role::${lowerRole}`);
+          await client.join(`role::${user.role}`);
+          await client.join(`role::${lowerRole}`);
         }
       }
 
@@ -431,7 +431,7 @@ export class SocketGateway
       }
 
       // Join Socket.IO room
-      client.join(scopedSocketRoom(client.data?.user, conversationId));
+      await client.join(scopedSocketRoom(client.data?.user, conversationId));
 
       // Update Redis state
       await this.socketRoomService.joinRoom(
@@ -491,7 +491,7 @@ export class SocketGateway
       }
 
       // Leave Socket.IO room
-      client.leave(scopedSocketRoom(client.data?.user, conversationId));
+      await client.leave(scopedSocketRoom(client.data?.user, conversationId));
 
       // Update Redis state
       await this.socketRoomService.leaveRoom(
@@ -849,7 +849,7 @@ export class SocketGateway
       const taskRoom = scopedSocketRoom(client.data?.user, taskId);
 
       // Join Socket.IO room
-      client.join(taskRoom);
+      await client.join(taskRoom);
 
       // Update Redis state
       await this.socketRoomService.joinTaskRoom(
@@ -903,7 +903,7 @@ export class SocketGateway
       const taskRoom = scopedSocketRoom(client.data?.user, taskId);
 
       // Leave Socket.IO room
-      client.leave(taskRoom);
+      await client.leave(taskRoom);
 
       // Update Redis state
       await this.socketRoomService.leaveTaskRoom(

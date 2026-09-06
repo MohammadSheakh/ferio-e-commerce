@@ -58,7 +58,7 @@ export class CloudinaryStrategy {
 
       // Upload to Cloudinary
       const result = await new Promise<UploadApiResponse>((resolve, reject) => {
-        cloudinary.uploader.upload(
+        void cloudinary.uploader.upload(
           base64File,
           {
             folder: `task-mgmt/${folder}`,
