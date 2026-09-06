@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useCart } from "@/components/CartContext";
 import { formatTaka } from "@/lib/catalog";
+import { getErrorMessage } from "@/lib/error-message";
 
 export default function CartPage() {
   const { cart, lines, remove, setQty, subtotal, loading, error, clearError } = useCart();
@@ -59,9 +60,9 @@ export default function CartPage() {
       setShareLink(link);
       setSaveModalOpen(false);
       setCartNameInput("");
-    } catch (err: any) {
+    } catch (err: unknown) {
       setNotification(null);
-      alert(err.message || "Could not save cart.");
+      alert(getErrorMessage(err, "Could not save cart."));
     } finally {
       setSavingCart(false);
     }
@@ -84,8 +85,8 @@ export default function CartPage() {
       await navigator.clipboard.writeText(link);
       setNotification("Share link copied to clipboard!");
       setShareLink(link);
-    } catch (err: any) {
-      alert(err.message || "Could not share cart.");
+    } catch (err: unknown) {
+      alert(getErrorMessage(err, "Could not share cart."));
     } finally {
       setSavingCart(false);
     }

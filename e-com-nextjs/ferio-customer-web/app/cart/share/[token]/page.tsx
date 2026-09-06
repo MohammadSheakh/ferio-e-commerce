@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { formatTaka } from "@/lib/catalog";
 import { useCart } from "@/components/CartContext";
+import { getErrorMessage } from "@/lib/error-message";
 
 type SharedCartItem = {
   id: string;
@@ -57,8 +58,8 @@ export default function SharedCartPage({
           throw new Error(payload.message || "Shared cart not found.");
         }
         setCart(payload.data || payload);
-      } catch (err: any) {
-        setError(err.message || "Unable to load shared cart.");
+      } catch (err: unknown) {
+        setError(getErrorMessage(err, "Unable to load shared cart."));
       } finally {
         setLoading(false);
       }
@@ -79,8 +80,8 @@ export default function SharedCartPage({
       }
       await revalidate();
       setNotification(data.summary || "Cart items added to your cart!");
-    } catch (err: any) {
-      setError(err.message || "Could not import items.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Could not import items."));
     } finally {
       setImporting(false);
     }
@@ -103,8 +104,8 @@ export default function SharedCartPage({
         throw new Error(data.message || "Failed to save cart to account.");
       }
       setNotification("Cart saved to your account! View it in Saved Carts.");
-    } catch (err: any) {
-      setError(err.message || "Could not save to account.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Could not save to account."));
     } finally {
       setSavingAccount(false);
     }
