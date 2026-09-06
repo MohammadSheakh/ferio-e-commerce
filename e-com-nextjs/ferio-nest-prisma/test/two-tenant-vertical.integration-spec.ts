@@ -18,14 +18,14 @@
 import { Pool } from 'pg';
 import { NotFoundException } from '@nestjs/common';
 
-import { TenantSchemaBootstrapper } from '../src/tenancy/tenant-schema.bootstrapper';
-import { TenantDatabaseManager } from '../src/tenancy/tenant-database.manager';
-import { TenantDbService } from '../src/tenancy/tenant-db.service';
+import { TenantSchemaBootstrapper } from '../src/tenancy/services/tenant-schema.bootstrapper';
+import { TenantDatabaseManager } from '../src/tenancy/services/tenant-database.manager';
+import { TenantDbService } from '../src/tenancy/services/tenant-db.service';
 import { encryptSecret } from '../src/platform/utils/secret-box';
 import {
   runWithTenantContext,
   type TenantContext,
-} from '../src/tenancy/tenant-context';
+} from '../src/tenancy/context/tenant-context';
 
 import { CatalogService } from '../src/features/catalog/catalog.service';
 import { CartService } from '../src/features/cart/cart.service';

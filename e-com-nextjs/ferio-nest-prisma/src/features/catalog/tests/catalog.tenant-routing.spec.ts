@@ -1,5 +1,5 @@
 import { PrismaService } from '@app/database';
-import { TenantDbService } from '../../../tenancy/tenant-db.service';
+import { TenantDbService } from '../../../tenancy/services/tenant-db.service';
 import { CatalogService } from '../catalog.service';
 import { CommerceSettingsService } from '../../settings/services/commerce-settings.service';
 

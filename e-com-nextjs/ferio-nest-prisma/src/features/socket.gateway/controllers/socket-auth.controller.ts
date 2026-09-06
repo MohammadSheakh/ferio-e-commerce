@@ -10,7 +10,7 @@ import { IsString, Matches } from 'class-validator';
 import { AuthGuard, Public, User } from '@app/common';
 import type { UserPayload } from '@app/common';
 import { SocketAuthService } from '../services/socket-auth.service';
-import { tryGetTenantContext } from '../../../tenancy/tenant-context';
+import { tryGetTenantContext } from '../../../tenancy/context/tenant-context';
 
 class GuestSocketTicketDto {
   @IsString()

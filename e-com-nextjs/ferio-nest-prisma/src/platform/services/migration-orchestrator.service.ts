@@ -9,7 +9,7 @@ import { QUEUE_NAMES } from '@app/queue';
 import { randomBytes } from 'crypto';
 import { StructuredLogger } from '@app/common';
 import { PlatformPrismaService } from '../platform-prisma.service';
-import { TenantSchemaBootstrapper } from '../../tenancy/tenant-schema.bootstrapper';
+import { TenantSchemaBootstrapper } from '../../tenancy/services/tenant-schema.bootstrapper';
 import { TenantDatabasesService } from './tenant-databases.service';
 import { toPlatformJsonInput } from '../utils/json-input.util';
 

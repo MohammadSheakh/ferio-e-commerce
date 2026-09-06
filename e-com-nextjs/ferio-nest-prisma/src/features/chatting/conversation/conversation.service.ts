@@ -12,13 +12,13 @@ import { PrismaService } from '@app/database';
 import {
   resolveTenantDatabase,
   TenantDbService,
-} from '../../../tenancy/tenant-db.service';
+} from '../../../tenancy/services/tenant-db.service';
 import { SocketGateway } from '../../socket.gateway/gateway/socket.gateway';
 import { SocketRoomService } from '../../socket.gateway/services/socket-room.service';
 import { BULLMQ_NOTIFY_PARTICIPANTS_QUEUE } from '@app/queue';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { ConversationType, ParticipantRole } from './conversation.constant';
-import { tryGetTenantContext } from '../../../tenancy/tenant-context';
+import { tryGetTenantContext } from '../../../tenancy/context/tenant-context';
 type ChatDb = PrismaClient | Prisma.TransactionClient;
 
 type ConversationMessage = Prisma.MessageGetPayload<{

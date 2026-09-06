@@ -7,13 +7,13 @@ import {
 import { Prisma, PrismaClient, UserProfile } from '@prisma/client';
 
 import { PrismaService } from '@app/database';
-import { scopedRedisKey } from '../../../tenancy/redis-keys.util';
+import { scopedRedisKey } from '../../../tenancy/utils/redis-keys.util';
 import { RedisService } from '@app/redis';
 import { USER_CACHE_CONFIG } from '../user/user.constants';
 import {
   resolveTenantDatabase,
   TenantDbService,
-} from '../../../tenancy/tenant-db.service';
+} from '../../../tenancy/services/tenant-db.service';
 
 type UserProfileWithUser = Prisma.UserProfileGetPayload<{
   include: {

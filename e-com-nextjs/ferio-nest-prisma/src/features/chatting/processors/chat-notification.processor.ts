@@ -1,7 +1,7 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import type { Job } from 'bullmq';
 import { QUEUE_NAMES } from '@app/queue';
-import { TenantFanoutService } from '../../../tenancy/tenant-fanout.service';
+import { TenantFanoutService } from '../../../tenancy/services/tenant-fanout.service';
 import { SocketGateway } from '../../socket.gateway/gateway/socket.gateway';
 
 type ChatNotificationJob = {

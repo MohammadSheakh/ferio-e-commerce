@@ -3,28 +3,28 @@ import { RedisModule, RedisService } from '@app/redis';
 import { JwtModule } from '@nestjs/jwt';
 import { BullModule } from '@nestjs/bullmq';
 import { QUEUE_NAMES } from '@app/queue';
-import { RetentionQueue } from './retention.queue';
-import { RetentionProcessor } from './retention.processor';
-import { RetentionSweepService } from './retention-sweep.service';
+import { RetentionQueue } from './queues/retention.queue';
+import { RetentionProcessor } from './processors/retention.processor';
+import { RetentionSweepService } from './services/retention-sweep.service';
 import { PlatformPrismaService } from '../platform/platform-prisma.service';
-import { TenancyController } from './tenancy.controller';
-import { TenancyPlanController } from './tenancy-plan.controller';
+import { TenancyController } from './controllers/tenancy.controller';
+import { TenancyPlanController } from './controllers/tenancy-plan.controller';
 import {
   TenantResolverService,
   TenantContextMiddleware,
-} from './tenant-resolver.service';
-import { TenantDatabaseManager } from './tenant-database.manager';
-import { TenantDbService } from './tenant-db.service';
-import { TenantSchemaBootstrapper } from './tenant-schema.bootstrapper';
+} from './services/tenant-resolver.service';
+import { TenantDatabaseManager } from './services/tenant-database.manager';
+import { TenantDbService } from './services/tenant-db.service';
+import { TenantSchemaBootstrapper } from './services/tenant-schema.bootstrapper';
 import {
   TenantMembershipGuard,
   TenantMembershipService,
-} from './tenant-membership.guard';
-import { TenantCallbackRunner } from './tenant-callback.runner';
-import { TenantFanoutService } from './tenant-fanout.service';
-import { TenancyObservabilityService } from './tenancy-observability.service';
-import { UsageReconciliationService } from './usage-reconciliation.service';
-import { TenantReturnOriginService } from './tenant-return-origin.service';
+} from './guards/tenant-membership.guard';
+import { TenantCallbackRunner } from './services/tenant-callback.runner';
+import { TenantFanoutService } from './services/tenant-fanout.service';
+import { TenancyObservabilityService } from './services/tenancy-observability.service';
+import { UsageReconciliationService } from './services/usage-reconciliation.service';
+import { TenantReturnOriginService } from './services/tenant-return-origin.service';
 
 /**
  * Tenant plane (MT-2/MT-3): trusted resolution, immutable request context,

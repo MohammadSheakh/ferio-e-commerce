@@ -20,7 +20,7 @@ import {
   scopedSocketRoom,
 } from '../services/socket-auth.service';
 import type { AuthenticatedSocket } from '../services/socket-auth.service';
-import { tryGetTenantContext } from '../../../tenancy/tenant-context';
+import { tryGetTenantContext } from '../../../tenancy/context/tenant-context';
 import { SocketRoomService } from '../services/socket-room.service';
 import { REDIS_PUB_CLIENT, REDIS_SUB_CLIENT } from '@app/redis';
 import { FirebaseService } from '@app/notification';

@@ -9,11 +9,11 @@ import { createHash } from 'crypto';
 import { Prisma } from '@prisma/client';
 import type { PrismaClient } from '@prisma/client';
 import { PrismaService } from '@app/database';
-import { assertTenantCommerceWritable } from '../../tenancy/commerce-write-guard.util';
+import { assertTenantCommerceWritable } from '../../tenancy/utils/commerce-write-guard.util';
 import {
   resolveTenantDatabase,
   TenantDbService,
-} from '../../tenancy/tenant-db.service';
+} from '../../tenancy/services/tenant-db.service';
 import type { UserPayload } from '@app/common';
 import { AuditService } from '../audit/services/audit.service';
 import { CustomerNotificationsService } from '../customer-notifications/customer-notifications.service';

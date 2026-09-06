@@ -1,4 +1,4 @@
-import { tryGetTenantContext } from '../../../tenancy/tenant-context';
+import { tryGetTenantContext } from '../../../tenancy/context/tenant-context';
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { ConfigService } from '@nestjs/config';

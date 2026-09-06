@@ -19,8 +19,8 @@ import { Optional } from '@nestjs/common';
 import {
   resolveTenantDatabase,
   TenantDbService,
-} from '../../../tenancy/tenant-db.service';
-import { tryGetTenantContext } from '../../../tenancy/tenant-context';
+} from '../../../tenancy/services/tenant-db.service';
+import { tryGetTenantContext } from '../../../tenancy/context/tenant-context';
 import type { PrismaClient } from '@prisma/client';
 import { toTenantJsonInput } from '../../../core/database/json-input.util';
 

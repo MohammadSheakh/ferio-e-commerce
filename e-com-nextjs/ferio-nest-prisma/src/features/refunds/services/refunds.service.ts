@@ -13,7 +13,7 @@ import { PrismaService } from '@app/database';
 import {
   resolveTenantDatabase,
   TenantDbService,
-} from '../../../tenancy/tenant-db.service';
+} from '../../../tenancy/services/tenant-db.service';
 import { toTenantJsonInput } from '../../../core/database/json-input.util';
 import { AuditService } from '../../audit/services/audit.service';
 import { CreateRefundDto, RecordRefundResultDto } from '../dto/refund.dto';

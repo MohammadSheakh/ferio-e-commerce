@@ -30,8 +30,8 @@ import { TwoFactorService } from '../two-factor/two-factor.service';
 import {
   resolveTenantDatabase,
   TenantDbService,
-} from '../../../tenancy/tenant-db.service';
-import { tryGetTenantContext } from '../../../tenancy/tenant-context';
+} from '../../../tenancy/services/tenant-db.service';
+import { tryGetTenantContext } from '../../../tenancy/context/tenant-context';
 import { jwtExpirySeconds } from '../../../config/jwt-expiry.util';
 
 const authUserSelect = {

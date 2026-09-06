@@ -30,7 +30,7 @@ import { SocketRoomService } from '../src/features/socket.gateway/services/socke
 import {
   runWithTenantContext,
   type TenantContext,
-} from '../src/tenancy/tenant-context';
+} from '../src/tenancy/context/tenant-context';
 
 const SECRET = 'e2e-jwt-access-secret-for-socket-isolation-spec';
 process.env.JWT_ACCESS_SECRET = SECRET;

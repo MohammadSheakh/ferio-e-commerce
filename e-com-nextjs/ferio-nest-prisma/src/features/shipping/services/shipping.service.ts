@@ -13,7 +13,7 @@ import { PrismaService } from '@app/database';
 import {
   resolveTenantDatabase,
   TenantDbService,
-} from '../../../tenancy/tenant-db.service';
+} from '../../../tenancy/services/tenant-db.service';
 import { toTenantJsonInput } from '../../../core/database/json-input.util';
 import type { UserPayload } from '@app/common';
 import type { CourierAdapter } from '../adapters/courier-adapter.interface';

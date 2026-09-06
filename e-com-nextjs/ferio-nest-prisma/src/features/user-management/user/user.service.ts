@@ -3,13 +3,13 @@ import { Prisma, PrismaClient } from '@prisma/client';
 
 import { RedisService } from '@app/redis';
 import { PrismaService } from '@app/database';
-import { scopedRedisKey } from '../../../tenancy/redis-keys.util';
+import { scopedRedisKey } from '../../../tenancy/utils/redis-keys.util';
 import { USER_CACHE_CONFIG } from './user.constants';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import {
   resolveTenantDatabase,
   TenantDbService,
-} from '../../../tenancy/tenant-db.service';
+} from '../../../tenancy/services/tenant-db.service';
 
 const publicUserSelect = {
   id: true,

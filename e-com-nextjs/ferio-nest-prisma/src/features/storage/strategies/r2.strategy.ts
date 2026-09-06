@@ -51,7 +51,7 @@ interface FileUploadResult {
 import {
   assertTenantObjectKey,
   tenantObjectKey,
-} from '../../../tenancy/object-keys.util';
+} from '../../../tenancy/utils/object-keys.util';
 
 export function sanitizeStoragePath(value: string, fallback = 'misc'): string {
   const segments = value

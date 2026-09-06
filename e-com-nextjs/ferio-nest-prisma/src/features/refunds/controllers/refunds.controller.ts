@@ -8,7 +8,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { TenantMembershipGuard } from '../../../tenancy/tenant-membership.guard';
+import { TenantMembershipGuard } from '../../../tenancy/guards/tenant-membership.guard';
 import {
   AuthGuard,
   PERMISSIONS,

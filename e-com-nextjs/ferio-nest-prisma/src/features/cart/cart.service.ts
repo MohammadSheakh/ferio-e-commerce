@@ -8,11 +8,11 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '@app/database';
 import { Optional } from '@nestjs/common';
 import type { PrismaClient } from '@prisma/client';
-import { assertTenantCommerceWritable } from '../../tenancy/commerce-write-guard.util';
+import { assertTenantCommerceWritable } from '../../tenancy/utils/commerce-write-guard.util';
 import {
   resolveTenantDatabase,
   TenantDbService,
-} from '../../tenancy/tenant-db.service';
+} from '../../tenancy/services/tenant-db.service';
 import { ConfigService } from '@nestjs/config';
 import { errorMessage } from '@app/common';
 import { AddCartItemDto, UpdateCartItemDto } from './cart.dto';

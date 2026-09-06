@@ -2,7 +2,7 @@ import { Injectable, Optional } from '@nestjs/common';
 import { AuditSource, Prisma, type PrismaClient } from '@prisma/client';
 import type { UserPayload } from '@app/common';
 import { PrismaService } from '@app/database';
-import { TenantDbService } from '../../../tenancy/tenant-db.service';
+import { TenantDbService } from '../../../tenancy/services/tenant-db.service';
 import { AuditLogQueryDto } from '../dto/audit.dto';
 import { safeAuditJson } from '../utils/audit.util';
 

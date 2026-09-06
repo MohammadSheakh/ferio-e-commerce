@@ -11,7 +11,7 @@ import { ShippingService } from '../shipping/services/shipping.service';
 import {
   resolveTenantDatabase,
   TenantDbService,
-} from '../../tenancy/tenant-db.service';
+} from '../../tenancy/services/tenant-db.service';
 import type { PrismaClient } from '@prisma/client';
 
 type DependencyProbe = {

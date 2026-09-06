@@ -5,7 +5,7 @@ import { PrismaService } from '@app/database';
 import {
   resolveTenantDatabase,
   TenantDbService,
-} from '../../../tenancy/tenant-db.service';
+} from '../../../tenancy/services/tenant-db.service';
 import { PurchaseActivityQueryDto } from '../purchase-activity.dto';
 import { maskPurchaseCustomerName } from '../utils/purchase-activity.util';
 

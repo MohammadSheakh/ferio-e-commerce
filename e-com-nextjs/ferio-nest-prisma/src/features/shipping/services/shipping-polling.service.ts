@@ -10,7 +10,7 @@ import { PrismaService } from '@app/database';
 import {
   resolveTenantDatabase,
   TenantDbService,
-} from '../../../tenancy/tenant-db.service';
+} from '../../../tenancy/services/tenant-db.service';
 import { toTenantJsonInput } from '../../../core/database/json-input.util';
 import { ShippingService } from './shipping.service';
 

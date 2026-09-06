@@ -7,7 +7,7 @@ import { PrismaService } from '@app/database';
 import {
   resolveTenantDatabase,
   TenantDbService,
-} from '../../tenancy/tenant-db.service';
+} from '../../tenancy/services/tenant-db.service';
 import { toTenantJsonInput } from '../../core/database/json-input.util';
 import { CreateStorefrontAnalyticsEventDto } from './storefront-analytics.dto';
 import { CommerceSettingsService } from '../settings/services/commerce-settings.service';

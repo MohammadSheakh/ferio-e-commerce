@@ -2,7 +2,7 @@ import { SocketGateway } from '../gateway/socket.gateway';
 import {
   runWithTenantContext,
   type TenantContext,
-} from '../../../tenancy/tenant-context';
+} from '../../../tenancy/context/tenant-context';
 
 function tenantContext(organizationId: string): TenantContext {
   return Object.freeze({

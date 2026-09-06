@@ -5,7 +5,7 @@ import { DeviceType } from './enums/TDevice.enum';
 import {
   resolveTenantDatabase,
   TenantDbService,
-} from '../../../tenancy/tenant-db.service';
+} from '../../../tenancy/services/tenant-db.service';
 
 /**
  * UserDevices Service

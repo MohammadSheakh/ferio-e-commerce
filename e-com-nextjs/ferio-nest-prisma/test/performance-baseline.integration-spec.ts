@@ -19,9 +19,9 @@
  */
 import { Pool } from 'pg';
 
-import { TenantSchemaBootstrapper } from '../src/tenancy/tenant-schema.bootstrapper';
-import { TenantDatabaseManager } from '../src/tenancy/tenant-database.manager';
-import type { ResolvedTenant } from '../src/tenancy/tenant-resolver.service';
+import { TenantSchemaBootstrapper } from '../src/tenancy/services/tenant-schema.bootstrapper';
+import { TenantDatabaseManager } from '../src/tenancy/services/tenant-database.manager';
+import type { ResolvedTenant } from '../src/tenancy/services/tenant-resolver.service';
 import { encryptSecret } from '../src/platform/utils/secret-box';
 
 const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL;
@@ -142,7 +142,7 @@ function resolverHarness(controlPlaneOk: boolean) {
   };
   const {
     TenantResolverService,
-  } = require('../src/tenancy/tenant-resolver.service');
+  } = require('../src/tenancy/services/tenant-resolver.service');
   const service = new TenantResolverService(
     platform as never,
     new MiniRedis() as never,

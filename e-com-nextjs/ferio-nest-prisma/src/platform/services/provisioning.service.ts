@@ -10,7 +10,7 @@ import { PlatformAuditService } from './platform-audit.service';
 import { OrganizationsService } from './organizations.service';
 import { DomainsService } from './domains.service';
 import { TenantDatabasesService } from './tenant-databases.service';
-import { TenantSchemaBootstrapper } from '../../tenancy/tenant-schema.bootstrapper';
+import { TenantSchemaBootstrapper } from '../../tenancy/services/tenant-schema.bootstrapper';
 import { LocalPostgresProvisioner } from './local-postgres-provisioner';
 import type { TenantDatabaseProvisioner } from './tenant-database-provisioner.interface';
 import { toPlatformJsonInput } from '../utils/json-input.util';

@@ -11,7 +11,7 @@ import { PrismaService } from '@app/database';
 import {
   resolveTenantDatabase,
   TenantDbService,
-} from '../../tenancy/tenant-db.service';
+} from '../../tenancy/services/tenant-db.service';
 import { timingSafeEqual } from 'crypto';
 import { normalizeBangladeshPhone } from '../checkout/utils/checkout.util';
 import {

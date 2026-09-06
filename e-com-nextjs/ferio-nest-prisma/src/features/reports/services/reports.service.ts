@@ -6,7 +6,7 @@ import { PrismaService } from '@app/database';
 import {
   resolveTenantDatabase,
   TenantDbService,
-} from '../../../tenancy/tenant-db.service';
+} from '../../../tenancy/services/tenant-db.service';
 import { randomUUID } from 'node:crypto';
 import { ReportQueryDto } from '../dto/report-query.dto';
 import { csvCell, maskExportName, reportPeriod } from '../utils/report.util';

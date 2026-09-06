@@ -173,3 +173,19 @@ This wave intentionally did not flatten the established submodule structures
 under authentication, chatting, checkout, or user-management. Those folders
 already express bounded subdomains and should be renamed or decomposed only as
 an atomic dependency migration, not as a cosmetic bulk move.
+
+## Tenancy Bounded-Context Refactor
+
+- Refactored `src/tenancy` from a mixed root containing runtime files and
+  colocated specs into explicit NestJS role folders:
+  `controllers/`, `services/`, `guards/`, `queues/`, `processors/`,
+  `utils/`, `context/`, `errors/`, and `tests/`.
+- Kept `tenancy.module.ts` at the bounded-context root so the module remains
+  the composition boundary and is easy to discover.
+- Moved all tenancy specs into `tests/`, including controller, guard, service,
+  utility, worker-boundary, and integration-facing unit contracts.
+- Updated all feature, platform, application, and integration-test imports;
+  routes, provider tokens, class names, and runtime behavior were unchanged.
+- Verification: tenancy tests passed with 16 suites and 111 tests; application
+  typecheck, architecture boundary check, strict source lint, Prettier, and
+  `git diff --check` passed.

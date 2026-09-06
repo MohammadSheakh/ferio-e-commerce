@@ -1,7 +1,7 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { createHash, randomInt, timingSafeEqual } from 'crypto';
 import { RedisService } from '@app/redis';
-import { scopedRedisKey } from '../../../tenancy/redis-keys.util';
+import { scopedRedisKey } from '../../../tenancy/utils/redis-keys.util';
 import { OtpType } from './interfaces/otp-payload.interface';
 import { StructuredLogger } from '@app/common';
 

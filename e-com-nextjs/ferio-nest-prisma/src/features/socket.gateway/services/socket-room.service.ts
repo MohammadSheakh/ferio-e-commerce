@@ -7,10 +7,10 @@ import { PrismaService } from '@app/database';
 import {
   resolveTenantDatabase,
   TenantDbService,
-} from '../../../tenancy/tenant-db.service';
+} from '../../../tenancy/services/tenant-db.service';
 import type { PrismaClient } from '@prisma/client';
-import { tryGetTenantContext } from '../../../tenancy/tenant-context';
-import { TenantFanoutService } from '../../../tenancy/tenant-fanout.service';
+import { tryGetTenantContext } from '../../../tenancy/context/tenant-context';
+import { TenantFanoutService } from '../../../tenancy/services/tenant-fanout.service';
 import { scopedSocketRoom } from './socket-auth.service';
 import { errorMessage } from '@app/common';
 

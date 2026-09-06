@@ -1,7 +1,7 @@
 import type { PrismaClient } from '@prisma/client';
-import type { TenantFanoutService } from '../../../tenancy/tenant-fanout.service';
-import { tryGetTenantContext } from '../../../tenancy/tenant-context';
-import { TenantDbService } from '../../../tenancy/tenant-db.service';
+import type { TenantFanoutService } from '../../../tenancy/services/tenant-fanout.service';
+import { tryGetTenantContext } from '../../../tenancy/context/tenant-context';
+import { TenantDbService } from '../../../tenancy/services/tenant-db.service';
 import {
   ConflictException,
   Injectable,

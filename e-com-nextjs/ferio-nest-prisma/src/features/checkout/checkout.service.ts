@@ -11,7 +11,7 @@ import type { PrismaClient } from '@prisma/client';
 import {
   resolveTenantDatabase,
   TenantDbService,
-} from '../../tenancy/tenant-db.service';
+} from '../../tenancy/services/tenant-db.service';
 import { ConfigService } from '@nestjs/config';
 import type { UserPayload } from '@app/common';
 import { CartService } from '../cart/cart.service';

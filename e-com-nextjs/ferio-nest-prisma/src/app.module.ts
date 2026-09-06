@@ -25,7 +25,7 @@ import { CommercePaymentsModule } from './features/commerce-payments/commerce-pa
 import { NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { PlatformModule } from './platform/platform.module';
 import { TenancyModule } from './tenancy/tenancy.module';
-import { TenantContextMiddleware } from './tenancy/tenant-resolver.service';
+import { TenantContextMiddleware } from './tenancy/services/tenant-resolver.service';
 import { ProductContentModule } from './features/product-content/product-content.module';
 import { ServiceBookingModule } from './features/service-booking/service-booking.module';
 import { WarrantyModule } from './features/warranty/warranty.module';

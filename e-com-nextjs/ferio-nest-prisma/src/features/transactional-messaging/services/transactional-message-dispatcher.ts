@@ -9,7 +9,7 @@ import { MessageAdapterRegistry } from '../adapters/message-adapter.registry';
 import {
   resolveTenantDatabase,
   TenantDbService,
-} from '../../../tenancy/tenant-db.service';
+} from '../../../tenancy/services/tenant-db.service';
 import { toTenantJsonInput } from '../../../core/database/json-input.util';
 
 @Injectable()

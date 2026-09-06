@@ -14,8 +14,8 @@ import { PrismaService } from '@app/database';
 import {
   resolveTenantDatabase,
   TenantDbService,
-} from '../../tenancy/tenant-db.service';
-import { tryGetTenantContext } from '../../tenancy/tenant-context';
+} from '../../tenancy/services/tenant-db.service';
+import { tryGetTenantContext } from '../../tenancy/context/tenant-context';
 import type { UserPayload } from '@app/common';
 import { CartService } from '../cart/cart.service';
 import { TransactionalMessagingService } from '../transactional-messaging/services/transactional-messaging.service';

@@ -9,7 +9,7 @@ import {
 import {
   UsageReconciliationService,
   UsageReconciliationReport,
-} from '../../tenancy/usage-reconciliation.service';
+} from '../../tenancy/services/usage-reconciliation.service';
 
 type UsagePlatform = {
   client: {

@@ -8,11 +8,11 @@ import { PrismaService } from '@app/database';
 import {
   resolveTenantDatabase,
   TenantDbService,
-} from '../../tenancy/tenant-db.service';
+} from '../../tenancy/services/tenant-db.service';
 import { Prisma, type PrismaClient } from '@prisma/client';
 import { AuditService } from '../audit/services/audit.service';
 import type { UserPayload } from '@app/common';
-import { assertTenantCommerceWritable } from '../../tenancy/commerce-write-guard.util';
+import { assertTenantCommerceWritable } from '../../tenancy/utils/commerce-write-guard.util';
 import type {
   CheckStoreAvailabilityDto,
   CreateStoreLocationDto,

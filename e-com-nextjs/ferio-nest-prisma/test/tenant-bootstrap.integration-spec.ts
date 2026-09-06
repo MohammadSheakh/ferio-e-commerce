@@ -11,7 +11,7 @@
  *      a product written to tenant A is invisible to tenant B.
  */
 import { Pool } from 'pg';
-import { TenantSchemaBootstrapper } from '../src/tenancy/tenant-schema.bootstrapper';
+import { TenantSchemaBootstrapper } from '../src/tenancy/services/tenant-schema.bootstrapper';
 
 const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL;
 

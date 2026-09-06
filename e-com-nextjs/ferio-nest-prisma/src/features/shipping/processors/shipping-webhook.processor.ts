@@ -2,7 +2,7 @@ import { Processor, WorkerHost } from '@nestjs/bullmq';
 import type { Job } from 'bullmq';
 import { QUEUE_NAMES } from '@app/queue';
 import { Optional } from '@nestjs/common';
-import { TenantFanoutService } from '../../../tenancy/tenant-fanout.service';
+import { TenantFanoutService } from '../../../tenancy/services/tenant-fanout.service';
 import { runWithCorrelationId, StructuredLogger } from '@app/common';
 import { ShippingService } from '../services/shipping.service';
 import {

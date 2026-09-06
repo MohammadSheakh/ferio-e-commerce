@@ -38,7 +38,7 @@ import {
 } from '@app/common';
 import type { UserPayload } from '@app/common';
 import { SETTINGS_RATE_LIMITS } from '../constants/settings.cache.constants';
-import { TenantMembershipGuard } from '../../../tenancy/tenant-membership.guard';
+import { TenantMembershipGuard } from '../../../tenancy/guards/tenant-membership.guard';
 
 @Controller('settings')
 @ApiTags('Settings')

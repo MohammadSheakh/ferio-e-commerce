@@ -7,7 +7,7 @@ import {
   Optional,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { tryGetTenantContext } from '../../tenancy/tenant-context';
+import { tryGetTenantContext } from '../../tenancy/context/tenant-context';
 import { Prisma, UserRole } from '@prisma/client';
 import type { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
@@ -17,7 +17,7 @@ import { PrismaService } from '@app/database';
 import {
   resolveTenantDatabase,
   TenantDbService,
-} from '../../tenancy/tenant-db.service';
+} from '../../tenancy/services/tenant-db.service';
 import { AuditService } from '../audit/services/audit.service';
 import { EmailService } from '../authentication/email/email.service';
 import { InviteStaffDto, UpdateStaffAccessDto } from './staff-access.dto';

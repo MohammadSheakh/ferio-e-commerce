@@ -1,6 +1,6 @@
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 import { PERMISSIONS_KEY, PERMISSIONS, ROLES_KEY } from '@app/common';
-import { TenantMembershipGuard } from '../../../tenancy/tenant-membership.guard';
+import { TenantMembershipGuard } from '../../../tenancy/guards/tenant-membership.guard';
 import {
   AdminProductRequestController,
   PublicProductRequestController,

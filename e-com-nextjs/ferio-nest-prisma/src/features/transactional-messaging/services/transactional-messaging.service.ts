@@ -12,7 +12,7 @@ import { PrismaService } from '@app/database';
 import {
   resolveTenantDatabase,
   TenantDbService,
-} from '../../../tenancy/tenant-db.service';
+} from '../../../tenancy/services/tenant-db.service';
 import { AuditService } from '../../audit/services/audit.service';
 import {
   TransactionalMessageQueryDto,

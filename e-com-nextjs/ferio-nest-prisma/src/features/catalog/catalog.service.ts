@@ -9,12 +9,12 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '@app/database';
 import type { PrismaClient } from '@prisma/client';
 import { Optional } from '@nestjs/common';
-import { assertTenantCommerceWritable } from '../../tenancy/commerce-write-guard.util';
+import { assertTenantCommerceWritable } from '../../tenancy/utils/commerce-write-guard.util';
 import {
   resolveTenantDatabase,
   TenantDbService,
-} from '../../tenancy/tenant-db.service';
-import { tryGetTenantContext } from '../../tenancy/tenant-context';
+} from '../../tenancy/services/tenant-db.service';
+import { tryGetTenantContext } from '../../tenancy/context/tenant-context';
 import type { UserPayload } from '@app/common';
 import { AuditService } from '../audit/services/audit.service';
 import {

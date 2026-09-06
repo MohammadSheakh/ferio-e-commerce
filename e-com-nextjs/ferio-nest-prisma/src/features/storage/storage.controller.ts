@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Inject, Post, UseGuards } from '@nestjs/common';
 import { AuthGuard, PermissionsGuard, Roles, RolesGuard } from '@app/common';
-import { TenantMembershipGuard } from '../../tenancy/tenant-membership.guard';
-import { assertTenantObjectKey } from '../../tenancy/object-keys.util';
+import { TenantMembershipGuard } from '../../tenancy/guards/tenant-membership.guard';
+import { assertTenantObjectKey } from '../../tenancy/utils/object-keys.util';
 import type { StorageStrategy } from './strategies/r2.strategy';
 
 /**

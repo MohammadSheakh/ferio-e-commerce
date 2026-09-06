@@ -30,9 +30,9 @@ import {
   USAGE_METRICS,
   usageMetricKeys,
 } from './services/usage-metrics.registry';
-import { UsageReconciliationService } from '../tenancy/usage-reconciliation.service';
-import { RetentionSweepService } from '../tenancy/retention-sweep.service';
-import { TenantSchemaBootstrapper } from '../tenancy/tenant-schema.bootstrapper';
+import { UsageReconciliationService } from '../tenancy/services/usage-reconciliation.service';
+import { RetentionSweepService } from '../tenancy/services/retention-sweep.service';
+import { TenantSchemaBootstrapper } from '../tenancy/services/tenant-schema.bootstrapper';
 import { JwtService } from '@nestjs/jwt';
 import {
   PlatformAuthGuard,

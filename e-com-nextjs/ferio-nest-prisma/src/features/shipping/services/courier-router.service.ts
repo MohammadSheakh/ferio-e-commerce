@@ -4,7 +4,7 @@ import { PrismaService } from '@app/database';
 import {
   resolveTenantDatabase,
   TenantDbService,
-} from '../../../tenancy/tenant-db.service';
+} from '../../../tenancy/services/tenant-db.service';
 import type { PrismaClient } from '@prisma/client';
 import { ConfigService } from '@nestjs/config';
 import { StructuredLogger } from '@app/common';
