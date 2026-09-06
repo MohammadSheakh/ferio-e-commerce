@@ -206,12 +206,34 @@ async function bootstrap() {
   app.enableShutdownHooks();
 
   // Handle process termination without handing an async callback to the
-  // EventEmitter, which does not observe rejected promises.
+  // EventEmitter, which does not observe rejected promises. A bounded
+  // deadline prevents a stuck dependency from blocking rolling deploys.
+  const shutdownTimeoutMs = boundedMilliseconds(
+    configService.get<string>('SHUTDOWN_TIMEOUT_MS'),
+    25_000,
+  );
+  let shuttingDown = false;
   const shutdown = async (signal: string): Promise<void> => {
+    if (shuttingDown) return;
+    shuttingDown = true;
     logger.log(`${signal} signal received: closing HTTP server`);
-    await app.close();
-    logger.log('HTTP server closed');
-    process.exit(0);
+    const deadline = setTimeout(() => {
+      logger.error(
+        `Shutdown exceeded ${shutdownTimeoutMs}ms; forcing process exit`,
+      );
+      process.exit(1);
+    }, shutdownTimeoutMs);
+    deadline.unref?.();
+    try {
+      await app.close();
+      logger.log('HTTP server closed');
+      process.exit(0);
+    } catch (error) {
+      logger.error(`Shutdown failed: ${sanitizeLogText(error)}`);
+      process.exit(1);
+    } finally {
+      clearTimeout(deadline);
+    }
   };
 
   process.on('SIGTERM', () => void shutdown('SIGTERM'));
@@ -240,3 +262,10 @@ bootstrap().catch((error) => {
   logger.error(`Failed to start application: ${sanitizeLogText(error)}`);
   process.exit(1);
 });
+
+function boundedMilliseconds(value: unknown, fallback: number): number {
+  const parsed = Number(value ?? fallback);
+  return Number.isSafeInteger(parsed) && parsed >= 1_000
+    ? Math.min(parsed, 120_000)
+    : fallback;
+}

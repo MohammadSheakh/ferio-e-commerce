@@ -88,11 +88,13 @@ services:
     expose:
       - "6733"
       - "6734"
+    stop_grace_period: 30s
     environment:
       DATABASE_URL: postgresql://ferio:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/ferio_dev
       PLATFORM_DATABASE_URL: postgresql://ferio:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/ferio_platform
       REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
       NODE_ENV: production
+      SHUTDOWN_TIMEOUT_MS: ${SHUTDOWN_TIMEOUT_MS:-25000}
       TENANCY_ENABLED: "true"
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?JWT_ACCESS_SECRET must be set}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET must be set}
