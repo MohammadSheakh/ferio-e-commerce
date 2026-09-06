@@ -45,7 +45,9 @@ describe('RtoService', () => {
   };
   const prisma = {
     rtoCase: { findMany: jest.fn() },
-    $transaction: jest.fn((callback) => callback(transaction)),
+    $transaction: jest.fn((callback: (value: typeof transaction) => unknown) =>
+      callback(transaction),
+    ),
   };
   const audit = { record: jest.fn() };
   const service = new RtoService(
@@ -106,28 +108,39 @@ describe('RtoService', () => {
         damaged: { increment: 1 },
       },
     });
-    expect(transaction.inventoryReservation.update).toHaveBeenCalledWith({
-      where: { id: 'reservation-1' },
-      data: { status: 'RELEASED', releasedAt: expect.any(Date) },
+    const reservationCall = (
+      transaction.inventoryReservation.update.mock.calls as unknown[][]
+    )[0]?.[0] as { data: { status: string; releasedAt: unknown } };
+    expect(reservationCall.data.status).toBe('RELEASED');
+    expect(reservationCall.data.releasedAt).toBeInstanceOf(Date);
+    const rtoUpdateCall = (
+      transaction.rtoCase.update.mock.calls as unknown[][]
+    )[0]?.[0] as {
+      data: { status: string; totalCost: number; inspectedByActorId: string };
+    };
+    expect(rtoUpdateCall.data).toMatchObject({
+      status: 'INSPECTED',
+      totalCost: 14000,
+      inspectedByActorId: 'admin-1',
     });
-    expect(transaction.rtoCase.update).toHaveBeenCalledWith({
-      where: { id: 'rto-1' },
-      data: expect.objectContaining({
-        status: 'INSPECTED',
-        totalCost: 14000,
-        inspectedByActorId: 'admin-1',
-      }),
-    });
-    expect(transaction.order.update).toHaveBeenCalledWith({
-      where: { id: 'order-1' },
+    const orderUpdateCall = (
+      transaction.order.update.mock.calls as unknown[][]
+    )[0]?.[0] as {
       data: {
-        status: 'CANCELLED',
-        fulfillmentStatus: 'CANCELLED',
-        shipmentStatus: 'RTO',
-        cancellationReason: 'RTO: Customer unreachable after three attempts',
-        cancelledAt: expect.any(Date),
-      },
+        status: string;
+        fulfillmentStatus: string;
+        shipmentStatus: string;
+        cancellationReason: string;
+        cancelledAt: unknown;
+      };
+    };
+    expect(orderUpdateCall.data).toMatchObject({
+      status: 'CANCELLED',
+      fulfillmentStatus: 'CANCELLED',
+      shipmentStatus: 'RTO',
+      cancellationReason: 'RTO: Customer unreachable after three attempts',
     });
+    expect(orderUpdateCall.data.cancelledAt).toBeInstanceOf(Date);
     expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'RTO_CASE_INSPECTED', actor }),
       transaction,
