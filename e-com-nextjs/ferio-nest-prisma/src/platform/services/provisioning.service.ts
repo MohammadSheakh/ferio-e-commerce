@@ -11,7 +11,6 @@ import { OrganizationsService } from './organizations.service';
 import { DomainsService } from './domains.service';
 import { TenantDatabasesService } from './tenant-databases.service';
 import { TenantSchemaBootstrapper } from '../../tenancy/services/tenant-schema.bootstrapper';
-import { LocalPostgresProvisioner } from './local-postgres-provisioner';
 import type { TenantDatabaseProvisioner } from './tenant-database-provisioner.interface';
 import { toPlatformJsonInput } from '../utils/json-input.util';
 
@@ -57,7 +56,7 @@ export class ProvisioningService {
     private readonly bootstrapper: TenantSchemaBootstrapper,
 
     @Inject('TENANT_DB_PROVISIONER')
-    private dbProvisioner: TenantDatabaseProvisioner,
+    private readonly dbProvisioner: TenantDatabaseProvisioner,
   ) {}
 
   /**
@@ -285,13 +284,8 @@ export class ProvisioningService {
     }
   }
 
-  private provisionerRef: TenantDatabaseProvisioner | null = null;
-
-  /** Physical creation boundary (PO-022): replace via DI when managed hosting lands. */
+  /** Physical creation boundary selected by the module's DI token. */
   private executor(): ProvisioningExecutor {
-    if (!this.dbProvisioner) {
-      this.dbProvisioner = new LocalPostgresProvisioner(this.platform);
-    }
     return this.dbProvisioner;
   }
 }

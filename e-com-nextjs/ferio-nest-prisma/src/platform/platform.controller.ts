@@ -76,6 +76,7 @@ export class PlatformAdminController {
     private readonly usage: UsageService,
     private readonly usageReconciliation: UsageReconciliationService,
     private readonly retentionSweep: RetentionSweepService,
+    private readonly tenantSchemaBootstrapper: TenantSchemaBootstrapper,
   ) {}
 
   @Post('organizations')
@@ -188,8 +189,7 @@ export class PlatformAdminController {
   @Get('database-health')
   @PlatformPermissions('organization:read')
   async databaseHealth() {
-    const bootstrapper = new TenantSchemaBootstrapper();
-    const migrations = bootstrapper.listMigrations();
+    const migrations = this.tenantSchemaBootstrapper.listMigrations();
     const canonicalHead = migrations.at(-1) ?? null;
     const rows = await this.platformPrisma.client.tenantDatabase.findMany({
       orderBy: { createdAt: 'asc' },
