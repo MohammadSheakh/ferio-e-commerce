@@ -73,6 +73,8 @@ jobs:
         run: pnpm architecture:check
       - name: Lint active application entrypoints
         run: pnpm lint:application
+      - name: Strict lint for the complete backend source tree
+        run: pnpm lint:strict:src
       - name: Apply tenant database migrations
         run: pnpm prisma:migrate:deploy
       - name: Apply platform database migrations
