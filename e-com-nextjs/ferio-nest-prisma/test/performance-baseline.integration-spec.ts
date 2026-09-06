@@ -337,6 +337,68 @@ conditionalDescribe(
       }
     }, 60_000);
 
+    it('keeps concurrent tenant database sessions inside the pool budget', async () => {
+      const previousPoolMax = process.env.TENANT_DB_POOL_MAX;
+      process.env.TENANT_DB_POOL_MAX = '2';
+      const manager = new TenantDatabaseManager();
+      const dbName = await createBareDatabase('ferio_perf_pool');
+      created.push(dbName);
+      const inspector = new Pool({
+        ...serverConfig(),
+        database: 'postgres',
+        max: 1,
+      });
+
+      try {
+        const material = materialFor(dbName);
+        const client = await manager.getClient(material);
+        const queryCount = 24;
+        let peakConnections = 0;
+        let polling = true;
+
+        const sampleConnections = async (): Promise<void> => {
+          while (polling) {
+            const result = await inspector.query<{ count: number }>(
+              `SELECT count(*)::int AS count
+               FROM pg_stat_activity
+               WHERE datname = $1 AND pid <> pg_backend_pid()`,
+              [dbName],
+            );
+            peakConnections = Math.max(
+              peakConnections,
+              result.rows[0]?.count ?? 0,
+            );
+            await new Promise<void>((resolve) => setTimeout(resolve, 5));
+          }
+        };
+
+        const sampler = sampleConnections();
+        await Promise.all(
+          Array.from(
+            { length: queryCount },
+            () => client.$queryRaw`SELECT pg_sleep(0.03)`,
+          ),
+        );
+        polling = false;
+        await sampler;
+
+        expect(peakConnections).toBeGreaterThan(0);
+        expect(peakConnections).toBeLessThanOrEqual(2);
+        evidence('perf_db_pool_bound', {
+          configuredPoolMax: 2,
+          queryCount,
+          peakConnections,
+        });
+      } finally {
+        polling = false;
+        await inspector.end().catch(() => undefined);
+        await manager.onModuleDestroy();
+        if (previousPoolMax === undefined)
+          delete process.env.TENANT_DB_POOL_MAX;
+        else process.env.TENANT_DB_POOL_MAX = previousPoolMax;
+      }
+    }, 60_000);
+
     it('bootstraps a fresh tenant database well inside the provisioning budget', async () => {
       const bootstrapper = new TenantSchemaBootstrapper();
       const dbName = await createBareDatabase('ferio_perf_boot');
