@@ -34,7 +34,7 @@ describe('ReportsService', () => {
   const prisma = { order: { findMany: jest.fn() } };
   const audit = {
     record: jest
-      .fn<(payload: unknown) => Promise<{ id: string }>>()
+      .fn<Promise<{ id: string }>, [unknown]>()
       .mockResolvedValue({ id: 'audit-1' }),
   };
   const service = new ReportsService(
@@ -197,7 +197,7 @@ describe('ReportsService', () => {
     expect(result.content).toContain('"\'+88017****3456"');
     expect(result.content).toContain('"[masked]"');
     expect(result.content).toContain("'=Road Bike");
-    const auditCalls = audit.record.mock.calls as unknown as Array<[unknown]>;
+    const auditCalls = audit.record.mock.calls;
     const auditPayload = auditCalls.at(-1)?.[0];
     expect(isRecord(auditPayload)).toBe(true);
     if (!isRecord(auditPayload)) return;

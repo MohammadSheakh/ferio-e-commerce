@@ -11,8 +11,8 @@ import { TenantDbService } from '../../../tenancy/tenant-db.service';
 /**
  * UserDevices Service
  * 
- * Manages user devices for push notifications
- * Extends GenericService for CRUD operations
+ * Manages user devices for push notifications through the tenant-aware
+ * Prisma boundary.
  */
 @Injectable()
 export class UserDevicesService {

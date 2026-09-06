@@ -1,12 +1,7 @@
 import { TenantFanoutService } from './tenant-fanout.service';
 import { getTenantContext } from './tenant-context';
 
-type Registry = ReturnType<typeof registry>;
 type TenantOperation = () => Promise<unknown>;
-type RunTransient = (
-  material: Registry,
-  operation: TenantOperation,
-) => Promise<unknown>;
 
 describe('TenantFanoutService (MT-8 §11.2)', () => {
   const originalEnv = { ...process.env };
@@ -24,6 +19,11 @@ describe('TenantFanoutService (MT-8 §11.2)', () => {
     username: 'u',
     credentialCipher: 'cipher',
   });
+  type Registry = ReturnType<typeof registry>;
+  type RunTransient = (
+    material: Registry,
+    operation: TenantOperation,
+  ) => Promise<unknown>;
 
   function build(registries: Registry[]) {
     type FindManyArgs = { cursor?: { id: string }; take: number };
@@ -62,7 +62,9 @@ describe('TenantFanoutService (MT-8 §11.2)', () => {
     const { service } = build([registry('org-1')]);
     const calls: string[] = [];
     await service.forEachTenant(
-      () => Promise.resolve().then(() => calls.push('run')),
+      () => Promise.resolve().then(() => {
+        calls.push('run');
+      }),
       { label: 'test' },
     );
     expect(calls).toEqual(['run']); // exactly one legacy run
@@ -73,10 +75,9 @@ describe('TenantFanoutService (MT-8 §11.2)', () => {
     const { service } = build([registry('org-1'), registry('org-2')]);
     const seen: string[] = [];
     const outcome = await service.forEachTenant(
-      () =>
-        Promise.resolve().then(() =>
-          seen.push(getTenantContext().organizationId),
-        ),
+      () => Promise.resolve().then(() => {
+        seen.push(getTenantContext().organizationId);
+      }),
       { label: 'test' },
     );
     expect(seen.sort()).toEqual(['org-1', 'org-2']);
@@ -147,10 +148,9 @@ describe('TenantFanoutService (MT-8 §11.2)', () => {
     });
     const seen: string[] = [];
     const outcome = await built.service.forEachTenant(
-      () =>
-        Promise.resolve().then(() =>
-          seen.push(getTenantContext().organizationId),
-        ),
+      () => Promise.resolve().then(() => {
+        seen.push(getTenantContext().organizationId);
+      }),
       { label: 'test' },
     );
     expect(seen).toEqual(['org-good']);

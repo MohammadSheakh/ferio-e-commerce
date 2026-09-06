@@ -12,8 +12,8 @@ import { TenantDbService } from '../../../tenancy/tenant-db.service';
 /**
  * OAuthAccount Service
  * 
- * Manages OAuth provider accounts linked to users
- * Extends GenericService for CRUD operations
+ * Manages OAuth provider accounts linked to users through the tenant-aware
+ * Prisma boundary.
  */
 @Injectable()
 export class OAuthAccountService {

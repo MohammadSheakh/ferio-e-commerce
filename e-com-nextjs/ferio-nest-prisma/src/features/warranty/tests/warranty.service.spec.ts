@@ -8,7 +8,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 describe('WarrantyService', () => {
   const prisma = {
     warrantyClaim: {
-      findMany: jest.fn<(query: unknown) => Promise<unknown[]>>(),
+      findMany: jest.fn<Promise<unknown[]>, [unknown]>(),
       count: jest.fn(),
     },
     $transaction: jest.fn((operations) => Promise.all(operations)),
@@ -37,9 +37,7 @@ describe('WarrantyService', () => {
       limit: 20,
       totalPages: 3,
     });
-    const calls = prisma.warrantyClaim.findMany.mock.calls as unknown as Array<
-      [unknown]
-    >;
+    const calls = prisma.warrantyClaim.findMany.mock.calls;
     const query = calls.at(-1)?.[0];
     expect(isRecord(query)).toBe(true);
     if (!isRecord(query)) return;

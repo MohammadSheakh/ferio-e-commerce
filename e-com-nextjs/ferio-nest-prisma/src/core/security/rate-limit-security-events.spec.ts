@@ -54,8 +54,8 @@ describe('rate-limit security events', () => {
       { multi: jest.fn().mockReturnValue(pipeline) } as never,
     );
     const logger = {
-      warn: jest.fn<(event: string, payload: unknown) => void>(),
-      error: jest.fn<(event: string, payload: unknown) => void>(),
+      warn: jest.fn<void, [string, unknown]>(),
+      error: jest.fn<void, [string, unknown]>(),
     };
     (guard as unknown as { logger: typeof logger }).logger = logger;
     const response = { set: jest.fn() };
@@ -71,9 +71,7 @@ describe('rate-limit security events', () => {
       HttpException,
     );
 
-    const warningCalls = logger.warn.mock.calls as unknown as Array<
-      [string, unknown]
-    >;
+    const warningCalls = logger.warn.mock.calls;
     const warningCall = warningCalls.at(-1);
     expect(warningCall?.[0]).toBe('authentication_rate_limit_exceeded');
     expect(isRecord(warningCall?.[1])).toBe(true);

@@ -35,9 +35,6 @@ export * from './constants/rate-limit.constants';
 export * from './constants/redis.constants';
 export * from './constants/permissions.constants';
 
-// Generic
-export * from './generic/generic.service';
-export * from './generic/generic.controller';
 export * from './utils/prisma.utils';
 export * from './utils/log-sanitizer';
 export * from './utils/request-context';
@@ -46,6 +43,3 @@ export * from './utils/tenant-metrics';
 export * from './utils/error-message';
 export * from './utils/error-code';
 export * from './utils/structured-logger';
-
-// Base
-// export * from './base/base.entity';

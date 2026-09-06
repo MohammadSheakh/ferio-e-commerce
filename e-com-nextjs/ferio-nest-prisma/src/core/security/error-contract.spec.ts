@@ -22,7 +22,7 @@ describe('machine-readable error contract', () => {
   });
 
   it('returns a stable code and correlation reference for validation errors', () => {
-    const json = jest.fn<(payload: unknown) => void>();
+    const json = jest.fn<void, [unknown]>();
     const status = jest.fn().mockReturnValue({ json });
     const host = {
       switchToHttp: () => ({
@@ -41,7 +41,7 @@ describe('machine-readable error contract', () => {
     );
 
     expect(status).toHaveBeenCalledWith(400);
-    const calls = json.mock.calls as unknown as Array<[unknown]>;
+    const calls = json.mock.calls;
     const payload = calls.at(-1)?.[0];
     expect(isRecord(payload)).toBe(true);
     if (!isRecord(payload)) return;
