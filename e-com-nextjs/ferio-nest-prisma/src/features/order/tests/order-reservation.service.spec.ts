@@ -100,9 +100,8 @@ describe('OrderService reservation rules', () => {
         referenceId: string;
       };
     };
-    const movementCalls = transaction.inventoryMovement.create.mock.calls as unknown as Array<
-      [MovementCall]
-    >;
+    const movementCalls = transaction.inventoryMovement.create.mock
+      .calls as unknown as Array<[MovementCall]>;
     expect(movementCalls[0][0].data).toMatchObject({
       inventoryId: 'stock-a',
       type: 'RESERVE',
@@ -171,10 +170,13 @@ describe('OrderService reservation rules', () => {
       where: { id: 'stock-d' },
       data: { reserved: { decrement: 2 } },
     });
-    const reservationUpdate = transaction.inventoryReservation.update.mock.calls[0] as unknown as [{
-      where: { id: string };
-      data: { status: string; releasedAt: Date };
-    }];
+    const reservationUpdate = transaction.inventoryReservation.update.mock
+      .calls[0] as unknown as [
+      {
+        where: { id: string };
+        data: { status: string; releasedAt: Date };
+      },
+    ];
     expect(reservationUpdate[0].where).toEqual({ id: 'reservation-1' });
     expect(reservationUpdate[0].data.status).toBe('RELEASED');
     expect(reservationUpdate[0].data.releasedAt).toBeInstanceOf(Date);

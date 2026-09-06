@@ -187,7 +187,10 @@ type ProductFixture = {
   sku: string;
 };
 
-async function createProduct(name: string, suffix: string): Promise<ProductFixture> {
+async function createProduct(
+  name: string,
+  suffix: string,
+): Promise<ProductFixture> {
   const category = await prisma.category.create({
     data: {
       name: `Activity ${suffix}`,
@@ -213,7 +216,12 @@ async function createProduct(name: string, suffix: string): Promise<ProductFixtu
       productId: product.id,
     },
   });
-  return { productId: product.id, variantId: variant.id, productName: name, sku };
+  return {
+    productId: product.id,
+    variantId: variant.id,
+    productName: name,
+    sku,
+  };
 }
 
 async function createOrder(

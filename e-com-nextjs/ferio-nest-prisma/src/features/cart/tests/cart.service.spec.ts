@@ -209,9 +209,8 @@ describe('CartService', () => {
         findFirst: jest.fn().mockResolvedValue(target),
         findUnique: jest.fn().mockResolvedValue(target),
       },
-      $transaction: jest.fn(
-        (callback: (tx: typeof transaction) => unknown) =>
-          Promise.resolve(callback(transaction)),
+      $transaction: jest.fn((callback: (tx: typeof transaction) => unknown) =>
+        Promise.resolve(callback(transaction)),
       ),
     } as unknown as PrismaService;
 
@@ -269,7 +268,9 @@ describe('CartService', () => {
         };
       };
     };
-    const call = findMany.mock.calls[0] as unknown as [{ where: EligibilityWhere }];
+    const call = findMany.mock.calls[0] as unknown as [
+      { where: EligibilityWhere },
+    ];
     const where = call[0].where;
     expect(where.status).toBe('ACTIVE');
     expect(where.userId).toEqual({ not: null });

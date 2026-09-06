@@ -66,9 +66,8 @@ describe('RefundsService', () => {
   const prisma = {
     commerceRefund: { findUnique: jest.fn(), findMany: jest.fn() },
     returnCase: { findUnique: jest.fn() },
-    $transaction: jest.fn(
-      (callback: (tx: typeof transaction) => unknown) =>
-        Promise.resolve(callback(transaction)),
+    $transaction: jest.fn((callback: (tx: typeof transaction) => unknown) =>
+      Promise.resolve(callback(transaction)),
     ),
   };
   const audit = { record: jest.fn() };
@@ -97,9 +96,12 @@ describe('RefundsService', () => {
       ),
     ).resolves.toBe(createdRefund);
 
-    const refundCreate = transaction.commerceRefund.create.mock.calls[0] as unknown as [{
-      data: RefundCreateData;
-    }];
+    const refundCreate = transaction.commerceRefund.create.mock
+      .calls[0] as unknown as [
+      {
+        data: RefundCreateData;
+      },
+    ];
     expect(refundCreate[0].data).toMatchObject({
       orderId: 'order-1',
       returnCaseId: 'return-1',
@@ -171,9 +173,12 @@ describe('RefundsService', () => {
       actor,
     );
 
-    const attemptCreate = transaction.refundAttempt.create.mock.calls[0] as unknown as [{
-      data: RefundAttemptData;
-    }];
+    const attemptCreate = transaction.refundAttempt.create.mock
+      .calls[0] as unknown as [
+      {
+        data: RefundAttemptData;
+      },
+    ];
     expect(attemptCreate[0].data).toMatchObject({
       refundId: 'refund-1',
       attemptNumber: 1,

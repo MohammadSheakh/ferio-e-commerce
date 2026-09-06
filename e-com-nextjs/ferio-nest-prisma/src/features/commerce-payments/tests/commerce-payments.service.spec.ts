@@ -48,9 +48,8 @@ describe('CommercePaymentsService', () => {
     checkoutDraft: {
       findUnique: jest.fn(),
     },
-    $transaction: jest.fn(
-      (callback: (tx: typeof transaction) => unknown) =>
-        Promise.resolve(callback(transaction)),
+    $transaction: jest.fn((callback: (tx: typeof transaction) => unknown) =>
+      Promise.resolve(callback(transaction)),
     ),
   };
   const config = {
@@ -140,16 +139,19 @@ describe('CommercePaymentsService', () => {
         total: 31,
         totalPages: 2,
       });
-      const listCall = prisma.commercePaymentAttempt.findMany.mock.calls[0] as unknown as [{
-        skip: number;
-        take: number;
-        where: {
-          provider: string;
-          status: string;
-          order: { paymentStatus: string; refundStatus: string };
-          OR?: unknown[];
-        };
-      }];
+      const listCall = prisma.commercePaymentAttempt.findMany.mock
+        .calls[0] as unknown as [
+        {
+          skip: number;
+          take: number;
+          where: {
+            provider: string;
+            status: string;
+            order: { paymentStatus: string; refundStatus: string };
+            OR?: unknown[];
+          };
+        },
+      ];
       expect(listCall[0].skip).toBe(30);
       expect(listCall[0].take).toBe(30);
       expect(listCall[0].where).toMatchObject({
@@ -179,9 +181,13 @@ describe('CommercePaymentsService', () => {
         validatedResponse?: unknown;
         callbacks: { select: { payload?: unknown } };
       };
-      const queryCall = prisma.commercePaymentAttempt.findUnique.mock.calls.at(-1) as unknown as [{
-        select: AttemptSelect;
-      }];
+      const queryCall = prisma.commercePaymentAttempt.findUnique.mock.calls.at(
+        -1,
+      ) as unknown as [
+        {
+          select: AttemptSelect;
+        },
+      ];
       const select = queryCall[0].select;
       expect(select).toBeDefined();
       expect(select).not.toHaveProperty('initiationRequest');
@@ -194,16 +200,16 @@ describe('CommercePaymentsService', () => {
   describe('initiate', () => {
     it('throws ConflictException if payment gateway is not configured', async () => {
       mockGateway.isConfigured.mockReturnValueOnce(false);
-      await expect(service.initiate('order-1', 'FER-1001', '+8801711111111', 'SSLCOMMERZ')).rejects.toThrow(
-        ConflictException,
-      );
+      await expect(
+        service.initiate('order-1', 'FER-1001', '+8801711111111', 'SSLCOMMERZ'),
+      ).rejects.toThrow(ConflictException);
     });
 
     it('throws NotFoundException if order does not exist', async () => {
       prisma.order.findUnique.mockResolvedValueOnce(null);
-      await expect(service.initiate('order-1', 'FER-1001', '+8801711111111', 'SSLCOMMERZ')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        service.initiate('order-1', 'FER-1001', '+8801711111111', 'SSLCOMMERZ'),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('throws ConflictException if order is not PREPAID or is already PAID', async () => {
@@ -215,9 +221,9 @@ describe('CommercePaymentsService', () => {
         address: { recipientName: 'John', phoneNormalized: '+8801711111111' },
         paymentAttempts: [],
       });
-      await expect(service.initiate('order-1', 'FER-1001', '+8801711111111', 'SSLCOMMERZ')).rejects.toThrow(
-        ConflictException,
-      );
+      await expect(
+        service.initiate('order-1', 'FER-1001', '+8801711111111', 'SSLCOMMERZ'),
+      ).rejects.toThrow(ConflictException);
     });
 
     it('creates payment attempt and returns redirect URL on successful initiation', async () => {
@@ -252,15 +258,22 @@ describe('CommercePaymentsService', () => {
         redirectUrl: 'https://sandbox.sslcommerz.com/pay/session123',
       });
 
-      const result = await service.initiate('order-1', 'FER-1001', '+8801711111111', 'SSLCOMMERZ');
+      const result = await service.initiate(
+        'order-1',
+        'FER-1001',
+        '+8801711111111',
+        'SSLCOMMERZ',
+      );
 
       expect(orders.preparePrepaidRetry).toHaveBeenCalled();
-      const initiationCall = mockGateway.initiate.mock.calls[0] as unknown as [{
-        merchantTransactionId: string;
-        amount: number;
-        currency: string;
-        orderReference: string;
-      }];
+      const initiationCall = mockGateway.initiate.mock.calls[0] as unknown as [
+        {
+          merchantTransactionId: string;
+          amount: number;
+          currency: string;
+          orderReference: string;
+        },
+      ];
       expect(initiationCall[0]).toMatchObject({
         amount: 150000,
         currency: 'BDT',

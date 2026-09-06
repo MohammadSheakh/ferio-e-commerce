@@ -25,13 +25,12 @@ import { JwtService } from '@nestjs/jwt';
 import { randomUUID } from 'node:crypto';
 
 import { SocketGateway } from '../src/features/socket.gateway/gateway/socket.gateway';
+import { SocketAuthService } from '../src/features/socket.gateway/services/socket-auth.service';
+import { SocketRoomService } from '../src/features/socket.gateway/services/socket-room.service';
 import {
-  SocketAuthService,
-} from '../src/features/socket.gateway/services/socket-auth.service';
-import {
-  SocketRoomService,
-} from '../src/features/socket.gateway/services/socket-room.service';
-import { runWithTenantContext, type TenantContext } from '../src/tenancy/tenant-context';
+  runWithTenantContext,
+  type TenantContext,
+} from '../src/tenancy/tenant-context';
 
 const SECRET = 'e2e-jwt-access-secret-for-socket-isolation-spec';
 process.env.JWT_ACCESS_SECRET = SECRET;
@@ -73,15 +72,33 @@ class RedisStub {
     n += this.hashes.delete(key) ? 1 : 0;
     return n;
   }
-  lpush() { return 1; }
-  ltrim() { return true; }
-  lrange(_key: string, _start: number, _stop: number) { return []; }
-  expire() { return 1; }
+  lpush() {
+    return 1;
+  }
+  ltrim() {
+    return true;
+  }
+  lrange(_key: string, _start: number, _stop: number) {
+    return [];
+  }
+  expire() {
+    return 1;
+  }
   multi() {
     const chain: Record<string, unknown> = {};
     for (const command of [
-      'sadd', 'srem', 'smembers', 'sismember', 'scard',
-      'hset', 'hgetall', 'del', 'lpush', 'ltrim', 'lrange', 'expire',
+      'sadd',
+      'srem',
+      'smembers',
+      'sismember',
+      'scard',
+      'hset',
+      'hgetall',
+      'del',
+      'lpush',
+      'ltrim',
+      'lrange',
+      'expire',
     ]) {
       chain[command] = (..._args: unknown[]) => chain;
     }
@@ -94,17 +111,22 @@ function prismaDouble() {
   type UserWhere = { id?: string };
   return {
     user: {
-      findUnique: jest.fn().mockImplementation(({ where }: { where: UserWhere }) =>
-        Promise.resolve(
-          where?.id === 'admin-shared'
-            ? { id: 'admin-shared', role: 'admin', name: 'Shared Admin' }
-            : null,
+      findUnique: jest
+        .fn()
+        .mockImplementation(({ where }: { where: UserWhere }) =>
+          Promise.resolve(
+            where?.id === 'admin-shared'
+              ? { id: 'admin-shared', role: 'admin', name: 'Shared Admin' }
+              : null,
+          ),
         ),
-      ),
       findFirst: jest.fn().mockResolvedValue(null),
     },
     deliveryPersonnel: { findUnique: jest.fn().mockResolvedValue(null) },
-    customer: { findFirst: jest.fn().mockResolvedValue(null), findUnique: jest.fn().mockResolvedValue(null) },
+    customer: {
+      findFirst: jest.fn().mockResolvedValue(null),
+      findUnique: jest.fn().mockResolvedValue(null),
+    },
     conversationParticipents: { findMany: jest.fn().mockResolvedValue([]) },
   };
 }
@@ -123,7 +145,9 @@ function connectClient(
   port: number,
   auth: Record<string, unknown>,
 ): Promise<WireClient> {
-  const ws = new WebSocket(`ws://127.0.0.1:${port}/socket.io/?EIO=4&transport=websocket`);
+  const ws = new WebSocket(
+    `ws://127.0.0.1:${port}/socket.io/?EIO=4&transport=websocket`,
+  );
   const received: Array<{ event: string; data: unknown }> = [];
   const waiters: Array<{
     event: string;
@@ -161,7 +185,11 @@ function connectClient(
       // namespace connect_error — surface it as a received marker
       dispatch(`42["io-connect-error",${frame.slice(2)}]`);
     } else {
-      if (process.env.DEBUG_SOCKET_FRAMES) console.log(`<< [${auth.organizationId ?? 'anon'}]`, frame.slice(0, 140));
+      if (process.env.DEBUG_SOCKET_FRAMES)
+        console.log(
+          `<< [${auth.organizationId ?? 'anon'}]`,
+          frame.slice(0, 140),
+        );
       dispatch(frame);
     }
   });
@@ -172,7 +200,9 @@ function connectClient(
   });
 
   return opened.then(() => ({
-    get id() { return id; },
+    get id() {
+      return id;
+    },
     rooms: async () => {
       throw new Error('server-side rooms are asserted separately');
     },
@@ -271,11 +301,19 @@ describe('Two-tenant live socket isolation (§10.11 multi-client E2E)', () => {
     // methods, not in the decorator registry.
     io.on('connection', (socket) => {
       const s = socket as never;
-      socket.on('join', (data: unknown, ack?: unknown) =>
-        void Promise.resolve(gateway.handleJoinRoom(s as never, data as never, ack as never)),
+      socket.on(
+        'join',
+        (data: unknown, ack?: unknown) =>
+          void Promise.resolve(
+            gateway.handleJoinRoom(s as never, data as never, ack as never),
+          ),
       );
-      socket.on('new-message-received', (data: unknown, ack?: unknown) =>
-        void Promise.resolve(gateway.handleNewMessage(s as never, data as never, ack as never)),
+      socket.on(
+        'new-message-received',
+        (data: unknown, ack?: unknown) =>
+          void Promise.resolve(
+            gateway.handleNewMessage(s as never, data as never, ack as never),
+          ),
       );
       void gateway.handleConnection(s).catch((error) => {
         console.log('HANDLE_CONNECTION_FAILED:', error?.message);
@@ -334,8 +372,12 @@ describe('Two-tenant live socket isolation (§10.11 multi-client E2E)', () => {
     expect(roomsA.has('role::admin')).toBe(false);
 
     expect(roomsB.has('org:org-b:role::admin')).toBe(true);
-    expect([...roomsB].some((room) => room.startsWith('org:org-a:'))).toBe(false);
-    expect([...roomsA].some((room) => room.startsWith('org:org-b:'))).toBe(false);
+    expect([...roomsB].some((room) => room.startsWith('org:org-a:'))).toBe(
+      false,
+    );
+    expect([...roomsA].some((room) => room.startsWith('org:org-b:'))).toBe(
+      false,
+    );
   });
 
   it('identical userIds across tenants receive only their own notifications', async () => {
@@ -345,14 +387,18 @@ describe('Two-tenant live socket isolation (§10.11 multi-client E2E)', () => {
     await runWithTenantContext(tenantContext('org-a'), () =>
       gateway.emitNotificationToUser('admin-shared', { from: 'org-a' }),
     );
-    const delivered = await adminA.waitFor<{ from: string }>('notification::admin-shared');
+    const delivered = await adminA.waitFor<{ from: string }>(
+      'notification::admin-shared',
+    );
     expect(delivered.from).toBe('org-a');
     await adminB.expectSilence('notification::admin-shared');
 
     await runWithTenantContext(tenantContext('org-b'), () =>
       gateway.emitNotificationToUser('admin-shared', { from: 'org-b' }),
     );
-    const deliveredB = await adminB.waitFor<{ from: string }>('notification::admin-shared');
+    const deliveredB = await adminB.waitFor<{ from: string }>(
+      'notification::admin-shared',
+    );
     expect(deliveredB.from).toBe('org-b');
   });
 
@@ -371,18 +417,20 @@ describe('Two-tenant live socket isolation (§10.11 multi-client E2E)', () => {
     const scopedForA = [...guestBRooms].filter((room) =>
       room.includes(conversationId),
     );
-    expect(
-      scopedForA.every((room) => room.startsWith('org:org-b:')),
-    ).toBe(true);
+    expect(scopedForA.every((room) => room.startsWith('org:org-b:'))).toBe(
+      true,
+    );
 
     // The correct same-org audience for a guest chat is that org's ADMIN
     // console (guests can only ever see their own conversation).
-        guestA.client.emitEvent('new-message-received', {
+    guestA.client.emitEvent('new-message-received', {
       conversationId,
       text: 'hello from org-a',
     });
 
-    const heardByOwnOrgAdmin = await adminA.waitFor<{ conversationId: string }>('new-message-received');
+    const heardByOwnOrgAdmin = await adminA.waitFor<{ conversationId: string }>(
+      'new-message-received',
+    );
     expect(heardByOwnOrgAdmin.conversationId).toBe(conversationId);
     await adminB.expectSilence('new-message-received');
     await guestB.client.expectSilence('new-message-received');

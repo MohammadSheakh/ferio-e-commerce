@@ -160,10 +160,12 @@ describe('AuthService token lifecycle', () => {
       service.login({ email: user.email, password: 'wrong-password' }),
     ).rejects.toBeInstanceOf(UnauthorizedException);
 
-    const updateCall = update.mock.calls[0] as unknown as [{
-      where: { id: string };
-      data: { failedLoginAttempts: number; lockUntil: Date };
-    }];
+    const updateCall = update.mock.calls[0] as unknown as [
+      {
+        where: { id: string };
+        data: { failedLoginAttempts: number; lockUntil: Date };
+      },
+    ];
     expect(updateCall[0].where).toEqual({ id: user.id });
     expect(updateCall[0].data.failedLoginAttempts).toBe(0);
     expect(updateCall[0].data.lockUntil).toBeInstanceOf(Date);

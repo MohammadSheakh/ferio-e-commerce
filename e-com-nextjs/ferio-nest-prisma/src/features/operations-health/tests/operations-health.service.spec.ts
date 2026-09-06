@@ -142,7 +142,9 @@ describe('OperationsHealthService', () => {
       expect(health.runtimeStatus).toBe('UNAVAILABLE');
       expect(health.launchReady).toBe(false);
       expect(health.launchBlockers).toHaveLength(4);
-      expect(health.dependencies.database.detail).toBe('PostgreSQL probe failed');
+      expect(health.dependencies.database.detail).toBe(
+        'PostgreSQL probe failed',
+      );
       expect(JSON.stringify(health)).not.toContain('secret queue error');
     } finally {
       if (previousTenancy === undefined) delete process.env.TENANCY_ENABLED;

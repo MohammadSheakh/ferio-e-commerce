@@ -62,9 +62,10 @@ describe('TenantFanoutService (MT-8 §11.2)', () => {
     const { service } = build([registry('org-1')]);
     const calls: string[] = [];
     await service.forEachTenant(
-      () => Promise.resolve().then(() => {
-        calls.push('run');
-      }),
+      () =>
+        Promise.resolve().then(() => {
+          calls.push('run');
+        }),
       { label: 'test' },
     );
     expect(calls).toEqual(['run']); // exactly one legacy run
@@ -75,9 +76,10 @@ describe('TenantFanoutService (MT-8 §11.2)', () => {
     const { service } = build([registry('org-1'), registry('org-2')]);
     const seen: string[] = [];
     const outcome = await service.forEachTenant(
-      () => Promise.resolve().then(() => {
-        seen.push(getTenantContext().organizationId);
-      }),
+      () =>
+        Promise.resolve().then(() => {
+          seen.push(getTenantContext().organizationId);
+        }),
       { label: 'test' },
     );
     expect(seen.sort()).toEqual(['org-1', 'org-2']);
@@ -148,9 +150,10 @@ describe('TenantFanoutService (MT-8 §11.2)', () => {
     });
     const seen: string[] = [];
     const outcome = await built.service.forEachTenant(
-      () => Promise.resolve().then(() => {
-        seen.push(getTenantContext().organizationId);
-      }),
+      () =>
+        Promise.resolve().then(() => {
+          seen.push(getTenantContext().organizationId);
+        }),
       { label: 'test' },
     );
     expect(seen).toEqual(['org-good']);

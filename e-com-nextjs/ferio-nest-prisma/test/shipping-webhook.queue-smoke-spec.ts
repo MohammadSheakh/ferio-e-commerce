@@ -15,7 +15,9 @@ import {
 const redisPort = Number(process.env.TEST_REDIS_PORT);
 const queuePrefix = process.env.TEST_QUEUE_PREFIX;
 if (!Number.isInteger(redisPort) || redisPort < 1 || redisPort === 6379) {
-  throw new Error('TEST_REDIS_PORT must use an isolated non-default Redis port');
+  throw new Error(
+    'TEST_REDIS_PORT must use an isolated non-default Redis port',
+  );
 }
 if (!queuePrefix?.startsWith('ferio:test:')) {
   throw new Error('TEST_QUEUE_PREFIX must start with ferio:test:');
@@ -33,7 +35,10 @@ const queue = new Queue<CourierCallbackJobData>(queueName, {
     removeOnFail: false,
   },
 });
-const queueEvents = new QueueEvents(queueName, { connection, prefix: queuePrefix });
+const queueEvents = new QueueEvents(queueName, {
+  connection,
+  prefix: queuePrefix,
+});
 const config = {
   get: jest.fn((key: string, fallback: string) => {
     const values: Record<string, string> = {
@@ -47,9 +52,9 @@ const config = {
 const prisma = {
   shipmentWebhookLog: {
     count: jest.fn().mockResolvedValue(1),
-    findMany: jest.fn().mockResolvedValue([
-      { id: 'log-scheduled', attemptCount: 1 },
-    ]),
+    findMany: jest
+      .fn()
+      .mockResolvedValue([{ id: 'log-scheduled', attemptCount: 1 }]),
     findUnique: jest.fn().mockResolvedValue({
       id: 'log-manual',
       authValid: true,
@@ -128,7 +133,9 @@ describe('Courier callback BullMQ runtime smoke', () => {
       'courier-callback-retry-log-scheduled-2',
     );
     expect(retryJob?.name).toBe(COURIER_CALLBACK_RETRY_JOB);
-    await expect(retryJob!.waitUntilFinished(queueEvents, 10000)).resolves.toEqual(
+    await expect(
+      retryJob!.waitUntilFinished(queueEvents, 10000),
+    ).resolves.toEqual(
       expect.objectContaining({ accepted: true, applied: true }),
     );
     expect(shipping.retryWebhookLog).toHaveBeenCalledTimes(2);

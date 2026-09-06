@@ -114,7 +114,11 @@ describe('ShippingWebhookQueue', () => {
   });
 
   it('queues and audits an operator retry', async () => {
-    const actor = { userId: 'admin-1', role: 'admin', email: 'admin@ferio.local' } as const;
+    const actor = {
+      userId: 'admin-1',
+      role: 'admin',
+      email: 'admin@ferio.local',
+    } as const;
 
     await expect(service.enqueueRetry('log-1', actor)).resolves.toEqual({
       callbackLogId: 'log-1',

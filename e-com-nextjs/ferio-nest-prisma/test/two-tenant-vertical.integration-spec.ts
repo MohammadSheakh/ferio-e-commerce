@@ -99,7 +99,13 @@ conditionalDescribe('Two-Tenant End-to-End Vertical Proof', () => {
 
   interface Tenant {
     dbName: string;
-    conn: { host: string; port: number; user: string; password: string; database: string };
+    conn: {
+      host: string;
+      port: number;
+      user: string;
+      password: string;
+      database: string;
+    };
     material: Material;
     context: TenantContext;
     token: string;
@@ -129,7 +135,15 @@ conditionalDescribe('Two-Tenant End-to-End Vertical Proof', () => {
       hostname: `${dbName}.ferio.test`,
       subscriptionStatus: 'ACTIVE' as const,
     }) as TenantContext;
-    return { dbName, conn, material, context, token: '', orderId: '', orderReference: '' };
+    return {
+      dbName,
+      conn,
+      material,
+      context,
+      token: '',
+      orderId: '',
+      orderReference: '',
+    };
   }
 
   async function inTenant<T>(
@@ -159,182 +173,203 @@ conditionalDescribe('Two-Tenant End-to-End Vertical Proof', () => {
     }
   });
 
-  it(
-    'runs catalog → cart → checkout → COD order → confirmation per tenant and proves cross-tenant impossibility',
-    async () => {
-      // ── Provision two scratch tenants through the canonical path ──
-      const dbA = await createScratchDatabase('ferio_vt_a');
-      const dbB = await createScratchDatabase('ferio_vt_b');
-      created.push(dbA, dbB);
-      const tA = tenantFrom(dbA);
-      const tB = tenantFrom(dbB);
-      await bootstrapper.bootstrap(tA.conn);
-      await bootstrapper.bootstrap(tB.conn);
-      await bootstrapper.seedBaseline({ ...tA.conn, organizationName: 'Tenant A' });
-      await bootstrapper.seedBaseline({ ...tB.conn, organizationName: 'Tenant B' });
+  it('runs catalog → cart → checkout → COD order → confirmation per tenant and proves cross-tenant impossibility', async () => {
+    // ── Provision two scratch tenants through the canonical path ──
+    const dbA = await createScratchDatabase('ferio_vt_a');
+    const dbB = await createScratchDatabase('ferio_vt_b');
+    created.push(dbA, dbB);
+    const tA = tenantFrom(dbA);
+    const tB = tenantFrom(dbB);
+    await bootstrapper.bootstrap(tA.conn);
+    await bootstrapper.bootstrap(tB.conn);
+    await bootstrapper.seedBaseline({
+      ...tA.conn,
+      organizationName: 'Tenant A',
+    });
+    await bootstrapper.seedBaseline({
+      ...tB.conn,
+      organizationName: 'Tenant B',
+    });
 
-      // Seed a delivery zone + district so preview can resolve shipping.
-      for (const conn of [tA.conn, tB.conn]) {
-        const pool = new Pool({ ...conn, max: 1 });
-        await pool.query(
-          `INSERT INTO "DeliveryZone" ("id", "name", "deliveryFee", "freeDeliveryThreshold", "isActive", "createdAt", "updatedAt")
+    // Seed a delivery zone + district so preview can resolve shipping.
+    for (const conn of [tA.conn, tB.conn]) {
+      const pool = new Pool({ ...conn, max: 1 });
+      await pool.query(
+        `INSERT INTO "DeliveryZone" ("id", "name", "deliveryFee", "freeDeliveryThreshold", "isActive", "createdAt", "updatedAt")
            VALUES ('zone-dhaka', 'Dhaka Zone', 60, 100000, true, now(), now())
-           ON CONFLICT ("id") DO NOTHING`
-        );
-        await pool.query(
-          `INSERT INTO "DeliveryZoneDistrict" ("id", "zoneId", "name", "normalizedName", "createdAt", "updatedAt")
-           VALUES ('dzd-dhaka', 'zone-dhaka', 'Dhaka', 'dhaka', now(), now())
-           ON CONFLICT ("id") DO NOTHING`
-        );
-        await pool.end();
-      }
-
-      // Shared service instances: tenant resolution is ambient per call.
-      const catalog = new CatalogService({} as never, auditStub as never, tenantDb);
-      const carts = new CartService({} as never, configStub as never, tenantDb);
-      const checkout = new CheckoutService({} as never, carts, auditStub as never, configStub as never, tenantDb);
-      const orders = new OrderService(
-        {} as never,
-        carts,
-        autoStub() as never,
-        auditStub as never,
-        configStub as never,
-        autoStub() as never,
-        autoStub() as never,
-        tenantDb,
+           ON CONFLICT ("id") DO NOTHING`,
       );
-      const riders = new DeliveryPersonnelService({} as never, auditStub as never, tenantDb);
+      await pool.query(
+        `INSERT INTO "DeliveryZoneDistrict" ("id", "zoneId", "name", "normalizedName", "createdAt", "updatedAt")
+           VALUES ('dzd-dhaka', 'zone-dhaka', 'Dhaka', 'dhaka', now(), now())
+           ON CONFLICT ("id") DO NOTHING`,
+      );
+      await pool.end();
+    }
 
-      const adminActor = {
-        userId: 'admin-e2e',
-        email: 'admin@ferio.test',
-        role: 'admin',
-      };
+    // Shared service instances: tenant resolution is ambient per call.
+    const catalog = new CatalogService(
+      {} as never,
+      auditStub as never,
+      tenantDb,
+    );
+    const carts = new CartService({} as never, configStub as never, tenantDb);
+    const checkout = new CheckoutService(
+      {} as never,
+      carts,
+      auditStub as never,
+      configStub as never,
+      tenantDb,
+    );
+    const orders = new OrderService(
+      {} as never,
+      carts,
+      autoStub() as never,
+      auditStub as never,
+      configStub as never,
+      autoStub() as never,
+      autoStub() as never,
+      tenantDb,
+    );
+    const riders = new DeliveryPersonnelService(
+      {} as never,
+      auditStub as never,
+      tenantDb,
+    );
 
-      // ── Identical catalog seeded into BOTH tenants ──
-      for (const tenant of [tA, tB]) {
-        await inTenant(tenant, async () => {
-          const category = await catalog.createCategory(
-            { name: 'Shared Category' } as never,
-            adminActor as never,
-          );
-          await catalog.createProduct(
-            {
-              name: 'Shared Product',
-              description: 'Identical product seeded into every tenant',
-              categoryId: category.id,
-              status: 'ACTIVE',
-              publishedAt: new Date(),
-              variants: [
-                { sku: 'SKU-SHARED', name: 'Default', price: 150000, initialStock: 5 },
-              ],
-            } as never,
-            adminActor as never,
-          );
+    const adminActor = {
+      userId: 'admin-e2e',
+      email: 'admin@ferio.test',
+      role: 'admin',
+    };
+
+    // ── Identical catalog seeded into BOTH tenants ──
+    for (const tenant of [tA, tB]) {
+      await inTenant(tenant, async () => {
+        const category = await catalog.createCategory(
+          { name: 'Shared Category' } as never,
+          adminActor as never,
+        );
+        await catalog.createProduct(
+          {
+            name: 'Shared Product',
+            description: 'Identical product seeded into every tenant',
+            categoryId: category.id,
+            status: 'ACTIVE',
+            publishedAt: new Date(),
+            variants: [
+              {
+                sku: 'SKU-SHARED',
+                name: 'Default',
+                price: 150000,
+                initialStock: 5,
+              },
+            ],
+          } as never,
+          adminActor as never,
+        );
+      });
+    }
+
+    // ── Guest carts: independent tokens per tenant ──
+    for (const tenant of [tA, tB]) {
+      await inTenant(tenant, async () => {
+        const variant = await (
+          await tenantDb.get()
+        ).productVariant.findFirstOrThrow({
+          select: { id: true },
         });
-      }
-
-      // ── Guest carts: independent tokens per tenant ──
-      for (const tenant of [tA, tB]) {
-        await inTenant(tenant, async () => {
-          const variant = await (
-            await tenantDb.get()
-          ).productVariant.findFirstOrThrow({
-            select: { id: true },
-          });
-          const added = await carts.addItem(
-            { variantId: variant.id, quantity: 2 },
-            undefined,
-          );
-          tenant.token = added.cartToken!;
-        });
-      }
-      expect(tA.token).toBeTruthy();
-      expect(tB.token).toBeTruthy();
-
-      // ── Checkout drafts from identical inputs ──
-      for (const tenant of [tA, tB]) {
-        await inTenant(tenant, () =>
-          checkout.preview(
-            {
-              name: 'E2E Customer',
-              phone: '01712345678',
-              district: 'Dhaka',
-              area: 'Gulshan',
-              detailedAddress: 'House 1, Road 1',
-              paymentMethod: 'COD',
-              termsAccepted: true,
-            } as never,
-            tenant.token,
-          ),
+        const added = await carts.addItem(
+          { variantId: variant.id, quantity: 2 },
+          undefined,
         );
-      }
+        tenant.token = added.cartToken!;
+      });
+    }
+    expect(tA.token).toBeTruthy();
+    expect(tB.token).toBeTruthy();
 
-      // ── Place COD orders with the SAME idempotency key ──
-      for (const tenant of [tA, tB]) {
-        await inTenant(tenant, async () => {
-          const confirmation = await orders.placeOrder(
-            'COD',
-            tenant.token,
-            'IDEM-SHARED-ACROSS-TENANTS-0123456789',
-            adminActor as never,
-          );
-          tenant.orderReference = confirmation.reference;
-          tenant.orderId = confirmation.id;
-        });
-      }
-      expect(tA.orderId).not.toBe(tB.orderId);
+    // ── Checkout drafts from identical inputs ──
+    for (const tenant of [tA, tB]) {
+      await inTenant(tenant, () =>
+        checkout.preview(
+          {
+            name: 'E2E Customer',
+            phone: '01712345678',
+            district: 'Dhaka',
+            area: 'Gulshan',
+            detailedAddress: 'House 1, Road 1',
+            paymentMethod: 'COD',
+            termsAccepted: true,
+          } as never,
+          tenant.token,
+        ),
+      );
+    }
 
-      // ── Cross-tenant impossibility: references cannot leak ──
-      const poolA = new Pool({ ...tA.conn, max: 1 });
-      const poolB = new Pool({ ...tB.conn, max: 1 });
-      try {
-        const refInB = await poolB.query(
-          `SELECT id FROM "Order" WHERE reference = $1`,
-          [tA.orderReference],
+    // ── Place COD orders with the SAME idempotency key ──
+    for (const tenant of [tA, tB]) {
+      await inTenant(tenant, async () => {
+        const confirmation = await orders.placeOrder(
+          'COD',
+          tenant.token,
+          'IDEM-SHARED-ACROSS-TENANTS-0123456789',
+          adminActor as never,
         );
-        const refInA = await poolA.query(
-          `SELECT id FROM "Order" WHERE reference = $1`,
-          [tB.orderReference],
-        );
-        expect(refInB.rowCount).toBe(0);
-        expect(refInA.rowCount).toBe(0);
+        tenant.orderReference = confirmation.reference;
+        tenant.orderId = confirmation.id;
+      });
+    }
+    expect(tA.orderId).not.toBe(tB.orderId);
 
-        // Confirmation in A reserves ONLY A's stock (COD policy ALWAYS keeps
-        // placement unreserved; confirmation mints the active reservation).
-        // Must run inside A's tenant context — no ambient scope here.
-        await inTenant(tA, () =>
-          orders.confirmOrder(tA.orderId, {} as never, adminActor as never),
-        );
+    // ── Cross-tenant impossibility: references cannot leak ──
+    const poolA = new Pool({ ...tA.conn, max: 1 });
+    const poolB = new Pool({ ...tB.conn, max: 1 });
+    try {
+      const refInB = await poolB.query(
+        `SELECT id FROM "Order" WHERE reference = $1`,
+        [tA.orderReference],
+      );
+      const refInA = await poolA.query(
+        `SELECT id FROM "Order" WHERE reference = $1`,
+        [tB.orderReference],
+      );
+      expect(refInB.rowCount).toBe(0);
+      expect(refInA.rowCount).toBe(0);
 
-        const reservedAfter = await poolA.query(
-          `SELECT COALESCE(SUM("reserved"),0)::int AS r FROM "InventoryStock"`,
-        );
-        const reservedAfterB = await poolB.query(
-          `SELECT COALESCE(SUM("reserved"),0)::int AS r FROM "InventoryStock"`,
-        );
+      // Confirmation in A reserves ONLY A's stock (COD policy ALWAYS keeps
+      // placement unreserved; confirmation mints the active reservation).
+      // Must run inside A's tenant context — no ambient scope here.
+      await inTenant(tA, () =>
+        orders.confirmOrder(tA.orderId, {} as never, adminActor as never),
+      );
 
-        // A's reservation state stays tenant-local: B remains at zero even
-        // though both tenants seeded identical catalog identifiers.
-        expect(reservedAfter.rows[0].r).toBe(2);
-        expect(reservedAfterB.rows[0].r).toBe(0);
+      const reservedAfter = await poolA.query(
+        `SELECT COALESCE(SUM("reserved"),0)::int AS r FROM "InventoryStock"`,
+      );
+      const reservedAfterB = await poolB.query(
+        `SELECT COALESCE(SUM("reserved"),0)::int AS r FROM "InventoryStock"`,
+      );
 
-        // ── Guest-cart token scoping: A's token is meaningless in B ──
-        const foreignCart = await inTenant(tB, () => carts.getCart(tA.token));
-        expect((foreignCart as { id?: string | null }).id ?? null).toBeNull();
+      // A's reservation state stays tenant-local: B remains at zero even
+      // though both tenants seeded identical catalog identifiers.
+      expect(reservedAfter.rows[0].r).toBe(2);
+      expect(reservedAfterB.rows[0].r).toBe(0);
 
-        // ── Rider in B cannot act on A's order ──
-        await expect(
-          inTenant(tB, () =>
-            riders.updateDeliveryOrderStatus('rider-B', tA.orderId, {
-              status: 'DELIVERED',
-            } as never),
-          ),
-        ).rejects.toBeInstanceOf(NotFoundException);
-      } finally {
-        await Promise.all([poolA.end(), poolB.end()]);
-      }
-    },
-    300_000,
-  );
+      // ── Guest-cart token scoping: A's token is meaningless in B ──
+      const foreignCart = await inTenant(tB, () => carts.getCart(tA.token));
+      expect((foreignCart as { id?: string | null }).id ?? null).toBeNull();
+
+      // ── Rider in B cannot act on A's order ──
+      await expect(
+        inTenant(tB, () =>
+          riders.updateDeliveryOrderStatus('rider-B', tA.orderId, {
+            status: 'DELIVERED',
+          } as never),
+        ),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    } finally {
+      await Promise.all([poolA.end(), poolB.end()]);
+    }
+  }, 300_000);
 });

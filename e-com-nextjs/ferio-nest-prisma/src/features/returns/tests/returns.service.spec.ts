@@ -44,9 +44,8 @@ describe('ReturnsService review', () => {
     inventoryMovement: { create: jest.fn() },
   };
   const prisma = {
-    $transaction: jest.fn(
-      (callback: (tx: typeof transaction) => unknown) =>
-        Promise.resolve(callback(transaction)),
+    $transaction: jest.fn((callback: (tx: typeof transaction) => unknown) =>
+      Promise.resolve(callback(transaction)),
     ),
   };
   const audit = { record: jest.fn() };
@@ -83,9 +82,12 @@ describe('ReturnsService review', () => {
       where: { id: 'item-1' },
       data: { approvedQuantity: 2 },
     });
-    const historyCreate = transaction.returnStatusHistory.create.mock.calls[0] as unknown as [{
-      data: ReturnStatusHistoryData;
-    }];
+    const historyCreate = transaction.returnStatusHistory.create.mock
+      .calls[0] as unknown as [
+      {
+        data: ReturnStatusHistoryData;
+      },
+    ];
     expect(historyCreate[0].data).toMatchObject({
       oldStatus: 'REQUESTED',
       newStatus: 'APPROVED',
@@ -166,9 +168,12 @@ describe('ReturnsService review', () => {
       where: { id: 'stock-1' },
       data: { onHand: { increment: 2 }, damaged: undefined },
     });
-    const returnMovement = transaction.inventoryMovement.create.mock.calls[0] as unknown as [{
-      data: ReturnMovementData;
-    }];
+    const returnMovement = transaction.inventoryMovement.create.mock
+      .calls[0] as unknown as [
+      {
+        data: ReturnMovementData;
+      },
+    ];
     expect(returnMovement[0].data).toMatchObject({
       type: 'RETURN',
       quantityDelta: 2,
@@ -270,9 +275,12 @@ describe('ReturnsService review', () => {
         damaged: { increment: 1 },
       },
     });
-    const damageMovement = transaction.inventoryMovement.create.mock.calls[0] as unknown as [{
-      data: ReturnMovementData;
-    }];
+    const damageMovement = transaction.inventoryMovement.create.mock
+      .calls[0] as unknown as [
+      {
+        data: ReturnMovementData;
+      },
+    ];
     expect(damageMovement[0].data).toMatchObject({
       type: 'DAMAGE',
       quantityDelta: 1,

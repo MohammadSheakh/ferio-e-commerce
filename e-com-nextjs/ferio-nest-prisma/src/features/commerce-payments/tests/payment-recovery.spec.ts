@@ -19,9 +19,8 @@ describe('payment expiry recovery', () => {
       },
     };
     const prisma = {
-      $transaction: jest.fn(
-        (callback: (tx: typeof transaction) => unknown) =>
-          Promise.resolve(callback(transaction)),
+      $transaction: jest.fn((callback: (tx: typeof transaction) => unknown) =>
+        Promise.resolve(callback(transaction)),
       ),
     };
     const orders = {
@@ -44,9 +43,12 @@ describe('payment expiry recovery', () => {
       transaction,
       'order-1',
     );
-    const updateCall = transaction.commercePaymentAttempt.updateMany.mock.calls[0] as unknown as [{
-      data: { status: string };
-    }];
+    const updateCall = transaction.commercePaymentAttempt.updateMany.mock
+      .calls[0] as unknown as [
+      {
+        data: { status: string };
+      },
+    ];
     expect(updateCall[0].data.status).toBe('EXPIRED');
     expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({

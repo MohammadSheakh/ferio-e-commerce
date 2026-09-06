@@ -53,7 +53,9 @@ describe('hosted payment adapters', () => {
       redirectUrl: 'https://sandbox.sslcommerz.com/pay',
       providerSessionId: 'session-1',
     });
-    const fetchMock = global.fetch as unknown as jest.MockedFunction<typeof fetch>;
+    const fetchMock = global.fetch as unknown as jest.MockedFunction<
+      typeof fetch
+    >;
     const request = fetchMock.mock.calls[0]?.[1];
     const body = request?.body;
     const requestBody =
@@ -95,8 +97,9 @@ describe('hosted payment adapters', () => {
       validationId: 'VAL-12345',
       riskLevel: '0',
     });
-    const validationRequest = (global.fetch as unknown as jest.MockedFunction<typeof fetch>)
-      .mock.calls[0]?.[1];
+    const validationRequest = (
+      global.fetch as unknown as jest.MockedFunction<typeof fetch>
+    ).mock.calls[0]?.[1];
     expect(validationRequest).toBeDefined();
     const headers = new Headers(validationRequest?.headers);
     expect(headers.get('X-Correlation-ID')).toEqual(expect.any(String));
@@ -127,8 +130,9 @@ describe('hosted payment adapters', () => {
       currency: 'BDT',
       providerTransactionId: 'AAM-1',
     });
-    const aamarpayCall = (global.fetch as unknown as jest.MockedFunction<typeof fetch>)
-      .mock.calls[0];
+    const aamarpayCall = (
+      global.fetch as unknown as jest.MockedFunction<typeof fetch>
+    ).mock.calls[0];
     expect(aamarpayCall?.[0]).toContain('/api/v1/trxcheck/request.php?');
     const aamarpayHeaders = new Headers(aamarpayCall?.[1]?.headers);
     expect(aamarpayHeaders.get('X-Correlation-ID')).toEqual(expect.any(String));

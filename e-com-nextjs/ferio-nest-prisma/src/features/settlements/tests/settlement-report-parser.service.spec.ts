@@ -43,7 +43,9 @@ describe('SettlementReportParserService', () => {
     expect(result.acceptedRowCount).toBe(1);
     expect(result.rejectedLineCount).toBe(0);
     expect(result.sourceChecksum).toMatch(/^[a-f0-9]{64}$/);
-    expect(result.warnings).toEqual(['Ignored unsupported headers: unused_column']);
+    expect(result.warnings).toEqual([
+      'Ignored unsupported headers: unused_column',
+    ]);
     expect(result.rows).toEqual([
       {
         providerRowReference: 'row-1',
