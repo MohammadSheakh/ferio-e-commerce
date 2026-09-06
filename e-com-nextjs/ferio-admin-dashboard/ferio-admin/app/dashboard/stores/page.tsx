@@ -205,7 +205,7 @@ export default function StoresPage() {
               🏪 Store Outlets Management
             </h1>
             <p className="text-sm text-ink2 mt-1">
-              Configure physical store locations available for customer "Pickup from Store" orders.
+              Configure physical store locations available for customer &quot;Pickup from Store&quot; orders.
             </p>
           </div>
           <div className="flex items-center gap-3">
