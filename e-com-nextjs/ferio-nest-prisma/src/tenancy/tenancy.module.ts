@@ -3,16 +3,16 @@ import { RedisModule, RedisService } from '@app/redis';
 import { JwtModule } from '@nestjs/jwt';
 import { BullModule } from '@nestjs/bullmq';
 import { QUEUE_NAMES } from '@app/queue';
-import {
-  RetentionQueue,
-  RETENTION_SWEEP_JOB,
-} from './retention.queue';
+import { RetentionQueue } from './retention.queue';
 import { RetentionProcessor } from './retention.processor';
 import { RetentionSweepService } from './retention-sweep.service';
 import { PlatformPrismaService } from '../platform/platform-prisma.service';
 import { TenancyController } from './tenancy.controller';
 import { TenancyPlanController } from './tenancy-plan.controller';
-import { TenantResolverService, TenantContextMiddleware } from './tenant-resolver.service';
+import {
+  TenantResolverService,
+  TenantContextMiddleware,
+} from './tenant-resolver.service';
 import { TenantDatabaseManager } from './tenant-database.manager';
 import { TenantDbService } from './tenant-db.service';
 import { TenantSchemaBootstrapper } from './tenant-schema.bootstrapper';
@@ -35,7 +35,7 @@ import { TenantReturnOriginService } from './tenant-return-origin.service';
   imports: [
     RedisModule,
     JwtModule.register({
-      secret: process.env.JWT_ACCESS_SECRET as string,
+      secret: process.env.JWT_ACCESS_SECRET ?? '',
     }),
     BullModule.registerQueue({
       name: QUEUE_NAMES.RETENTION,
@@ -50,7 +50,10 @@ import { TenantReturnOriginService } from './tenant-return-origin.service';
     TenantResolverService,
     {
       provide: TenantMembershipService,
-      useFactory: async (platform: PlatformPrismaService, redis: RedisService) => {
+      useFactory: async (
+        platform: PlatformPrismaService,
+        redis: RedisService,
+      ) => {
         const service = new TenantMembershipService(platform.client, redis);
         await service.initCrossInstanceInvalidation();
         return service;

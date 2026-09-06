@@ -2,13 +2,11 @@ import { Controller, Get, UseGuards, Req } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AuthGuard, type UserPayload } from '@app/common';
 import type { Request } from 'express';
-import {
-  TenantMembershipService,
-  TenantMembershipGuard,
-} from './tenant-membership.guard';
+import { TenantMembershipService } from './tenant-membership.guard';
 import { PlatformPrismaService } from '../platform/platform-prisma.service';
 import { EntitlementsService } from '../platform/services/entitlements.service';
 import { UsageService } from '../platform/services/usage.service';
+import { tryGetTenantContext } from './tenant-context';
 
 export interface TenantPlanStatusPayload {
   code: 'LEGACY' | 'ACTIVE' | 'TENANT_MEMBERSHIP_REQUIRED';
@@ -38,7 +36,9 @@ export class TenancyPlanController {
 
   @Get('my-plan')
   @UseGuards(AuthGuard)
-  async myPlan(@Req() request: Request & { user?: UserPayload }): Promise<TenantPlanStatusPayload> {
+  async myPlan(
+    @Req() request: Request & { user?: UserPayload },
+  ): Promise<TenantPlanStatusPayload> {
     if ((process.env.TENANCY_ENABLED || 'false') !== 'true') {
       return { code: 'LEGACY' };
     }
@@ -46,7 +46,10 @@ export class TenancyPlanController {
     if (!ctx) return { code: 'LEGACY' };
 
     const email = String(request.user?.email ?? '').toLowerCase();
-    const membership = await this.memberships.findActive(ctx.organizationId, email);
+    const membership = await this.memberships.findActive(
+      ctx.organizationId,
+      email,
+    );
     if (!membership) return { code: 'TENANT_MEMBERSHIP_REQUIRED' };
 
     const [subscription, domains, usage] = await Promise.all([
@@ -58,14 +61,18 @@ export class TenancyPlanController {
         where: { organizationId: ctx.organizationId, status: 'ACTIVE' },
         select: { hostname: true, status: true, isPrimary: true },
       }),
-      this.usage.snapshot(ctx.organizationId, ['orders_per_month', 'products_max']),
+      this.usage.snapshot(ctx.organizationId, [
+        'orders_per_month',
+        'products_max',
+      ]),
     ]);
 
     if (!subscription) return { code: 'LEGACY' };
 
     const limits: Record<string, number> = {};
     for (const entitlement of subscription.plan.entitlements) {
-      if (entitlement.limit != null) limits[entitlement.featureKey] = entitlement.limit;
+      if (entitlement.limit != null)
+        limits[entitlement.featureKey] = entitlement.limit;
     }
 
     return {
@@ -87,8 +94,6 @@ export class TenancyPlanController {
   }
 
   private context() {
-    // Imported lazily to keep this controller's dependency surface tiny.
-    const { tryGetTenantContext } = require('./tenant-context') as typeof import('./tenant-context');
     return tryGetTenantContext();
   }
 }

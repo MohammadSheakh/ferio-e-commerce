@@ -8,12 +8,15 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
+import type { Request } from 'express';
 
 export interface PlatformPrincipal {
   platformUserId: string;
   email: string;
   roles: string[];
 }
+
+type PlatformRequest = Request & { platformPrincipal?: PlatformPrincipal };
 
 /** Role → permission map; SUPERADMIN is the only wildcard realm role. */
 const ROLE_PERMISSIONS: Record<string, string[]> = {
@@ -71,7 +74,7 @@ export class PlatformAuthGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest();
+    const request = context.switchToHttp().getRequest<PlatformRequest>();
     const requestPath = String(request.path ?? request.url ?? '').split('?')[0];
     // Platform login is the credential-exchange endpoint and therefore cannot
     // require the platform bearer token it is responsible for issuing.
@@ -81,7 +84,16 @@ export class PlatformAuthGuard implements CanActivate {
     ) {
       return true;
     }
-    const header: string | undefined = request.headers?.authorization;
+    const authorization: unknown = request.headers.authorization;
+    const header =
+      typeof authorization === 'string'
+        ? authorization
+        : Array.isArray(authorization) &&
+            authorization.every(
+              (value): value is string => typeof value === 'string',
+            )
+          ? authorization[0]
+          : undefined;
     if (!header?.startsWith('Bearer ')) {
       throw new UnauthorizedException('PLATFORM_AUTH_REQUIRED');
     }

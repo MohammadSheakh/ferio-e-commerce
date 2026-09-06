@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { randomBytes } from 'crypto';
 import { PlatformPrismaService } from '../platform-prisma.service';
-import type { Pool } from 'pg';
+import { Pool } from 'pg';
 import {
   TenantDatabaseProvisioner,
   type CreatedTenantDatabase,
@@ -28,15 +28,18 @@ export class LocalPostgresProvisioner extends TenantDatabaseProvisioner {
     const url = process.env.PLATFORM_DATABASE_URL;
     if (!url) throw new Error('PLATFORM_DATABASE_URL_MISSING');
     const parsed = new URL(url);
-    const dbName = `ferio_tenant_${params.slug.replace(/-/g, '_')}_${randomBytes(2)
-      .toString('hex')}`;
+    const dbName = `ferio_tenant_${params.slug.replace(/-/g, '_')}_${randomBytes(
+      2,
+    ).toString('hex')}`;
     const dbPassword = randomBytes(18).toString('base64url');
     const roleName = `tenant_${params.organizationId.slice(-8)}`;
 
     const adminUrl = new URL(url);
     adminUrl.pathname = '/postgres';
-    const { Pool } = require('pg') as typeof import('pg');
-    const pool: Pool = new Pool({ connectionString: adminUrl.toString(), max: 1 });
+    const pool: Pool = new Pool({
+      connectionString: adminUrl.toString(),
+      max: 1,
+    });
     try {
       const quotedName = `"${dbName.replace(/"/g, '')}"`;
       await pool.query(`CREATE DATABASE ${quotedName}`);

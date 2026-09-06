@@ -6,11 +6,9 @@ import {
   Param,
   Post,
   Query,
-  Req,
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import type { Request } from 'express';
 import {
   PlatformAuthGuard,
   PlatformPermissions,
@@ -31,10 +29,16 @@ export class PlatformBillingController {
   @PlatformPermissions('saas_billing:write')
   ensureInvoice(
     @Body()
-    body: { organizationId: string; periodStart: string; periodEnd: string },
+    body: {
+      organizationId: string;
+      periodStart: string;
+      periodEnd: string;
+    },
   ) {
     if (!body.organizationId || !body.periodStart || !body.periodEnd) {
-      throw new BadRequestException('organizationId, periodStart, periodEnd required');
+      throw new BadRequestException(
+        'organizationId, periodStart, periodEnd required',
+      );
     }
     return this.billing.ensureInvoice({
       organizationId: body.organizationId,
@@ -72,10 +76,14 @@ export class PlatformBillingCallbackController {
     @Query('ref') ref: string,
     @Query('outcome') outcome: 'success' | 'fail' | 'cancel' | 'ipn',
     @Query('val_id') valId?: string,
-    @Req() _request?: Request,
   ): Promise<{ applied: boolean; duplicate?: boolean; paid?: boolean }> {
-    if (!ref || !outcome) throw new BadRequestException('CALLBACK_PARAMETERS_REQUIRED');
-    return this.billing.applyCallbackOutcome({ reference: ref, valId, outcome });
+    if (!ref || !outcome)
+      throw new BadRequestException('CALLBACK_PARAMETERS_REQUIRED');
+    return this.billing.applyCallbackOutcome({
+      reference: ref,
+      valId,
+      outcome,
+    });
   }
 
   @Post('callback')
