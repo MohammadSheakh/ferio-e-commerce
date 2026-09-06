@@ -75,6 +75,8 @@ jobs:
         run: pnpm lint:application
       - name: Strict lint for the complete backend source tree
         run: pnpm lint:strict:src
+      - name: Full backend lint (source, libraries, and tests)
+        run: pnpm lint
       - name: Apply tenant database migrations
         run: pnpm prisma:migrate:deploy
       - name: Apply platform database migrations
