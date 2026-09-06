@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { customerSessionFetch } from "@/lib/customer-session";
+import { getErrorMessage } from "@/lib/error-message";
 
 export async function GET() {
   try {
@@ -12,9 +13,9 @@ export async function GET() {
     }
     const payload = await sessionRes.response.json();
     return NextResponse.json(payload);
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
-      { message: error.message || "Failed to fetch saved carts." },
+      { message: getErrorMessage(error, "Failed to fetch saved carts.") },
       { status: 500 },
     );
   }

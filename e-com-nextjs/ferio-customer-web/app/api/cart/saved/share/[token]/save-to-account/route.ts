@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { customerSessionFetch } from "@/lib/customer-session";
+import { getErrorMessage } from "@/lib/error-message";
 
 export async function POST(
   _req: Request,
@@ -18,9 +19,14 @@ export async function POST(
     }
     const payload = await sessionRes.response.json();
     return NextResponse.json(payload);
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
-      { message: error.message || "Failed to copy shared cart to account." },
+      {
+        message: getErrorMessage(
+          error,
+          "Failed to copy shared cart to account.",
+        ),
+      },
       { status: 500 },
     );
   }

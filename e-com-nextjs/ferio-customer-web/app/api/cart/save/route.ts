@@ -3,6 +3,7 @@ import { customerSessionFetch, backendApiUrl } from "@/lib/customer-session";
 import { cookies } from "next/headers";
 import { withCorrelationId } from "@/lib/correlation";
 import { hostForwardHeadersFromRequest } from "@/lib/host-forward";
+import { getErrorMessage } from "@/lib/error-message";
 
 export async function POST(req: Request) {
   try {
@@ -36,9 +37,9 @@ export async function POST(req: Request) {
 
     const payload = await res.json();
     return NextResponse.json(payload, { status: res.status });
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
-      { message: error.message || "Failed to save cart." },
+      { message: getErrorMessage(error, "Failed to save cart.") },
       { status: 500 },
     );
   }
