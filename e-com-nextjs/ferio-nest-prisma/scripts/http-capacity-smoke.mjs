@@ -1,8 +1,15 @@
 #!/usr/bin/env node
 
-const target = process.env.CAPACITY_BASE_URL;
-if (!target) {
-  console.error('CAPACITY_BASE_URL is required');
+const targets = (
+  process.env.CAPACITY_BASE_URLS ??
+  process.env.CAPACITY_BASE_URL ??
+  ''
+)
+  .split(',')
+  .map((value) => value.trim())
+  .filter(Boolean);
+if (targets.length === 0) {
+  console.error('CAPACITY_BASE_URL or CAPACITY_BASE_URLS is required');
   process.exit(64);
 }
 
@@ -19,13 +26,19 @@ const requests = integerEnv('CAPACITY_REQUESTS', 1000, 1, 100_000);
 const concurrency = integerEnv('CAPACITY_CONCURRENCY', 50, 1, 1_000);
 const timeoutMs = integerEnv('CAPACITY_TIMEOUT_MS', 5_000, 100, 60_000);
 const latencies = [];
+const targetStats = new Map(
+  targets.map((target) => [target, { requests: 0, failures: 0 }]),
+);
 let startedRequests = 0;
 let completed = 0;
 let failures = 0;
 
 const startedAt = performance.now();
 
-async function requestOnce() {
+async function requestOnce(target) {
+  const stats = targetStats.get(target);
+  if (!stats) throw new Error(`Unknown capacity target: ${target}`);
+  stats.requests += 1;
   const started = performance.now();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -35,10 +48,14 @@ async function requestOnce() {
       headers: { accept: 'application/json' },
     });
     latencies.push(performance.now() - started);
-    if (!response.ok) failures += 1;
+    if (!response.ok) {
+      failures += 1;
+      stats.failures += 1;
+    }
   } catch {
     latencies.push(performance.now() - started);
     failures += 1;
+    stats.failures += 1;
   } finally {
     clearTimeout(timeout);
     completed += 1;
@@ -48,8 +65,9 @@ async function requestOnce() {
 async function worker() {
   while (true) {
     if (startedRequests >= requests) return;
+    const target = targets[startedRequests % targets.length];
     startedRequests += 1;
-    await requestOnce();
+    await requestOnce(target);
   }
 }
 
@@ -59,13 +77,18 @@ await Promise.all(
 
 latencies.sort((a, b) => a - b);
 const percentile = (ratio) =>
-  Math.round(latencies[Math.min(Math.floor(latencies.length * ratio), latencies.length - 1)] ?? 0);
+  Math.round(
+    latencies[
+      Math.min(Math.floor(latencies.length * ratio), latencies.length - 1)
+    ] ?? 0,
+  );
 const elapsedMs = Math.max(performance.now() - startedAt, 1);
 
 console.log(
   JSON.stringify({
     event: 'capacity_http_smoke',
-    target,
+    target: targets.length === 1 ? targets[0] : targets,
+    targetStats: Object.fromEntries(targetStats),
     requests,
     concurrency: Math.min(concurrency, requests),
     completed,
