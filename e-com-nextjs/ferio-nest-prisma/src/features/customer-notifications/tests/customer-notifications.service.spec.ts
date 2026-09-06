@@ -20,9 +20,7 @@ describe('CustomerNotificationsService', () => {
 
   it('lists only the authenticated customer notifications', async () => {
     prisma.notification.findMany.mockResolvedValueOnce([{ id: 'notice-1' }]);
-    prisma.notification.count
-      .mockResolvedValueOnce(1)
-      .mockResolvedValueOnce(3);
+    prisma.notification.count.mockResolvedValueOnce(1).mockResolvedValueOnce(3);
 
     await expect(service.list('user-1', 2, 10, true)).resolves.toMatchObject({
       items: [{ id: 'notice-1' }],
@@ -46,10 +44,20 @@ describe('CustomerNotificationsService', () => {
     await expect(service.markRead('user-1', 'notice-2')).rejects.toThrow(
       NotFoundException,
     );
-    expect(prisma.notification.updateMany).toHaveBeenCalledWith({
-      where: { id: 'notice-2', receiverId: 'user-1', isDeleted: false },
-      data: { isRead: true, readAt: expect.any(Date), status: 'read' },
+    const updateCall = (
+      prisma.notification.updateMany.mock.calls as unknown[][]
+    )[0]?.[0] as {
+      where: { id: string; receiverId: string; isDeleted: boolean };
+      data: { isRead: boolean; readAt: unknown; status: string };
+    };
+    expect(updateCall.where).toEqual({
+      id: 'notice-2',
+      receiverId: 'user-1',
+      isDeleted: false,
     });
+    expect(updateCall.data.isRead).toBe(true);
+    expect(updateCall.data.readAt).toBeInstanceOf(Date);
+    expect(updateCall.data.status).toBe('read');
   });
 
   it('soft-deletes only an owned notification', async () => {

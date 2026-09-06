@@ -82,19 +82,15 @@ describe('OperationsHealthService', () => {
 
     const health = await service.getHealth();
 
-    expect(health).toEqual(
-      expect.objectContaining({
-        runtimeStatus: 'HEALTHY',
-        launchReady: true,
-        launchBlockers: [],
-        requests: expect.objectContaining({ total: 1, p95DurationMs: 12 }),
-        commerce: expect.objectContaining({ available: true, ordersPlaced: 2 }),
-        backup: expect.objectContaining({
-          status: 'CURRENT',
-          restoreStatus: 'VERIFIED',
-        }),
-      }),
-    );
+    expect(health.runtimeStatus).toBe('HEALTHY');
+    expect(health.launchReady).toBe(true);
+    expect(health.launchBlockers).toEqual([]);
+    expect(health.requests).toMatchObject({ total: 1, p95DurationMs: 12 });
+    expect(health.commerce).toMatchObject({ available: true, ordersPlaced: 2 });
+    expect(health.backup).toMatchObject({
+      status: 'CURRENT',
+      restoreStatus: 'VERIFIED',
+    });
     expect(health.queues).toHaveLength(6);
   });
 
