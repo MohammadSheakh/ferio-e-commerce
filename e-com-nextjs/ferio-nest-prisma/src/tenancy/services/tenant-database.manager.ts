@@ -170,10 +170,18 @@ export class TenantDatabaseManager implements OnModuleDestroy {
     }
   }
 
-  async disconnect(tenantDatabaseId: string): Promise<void> {
+  async disconnect(
+    tenantDatabaseId: string,
+    reason: 'manual' | 'eviction' | 'shutdown' | 'transient' = 'manual',
+  ): Promise<void> {
     const entry = this.cache.get(tenantDatabaseId);
     if (!entry) return;
     this.cache.delete(tenantDatabaseId);
+    if (reason === 'eviction') {
+      TenantMetrics.increment('db_client_evicted', {
+        tenantDatabaseId,
+      });
+    }
     await entry.client.$disconnect().catch(() => undefined);
     await entry.pool.end().catch(() => undefined);
   }
@@ -213,7 +221,7 @@ export class TenantDatabaseManager implements OnModuleDestroy {
             entry.transientLeases === 0 &&
             entry.externalAccesses === 0
           ) {
-            await this.disconnect(material.id);
+            await this.disconnect(material.id, 'transient');
           }
         }
       }
@@ -241,17 +249,21 @@ export class TenantDatabaseManager implements OnModuleDestroy {
     try {
       while (this.cache.size + this.reservedSlots >= this.maxClients) {
         const oldestKey = this.cache.keys().next().value as string | undefined;
-        if (!oldestKey) throw new Error('TENANT_DATABASE_CAPACITY_EXHAUSTED');
+        if (!oldestKey) {
+          TenantMetrics.increment('db_capacity_exhausted');
+          throw new Error('TENANT_DATABASE_CAPACITY_EXHAUSTED');
+        }
         const oldest = this.cache.get(oldestKey);
         if (
           oldest &&
           (oldest.transientLeases > 0 ||
             Date.now() - oldest.lastUsedAt < this.evictionGraceMs)
         ) {
+          TenantMetrics.increment('db_capacity_exhausted');
           throw new Error('TENANT_DATABASE_CAPACITY_EXHAUSTED');
         }
         // Never disconnect a recently acquired client that may still be in use.
-        await this.disconnect(oldestKey);
+        await this.disconnect(oldestKey, 'eviction');
       }
       this.reservedSlots += 1;
     } finally {
@@ -263,7 +275,7 @@ export class TenantDatabaseManager implements OnModuleDestroy {
     const cutoff = Date.now() - this.idleTtlMs;
     for (const [id, entry] of this.cache) {
       if (entry.transientLeases === 0 && entry.lastUsedAt < cutoff) {
-        await this.disconnect(id);
+        await this.disconnect(id, 'eviction');
       }
     }
   }
@@ -315,7 +327,7 @@ export class TenantDatabaseManager implements OnModuleDestroy {
     clearInterval(this.sweepTimer);
     await Promise.allSettled([...this.creations.values()]);
     await Promise.allSettled(
-      [...this.cache.keys()].map((id) => this.disconnect(id)),
+      [...this.cache.keys()].map((id) => this.disconnect(id, 'shutdown')),
     );
   }
 }

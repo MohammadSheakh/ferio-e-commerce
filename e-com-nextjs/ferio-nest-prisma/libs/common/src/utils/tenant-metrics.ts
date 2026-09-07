@@ -18,6 +18,8 @@ export type TenantMetricName =
   | 'entitlement_denied'
   | 'db_acquire_failure'
   | 'db_breaker_opened'
+  | 'db_client_evicted'
+  | 'db_capacity_exhausted'
   | 'queue_tenant_failure'
   | 'migration_run_started'
   | 'migration_tenant_succeeded'

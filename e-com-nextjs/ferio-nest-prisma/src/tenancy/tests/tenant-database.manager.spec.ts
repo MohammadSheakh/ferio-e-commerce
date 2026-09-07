@@ -1,6 +1,7 @@
 import { TenantDatabaseManager } from '../services/tenant-database.manager';
 import { PrismaClient } from '@prisma/client';
 import { decryptSecret, encryptSecret } from '../../platform/utils/secret-box';
+import { TenantMetrics } from '@app/common';
 
 jest.mock('@prisma/client', () => ({
   PrismaClient: jest.fn().mockImplementation(() => ({
@@ -31,6 +32,7 @@ describe('TenantDatabaseManager (ADR-0003)', () => {
     process.env.TENANT_DB_IDLE_TTL_SECONDS = '300';
     process.env.TENANT_DB_EVICTION_GRACE_MS = '0';
     jest.clearAllMocks();
+    TenantMetrics.reset();
   });
 
   afterEach(() => {
@@ -183,6 +185,29 @@ describe('TenantDatabaseManager (ADR-0003)', () => {
     await manager.getClient(material('tdb-4')); // must evict tdb-2
 
     expect(manager.metrics().activeClients).toBe(3);
+    expect(TenantMetrics.snapshot().counters).toContainEqual(
+      expect.objectContaining({ name: 'db_client_evicted', value: 1 }),
+    );
+    await manager.onModuleDestroy();
+  });
+
+  it('records capacity exhaustion when every cached client is still active', async () => {
+    process.env.TENANT_DB_EVICTION_GRACE_MS = '60000';
+    const manager = newManager();
+
+    await Promise.all([
+      manager.getClient(material('tdb-active-1')),
+      manager.getClient(material('tdb-active-2')),
+      manager.getClient(material('tdb-active-3')),
+    ]);
+    expect(manager.metrics().activeClients).toBe(3);
+
+    await expect(manager.getClient(material('tdb-active-4'))).rejects.toThrow(
+      'TENANT_DATABASE_CAPACITY_EXHAUSTED',
+    );
+    expect(TenantMetrics.snapshot().counters).toContainEqual(
+      expect.objectContaining({ name: 'db_capacity_exhausted', value: 1 }),
+    );
     await manager.onModuleDestroy();
   });
 

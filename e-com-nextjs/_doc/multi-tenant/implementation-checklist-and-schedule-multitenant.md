@@ -301,18 +301,18 @@ Create a separate control-plane schema/database for platform metadata.
 
 ## 6.1 Tenant Prisma client manager
 
-- [ ] Implement a centralized tenant database connection manager.
-- [ ] Resolve DB connection only from trusted `TenantDatabase` control-plane metadata.
-- [ ] Encrypt tenant database credentials at rest.
-- [ ] Keep decrypted credentials out of normal logs/errors.
-- [ ] Add bounded client/connection caching.
-- [ ] Add idle eviction.
-- [ ] Add maximum active tenant-client limits.
-- [ ] Add connection acquisition timeout.
-- [ ] Add health-state handling for unavailable tenant DBs.
-- [ ] Prevent unbounded `new PrismaClient()` per request.
-- [ ] Add graceful application shutdown/disconnect.
-- [ ] Add metrics for active clients, evictions, acquisition failures, and pool exhaustion.
+- [x] Implement a centralized tenant database connection manager. (`TenantDatabaseManager` owns all tenant Prisma clients and PostgreSQL pools)
+- [x] Resolve DB connection only from trusted `TenantDatabase` control-plane metadata. (`TenantDbService` reads immutable `TenantContext.database`; request input never supplies connection material)
+- [x] Encrypt tenant database credentials at rest. (`secret-box` AES-256-GCM envelope)
+- [x] Keep decrypted credentials out of normal logs/errors. (decryption is scoped to pool construction and credentials are not included in structured errors)
+- [x] Add bounded client/connection caching. (single-flight client creation plus configurable LRU capacity)
+- [x] Add idle eviction. (bounded sweep with configurable idle TTL and eviction grace)
+- [x] Add maximum active tenant-client limits. (`TENANT_DB_MAX_CLIENTS` reservation gate)
+- [x] Add connection acquisition timeout. (`TENANT_DB_ACQUIRE_TIMEOUT_MS` bounds PostgreSQL pool acquisition)
+- [x] Add health-state handling for unavailable tenant DBs. (per-database circuit breaker with cooldown and fail-fast error)
+- [x] Prevent unbounded `new PrismaClient()` per request. (one cached client per registry ID with concurrent cold-start single-flight)
+- [x] Add graceful application shutdown/disconnect. (`OnModuleDestroy` drains creations and disconnects all pools)
+- [x] Add metrics for active clients, evictions, acquisition failures, and pool exhaustion. (`metrics()` plus bounded `TenantMetrics` events)
 - [ ] Design for PgBouncer/managed pooling if tenant count requires it.
 - [ ] Add a circuit-breaker/backoff strategy for repeatedly unhealthy tenant DBs.
 
