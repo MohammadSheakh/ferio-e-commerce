@@ -1,5 +1,4 @@
-import { readFile } from 'node:fs/promises';
-import { access } from 'node:fs/promises';
+import { access, readFile, readdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 const root = resolve(import.meta.dirname, '..');
@@ -30,6 +29,46 @@ const activeMongoSource = withoutComments(mongoModule);
 const activePlatformBillingSource = withoutComments(platformBilling);
 const violations = [];
 
+async function listControllerFiles(directory) {
+  const entries = await readdir(directory, { withFileTypes: true });
+  const files = [];
+  for (const entry of entries) {
+    const path = resolve(directory, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...(await listControllerFiles(path)));
+    } else if (entry.isFile() && entry.name.endsWith('.controller.ts')) {
+      files.push(path);
+    }
+  }
+  return files;
+}
+
+async function checkTenantAdminControllerGuards() {
+  const featureRoot = resolve(root, 'src/features');
+  const controllerFiles = await listControllerFiles(featureRoot);
+
+  for (const file of controllerFiles) {
+    const source = withoutComments(await readFile(file, 'utf8'));
+    const controllerPattern = /@Controller\(\s*(['"])(admin(?:\/|\1))/g;
+    for (const match of source.matchAll(controllerPattern)) {
+      const start = match.index ?? 0;
+      const nextController = source.indexOf('@Controller', start + 1);
+      const classDeclaration = source.indexOf('export class', start);
+      const endCandidates = [nextController, classDeclaration].filter(
+        (index) => index >= 0,
+      );
+      const end =
+        endCandidates.length > 0 ? Math.min(...endCandidates) : source.length;
+      const decoratorBlock = source.slice(start, end);
+      if (!decoratorBlock.includes('TenantMembershipGuard')) {
+        violations.push(
+          `${file.replace(`${root}/`, '')} exposes an admin controller without TenantMembershipGuard`,
+        );
+      }
+    }
+  }
+}
+
 if (/MongooseModule\s*\.\s*forRoot(?:Async)?\s*\(/.test(activeAppSource)) {
   violations.push('AppModule must not register a legacy Mongoose root connection');
 }
@@ -53,6 +92,8 @@ if (
     'platform billing must not import tenant-plane services or tenant database access',
   );
 }
+
+await checkTenantAdminControllerGuards();
 
 try {
   await access(resolve(root, '..', 'docker-compose.production.yml'));

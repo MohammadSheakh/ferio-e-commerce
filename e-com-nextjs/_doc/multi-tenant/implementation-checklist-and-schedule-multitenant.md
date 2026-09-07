@@ -285,7 +285,7 @@ Create a separate control-plane schema/database for platform metadata.
 - [ ] Define same-email behavior across independent tenant businesses.
 - [ ] Define whether customer identity is tenant-local initially.
 - [ ] Prevent a valid session from tenant A being replayed against tenant B.
-- [ ] **PARTIAL:** Bind Tenant Admin session authorization to resolved tenant membership. (`TenantMembershipGuard` shipped: legacy passthrough, cross-tenant replay denial, OWNER/STAFF roster lookup with 60s cache + invalidation; applied to `admin/catalog` as the proof point — remaining controllers sweep at MT-10 cutover)
+- [x] Bind Tenant Admin session authorization to resolved tenant membership. (`TenantMembershipGuard` covers all current `admin/*` controller classes; settings, delivery-personnel, conversations, and socket-ticket method-level routes have focused coverage; `architecture:check` fails on future unguarded admin controller classes)
 - [ ] Bind rider authorization to tenant + approved personnel record.
 - [ ] **PARTIAL:** Add negative tests for forged hosts and cross-tenant cookies/tokens. (unit suites cover forged/malformed hosts, unknown-domain fail-closed, cross-org session replay denial; full multi-client E2E remains MT-14)
 
