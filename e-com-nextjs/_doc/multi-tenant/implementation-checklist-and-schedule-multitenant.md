@@ -214,7 +214,7 @@ Create a separate control-plane schema/database for platform metadata.
 - [x] Implement subscription state machine. (trialing→active→past-due→suspended/cancelled with event history)
 - [x] Implement usage service. (atomic increment upserts, period-keyed snapshots)
 - [x] Implement provisioning orchestration service. (9-step idempotent state machine with database readiness and baseline smoke verification, resumable runs, pluggable executor)
-- [ ] **PARTIAL:** Implement tenant migration orchestration service. (run/result models + version stamping landed; BullMQ fleet runner lands in MT-11)
+- [x] Implement tenant migration orchestration service. (BullMQ-backed canary/batch runner with per-tenant results, transient retry, failure-threshold pause, and queued resume; physical 10-database validation remains a CI/operations gate)
 - [x] Implement support-access service. (reason-bound TTL grants, revoke, assert-active)
 - [x] Validate platform organization lifecycle mutations with dedicated DTOs. (organization creation, status transition, provisioning idempotency key, and closure requests use bounded runtime validation)
 - [x] Validate plan and subscription mutations with dedicated DTOs. (nested entitlement keys/limits, plan pricing/interval, trial duration, and subscription status transitions are bounded at the controller boundary)
@@ -371,7 +371,7 @@ Provisioning should behave as an idempotent state machine, not a controller scri
 - [x] Persist every provisioning step/result.
 - [x] Make retries resume safely. (resume-from-first-incomplete-step; idempotency-key replay returns completed runs)
 - [x] Prevent duplicate DB/domain creation on repeated requests. (unique org slug/domain hostname/registry orgId/idempotencyKey)
-- [ ] Add compensation/manual-recovery instructions for partial failure.
+- [ ] Add compensation/manual-recovery instructions for partial failure. (The resumable queue workflow is implemented; operator runbook and physical-provider cleanup actions remain.)
 
 ## 7.2 Tenant seed
 

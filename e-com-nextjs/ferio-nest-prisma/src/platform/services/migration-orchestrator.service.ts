@@ -108,11 +108,7 @@ export class MigrationOrchestratorService {
       failureThreshold,
     });
     TenantMetrics.increment('migration_run_started');
-    await this.migrationQueue.add(
-      TENANT_MIGRATION_RUN_JOB,
-      { migrationRunId: run.id },
-      { jobId: `t:${run.id}:migration-run`, attempts: 1 },
-    );
+    await this.enqueueRun(run.id);
     return { runId: run.id };
   }
 
@@ -281,8 +277,19 @@ export class MigrationOrchestratorService {
       where: { id: runId },
       data: { status: 'BATCHING' },
     });
-    await this.processRun(runId);
+    // Resumes must use the same queue boundary as initial runs. Running the
+    // fleet from an HTTP request would tie up the operator request and makes
+    // retries vulnerable to proxy/request timeouts.
+    await this.enqueueRun(runId);
     return { runId };
+  }
+
+  private enqueueRun(runId: string): Promise<unknown> {
+    return this.migrationQueue.add(
+      TENANT_MIGRATION_RUN_JOB,
+      { migrationRunId: runId },
+      { jobId: `t:${runId}:migration-run`, attempts: 1 },
+    );
   }
 
   async getRun(runId: string) {

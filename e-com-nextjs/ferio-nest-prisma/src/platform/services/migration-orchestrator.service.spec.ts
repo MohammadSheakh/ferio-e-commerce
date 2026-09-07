@@ -323,4 +323,28 @@ describe('MigrationOrchestratorService (MT-11 / ADR-0005)', () => {
       ).filter(([call]) => call.database === 'tdb-4'),
     ).toHaveLength(0);
   });
+
+  it('queues a paused-run resume instead of running the fleet in the HTTP request', async () => {
+    const built = build([
+      { id: 'tdb-1', organizationId: 'org-1', status: 'READY' },
+    ]);
+    built.runState['run-1'] = 'PAUSED';
+
+    await expect(built.service.resume('run-1')).resolves.toEqual({
+      runId: 'run-1',
+    });
+
+    expect(
+      built.platform.client.tenantMigrationRun.update,
+    ).toHaveBeenCalledWith({
+      where: { id: 'run-1' },
+      data: { status: 'BATCHING' },
+    });
+    expect(built.migrationQueue.add).toHaveBeenCalledWith(
+      'run-tenant-migration',
+      { migrationRunId: 'run-1' },
+      { jobId: 't:run-1:migration-run', attempts: 1 },
+    );
+    expect(built.bootstrapper.bootstrap).not.toHaveBeenCalled();
+  });
 });
