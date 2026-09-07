@@ -4,6 +4,10 @@ import { resolve } from 'node:path';
 
 const root = resolve(import.meta.dirname, '..');
 const appModule = await readFile(resolve(root, 'src/app.module.ts'), 'utf8');
+const platformBilling = await readFile(
+  resolve(root, 'src/platform/services/platform-billing.service.ts'),
+  'utf8',
+);
 let mongoModule = '';
 try {
   mongoModule = await readFile(
@@ -23,6 +27,7 @@ const withoutComments = (source) =>
 
 const activeAppSource = withoutComments(appModule);
 const activeMongoSource = withoutComments(mongoModule);
+const activePlatformBillingSource = withoutComments(platformBilling);
 const violations = [];
 
 if (/MongooseModule\s*\.\s*forRoot(?:Async)?\s*\(/.test(activeAppSource)) {
@@ -32,6 +37,20 @@ if (/MongooseModule\s*\.\s*forRoot(?:Async)?\s*\(/.test(activeAppSource)) {
 if (/MongooseModule\s*\.\s*forRoot(?:Async)?\s*\(/.test(activeMongoSource)) {
   violations.push(
     'src/core/database/mongo/mongodb.module.ts must not register a legacy Mongoose root connection',
+  );
+}
+
+if (
+  /from\s+['"][^'"]*(?:^|\/)tenancy(?:\/|['"])/m.test(
+    activePlatformBillingSource,
+  ) ||
+  /from\s+['"][^'"]*(?:^|\/)features(?:\/|['"])/m.test(
+    activePlatformBillingSource,
+  ) ||
+  /\bTenant(?:DbService|DatabaseManager)\b/.test(activePlatformBillingSource)
+) {
+  violations.push(
+    'platform billing must not import tenant-plane services or tenant database access',
   );
 }
 

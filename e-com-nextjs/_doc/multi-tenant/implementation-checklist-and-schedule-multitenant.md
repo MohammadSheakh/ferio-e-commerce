@@ -511,7 +511,7 @@ All surfaces live in the ferio-platform-admin console:
 - [ ] **PARTIAL:** Add retry/recovery. (failed sessions recorded with reasons and can be re-initiated as fresh attempts; automated recovery sweep pending)
 - [x] Add billing history.
 - [ ] Add manual/admin adjustment workflow with audit if required.
-- [ ] Never write SaaS subscription payments into tenant `Payment`, `Wallet`, COD, refund, or settlement records.
+- [x] Never write SaaS subscription payments into tenant `Payment`, `Wallet`, COD, refund, or settlement records. (`PlatformBillingService` depends only on the control-plane client/audit boundary; `architecture:check` now rejects tenant-plane imports or tenant database access in this service.)
 
 ## 9.4 Usage metering
 
@@ -537,7 +537,7 @@ All surfaces live in the ferio-platform-admin console:
 ### MT-6 gate
 
 - [x] One test tenant can subscribe/activate, hit a plan limit, upgrade, and unlock the capability. (subscription/trial activation covered by the subscriptions unit suite; `test/plan-limit-lifecycle.integration-spec.ts` proves the full enforcement loop against REAL PostgreSQL — placement succeeds under limit, third order denied server-side with PLAN_LIMIT_REACHED and zero partial state, upgrade unlocks without touching tenant rows, downgrade blocks again)
-- [ ] SaaS billing is financially and technically isolated from customer commerce billing.
+- [x] SaaS billing is financially and technically isolated from customer commerce billing. (Control-plane-only billing tests and the automated platform-billing import boundary prevent SaaS records from crossing into tenant commerce ledgers.)
 
 ---
 
