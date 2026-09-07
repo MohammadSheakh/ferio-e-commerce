@@ -940,12 +940,12 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 
 ## 14.1 Migration packaging
 
-- [ ] Define canonical tenant Prisma schema.
-- [ ] Define canonical migration artifact/version.
-- [ ] Record expected schema version in control plane.
+- [x] Define canonical tenant Prisma schema. (`prisma/schema.prisma` is built from the canonical tenant model sources and is distinct from `prisma/platform.prisma`)
+- [x] Define canonical migration artifact/version. (`prisma/migrations` is validated and `TenantSchemaBootstrapper` reports the completed migration head as the tenant schema version)
+- [x] Record expected schema version in control plane. (`TenantDatabase.schemaVersion` is stamped during provisioning and migration, and platform migration results retain from/to versions)
 - [ ] Make migration artifact immutable once released.
 - [ ] Add compatibility metadata if application version requires minimum schema version.
-- [ ] Separate control-plane migrations from tenant-plane migrations.
+- [x] Separate control-plane migrations from tenant-plane migrations. (`prisma/platform-migrations` and `prisma/migrations` have independent PostgreSQL locks, validation, and deployment commands)
 
 ## 14.2 Migration orchestrator
 
@@ -981,14 +981,14 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 - [ ] Migrate all successfully.
 - [ ] Inject one failing tenant.
 - [ ] Prove remaining tenants are handled according to rollout policy.
-- [ ] Prove retry after repair.
-- [ ] Prove schema-version reporting.
-- [ ] Prove app rejects/isolates incompatible tenant safely.
+- [x] Prove retry after repair. (`migration-orchestrator.service.spec.ts` retries transient failures and resumes failed results without re-running successful tenants)
+- [x] Prove schema-version reporting. (migration result rows, tenant registry views, provisioning evidence, and restore verification expose schema versions)
+- [x] Prove app rejects/isolates incompatible tenant safely. (resolver tests reject `MIGRATION_REQUIRED` before tenant request routing)
 
 ### MT-11 gate
 
 - [ ] Canary → batch → fleet migration works with one intentionally failing database.
-- [ ] Production deployment does not depend on manually migrating tenant DBs one by one.
+- [x] Production deployment does not depend on manually migrating tenant DBs one by one. (operator start enqueues one bounded canary/batch fleet job; workers record per-tenant results and support queued resume)
 
 ---
 
@@ -1029,13 +1029,13 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 - [ ] **PARTIAL:** Stop scheduled jobs. (fan-out skips non-ACTIVE orgs by query shape; explicit job-revocation sweep pending)
 - [x] Close DB connections. (registry RETIRED → connection manager refuses; graceful disconnect path exists)
 - [ ] **PARTIAL:** Archive/delete DB according to policy. (90-day recoverable window implemented per PO-013 — finalize refuses inside the window without operator override; registry retirement + CLOSED transition landed; physical destruction awaits hosting decision)
-- [ ] Prevent domain takeover after closure.
+- [x] Prevent domain takeover after closure. (closure disables all organization domains before the retention window; domain service tests preserve the disabled state and resolver fail-closed behavior)
 - [x] Preserve required platform billing/audit evidence.
 
 ### MT-12 gate
 
 - [ ] One tenant can be restored independently from backup.
-- [ ] A documented closure flow exists before accepting production tenants.
+- [x] A documented closure flow exists before accepting production tenants. (`TenantClosureService` and its tests cover CLOSURE_PENDING, domain revocation, retention-window refusal, explicit finalization acknowledgement, registry retirement, and audit evidence)
 
 ---
 
