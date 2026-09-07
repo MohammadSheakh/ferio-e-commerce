@@ -672,7 +672,7 @@ This is the largest migration slice. Existing feature behavior should remain sta
 - [x] Existing product-request workflow exists.
 - [x] Existing store pickup/outlet workflow exists.
 - [x] Tenant-scope all records and settings. (`ServiceBookingService`, `WarrantyService`, `ProductContentService` (reviews/banners), `ProductRequestService`, `StoreLocationsService` all resolve through the tenant client with explicit legacy fallback)
-- [ ] Tenant-scope media/evidence.
+- [x] Tenant-scope media/evidence. (Warranty evidence now uses the shared R2 `STORAGE_STRATEGY`; `R2Strategy` derives private `tenants/{organizationId}/...` keys from trusted tenant context.)
 - [ ] Tenant-scope outlet inventory/pickup configuration.
 - [ ] Tenant-scope moderation and Admin queues.
 - [ ] Add cross-tenant ownership tests.

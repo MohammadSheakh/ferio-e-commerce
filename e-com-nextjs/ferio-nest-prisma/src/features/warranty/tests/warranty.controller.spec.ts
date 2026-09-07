@@ -1,4 +1,4 @@
-import type { CloudinaryStrategy } from '../../attachments/strategies/cloudinary.strategy';
+import type { StorageStrategy } from '../../storage/strategies/r2.strategy';
 import type { CommerceSettingsService } from '../../settings/services/commerce-settings.service';
 import { WarrantyController } from '../warranty.controller';
 import type { WarrantyService } from '../warranty.service';
@@ -9,7 +9,7 @@ describe('WarrantyController', () => {
   const settings = { get: jest.fn() };
   const controller = new WarrantyController(
     service as unknown as WarrantyService,
-    upload as unknown as CloudinaryStrategy,
+    upload as unknown as StorageStrategy,
     settings as unknown as CommerceSettingsService,
   );
 
