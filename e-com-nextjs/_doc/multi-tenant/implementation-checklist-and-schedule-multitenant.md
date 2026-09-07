@@ -680,7 +680,7 @@ This is the largest migration slice. Existing feature behavior should remain sta
 ## 10.11 Chat and real-time communication
 
 - [x] Chat foundation exists.
-- [ ] Tenant-scope socket tickets.
+- [x] Tenant-scope socket tickets. (Authenticated ticket issuance now requires `TenantMembershipGuard`; the signed ticket carries only the resolved organization context.)
 - [x] Tenant-scope rooms/channels. (conversations, tasks, admin role rooms, and every server-side emission path are org-prefixed; task-room Redis presence lists are scoped by the same names)
 - [x] Tenant-scope conversation lookup/history. (chat REST swept; realtime rooms namespaced in MT-8)
 - [ ] Tenant-scope quick replies/folders if configurable.

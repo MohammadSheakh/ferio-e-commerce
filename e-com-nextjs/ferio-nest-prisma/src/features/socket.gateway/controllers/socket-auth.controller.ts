@@ -11,6 +11,7 @@ import { AuthGuard, Public, User } from '@app/common';
 import type { UserPayload } from '@app/common';
 import { SocketAuthService } from '../services/socket-auth.service';
 import { tryGetTenantContext } from '../../../tenancy/context/tenant-context';
+import { TenantMembershipGuard } from '../../../tenancy/guards/tenant-membership.guard';
 
 class GuestSocketTicketDto {
   @IsString()
@@ -25,7 +26,7 @@ export class SocketAuthController {
   constructor(private readonly socketAuthService: SocketAuthService) {}
 
   @Post('ticket')
-  @UseGuards(AuthGuard)
+  @UseGuards(AuthGuard, TenantMembershipGuard)
   async issueAuthenticatedTicket(@User() user: UserPayload) {
     const token = await this.socketAuthService.issueSocketTicket({
       ...user,
