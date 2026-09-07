@@ -1064,7 +1064,7 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 - [ ] IDOR tests using same IDs across tenant DBs.
 - [x] Tenant Admin → Platform Admin privilege escalation tests. (platform realm guard rejects tenant tokens and enforces platform permissions)
 - [x] Platform Support access expiry/revocation tests. (active lookup requires exact organization/user, unexpired `expiresAt`, and `revokedAt: null`; revoke is idempotent)
-- [ ] Cross-tenant saved-cart token tests.
+- [x] Cross-tenant saved-cart token tests. (`cart.tenant-isolation.spec.ts` proves identical share-token input is resolved only against the current trusted tenant database.)
 - [ ] Cross-tenant wallet tests.
 - [ ] Cross-tenant payment callback tests.
 - [ ] Cross-tenant rider assignment/GPS tests.
