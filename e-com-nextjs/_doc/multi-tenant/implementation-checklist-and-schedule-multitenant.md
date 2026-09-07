@@ -430,7 +430,7 @@ All surfaces live in the ferio-platform-admin console:
 - [x] Configure local-development tenant-domain strategy. (`TENANT_DEV_HOST_MAP` maps browser hosts such as `localhost:3000` to registered tenant domains without changing production routing.)
 - [ ] Add canonical redirect rules.
 - [x] Add reserved subdomain list (`www`, `admin`, `api`, `app`, etc.). (`RESERVED_SUBDOMAINS`)
-- [ ] Prevent organization slugs from colliding with reserved/system routes.
+- [x] Prevent organization slugs from colliding with reserved/system routes. (`OrganizationsService` rejects the canonical reserved subdomain set before opening the control-plane transaction.)
 - [x] Ensure storefront SSR/server requests resolve tenant before fetching tenant data. (Customer Web root layout gates rendering on backend `/tenancy/status`; all server-side BFF fetches forward `x-forwarded-host` via the instrumentation-registered provider)
 - [ ] **PARTIAL:** Make metadata/SEO tenant-aware. (layout metadata falls back neutrally on non-active states; per-tenant SEO titles/descriptions arrive with MT-7 settings reads)
 - [ ] Make sitemap/robots tenant-aware.

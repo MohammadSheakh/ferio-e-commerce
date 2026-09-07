@@ -6,6 +6,7 @@ import {
 import { OrganizationStatus } from '../generated/platform-client';
 import { PlatformPrismaService } from '../platform-prisma.service';
 import { PlatformAuditService } from './platform-audit.service';
+import { RESERVED_SUBDOMAINS } from './domains.service';
 
 /** Legal transitions of the organization lifecycle state machine. */
 const ALLOWED_TRANSITIONS: Record<OrganizationStatus, OrganizationStatus[]> = {
@@ -36,6 +37,9 @@ export class OrganizationsService {
     const slug = this.normalizeSlug(input.slug);
     if (!slug) {
       throw new ConflictException('ORGANIZATION_SLUG_INVALID');
+    }
+    if (RESERVED_SUBDOMAINS.has(slug)) {
+      throw new ConflictException('ORGANIZATION_SLUG_RESERVED');
     }
     const name = input.name.trim();
     if (name.length < 2) {

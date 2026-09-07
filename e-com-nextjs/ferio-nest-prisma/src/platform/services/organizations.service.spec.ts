@@ -127,6 +127,17 @@ describe('OrganizationsService lifecycle state machine', () => {
     expect(platform.client.$transaction).not.toHaveBeenCalled();
   });
 
+  it('rejects reserved system slugs before creating an organization', async () => {
+    await expect(
+      service.create({
+        name: 'Admin Store',
+        slug: 'admin',
+        ownerEmail: 'owner@example.com',
+      }),
+    ).rejects.toThrow(new ConflictException('ORGANIZATION_SLUG_RESERVED'));
+    expect(platform.client.$transaction).not.toHaveBeenCalled();
+  });
+
   it.each([
     ['PROVISIONING', 'ACTIVE', true],
     ['PROVISIONING', 'SUSPENDED', false],
