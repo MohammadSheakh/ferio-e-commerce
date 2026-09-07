@@ -348,6 +348,24 @@ describe('MigrationOrchestratorService (MT-11 / ADR-0005)', () => {
     expect(built.bootstrapper.bootstrap).not.toHaveBeenCalled();
   });
 
+  it('does not let a queued worker start a run paused by an operator', async () => {
+    const built = build([
+      { id: 'tdb-1', organizationId: 'org-1', status: 'READY' },
+    ]);
+    built.runState['run-1'] = 'PAUSED';
+
+    await expect(built.service.processRun('run-1')).resolves.toEqual({
+      status: 'PAUSED',
+      migrated: [],
+      failures: [],
+    });
+
+    expect(built.bootstrapper.bootstrap).not.toHaveBeenCalled();
+    expect(
+      built.platform.client.tenantMigrationRun.update,
+    ).not.toHaveBeenCalled();
+  });
+
   it('retries failed tenant results while preserving successful tenants', async () => {
     const built = build(
       [

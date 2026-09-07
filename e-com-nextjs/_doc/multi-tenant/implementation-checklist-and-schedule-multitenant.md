@@ -837,7 +837,7 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 
 - [ ] Tenant migration canary/batch control.
 - [x] Persist and honor the requested migration canary organization. (`TenantMigrationRun.canaryOrganizationId` is stored in the platform plane and the orchestrator migrates that organization before the remaining ordered fleet)
-- [ ] Pause rollout.
+- [x] Pause rollout. (Queued workers re-check the durable run status before touching any tenant database, so an operator pause wins races with already-enqueued jobs.)
 - [x] Retry failed tenant. (failed result rows remain retryable; queued resume retries them while skipping successful tenants)
 - [ ] DB health probe.
 - [x] Schema version drift view. (Database Health page highlights any tenant database behind the canonical head)

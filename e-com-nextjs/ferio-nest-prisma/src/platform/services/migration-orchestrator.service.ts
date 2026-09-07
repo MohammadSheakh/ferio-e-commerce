@@ -132,6 +132,11 @@ export class MigrationOrchestratorService {
         .map((r) => r.tenantDatabaseId);
       return { status: run.status, migrated: successes, failures: [] };
     }
+    // A pause request can race with a queued BullMQ job. The worker must honor
+    // the durable control-plane state before touching any tenant database.
+    if (run.status === 'PAUSED') {
+      return { status: run.status, migrated: [], failures: [] };
+    }
 
     // Failed results are evidence for the operator, not completed work. A
     // queued resume must retry them while preserving successful tenants.
