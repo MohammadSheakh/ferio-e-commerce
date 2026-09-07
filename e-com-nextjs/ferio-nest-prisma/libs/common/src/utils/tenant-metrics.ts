@@ -19,6 +19,11 @@ export type TenantMetricName =
   | 'db_acquire_failure'
   | 'db_breaker_opened'
   | 'queue_tenant_failure'
+  | 'migration_run_started'
+  | 'migration_tenant_succeeded'
+  | 'migration_tenant_failed'
+  | 'migration_run_paused'
+  | 'migration_run_completed'
   | 'usage_threshold_crossed'
   | 'usage_reconciliation_drift';
 

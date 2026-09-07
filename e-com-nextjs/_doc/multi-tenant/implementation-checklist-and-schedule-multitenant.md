@@ -1041,7 +1041,7 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 - [x] Add resolved domain where safe. (hostname rides the same envelope from the trusted `TenantContext`)
 - [x] Add tenant DB connection metrics. (`db_acquire_failure` / `db_breaker_opened` counters emitted per tenant database)
 - [ ] Add provisioning metrics.
-- [ ] Add migration fleet metrics.
+- [x] Add migration fleet metrics. (`migration_run_started`, `migration_tenant_succeeded`, `migration_tenant_failed`, `migration_run_paused`, and `migration_run_completed`; tenant labels remain bounded by `TenantMetrics` cardinality limits)
 - [x] Add subscription/entitlement denial metrics. (`entitlement_denied{code,featureKey}` counted at every server-side denial in `EntitlementsService.evaluate`)
 - [x] Add unknown-domain metrics. (`resolver_unknown_domain` / `resolver_suspended` / `resolver_tenant_unavailable` / `resolver_migration_required` counted at each fail-closed branch)
 - [x] Add per-tenant queue failure visibility. (`queue_tenant_failure{label,organizationId}` counted per isolated fan-out failure; snapshots carry org labels)

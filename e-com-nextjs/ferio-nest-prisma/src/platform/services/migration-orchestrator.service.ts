@@ -7,7 +7,7 @@ import {
 import { getQueueToken } from '@nestjs/bullmq';
 import { QUEUE_NAMES } from '@app/queue';
 import { randomBytes } from 'crypto';
-import { StructuredLogger } from '@app/common';
+import { StructuredLogger, TenantMetrics } from '@app/common';
 import { PlatformPrismaService } from '../platform-prisma.service';
 import { TenantSchemaBootstrapper } from '../../tenancy/services/tenant-schema.bootstrapper';
 import { TenantDatabasesService } from './tenant-databases.service';
@@ -106,6 +106,7 @@ export class MigrationOrchestratorService {
       concurrencyLimit,
       failureThreshold,
     });
+    TenantMetrics.increment('migration_run_started');
     await this.migrationQueue.add(
       TENANT_MIGRATION_RUN_JOB,
       { migrationRunId: run.id },
@@ -214,6 +215,7 @@ export class MigrationOrchestratorService {
               where: { id: run.id },
               data: { status: 'PAUSED' },
             });
+            TenantMetrics.increment('migration_run_paused');
             await this.auditNote('TENANT_MIGRATION_PAUSED', run.id, undefined, {
               reason: 'failure threshold reached',
               lastOrganizationId: registry.organizationId,
@@ -313,6 +315,7 @@ export class MigrationOrchestratorService {
         },
       });
       await this.databases.recordHealth(tenantDatabaseId, false);
+      TenantMetrics.increment('migration_tenant_failed', { tenantDatabaseId });
       throw error;
     }
   }
@@ -353,6 +356,7 @@ export class MigrationOrchestratorService {
         detail: toPlatformJsonInput({ appliedCount: outcome.applied.length }),
       },
     });
+    TenantMetrics.increment('migration_tenant_succeeded', { tenantDatabaseId });
   }
 
   private async retryTransient<T>(
@@ -444,6 +448,7 @@ export class MigrationOrchestratorService {
       where: { id: runId },
       data: { status: 'COMPLETED' },
     });
+    TenantMetrics.increment('migration_run_completed');
   }
 
   private auditNote(

@@ -1,7 +1,10 @@
 import { BadRequestException } from '@nestjs/common';
+import { TenantMetrics } from '@app/common';
 import { MigrationOrchestratorService } from './migration-orchestrator.service';
 
 describe('MigrationOrchestratorService (MT-11 / ADR-0005)', () => {
+  beforeEach(() => TenantMetrics.reset());
+
   type Registry = { id: string; organizationId: string; status: string };
   type MigrationResult = {
     tenantDatabaseId: string;
@@ -159,6 +162,11 @@ describe('MigrationOrchestratorService (MT-11 / ADR-0005)', () => {
       { migrationRunId: 'run-1' },
       expect.objectContaining({ jobId: `t:${runId}:migration-run` }),
     );
+    expect(TenantMetrics.snapshot().counters).toContainEqual({
+      name: 'migration_run_started',
+      labels: {},
+      value: 1,
+    });
   });
 
   it('retries transient tenant migration failures before recording success', async () => {
@@ -184,6 +192,16 @@ describe('MigrationOrchestratorService (MT-11 / ADR-0005)', () => {
         'tdb-1',
         false,
       );
+      expect(TenantMetrics.snapshot().counters).toContainEqual({
+        name: 'migration_tenant_succeeded',
+        labels: { tenantDatabaseId: 'tdb-1' },
+        value: 1,
+      });
+      expect(TenantMetrics.snapshot().counters).toContainEqual({
+        name: 'migration_run_completed',
+        labels: {},
+        value: 1,
+      });
     } finally {
       if (previousAttempts === undefined) {
         delete process.env.TENANT_MIGRATION_RETRY_ATTEMPTS;
