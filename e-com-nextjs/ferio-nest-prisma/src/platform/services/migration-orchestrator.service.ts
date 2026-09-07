@@ -28,6 +28,19 @@ export interface StartMigrationInput {
 
 const DEFAULT_BATCH = 2;
 const MAX_THRESHOLD = 25;
+const DEFAULT_RETRY_ATTEMPTS = 3;
+const DEFAULT_MIGRATION_TIMEOUT_MS = 120_000;
+const TRANSIENT_POSTGRES_CODES = new Set([
+  '40001', // serialization_failure
+  '40P01', // deadlock_detected
+  '55P03', // lock_not_available
+  '57P01', // admin_shutdown
+  '57P02', // crash_shutdown
+  '57P03', // cannot_connect_now
+  'P1001', // Prisma database unreachable
+  'P1002', // Prisma database timeout
+  'P1017', // Prisma server closed connection
+]);
 
 /**
  * Tenant migration orchestration (ADR-0005, checklist §14).
@@ -269,38 +282,16 @@ export class MigrationOrchestratorService {
     runId: string,
     tenantDatabaseId: string,
   ): Promise<void> {
-    const connection =
-      await this.databases.getDecryptedConnection(tenantDatabaseId);
-    const before = await this.databases.publicView(tenantDatabaseId);
     try {
-      const outcome = await this.bootstrapper.bootstrap(connection);
-      await this.databases.setSchemaVersion(
-        tenantDatabaseId,
-        outcome.schemaVersion,
+      await this.retryTransient(
+        () => this.migrateOneAttempt(runId, tenantDatabaseId),
+        this.migrationRetryAttempts(),
       );
-      await this.platform.client.tenantMigrationResult.upsert({
-        where: {
-          migrationRunId_tenantDatabaseId: {
-            migrationRunId: runId,
-            tenantDatabaseId,
-          },
-        },
-        create: {
-          migrationRunId: runId,
-          tenantDatabaseId,
-          fromVersion: before.schemaVersion ?? null,
-          toVersion: outcome.schemaVersion,
-          success: true,
-          detail: toPlatformJsonInput({ appliedCount: outcome.applied.length }),
-        },
-        update: {
-          success: true,
-          toVersion: outcome.schemaVersion,
-          detail: toPlatformJsonInput({ appliedCount: outcome.applied.length }),
-        },
-      });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      const before = await this.databases
+        .publicView(tenantDatabaseId)
+        .catch(() => ({ schemaVersion: undefined }));
       await this.platform.client.tenantMigrationResult.upsert({
         where: {
           migrationRunId_tenantDatabaseId: {
@@ -323,6 +314,128 @@ export class MigrationOrchestratorService {
       });
       await this.databases.recordHealth(tenantDatabaseId, false);
       throw error;
+    }
+  }
+
+  private async migrateOneAttempt(
+    runId: string,
+    tenantDatabaseId: string,
+  ): Promise<void> {
+    const connection =
+      await this.databases.getDecryptedConnection(tenantDatabaseId);
+    const before = await this.databases.publicView(tenantDatabaseId);
+    const outcome = await this.withTimeout(
+      this.bootstrapper.bootstrap(connection),
+      this.migrationTimeoutMs(),
+    );
+    await this.databases.setSchemaVersion(
+      tenantDatabaseId,
+      outcome.schemaVersion,
+    );
+    await this.platform.client.tenantMigrationResult.upsert({
+      where: {
+        migrationRunId_tenantDatabaseId: {
+          migrationRunId: runId,
+          tenantDatabaseId,
+        },
+      },
+      create: {
+        migrationRunId: runId,
+        tenantDatabaseId,
+        fromVersion: before.schemaVersion ?? null,
+        toVersion: outcome.schemaVersion,
+        success: true,
+        detail: toPlatformJsonInput({ appliedCount: outcome.applied.length }),
+      },
+      update: {
+        success: true,
+        toVersion: outcome.schemaVersion,
+        detail: toPlatformJsonInput({ appliedCount: outcome.applied.length }),
+      },
+    });
+  }
+
+  private async retryTransient<T>(
+    operation: () => Promise<T>,
+    attempts: number,
+  ): Promise<T> {
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= attempts; attempt += 1) {
+      try {
+        return await operation();
+      } catch (error) {
+        lastError = error;
+        if (!this.isTransientMigrationError(error) || attempt === attempts) {
+          throw error;
+        }
+        await this.delay(this.retryDelayMs(attempt));
+      }
+    }
+    throw lastError instanceof Error ? lastError : new Error(String(lastError));
+  }
+
+  private isTransientMigrationError(error: unknown): boolean {
+    if (!error || typeof error !== 'object') return false;
+    const candidate = error as { code?: unknown; message?: unknown };
+    const code = typeof candidate.code === 'string' ? candidate.code : '';
+    const message =
+      typeof candidate.message === 'string'
+        ? candidate.message.toLowerCase()
+        : '';
+    return (
+      TRANSIENT_POSTGRES_CODES.has(code) ||
+      /deadlock|lock timeout|connection (reset|closed|refused)|timed out|temporarily unavailable/.test(
+        message,
+      )
+    );
+  }
+
+  private migrationRetryAttempts(): number {
+    const value = Number(
+      process.env.TENANT_MIGRATION_RETRY_ATTEMPTS ?? DEFAULT_RETRY_ATTEMPTS,
+    );
+    return Number.isInteger(value) && value >= 1 && value <= 5
+      ? value
+      : DEFAULT_RETRY_ATTEMPTS;
+  }
+
+  private migrationTimeoutMs(): number {
+    const value = Number(
+      process.env.TENANT_MIGRATION_TIMEOUT_MS ?? DEFAULT_MIGRATION_TIMEOUT_MS,
+    );
+    return Number.isInteger(value) && value >= 1_000 && value <= 900_000
+      ? value
+      : DEFAULT_MIGRATION_TIMEOUT_MS;
+  }
+
+  private retryDelayMs(attempt: number): number {
+    const value = Number(process.env.TENANT_MIGRATION_RETRY_DELAY_MS ?? 250);
+    const base =
+      Number.isInteger(value) && value >= 0 && value <= 30_000 ? value : 250;
+    return Math.min(base * 2 ** (attempt - 1), 30_000);
+  }
+
+  private delay(milliseconds: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, milliseconds));
+  }
+
+  private async withTimeout<T>(
+    operation: Promise<T>,
+    timeoutMs: number,
+  ): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      return await Promise.race([
+        operation,
+        new Promise<T>((_, reject) => {
+          timer = setTimeout(
+            () => reject(new Error('TENANT_MIGRATION_TIMEOUT')),
+            timeoutMs,
+          );
+        }),
+      ]);
+    } finally {
+      if (timer) clearTimeout(timer);
     }
   }
 

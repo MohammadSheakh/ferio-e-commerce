@@ -161,6 +161,43 @@ describe('MigrationOrchestratorService (MT-11 / ADR-0005)', () => {
     );
   });
 
+  it('retries transient tenant migration failures before recording success', async () => {
+    const built = build([
+      { id: 'tdb-1', organizationId: 'org-1', status: 'READY' },
+    ]);
+    const previousAttempts = process.env.TENANT_MIGRATION_RETRY_ATTEMPTS;
+    const previousDelay = process.env.TENANT_MIGRATION_RETRY_DELAY_MS;
+    process.env.TENANT_MIGRATION_RETRY_ATTEMPTS = '2';
+    process.env.TENANT_MIGRATION_RETRY_DELAY_MS = '0';
+    const transient = Object.assign(new Error('lock timeout'), {
+      code: '55P03',
+    });
+    built.bootstrapper.bootstrap
+      .mockRejectedValueOnce(transient)
+      .mockResolvedValueOnce({ applied: [], schemaVersion: '9999_latest' });
+
+    try {
+      const outcome = await built.service.processRun('run-1');
+      expect(outcome.status).toBe('COMPLETED');
+      expect(built.bootstrapper.bootstrap).toHaveBeenCalledTimes(2);
+      expect(built.databases.recordHealth).not.toHaveBeenCalledWith(
+        'tdb-1',
+        false,
+      );
+    } finally {
+      if (previousAttempts === undefined) {
+        delete process.env.TENANT_MIGRATION_RETRY_ATTEMPTS;
+      } else {
+        process.env.TENANT_MIGRATION_RETRY_ATTEMPTS = previousAttempts;
+      }
+      if (previousDelay === undefined) {
+        delete process.env.TENANT_MIGRATION_RETRY_DELAY_MS;
+      } else {
+        process.env.TENANT_MIGRATION_RETRY_DELAY_MS = previousDelay;
+      }
+    }
+  });
+
   it('canary failure fails the whole run without migrating the fleet', async () => {
     const registries = [
       { id: 'tdb-1', organizationId: 'org-1', status: 'READY' },
@@ -207,8 +244,8 @@ describe('MigrationOrchestratorService (MT-11 / ADR-0005)', () => {
       .mockImplementationOnce(() =>
         Promise.resolve({ applied: [], schemaVersion: 'v' }),
       )
-      .mockRejectedValueOnce(new Error('lock timeout'))
-      .mockRejectedValueOnce(new Error('lock timeout'));
+      .mockRejectedValueOnce(new Error('migration syntax error'))
+      .mockRejectedValueOnce(new Error('migration syntax error'));
     built.platform.client.tenantMigrationRun.findUnique
       .mockClear()
       .mockImplementation(({ where }: { where: { id: string } }) =>

@@ -951,7 +951,7 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 - [x] Roll out in bounded batches. (sequential batches sized by run concurrencyLimit)
 - [x] Limit concurrency. (1–10 clamp at API boundary)
 - [x] Record per-tenant result. (TenantMigrationResult upserted for success AND failure with detail)
-- [ ] Retry transient failures.
+- [x] Retry transient failures. (bounded 1–5 attempts for known PostgreSQL/Prisma transient failures; retry count and backoff are configurable)
 - [x] Stop/pause on failure threshold. (two consecutive-failure case unit-tested)
 - [x] Isolate one failed tenant without blocking already healthy tenants unnecessarily. (healthy members of a batch complete before the pause)
 - [x] Prevent application from serving incompatible schema silently.
@@ -964,7 +964,7 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 - [ ] Define expand/migrate/contract pattern for breaking changes.
 - [ ] Avoid destructive schema changes in one step.
 - [ ] Test old app/new schema and new app/transition schema compatibility where rollout requires it.
-- [ ] Add migration timeout.
+- [x] Add migration timeout. (per-tenant bootstrap is bounded by `TENANT_MIGRATION_TIMEOUT_MS`, default 120 seconds)
 - [ ] Add lock/contention strategy.
 - [ ] Add rollback/forward-fix runbook.
 - [ ] Never run uncontrolled `prisma migrate deploy` against every tenant simultaneously from application startup.
