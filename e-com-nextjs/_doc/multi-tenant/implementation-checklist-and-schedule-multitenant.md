@@ -1066,7 +1066,7 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 - [x] Platform Support access expiry/revocation tests. (active lookup requires exact organization/user, unexpired `expiresAt`, and `revokedAt: null`; revoke is idempotent)
 - [x] Cross-tenant saved-cart token tests. (`cart.tenant-isolation.spec.ts` proves identical share-token input is resolved only against the current trusted tenant database.)
 - [ ] Cross-tenant wallet tests.
-- [ ] Cross-tenant payment callback tests.
+- [x] Cross-tenant payment callback tests. (`commerce-payments.controller.spec.ts` rejects a callback token signed with another secret before tenant routing; valid callbacks route only through the HMAC-bound organization context and the tenant-local payment client.)
 - [ ] Cross-tenant rider assignment/GPS tests.
 - [x] Cross-tenant WebSocket room tests. (single-instance and Redis-adapter multi-instance integration suites assert same-tenant delivery only)
 - [ ] Cross-tenant Redis collision tests.

@@ -80,4 +80,21 @@ describe('PublicCommercePaymentsController tenant returns', () => {
     );
     expect(response.redirect).not.toHaveBeenCalled();
   });
+
+  it('rejects a callback token signed for another secret before tenant routing', async () => {
+    await expect(
+      controller.callback(
+        CommercePaymentProvider.SSLCOMMERZ,
+        'success',
+        { merchantTransactionId: 'attempt-from-another-tenant' },
+        {
+          cbt: buildCallbackToken('org-b', 'different-callback-secret-12345'),
+        },
+        response as unknown as Response,
+      ),
+    ).rejects.toThrow('PAYMENT_CALLBACK_TENANT_INVALID');
+
+    expect(callbackRunner.runForOrganization).not.toHaveBeenCalled();
+    expect(payments.processCallback).not.toHaveBeenCalled();
+  });
 });
