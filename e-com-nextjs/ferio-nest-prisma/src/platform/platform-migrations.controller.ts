@@ -13,6 +13,7 @@ import {
 } from './guards/platform-auth.guard';
 import { MigrationOrchestratorService } from './services/migration-orchestrator.service';
 import type { PlatformRequest } from './platform-request.type';
+import { StartMigrationDto } from './dto/migration.dto';
 
 @Controller('platform')
 @UseGuards(PlatformAuthGuard)
@@ -22,12 +23,7 @@ export class PlatformMigrationsController {
   @Post('migrations')
   @PlatformPermissions('migration:run')
   startMigration(
-    @Body()
-    body: {
-      canaryOrganizationId?: string;
-      concurrencyLimit?: number;
-      failureThreshold?: number;
-    },
+    @Body() body: StartMigrationDto,
     @Req() request: PlatformRequest,
   ) {
     return this.migrations.start({

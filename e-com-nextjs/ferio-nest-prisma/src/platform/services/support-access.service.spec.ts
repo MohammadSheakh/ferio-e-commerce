@@ -104,7 +104,7 @@ describe('SupportAccessService (explicit, scoped, time-bound access)', () => {
   });
 
   it('requires an unexpired, unrevoked grant for the exact organization and user', async () => {
-    const { service, platform } = build();
+    const { service, platform, audit } = build();
     const active = grant();
     platform.supportAccessGrant.findFirst.mockResolvedValue(active);
 
@@ -121,6 +121,23 @@ describe('SupportAccessService (explicit, scoped, time-bound access)', () => {
       },
       orderBy: { createdAt: 'desc' },
     });
+    expect(audit.record).toHaveBeenCalledWith({
+      action: 'SUPPORT_ACCESS_USED',
+      entityType: 'SupportAccessGrant',
+      entityId: 'grant-1',
+      actorId: 'platform-1',
+      metadata: { organizationId: 'org-a' },
+    });
+  });
+
+  it('fails closed when support-access usage cannot be audited', async () => {
+    const { service, platform, audit } = build();
+    platform.supportAccessGrant.findFirst.mockResolvedValue(grant());
+    audit.record.mockRejectedValue(new Error('audit unavailable'));
+
+    await expect(service.assertActive('org-a', 'platform-1')).rejects.toThrow(
+      'audit unavailable',
+    );
   });
 
   it.each(['expired', 'revoked', 'wrong organization'])(

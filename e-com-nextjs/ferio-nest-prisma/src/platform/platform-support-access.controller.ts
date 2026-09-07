@@ -13,6 +13,10 @@ import {
   PlatformAuthGuard,
   PlatformPermissions,
 } from './guards/platform-auth.guard';
+import {
+  CreateSupportAccessDto,
+  ListSupportAccessQueryDto,
+} from './dto/support-access.dto';
 import { SupportAccessService } from './services/support-access.service';
 import type { PlatformRequest } from './platform-request.type';
 
@@ -23,8 +27,8 @@ export class PlatformSupportAccessController {
 
   @Get('support-access')
   @PlatformPermissions('support_access:request')
-  listSupportAccess(@Query('organizationId') organizationId?: string) {
-    return this.supportAccess.listActive(organizationId);
+  listSupportAccess(@Query() query: ListSupportAccessQueryDto) {
+    return this.supportAccess.listActive(query.organizationId);
   }
 
   @Post('support-access/:grantId/revoke')
@@ -42,13 +46,7 @@ export class PlatformSupportAccessController {
   @Post('support-access')
   @PlatformPermissions('support_access:request')
   requestSupportAccess(
-    @Body()
-    body: {
-      organizationId: string;
-      reason: string;
-      ttlMinutes?: number;
-      scope?: Record<string, unknown>;
-    },
+    @Body() body: CreateSupportAccessDto,
     @Req() request: PlatformRequest,
   ) {
     const principal = request.platformPrincipal;

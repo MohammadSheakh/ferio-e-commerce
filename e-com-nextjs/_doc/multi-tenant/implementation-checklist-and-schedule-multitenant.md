@@ -216,6 +216,9 @@ Create a separate control-plane schema/database for platform metadata.
 - [x] Implement provisioning orchestration service. (8-step idempotent state machine, resumable runs, pluggable executor)
 - [ ] **PARTIAL:** Implement tenant migration orchestration service. (run/result models + version stamping landed; BullMQ fleet runner lands in MT-11)
 - [x] Implement support-access service. (reason-bound TTL grants, revoke, assert-active)
+- [x] Validate platform organization lifecycle mutations with dedicated DTOs. (organization creation, status transition, provisioning idempotency key, and closure requests use bounded runtime validation)
+- [x] Validate plan and subscription mutations with dedicated DTOs. (nested entitlement keys/limits, plan pricing/interval, trial duration, and subscription status transitions are bounded at the controller boundary)
+- [x] Validate platform billing and migration controls with dedicated DTOs. (invoice dates, callback outcomes, and migration canary/concurrency/failure thresholds are validated before service execution)
 - [x] Implement platform audit service. (append-only)
 - [x] Keep all control-plane services independent of tenant Prisma models. (separate generated client + datasource)
 
@@ -1047,7 +1050,8 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 - [x] Add per-tenant queue failure visibility. (`queue_tenant_failure{label,organizationId}` counted per isolated fan-out failure; snapshots carry org labels)
 - [ ] Add platform billing metrics.
 - [ ] Add backup freshness metrics.
-- [ ] Add support-access security events.
+- [x] Add support-access security events. (`SUPPORT_ACCESS_GRANTED`, `SUPPORT_ACCESS_USED`, and `SUPPORT_ACCESS_REVOKED` are append-only platform audit events; usage fails closed if the audit write fails)
+- [x] Validate support-access control-plane requests with dedicated DTOs. (organization/reason/scope fields are bounded; TTL is transformed and constrained to 5 minutes through 8 hours; active-grant query filters are explicit)
 - [ ] **PARTIAL:** Add alerting for isolation-critical failures. (counters surface as periodic structured `tenant_metrics_snapshot` events any log pipeline can alert on; dedicated alert routing awaits metrics-stack decision)
 
 ## 16.2 Security tests
@@ -1142,7 +1146,7 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 - [ ] Backup and restore are proven.
 - [ ] Unknown/suspended-domain behavior is proven.
 - [ ] Redis/BullMQ/WebSocket/file isolation is proven.
-- [ ] Platform Admin support access is audited and constrained.
+- [x] Platform Admin support access is audited and constrained. (reason-bound, time-bound, organization/user-scoped, revocable, and usage-audited)
 - [ ] No production request path can fall back to the original single-tenant DB.
 - [ ] Critical/high security findings are closed or formally accepted.
 - [ ] Operational runbooks are complete.
@@ -1456,7 +1460,7 @@ It is complete when:
 - [ ] Redis, BullMQ, WebSockets, caches, files, and provider integrations are tenant-isolated.
 - [ ] Fleet migrations are staged and failure-isolated.
 - [ ] One tenant can be backed up/restored independently.
-- [ ] Platform support access is explicit and audited.
+- [x] Platform support access is explicit and audited. (no active grant means no support-data access; grant use is recorded)
 - [ ] Cross-tenant negative tests cover all sensitive domains.
 - [ ] Two or more real/pilot tenants can operate concurrently without data, cache, job, socket, credential, or financial leakage.
 - [ ] No legacy default-tenant fallback exists in production.

@@ -12,14 +12,15 @@ import {
   PlatformAuthGuard,
   PlatformPermissions,
 } from './guards/platform-auth.guard';
-import {
-  PlansService,
-  type CreatePlanInput,
-  type UpdatePlanInput,
-} from './services/plans.service';
+import { PlansService } from './services/plans.service';
 import { SubscriptionsService } from './services/subscriptions.service';
 import type { PlatformRequest } from './platform-request.type';
-import type { SubscriptionStatus } from './generated/platform-client';
+import {
+  CreatePlanDto,
+  StartTrialDto,
+  TransitionSubscriptionDto,
+  UpdatePlanDto,
+} from './dto/plan.dto';
 
 @Controller('platform')
 @UseGuards(PlatformAuthGuard)
@@ -31,7 +32,7 @@ export class PlatformCatalogController {
 
   @Post('plans')
   @PlatformPermissions('subscription:write')
-  createPlan(@Body() body: CreatePlanInput, @Req() request: PlatformRequest) {
+  createPlan(@Body() body: CreatePlanDto, @Req() request: PlatformRequest) {
     return this.plans.create({
       ...body,
       actorId: request.platformPrincipal?.platformUserId,
@@ -42,7 +43,7 @@ export class PlatformCatalogController {
   @PlatformPermissions('subscription:write')
   updatePlan(
     @Param('id') id: string,
-    @Body() body: UpdatePlanInput,
+    @Body() body: UpdatePlanDto,
     @Req() request: PlatformRequest,
   ) {
     return this.plans.update(id, {
@@ -59,10 +60,7 @@ export class PlatformCatalogController {
 
   @Post('organizations/:id/subscription/trial')
   @PlatformPermissions('subscription:write')
-  startTrial(
-    @Param('id') id: string,
-    @Body() body: { planKey: string; trialDays?: number },
-  ) {
+  startTrial(@Param('id') id: string, @Body() body: StartTrialDto) {
     return this.subscriptions.startTrial(
       id,
       body.planKey,
@@ -74,7 +72,7 @@ export class PlatformCatalogController {
   @PlatformPermissions('subscription:write')
   transitionSubscription(
     @Param('id') id: string,
-    @Body() body: { status: SubscriptionStatus; note?: string },
+    @Body() body: TransitionSubscriptionDto,
     @Req() request: PlatformRequest,
   ) {
     return this.subscriptions.transition(id, body.status, {

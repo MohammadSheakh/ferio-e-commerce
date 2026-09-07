@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Get,
@@ -14,6 +13,10 @@ import {
   PlatformPermissions,
 } from './guards/platform-auth.guard';
 import { PlatformBillingService } from './services/platform-billing.service';
+import {
+  CreatePlatformInvoiceDto,
+  PlatformBillingCallbackQueryDto,
+} from './dto/billing.dto';
 
 /**
  * Operator endpoints (platform-realm guarded) for SaaS billing
@@ -27,19 +30,7 @@ export class PlatformBillingController {
 
   @Post('invoices')
   @PlatformPermissions('saas_billing:write')
-  ensureInvoice(
-    @Body()
-    body: {
-      organizationId: string;
-      periodStart: string;
-      periodEnd: string;
-    },
-  ) {
-    if (!body.organizationId || !body.periodStart || !body.periodEnd) {
-      throw new BadRequestException(
-        'organizationId, periodStart, periodEnd required',
-      );
-    }
+  ensureInvoice(@Body() body: CreatePlatformInvoiceDto) {
     return this.billing.ensureInvoice({
       organizationId: body.organizationId,
       periodStart: new Date(body.periodStart),
@@ -73,25 +64,17 @@ export class PlatformBillingCallbackController {
 
   @Get('callback')
   async callback(
-    @Query('ref') ref: string,
-    @Query('outcome') outcome: 'success' | 'fail' | 'cancel' | 'ipn',
-    @Query('val_id') valId?: string,
+    @Query() query: PlatformBillingCallbackQueryDto,
   ): Promise<{ applied: boolean; duplicate?: boolean; paid?: boolean }> {
-    if (!ref || !outcome)
-      throw new BadRequestException('CALLBACK_PARAMETERS_REQUIRED');
     return this.billing.applyCallbackOutcome({
-      reference: ref,
-      valId,
-      outcome,
+      reference: query.ref,
+      valId: query.val_id,
+      outcome: query.outcome,
     });
   }
 
   @Post('callback')
-  postCallback(
-    @Query('ref') ref: string,
-    @Query('outcome') outcome: 'success' | 'fail' | 'cancel' | 'ipn',
-    @Query('val_id') valId?: string,
-  ) {
-    return this.callback(ref, outcome, valId);
+  postCallback(@Query() query: PlatformBillingCallbackQueryDto) {
+    return this.callback(query);
   }
 }

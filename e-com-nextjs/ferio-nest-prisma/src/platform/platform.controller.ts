@@ -29,8 +29,14 @@ import {
   PlatformPermissions,
 } from './guards/platform-auth.guard';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
-import type { OrganizationStatus } from './generated/platform-client';
 import type { PlatformRequest } from './platform-request.type';
+import {
+  CreateOrganizationDto,
+  FinalizeClosureDto,
+  InitiateClosureDto,
+  ProvisionOrganizationDto,
+  TransitionOrganizationDto,
+} from './dto/organization.dto';
 
 /**
  * Minimal Platform Admin API (MT-1 foundation). The full operational UI is
@@ -58,8 +64,7 @@ export class PlatformAdminController {
   @Post('organizations')
   @PlatformPermissions('organization:write')
   createOrganization(
-    @Body()
-    body: { name: string; slug: string; ownerEmail: string },
+    @Body() body: CreateOrganizationDto,
     @Req() request: PlatformRequest,
   ) {
     return this.organizations.create({
@@ -294,7 +299,7 @@ export class PlatformAdminController {
   @PlatformPermissions('organization:write')
   transitionOrganization(
     @Param('id') id: string,
-    @Body() body: { status: OrganizationStatus; reason?: string },
+    @Body() body: TransitionOrganizationDto,
     @Req() request: PlatformRequest,
   ) {
     return this.organizations.transition(id, body.status, {
@@ -307,7 +312,7 @@ export class PlatformAdminController {
   @PlatformPermissions('provisioning:run')
   provision(
     @Param('id') id: string,
-    @Body() body: { idempotencyKey?: string },
+    @Body() body: ProvisionOrganizationDto,
     @Req() request: PlatformRequest,
   ) {
     return this.provisioning.start(id, {
@@ -372,7 +377,7 @@ export class PlatformAdminController {
   @PlatformPermissions('organization:write')
   initiateClosure(
     @Param('id') id: string,
-    @Body() body: { reason?: string },
+    @Body() body: InitiateClosureDto,
     @Req() request: PlatformRequest,
   ) {
     return this.closure.initiateClosure(id, {
@@ -385,11 +390,7 @@ export class PlatformAdminController {
   @PlatformPermissions('organization:write')
   finalizeClosure(
     @Param('id') id: string,
-    @Body()
-    body: {
-      retentionAcknowledged?: boolean;
-      overrideRetentionPeriod?: boolean;
-    },
+    @Body() body: FinalizeClosureDto,
     @Req() request: PlatformRequest,
   ) {
     return this.closure.finalizeClosure(id, {

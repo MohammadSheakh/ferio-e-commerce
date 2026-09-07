@@ -67,6 +67,13 @@ export class SupportAccessService {
       orderBy: { createdAt: 'desc' },
     });
     if (!grant) throw new NotFoundException('SUPPORT_ACCESS_REQUIRED');
+    await this.audit.record({
+      action: 'SUPPORT_ACCESS_USED',
+      entityType: 'SupportAccessGrant',
+      entityId: grant.id,
+      actorId: platformUserId,
+      metadata: { organizationId },
+    });
     return grant;
   }
 
