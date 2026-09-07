@@ -9,6 +9,14 @@ export interface BootstrapResult {
   schemaVersion: string;
 }
 
+export interface TenantDatabaseConnection {
+  host: string;
+  port: number;
+  database: string;
+  user: string;
+  password: string;
+}
+
 /** Factory store name installed by migration 20260811103000_commerce_settings_foundation. */
 const FACTORY_STORE_NAME = 'Ferio';
 
@@ -46,13 +54,9 @@ export class TenantSchemaBootstrapper {
       .sort();
   }
 
-  async bootstrap(connection: {
-    host: string;
-    port: number;
-    database: string;
-    user: string;
-    password: string;
-  }): Promise<BootstrapResult> {
+  async bootstrap(
+    connection: TenantDatabaseConnection,
+  ): Promise<BootstrapResult> {
     const pool = new Pool({
       host: connection.host,
       port: connection.port,
@@ -143,18 +147,43 @@ export class TenantSchemaBootstrapper {
   }
 
   /**
+   * Read-only readiness probe used immediately before a tenant is activated.
+   * Connectivity alone is insufficient: provisioning must prove that the
+   * migration ledger and safe baseline tables are available.
+   */
+  async verifyReady(connection: TenantDatabaseConnection): Promise<void> {
+    const pool = new Pool({ ...connection, max: 1 });
+    try {
+      await pool.query('SELECT 1');
+      const result = await pool.query<{ tableName: string }>(
+        `SELECT table_name AS "tableName"
+         FROM information_schema.tables
+         WHERE table_schema = 'public'
+           AND table_name IN ('_ferio_tenant_migrations', 'CommerceSettings', 'CodVerificationPolicy')`,
+      );
+      const found = new Set(result.rows.map((row) => row.tableName));
+      const required = [
+        '_ferio_tenant_migrations',
+        'CommerceSettings',
+        'CodVerificationPolicy',
+      ];
+      const missing = required.filter((tableName) => !found.has(tableName));
+      if (missing.length > 0) {
+        throw new Error(`TENANT_SMOKE_TEST_FAILED:${missing.join(',')}`);
+      }
+    } finally {
+      await pool.end().catch(() => undefined);
+    }
+  }
+
+  /**
    * Minimal idempotent baseline seed (checklist §7.2): safe defaults with
    * commerce-affecting features OFF until the owner configures them.
    * No fake customers/orders/payments are ever seeded (PRD rule).
    */
-  async seedBaseline(connection: {
-    host: string;
-    port: number;
-    database: string;
-    user: string;
-    password: string;
-    organizationName?: string;
-  }): Promise<void> {
+  async seedBaseline(
+    connection: TenantDatabaseConnection & { organizationName?: string },
+  ): Promise<void> {
     const pool = new Pool({
       ...connection,
       max: 1,

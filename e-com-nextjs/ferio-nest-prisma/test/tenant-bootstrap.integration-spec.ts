@@ -75,6 +75,8 @@ conditionalDescribe('TenantSchemaBootstrapper (real PostgreSQL)', () => {
     expect(second.applied).toHaveLength(0);
     expect(second.schemaVersion).toBe(result.schemaVersion);
 
+    await expect(bootstrapper.verifyReady(connection)).resolves.toBeUndefined();
+
     // Baseline seed: defaults exist, COD verification at its safest mode.
     await bootstrapper.seedBaseline({
       ...connection,
@@ -103,6 +105,7 @@ conditionalDescribe('TenantSchemaBootstrapper (real PostgreSQL)', () => {
       ['default'],
     );
     expect(unchanged.rows[0]?.storeName).toBe('Tenant A');
+    await expect(bootstrapper.verifyReady(connection)).resolves.toBeUndefined();
     await pool.end();
   }, 240_000);
 

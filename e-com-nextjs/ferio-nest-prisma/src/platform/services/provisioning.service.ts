@@ -42,6 +42,7 @@ export const PROVISIONING_STEPS = [
   'SEED_TENANT',
   'ATTACH_OWNER_MEMBERSHIP',
   'HEALTH_CHECK',
+  'SMOKE_TEST',
   'ACTIVATE_ORGANIZATION',
 ] as const;
 
@@ -286,11 +287,29 @@ export class ProvisioningService {
             },
           );
           if (!registry) throw new ConflictException('TENANT_DATABASE_MISSING');
+          const connection = await this.databases.getDecryptedConnection(
+            registry.id,
+          );
+          await this.bootstrapper.verifyReady(connection);
           await this.databases.markReady(
             registry.id,
             registry.schemaVersion ?? '',
           );
-          await mark('COMPLETED');
+          await mark('COMPLETED', { databaseReachable: true });
+          break;
+        }
+        case 'SMOKE_TEST': {
+          const registry = await this.platform.client.tenantDatabase.findUnique(
+            {
+              where: { organizationId: run.organizationId },
+            },
+          );
+          if (!registry) throw new ConflictException('TENANT_DATABASE_MISSING');
+          const connection = await this.databases.getDecryptedConnection(
+            registry.id,
+          );
+          await this.bootstrapper.verifyReady(connection);
+          await mark('COMPLETED', { baselineTablesVerified: true });
           break;
         }
         case 'ACTIVATE_ORGANIZATION': {

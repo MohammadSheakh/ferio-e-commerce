@@ -213,7 +213,7 @@ Create a separate control-plane schema/database for platform metadata.
 - [x] Implement entitlement evaluator. (feature flags + limits + subscription state, stable denial codes)
 - [x] Implement subscription state machine. (trialing→active→past-due→suspended/cancelled with event history)
 - [x] Implement usage service. (atomic increment upserts, period-keyed snapshots)
-- [x] Implement provisioning orchestration service. (8-step idempotent state machine, resumable runs, pluggable executor)
+- [x] Implement provisioning orchestration service. (9-step idempotent state machine with database readiness and baseline smoke verification, resumable runs, pluggable executor)
 - [ ] **PARTIAL:** Implement tenant migration orchestration service. (run/result models + version stamping landed; BullMQ fleet runner lands in MT-11)
 - [x] Implement support-access service. (reason-bound TTL grants, revoke, assert-active)
 - [x] Validate platform organization lifecycle mutations with dedicated DTOs. (organization creation, status transition, provisioning idempotency key, and closure requests use bounded runtime validation)
@@ -364,8 +364,8 @@ Provisioning should behave as an idempotent state machine, not a controller scri
 - [x] Seed default tenant settings. (CommerceSettings store identity + COD verification ALWAYS baseline, ON CONFLICT-safe)
 - [ ] Seed default permissions/owner role.
 - [x] Create/attach initial owner membership. (created atomically with the organization; owner-membership conflicts cannot leave an orphan organization)
-- [x] Run DB health check. (bootstrap success + registry READY stamping)
-- [ ] Run minimal tenant smoke test.
+- [x] Run DB health check. (read-only `SELECT 1` plus required migration-ledger and baseline-table verification before registry READY stamping)
+- [x] Run minimal tenant smoke test. (provisioning records a separate `SMOKE_TEST` step and verifies the migration ledger, `CommerceSettings`, and `CodVerificationPolicy` tables against the new database)
 - [ ] Activate domain only after readiness.
 - [ ] Mark organization `READY/ACTIVE` only after all required steps succeed.
 - [x] Persist every provisioning step/result.
