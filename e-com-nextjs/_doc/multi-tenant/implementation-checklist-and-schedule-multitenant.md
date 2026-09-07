@@ -1067,10 +1067,10 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 - [x] Cross-tenant saved-cart token tests. (`cart.tenant-isolation.spec.ts` proves identical share-token input is resolved only against the current trusted tenant database.)
 - [x] Cross-tenant wallet tests. (`wallet.tenant-isolation.spec.ts` uses the same customer ID in two tenant contexts and proves wallet balances and ledgers remain database-local.)
 - [x] Cross-tenant payment callback tests. (`commerce-payments.controller.spec.ts` rejects a callback token signed with another secret before tenant routing; valid callbacks route only through the HMAC-bound organization context and the tenant-local payment client.)
-- [ ] Cross-tenant rider assignment/GPS tests.
+- [x] Cross-tenant rider assignment/GPS tests. (`delivery-personnel.tenant-isolation.spec.ts` proves the same rider user ID resolves to tenant-local personnel and location history.)
 - [x] Cross-tenant WebSocket room tests. (single-instance and Redis-adapter multi-instance integration suites assert same-tenant delivery only)
 - [ ] Cross-tenant Redis collision tests.
-- [ ] Cross-tenant file/object access tests.
+- [x] Cross-tenant file/object access tests. (`storage.controller.spec.ts` rejects another organization object prefix before presigning and allows only the current tenant namespace.)
 - [x] Unknown/suspended/deleted tenant tests. (resolver covers unknown/inactive domains, suspended browsing, closure, and unavailable registries)
 - [ ] SSR/BFF tenant-confusion tests.
 - [x] Cache poisoning/leak tests. (resolver cache validation binds entries to normalized hostnames and tests negative/positive isolation)
