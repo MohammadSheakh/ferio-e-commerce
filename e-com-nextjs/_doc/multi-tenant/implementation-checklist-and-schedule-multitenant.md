@@ -448,7 +448,7 @@ All surfaces live in the ferio-platform-admin console:
 - [ ] Support domain removal.
 - [ ] Prevent stale domain takeover/reassignment.
 - [ ] Audit domain changes.
-- [ ] Entitlement-gate custom domains by plan.
+- [x] Entitlement-gate custom domains by plan. (`DomainsService.addCustomDomain` evaluates the organization subscription before creating a pending verification record and returns stable denial codes.)
 
 ## 8.3 Tenant-aware frontend state
 

@@ -11,6 +11,9 @@ describe('DomainsService lifecycle (MT-1)', () => {
   let service: DomainsService;
   let platform: PlatformMock;
   const audit = { record: jest.fn().mockResolvedValue({}) };
+  const entitlements = {
+    evaluate: jest.fn().mockResolvedValue({ allowed: true }),
+  };
 
   beforeEach(() => {
     process.env.PLATFORM_PUBLIC_DOMAIN = 'ferio.test';
@@ -29,7 +32,13 @@ describe('DomainsService lifecycle (MT-1)', () => {
       },
     };
     audit.record.mockClear();
-    service = new DomainsService(platform as never, audit as never);
+    entitlements.evaluate.mockClear();
+    entitlements.evaluate.mockResolvedValue({ allowed: true });
+    service = new DomainsService(
+      platform as never,
+      audit as never,
+      entitlements as never,
+    );
   });
 
   it('reserves a pending primary subdomain from the org slug', async () => {
@@ -112,6 +121,22 @@ describe('DomainsService lifecycle (MT-1)', () => {
       'ferio-verify=token123',
     );
     expect(activated.status).toBe('ACTIVE');
+    expect(entitlements.evaluate).toHaveBeenCalledWith(
+      'org-1',
+      'custom_domain',
+    );
+  });
+
+  it('denies custom-domain registration when the plan does not include it', async () => {
+    entitlements.evaluate.mockResolvedValue({
+      allowed: false,
+      code: 'FEATURE_DISABLED',
+    });
+
+    await expect(
+      service.addCustomDomain('org-1', 'shop.example.com'),
+    ).rejects.toThrow('FEATURE_DISABLED');
+    expect(platform.client.tenantDomain.create).not.toHaveBeenCalled();
   });
 
   it('returns credential-free health diagnostics for every domain', async () => {

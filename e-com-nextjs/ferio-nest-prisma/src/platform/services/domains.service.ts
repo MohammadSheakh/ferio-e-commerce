@@ -1,11 +1,13 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { PlatformAuditService } from './platform-audit.service';
 import { invalidateDomainCache } from '../utils/domain-cache-invalidation';
 import { PlatformPrismaService } from '../platform-prisma.service';
+import { EntitlementsService } from './entitlements.service';
 
 /** Hosts that can never be tenant subdomains. */
 export const RESERVED_SUBDOMAINS = new Set([
@@ -29,6 +31,7 @@ export class DomainsService {
   constructor(
     private readonly platform: PlatformPrismaService,
     private readonly audit: PlatformAuditService,
+    private readonly entitlements: EntitlementsService,
   ) {}
 
   /**
@@ -121,6 +124,13 @@ export class DomainsService {
     const hostname = this.normalizeHostname(hostnameInput);
     if (!hostname || !hostname.includes('.')) {
       throw new ConflictException('CUSTOM_DOMAIN_INVALID');
+    }
+    const decision = await this.entitlements.evaluate(
+      organizationId,
+      'custom_domain',
+    );
+    if (!decision.allowed) {
+      throw new ForbiddenException(decision.code ?? 'FEATURE_DISABLED');
     }
     try {
       const verificationToken = `ferio-verify=${crypto.randomUUID()}`;
