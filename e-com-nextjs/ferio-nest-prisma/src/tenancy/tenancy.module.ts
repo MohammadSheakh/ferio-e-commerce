@@ -1,4 +1,5 @@
 import { Global, Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { RedisModule, RedisService } from '@app/redis';
 import { JwtModule } from '@nestjs/jwt';
 import { BullModule } from '@nestjs/bullmq';
@@ -25,6 +26,7 @@ import { TenantFanoutService } from './services/tenant-fanout.service';
 import { TenancyObservabilityService } from './services/tenancy-observability.service';
 import { UsageReconciliationService } from './services/usage-reconciliation.service';
 import { TenantReturnOriginService } from './services/tenant-return-origin.service';
+import { TenantSuspensionGuard } from './guards/tenant-suspension.guard';
 
 /**
  * Tenant plane (MT-2/MT-3): trusted resolution, immutable request context,
@@ -62,6 +64,10 @@ import { TenantReturnOriginService } from './services/tenant-return-origin.servi
       inject: [PlatformPrismaService, RedisService],
     },
     TenantMembershipGuard,
+    {
+      provide: APP_GUARD,
+      useClass: TenantSuspensionGuard,
+    },
     TenantContextMiddleware,
     TenantDatabaseManager,
     TenantDbService,

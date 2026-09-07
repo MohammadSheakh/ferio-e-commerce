@@ -893,7 +893,7 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 - [ ] Limit warnings before hard limits.
 - [x] Stable errors when limit reached. (`PLAN_LIMIT_REACHED` / `FEATURE_DISABLED` / `SUBSCRIPTION_INACTIVE` from EntitlementsService)
 - [ ] Downgraded tenant can still access historical records appropriately.
-- [ ] Suspended tenant gets approved read/write restrictions.
+- [x] Suspended tenant gets approved read/write restrictions. (Global tenancy guard permits reads and authentication, and blocks non-read tenant mutations with `COMMERCE_MUTATION_DISABLED_SUSPENDED`; service-level guard remains available for defense in depth.)
 
 ## 13.3 Tenant branding
 
