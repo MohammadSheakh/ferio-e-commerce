@@ -827,7 +827,7 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 - [x] Configure entitlements/limits. (`featureKey=limit` compiler in the console form)
 - [x] View subscriptions. (`GET /platform/subscriptions` directory + Subscriptions console page)
 - [x] View platform invoices/payment attempts. (Billing console page backed by the two billing endpoints)
-- [ ] Manual billing operations require explicit permission/reason/audit.
+- [x] Manual billing operations require explicit permission/reason/audit. (`saas_billing:write` plus 10–500 character reason DTOs; invoice creation and payment initiation record actor/reason audit events.)
 - [ ] Add internal/free entitlement state if approved.
 - [ ] Add tenant-specific override with expiry/reason if approved.
 

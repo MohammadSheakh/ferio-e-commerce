@@ -71,6 +71,7 @@ describe('PlatformBillingService', () => {
       organizationId: 'org-1',
       periodStart: new Date('2026-08-01'),
       periodEnd: new Date('2026-09-01'),
+      reason: 'Monthly platform invoice creation',
     });
     const createCall = (
       platform.client.saasInvoice.create.mock.calls as unknown[][]
@@ -93,11 +94,25 @@ describe('PlatformBillingService', () => {
           organizationId: 'org-1',
           periodStart,
           periodEnd,
+          reason: 'Monthly platform invoice creation',
         }),
       ).rejects.toBeInstanceOf(BadRequestException);
       expect(platform.client.subscription.findUnique).not.toHaveBeenCalled();
     },
   );
+
+  it('requires a reason for manual invoice creation', async () => {
+    const { service, platform } = build();
+    await expect(
+      service.ensureInvoice({
+        organizationId: 'org-1',
+        periodStart: new Date('2026-08-01'),
+        periodEnd: new Date('2026-09-01'),
+        reason: 'too short',
+      }),
+    ).rejects.toThrow('BILLING_REASON_REQUIRED');
+    expect(platform.client.subscription.findUnique).not.toHaveBeenCalled();
+  });
 
   it('initiates a hosted session with an unguessable reference and records INITIATED', async () => {
     const restore = global.fetch;
@@ -106,7 +121,9 @@ describe('PlatformBillingService', () => {
     });
     try {
       const built = build();
-      const result = await built.service.initiatePayment('inv-1');
+      const result = await built.service.initiatePayment('inv-1', {
+        reason: 'Operator requested payment session',
+      });
       expect(result.redirectUrl).toContain('sslcommerz.com');
       expect(result.reference).toMatch(/^SAAS-SI-/);
       const created = (
@@ -125,6 +142,29 @@ describe('PlatformBillingService', () => {
     }
   });
 
+  it('records actor and reason when a manual payment session is initiated', async () => {
+    const restore = global.fetch;
+    global.fetch = mockFetchResponse({
+      GatewayPageURL: 'https://sandbox.sslcommerz.com/hosted/session-1',
+    });
+    try {
+      const built = build();
+      await built.service.initiatePayment('inv-1', {
+        actorId: 'platform-user-1',
+        reason: 'Retry payment after owner confirmation',
+      });
+      expect(built.audit.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'SAAS_PAYMENT_MANUALLY_INITIATED',
+          actorId: 'platform-user-1',
+          metadata: { reason: 'Retry payment after owner confirmation' },
+        }),
+      );
+    } finally {
+      global.fetch = restore;
+    }
+  });
+
   it('rejects structured gateway URLs instead of stringifying provider objects', async () => {
     const restore = global.fetch;
     global.fetch = mockFetchResponse({
@@ -133,7 +173,9 @@ describe('PlatformBillingService', () => {
     try {
       const built = build();
       await expect(
-        built.service.initiatePayment('inv-1'),
+        built.service.initiatePayment('inv-1', {
+          reason: 'Operator requested payment session',
+        }),
       ).rejects.toBeInstanceOf(BadRequestException);
       const updateCall = (
         built.platform.client.saasPaymentAttempt.updateMany.mock

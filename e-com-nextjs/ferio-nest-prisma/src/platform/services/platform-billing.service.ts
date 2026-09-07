@@ -30,6 +30,11 @@ export interface InvoiceWithAttempts {
   organizationId: string;
 }
 
+interface ManualBillingAction {
+  actorId?: string;
+  reason: string;
+}
+
 /**
  * Platform SaaS billing via SSLCommerz (PO-006).
  *
@@ -84,7 +89,10 @@ export class PlatformBillingService {
     organizationId: string;
     periodStart: Date;
     periodEnd: Date;
+    actorId?: string;
+    reason: string;
   }): Promise<InvoiceWithAttempts> {
+    this.assertManualReason(input.reason);
     if (
       Number.isNaN(input.periodStart.getTime()) ||
       Number.isNaN(input.periodEnd.getTime()) ||
@@ -113,7 +121,7 @@ export class PlatformBillingService {
     )
       .toString('hex')
       .toUpperCase()}`;
-    return this.platform.client.saasInvoice.create({
+    const created = await this.platform.client.saasInvoice.create({
       data: {
         number,
         organizationId: input.organizationId,
@@ -124,6 +132,20 @@ export class PlatformBillingService {
         currency: 'BDT',
       },
     });
+    await this.audit.record({
+      action: 'SAAS_INVOICE_MANUALLY_CREATED',
+      entityType: 'SaasInvoice',
+      entityId: created.id,
+      actorId: input.actorId,
+      newValue: {
+        organizationId: input.organizationId,
+        periodStart: input.periodStart,
+        periodEnd: input.periodEnd,
+        amountMinor: created.amountMinor,
+      },
+      metadata: { reason: input.reason.trim() },
+    });
+    return created;
   }
 
   /**
@@ -133,7 +155,9 @@ export class PlatformBillingService {
    */
   async initiatePayment(
     invoiceId: string,
+    action: ManualBillingAction,
   ): Promise<{ redirectUrl?: string; reference: string }> {
+    this.assertManualReason(action.reason);
     const creds = this.credentials();
     if (!creds)
       throw new BadRequestException('PLATFORM_BILLING_NOT_CONFIGURED');
@@ -161,6 +185,14 @@ export class PlatformBillingService {
         status: 'INITIATED',
         amountMinor: invoice.amountMinor,
       },
+    });
+    await this.audit.record({
+      action: 'SAAS_PAYMENT_MANUALLY_INITIATED',
+      entityType: 'SaasPaymentAttempt',
+      entityId: reference,
+      actorId: action.actorId,
+      newValue: { invoiceId: invoice.id, amountMinor: invoice.amountMinor },
+      metadata: { reason: action.reason.trim() },
     });
 
     const publicBase = (
@@ -228,6 +260,12 @@ export class PlatformBillingService {
     // use a stable platform address — real owner contact lives on invoices.
     void organizationId;
     return 'billing@ferio.local';
+  }
+
+  private assertManualReason(reason: string): void {
+    if (reason.trim().length < 10) {
+      throw new BadRequestException('BILLING_REASON_REQUIRED');
+    }
   }
 
   /**

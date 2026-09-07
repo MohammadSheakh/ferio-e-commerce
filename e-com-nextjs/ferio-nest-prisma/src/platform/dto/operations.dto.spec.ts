@@ -13,6 +13,7 @@ describe('platform operations DTOs', () => {
       organizationId: 'org-a',
       periodStart: '2026-09-01T00:00:00.000Z',
       periodEnd: '2026-10-01T00:00:00.000Z',
+      reason: 'Monthly platform invoice creation',
     });
     const callback = plainToInstance(PlatformBillingCallbackQueryDto, {
       ref: 'SAAS-REF-1',

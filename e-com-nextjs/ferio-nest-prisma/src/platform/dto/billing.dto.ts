@@ -18,6 +18,18 @@ export class CreatePlatformInvoiceDto {
 
   @IsISO8601()
   periodEnd!: string;
+
+  @IsString()
+  @MinLength(10)
+  @MaxLength(500)
+  reason!: string;
+}
+
+export class ManualBillingActionDto {
+  @IsString()
+  @MinLength(10)
+  @MaxLength(500)
+  reason!: string;
 }
 
 export class PlatformBillingCallbackQueryDto {
