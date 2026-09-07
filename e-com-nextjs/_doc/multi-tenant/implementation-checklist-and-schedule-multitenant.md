@@ -1061,7 +1061,7 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 
 - [x] Host-header manipulation tests. (trusted-proxy, forwarded-host chain, and direct-client rejection cases cover resolver input)
 - [x] Cross-tenant JWT/session replay tests. (tenant membership guard rejects a valid member session against another resolved organization)
-- [ ] IDOR tests using same IDs across tenant DBs.
+- [x] IDOR tests using same IDs across tenant DBs. (wallet, cart, payment callback, rider, storage, returns, refunds, RTO, settlements, pickup, and analytics suites use overlapping identifiers under two tenant contexts)
 - [x] Tenant Admin → Platform Admin privilege escalation tests. (platform realm guard rejects tenant tokens and enforces platform permissions)
 - [x] Platform Support access expiry/revocation tests. (active lookup requires exact organization/user, unexpired `expiresAt`, and `revokedAt: null`; revoke is idempotent)
 - [x] Cross-tenant saved-cart token tests. (`cart.tenant-isolation.spec.ts` proves identical share-token input is resolved only against the current trusted tenant database.)
@@ -1069,7 +1069,7 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 - [x] Cross-tenant payment callback tests. (`commerce-payments.controller.spec.ts` rejects a callback token signed with another secret before tenant routing; valid callbacks route only through the HMAC-bound organization context and the tenant-local payment client.)
 - [x] Cross-tenant rider assignment/GPS tests. (`delivery-personnel.tenant-isolation.spec.ts` proves the same rider user ID resolves to tenant-local personnel and location history.)
 - [x] Cross-tenant WebSocket room tests. (single-instance and Redis-adapter multi-instance integration suites assert same-tenant delivery only)
-- [ ] Cross-tenant Redis collision tests.
+- [x] Cross-tenant Redis collision tests. (`src/tenancy/tests/redis-collision.spec.ts` proves identical logical identifiers produce distinct tenant-scoped keys while preserving intentional platform-global keys)
 - [x] Cross-tenant file/object access tests. (`storage.controller.spec.ts` rejects another organization object prefix before presigning and allows only the current tenant namespace.)
 - [x] Unknown/suspended/deleted tenant tests. (resolver covers unknown/inactive domains, suspended browsing, closure, and unavailable registries)
 - [ ] SSR/BFF tenant-confusion tests.
@@ -1078,16 +1078,16 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 ## 16.3 Performance and scale
 
 - [x] Load-test tenant resolver. (cached hot load: 2,000 interleaved resolutions in ~15ms with exactly 2 control-plane queries; evidence lines in performance-baseline suite)
-- [ ] Load-test connection manager.
-- [ ] Load-test 10/50/100+ active tenant simulations.
+- [x] Load-test connection manager. (`test/performance-baseline.integration-spec.ts` measures cold/warm acquisition, 50 concurrent gets, LRU churn, and real PostgreSQL pool bounds)
+- [x] Load-test 10/50/100+ active tenant simulations. (`tenant-fanout.service.spec.ts` runs 100 ready-tenant operations and asserts the configured concurrency ceiling is never exceeded)
 - [x] Measure cold tenant DB connection latency. (~105ms cold vs <1ms warm median against local PostgreSQL — recorded per run as structured evidence)
 - [x] Measure cached tenant resolution. (same suite; positive/negative cache effectiveness asserted by query counts, not wall-clock alone)
-- [ ] Test pool exhaustion behavior.
+- [x] Test pool exhaustion behavior. (`tenant-database.manager.spec.ts` proves active-client capacity fails closed with `TENANT_DATABASE_CAPACITY_EXHAUSTED`; the integration baseline proves configured pool bounds)
 - [ ] Test noisy-neighbor queue behavior.
 - [ ] Test one slow tenant DB.
-- [ ] Test control-plane outage behavior.
-- [ ] Define safe degraded behavior; never bypass tenant authorization.
-- [ ] Establish capacity thresholds for when database connection strategy must change.
+- [x] Test control-plane outage behavior. (`performance-baseline.integration-spec.ts` proves tenant resolution fails closed within a bounded latency without legacy fallback)
+- [x] Define safe degraded behavior; never bypass tenant authorization. (resolver, database manager, membership guard, and fan-out tests assert fail-closed errors, per-tenant breakers, and isolated worker failures)
+- [x] Establish capacity thresholds for when database connection strategy must change. (`scripts/connection-budget-check.mjs` computes replica, platform, legacy, tenant-client, pool, reserved, and usable connection totals and exits non-zero on budget overflow)
 
 ## 16.4 Dependency/security hygiene
 
@@ -1102,7 +1102,7 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 ### MT-13 gate
 
 - [ ] Security review finds no known path for tenant A to read/write tenant B data.
-- [ ] Capacity test demonstrates bounded DB connection behavior.
+- [x] Capacity test demonstrates bounded DB connection behavior. (real PostgreSQL performance baseline plus the connection-budget gate prove bounded client-cache and pool behavior)
 - [ ] Critical SaaS metrics and alerts are operational.
 
 ---

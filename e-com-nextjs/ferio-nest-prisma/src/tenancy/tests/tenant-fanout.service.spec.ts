@@ -138,6 +138,35 @@ describe('TenantFanoutService (MT-8 §11.2)', () => {
     expect(maximumActive).toBe(2);
   });
 
+  it('keeps a 100-tenant simulation inside the configured concurrency bound', async () => {
+    process.env.TENANCY_ENABLED = 'true';
+    process.env.TENANT_FANOUT_PAGE_SIZE = '100';
+    process.env.TENANT_FANOUT_CONCURRENCY = '4';
+    const built = build(
+      Array.from({ length: 100 }, (_, index) => registry(`org-${index}`)),
+    );
+    let active = 0;
+    let maximumActive = 0;
+    built.manager.runTransient.mockImplementation(
+      async (_material, operation) => {
+        active += 1;
+        maximumActive = Math.max(maximumActive, active);
+        await Promise.resolve();
+        const result = await operation();
+        active -= 1;
+        return result;
+      },
+    );
+
+    const outcome = await built.service.forEachTenant(() => Promise.resolve(), {
+      label: 'hundred-tenant-capacity-test',
+    });
+
+    expect(outcome.processed).toBe(100);
+    expect(outcome.failures).toEqual([]);
+    expect(maximumActive).toBeLessThanOrEqual(4);
+  });
+
   it('isolates one failing tenant without starving the others', async () => {
     process.env.TENANCY_ENABLED = 'true';
     const built = build([registry('org-bad'), registry('org-good')]);
