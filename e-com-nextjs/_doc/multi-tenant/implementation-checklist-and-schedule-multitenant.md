@@ -219,6 +219,7 @@ Create a separate control-plane schema/database for platform metadata.
 - [x] Validate platform organization lifecycle mutations with dedicated DTOs. (organization creation, status transition, provisioning idempotency key, and closure requests use bounded runtime validation)
 - [x] Validate plan and subscription mutations with dedicated DTOs. (nested entitlement keys/limits, plan pricing/interval, trial duration, and subscription status transitions are bounded at the controller boundary)
 - [x] Validate platform billing and migration controls with dedicated DTOs. (invoice dates, callback outcomes, and migration canary/concurrency/failure thresholds are validated before service execution)
+- [x] Enforce financial input invariants inside platform services. (invoice periods must be finite and strictly increasing; plan creation normalizes and validates keys, amounts, entitlement limits, and duplicate features)
 - [x] Implement platform audit service. (append-only)
 - [x] Keep all control-plane services independent of tenant Prisma models. (separate generated client + datasource)
 

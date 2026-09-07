@@ -79,6 +79,26 @@ describe('PlatformBillingService', () => {
     expect(createCall.data?.currency).toBe('BDT');
   });
 
+  it.each([
+    [new Date('2026-09-01'), new Date('2026-09-01')],
+    [new Date('2026-10-01'), new Date('2026-09-01')],
+    [new Date('invalid'), new Date('2026-09-01')],
+  ])(
+    'rejects invalid invoice period boundaries',
+    async (periodStart, periodEnd) => {
+      const { service, platform } = build();
+
+      await expect(
+        service.ensureInvoice({
+          organizationId: 'org-1',
+          periodStart,
+          periodEnd,
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(platform.client.subscription.findUnique).not.toHaveBeenCalled();
+    },
+  );
+
   it('initiates a hosted session with an unguessable reference and records INITIATED', async () => {
     const restore = global.fetch;
     global.fetch = mockFetchResponse({

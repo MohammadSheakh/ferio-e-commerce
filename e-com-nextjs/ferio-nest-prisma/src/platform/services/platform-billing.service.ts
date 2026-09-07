@@ -85,6 +85,13 @@ export class PlatformBillingService {
     periodStart: Date;
     periodEnd: Date;
   }): Promise<InvoiceWithAttempts> {
+    if (
+      Number.isNaN(input.periodStart.getTime()) ||
+      Number.isNaN(input.periodEnd.getTime()) ||
+      input.periodEnd <= input.periodStart
+    ) {
+      throw new BadRequestException('INVOICE_PERIOD_INVALID');
+    }
     const subscription = await this.platform.client.subscription.findUnique({
       where: { organizationId: input.organizationId },
       include: { plan: true },
