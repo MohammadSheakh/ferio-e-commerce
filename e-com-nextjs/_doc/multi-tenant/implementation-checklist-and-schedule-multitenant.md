@@ -371,7 +371,7 @@ Provisioning should behave as an idempotent state machine, not a controller scri
 - [x] Persist every provisioning step/result.
 - [x] Make retries resume safely. (resume-from-first-incomplete-step; idempotency-key replay returns completed runs)
 - [x] Prevent duplicate DB/domain creation on repeated requests. (unique org slug/domain hostname/registry orgId/idempotencyKey)
-- [ ] Add compensation/manual-recovery instructions for partial failure. (The resumable queue workflow is implemented; operator runbook and physical-provider cleanup actions remain.)
+- [x] Add compensation/manual-recovery instructions for partial failure. ([Provisioning partial-failure runbook](runbooks/provisioning-partial-failure.md) documents safe replay, orphan-resource review, escalation, and recovery evidence; automated physical-provider cleanup remains intentionally disabled.)
 
 ## 7.2 Tenant seed
 
@@ -416,7 +416,7 @@ All surfaces live in the ferio-platform-admin console:
 
 - [ ] A new organization can be created from Platform Admin and reach a working isolated storefront/admin environment without manual SQL.
 - [x] Replaying provisioning is idempotent. (active subdomain, registered tenant database, and already-active organization state are safely reused on step replay)
-- [ ] Failed provisioning is diagnosable and recoverable.
+- [x] Failed provisioning is diagnosable and recoverable. (Provisioning timeline, durable step/error records, idempotent replay, and the partial-failure runbook are available.)
 
 ---
 
