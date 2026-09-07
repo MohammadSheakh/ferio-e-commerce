@@ -81,24 +81,51 @@ export class ProvisioningService {
       include: { steps: true },
     });
     if (existingRun) {
+      if (existingRun.organizationId !== organizationId) {
+        throw new ConflictException('PROVISIONING_IDEMPOTENCY_KEY_CONFLICT');
+      }
       if (existingRun.status === 'COMPLETED') return existingRun;
       return this.resume(existingRun.id, options.actorId);
     }
 
-    const run = await this.platform.client.provisioningRun.create({
-      data: {
-        organizationId,
-        idempotencyKey,
-        status: 'PENDING',
-        steps: {
-          create: PROVISIONING_STEPS.map((name) => ({
-            name,
-            status: 'PENDING',
-          })),
+    let run: { id: string };
+    try {
+      run = await this.platform.client.provisioningRun.create({
+        data: {
+          organizationId,
+          idempotencyKey,
+          status: 'PENDING',
+          steps: {
+            create: PROVISIONING_STEPS.map((name) => ({
+              name,
+              status: 'PENDING',
+            })),
+          },
         },
-      },
-      include: { steps: true },
-    });
+        include: { steps: true },
+      });
+    } catch (error: unknown) {
+      if (
+        !(
+          typeof error === 'object' &&
+          error !== null &&
+          'code' in error &&
+          error.code === 'P2002'
+        )
+      ) {
+        throw error;
+      }
+      const racedRun = await this.platform.client.provisioningRun.findUnique({
+        where: { idempotencyKey },
+        include: { steps: true },
+      });
+      if (!racedRun) throw error;
+      if (racedRun.organizationId !== organizationId) {
+        throw new ConflictException('PROVISIONING_IDEMPOTENCY_KEY_CONFLICT');
+      }
+      if (racedRun.status === 'COMPLETED') return racedRun;
+      return this.resume(racedRun.id, options.actorId);
+    }
     return this.resume(run.id, options.actorId);
   }
 

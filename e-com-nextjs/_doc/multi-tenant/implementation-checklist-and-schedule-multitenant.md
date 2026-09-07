@@ -410,6 +410,7 @@ All surfaces live in the ferio-platform-admin console:
 - [x] Owner/membership status. (platform metadata member roster)
 - [x] Schema version. (per-database schemaVersion vs canonical head)
 - [x] Safe operational diagnostics without DB secrets. (registry views are credential-free by construction)
+- [x] Race-safe provisioning idempotency. (unique-key races re-read and resume or return the winning run; cross-organization key reuse fails with a stable conflict code)
 
 ### MT-4 gate
 
