@@ -1,4 +1,5 @@
 import { RetentionSweepService } from '../services/retention-sweep.service';
+import { tryGetTenantContext } from '../context/tenant-context';
 
 interface SelectionArgs {
   where: { createdAt: { lt: Date } };
@@ -35,6 +36,7 @@ function harness(options: {
 }) {
   const deleteCalls: Array<{ model: string; where: unknown }> = [];
   const selectionCalls: Array<{ model: string; args: SelectionArgs }> = [];
+  const contextOrganizations: string[] = [];
   const platform: RetentionPlatformDouble = {
     client: {
       tenantDatabase: {
@@ -62,6 +64,8 @@ function harness(options: {
       let remaining = options.counts?.[model] ?? 0;
       return {
         findMany: jest.fn().mockImplementation((args: SelectionArgs) => {
+          const organizationId = tryGetTenantContext()?.organizationId;
+          if (organizationId) contextOrganizations.push(organizationId);
           selectionCalls.push({ model, args });
           const count = Math.min(remaining, args.take);
           return Promise.resolve(
@@ -109,6 +113,7 @@ function harness(options: {
     platform,
     deleteCalls,
     selectionCalls,
+    contextOrganizations,
   };
 }
 
@@ -148,6 +153,8 @@ describe('RetentionSweepService (brutal-audit #7 — unbounded growth)', () => {
       const where = call.args.where;
       expect(where.createdAt.lt.getTime()).toBeLessThan(Date.now());
     }
+    expect(h.contextOrganizations).toHaveLength(3);
+    expect(new Set(h.contextOrganizations)).toEqual(new Set(['org-a']));
   });
 
   it('deletes in bounded batches and stops at the per-rule row budget', async () => {

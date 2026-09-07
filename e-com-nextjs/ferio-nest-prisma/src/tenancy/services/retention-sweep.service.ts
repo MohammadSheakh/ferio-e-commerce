@@ -1,7 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { StructuredLogger } from '@app/common';
+import { getCorrelationId, StructuredLogger } from '@app/common';
 import { PlatformPrismaService } from '../../platform/platform-prisma.service';
 import { TenantDatabaseManager } from './tenant-database.manager';
+import {
+  runWithTenantContext,
+  type TenantContext,
+} from '../context/tenant-context';
 
 export interface RetentionRuleResult {
   model: string;
@@ -31,7 +35,9 @@ type RetentionModel =
   | 'deliveryLocationHistory'
   | 'auditLog';
 
-type TenantDatabaseMaterial = Parameters<TenantDatabaseManager['getClient']>[0];
+type TenantDatabaseMaterial = Parameters<
+  TenantDatabaseManager['getClient']
+>[0] & { organizationId: string };
 
 function envDays(key: string, fallback: number): number {
   const value = Number(process.env[key] ?? fallback);
@@ -125,59 +131,80 @@ export class RetentionSweepService {
     }
 
     const material: TenantDatabaseMaterial = registry;
-    return this.manager.runTransient(material, async () => {
-      const db = await this.manager.getClient(material);
-      const results: RetentionRuleResult[] = [];
-      for (const rule of this.rules(now)) {
-        if (rule.days <= 0) {
-          results.push({
-            model: rule.label,
-            days: rule.days,
-            deleted: 0,
-            enabled: false,
-            batches: 0,
-            truncated: false,
-            durationMs: 0,
-          });
-          continue;
+    return this.manager.runTransient(material, () =>
+      runWithTenantContext(this.contextFor(material), async () => {
+        const db = await this.manager.getClient(material);
+        const results: RetentionRuleResult[] = [];
+        for (const rule of this.rules(now)) {
+          if (rule.days <= 0) {
+            results.push({
+              model: rule.label,
+              days: rule.days,
+              deleted: 0,
+              enabled: false,
+              batches: 0,
+              truncated: false,
+              durationMs: 0,
+            });
+            continue;
+          }
+          const result = await this.deleteInBatches(
+            db[rule.model],
+            rule.label,
+            rule.days,
+            rule.cutoff,
+          );
+          results.push(result);
+          if (result.deleted > 0) {
+            this.logger.log('retention_pruned', {
+              organizationId,
+              model: rule.label,
+              olderThanDays: rule.days,
+              deleted: result.deleted,
+              batches: result.batches,
+              truncated: result.truncated,
+              durationMs: result.durationMs,
+            });
+          }
+          if (result.truncated) {
+            this.logger.warn('retention_backlog_deferred', {
+              organizationId,
+              model: rule.label,
+              deleted: result.deleted,
+              rowBudget: boundedInteger(
+                'RETENTION_MAX_ROWS_PER_RULE',
+                10_000,
+                100_000,
+              ),
+            });
+          }
         }
-        const result = await this.deleteInBatches(
-          db[rule.model],
-          rule.label,
-          rule.days,
-          rule.cutoff,
-        );
-        results.push(result);
-        if (result.deleted > 0) {
-          this.logger.log('retention_pruned', {
-            organizationId,
-            model: rule.label,
-            olderThanDays: rule.days,
-            deleted: result.deleted,
-            batches: result.batches,
-            truncated: result.truncated,
-            durationMs: result.durationMs,
-          });
-        }
-        if (result.truncated) {
-          this.logger.warn('retention_backlog_deferred', {
-            organizationId,
-            model: rule.label,
-            deleted: result.deleted,
-            rowBudget: boundedInteger(
-              'RETENTION_MAX_ROWS_PER_RULE',
-              10_000,
-              100_000,
-            ),
-          });
-        }
-      }
 
-      return {
-        organizationId,
-        results,
-        totalDeleted: results.reduce((sum, r) => sum + r.deleted, 0),
-      };
+        return {
+          organizationId,
+          results,
+          totalDeleted: results.reduce((sum, r) => sum + r.deleted, 0),
+        };
+      }),
+    );
+  }
+
+  private contextFor(material: TenantDatabaseMaterial): TenantContext {
+    return Object.freeze({
+      correlationId: getCorrelationId(),
+      organizationId: material.organizationId,
+      tenantDatabaseId: material.id,
+      database: Object.freeze({
+        id: material.id,
+        host: material.host,
+        port: material.port,
+        databaseName: material.databaseName,
+        username: material.username,
+        credentialCipher: material.credentialCipher,
+      }),
+      domainId: 'background-retention',
+      hostname: 'background-worker',
+      subscriptionStatus: 'ACTIVE' as const,
     });
   }
 
