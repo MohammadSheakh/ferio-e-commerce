@@ -708,13 +708,13 @@ export class OrderService {
       throw new ForbiddenException('CHECKOUT_DISABLED_SUSPENDED');
     }
     // MT-10 §13.2: plan limits enforced server-side at the monetizable event.
-    if (tenantContext && this.entitlements) {
-      const decision = await this.entitlements
-        .evaluate(tenantContext.organizationId, 'orders_per_month', {
-          requestedCount: 1,
-        })
-        .catch(() => null);
-      if (decision && !decision.allowed) {
+    if (tenantContext) {
+      const decision = await this.entitlements.evaluate(
+        tenantContext.organizationId,
+        'orders_per_month',
+        { requestedCount: 1 },
+      );
+      if (!decision.allowed) {
         throw new ForbiddenException(decision.code ?? 'PLAN_LIMIT_REACHED');
       }
     }

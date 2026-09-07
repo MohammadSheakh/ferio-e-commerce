@@ -95,10 +95,10 @@ export class StaffAccessService {
     const db = await this.db();
     // MT-10 §13.2A: staff-seat entitlement enforced server-side for tenants.
     const tenantContext = tryGetTenantContext();
-    if (tenantContext && this.planGate && this.orgMembers) {
-      const currentMemberCount = await this.orgMembers
-        .countActiveMembers(tenantContext.organizationId)
-        .catch(() => 0);
+    if (tenantContext) {
+      const currentMemberCount = await this.orgMembers.countActiveMembers(
+        tenantContext.organizationId,
+      );
       await this.planGate.assertStaffSeat(
         tenantContext.organizationId,
         currentMemberCount,

@@ -136,4 +136,14 @@ describe('EntitlementsService evaluation matrix (ADR-0006)', () => {
     ).rejects.toThrow('requestedCount must be a non-negative safe integer');
     expect(usage.getValue).not.toHaveBeenCalled();
   });
+
+  it('propagates control-plane failures instead of allowing the feature', async () => {
+    platform.client.subscription.findUnique.mockRejectedValue(
+      new Error('control plane unavailable'),
+    );
+
+    await expect(service.evaluate('org', 'custom_domain')).rejects.toThrow(
+      'control plane unavailable',
+    );
+  });
 });

@@ -572,17 +572,16 @@ export class CatalogService {
     const db = await this.db();
     // MT-10 §13.2: SKU entitlement enforced server-side for tenants.
     const ctx = tryGetTenantContext();
-    if (ctx && this.entitlements) {
+    if (ctx) {
       const currentCount = await db.product.count({
         where: { status: { not: 'ARCHIVED' } },
       });
-      const decision = await this.entitlements
-        .evaluate(ctx.organizationId, 'products_max', {
-          requestedCount: 1,
-          currentOverride: currentCount,
-        })
-        .catch(() => null);
-      if (decision && !decision.allowed) {
+      const decision = await this.entitlements.evaluate(
+        ctx.organizationId,
+        'products_max',
+        { requestedCount: 1, currentOverride: currentCount },
+      );
+      if (!decision.allowed) {
         throw new ForbiddenException(decision.code ?? 'PLAN_LIMIT_REACHED');
       }
     }
