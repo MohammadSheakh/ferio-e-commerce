@@ -228,7 +228,7 @@ Create a separate control-plane schema/database for platform metadata.
 - [x] Create separate Platform Admin guards. (`PlatformAuthGuard`, realm=platform tokens, role→permission map)
 - [x] Define platform permissions for organization, subscription, billing, domain, provisioning, migration, support access, and platform health. (`PLATFORM_PERMISSION` is the typed canonical catalog; health diagnostics require `platform_health:read`.)
 - [x] Ensure tenant staff roles cannot invoke Platform Admin APIs. (realm mismatch rejected)
-- [ ] Ensure Platform Admin identity alone does not grant direct tenant commerce access.
+- [x] Ensure Platform Admin identity alone does not grant direct tenant commerce access. (`TenantMembershipGuard` rejects platform-realm principals before roster lookup; tenant data access requires an explicit support-access workflow.)
 - [ ] Require explicit support-access workflow for tenant-data access.
 - [x] Make support access reason-bound, time-bound, auditable, and revocable. (min reason length, 5min–8h TTL clamp)
 

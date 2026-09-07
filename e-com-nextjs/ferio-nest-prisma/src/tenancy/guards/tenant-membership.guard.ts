@@ -52,10 +52,12 @@ function isMembershipInvalidation(
  * Enforcement semantics:
  * - Legacy mode (`TENANCY_ENABLED=false`): passthrough — existing deployments
  *   and their authorization model are untouched.
- * - Tenancy on: requires BOTH an authenticated principal AND an active
- *   OrganizationMember row for the request's organization. A valid session
- * from tenant A is worthless against tenant B — different databases hold
- *   the commerce data and this gate holds the roster.
+ * - Tenancy on: requires a tenant-realm authenticated principal AND an active
+ *   OrganizationMember row for the request's organization. Platform-realm
+ *   principals are rejected here even when their email matches a tenant
+ *   membership; platform support must use an explicit support-access flow.
+ *   A valid session from tenant A is worthless against tenant B — different
+ *   databases hold the commerce data and this gate holds the roster.
  *
  * Apply AFTER AuthGuard/RolesGuard on tenant-admin controllers. Riders and
  * customers are bound separately: riders via the tenant-local approved
@@ -181,7 +183,11 @@ export class TenantMembershipGuard implements CanActivate {
       .getRequest<TenantMembershipRequest>();
     const { organizationId } = getTenantContext();
 
-    const principal = request.user ?? request.platformPrincipal;
+    if (request.platformPrincipal) {
+      throw new ForbiddenException('TENANT_SUPPORT_ACCESS_REQUIRED');
+    }
+
+    const principal = request.user;
     const email = (typeof principal?.email === 'string' ? principal.email : '')
       .trim()
       .toLowerCase();

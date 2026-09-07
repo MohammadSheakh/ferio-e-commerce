@@ -19,6 +19,7 @@ type MembershipPlatformDouble = {
 
 type GuardRequest = {
   user?: { email?: string };
+  platformPrincipal?: { email?: string };
   tenantMembership?: { membershipId: string; role: 'OWNER' | 'STAFF' };
 };
 
@@ -192,6 +193,42 @@ describe('TenantMembershipGuard (MT-2 §5.3 / ADR-0004)', () => {
           } as never),
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('rejects platform principals without implicit tenant access', async () => {
+    process.env.TENANCY_ENABLED = 'true';
+    const { guard, findFirst } = build([
+      {
+        id: 'm-1',
+        organizationId: 'org-A',
+        email: 'operator@ferio.local',
+        isActive: true,
+        role: 'OWNER',
+      },
+    ]);
+
+    await expect(
+      runWithTenantContext(
+        {
+          organizationId: 'org-A',
+          tenantDatabaseId: 'tdb-1',
+          database: {} as never,
+          domainId: 'dom-1',
+          hostname: 'a.example.com',
+          subscriptionStatus: 'ACTIVE',
+        },
+        () =>
+          guard.canActivate({
+            switchToHttp: () =>
+              ({
+                getRequest: () => ({
+                  platformPrincipal: { email: 'operator@ferio.local' },
+                }),
+              }) as never,
+          } as never),
+      ),
+    ).rejects.toMatchObject({ message: 'TENANT_SUPPORT_ACCESS_REQUIRED' });
+    expect(findFirst).not.toHaveBeenCalled();
   });
 });
 
