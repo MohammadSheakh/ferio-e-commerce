@@ -207,16 +207,34 @@ export class ProvisioningService {
     try {
       switch (stepName) {
         case 'RESERVE_SUBDOMAIN': {
-          const domain = await this.domains.reserveSubdomain(
-            run.organizationId,
-            run.organization.slug,
-          );
+          const existing = await this.platform.client.tenantDomain.findFirst({
+            where: {
+              organizationId: run.organizationId,
+              type: 'PLATFORM_SUBDOMAIN',
+              status: 'ACTIVE',
+            },
+          });
+          const domain =
+            existing ??
+            (await this.domains.reserveSubdomain(
+              run.organizationId,
+              run.organization.slug,
+            ));
           await mark('COMPLETED', { hostname: domain.hostname });
           break;
         }
         case 'REGISTER_TENANT_DATABASE': {
           // Physical creation is delegated to the executor below; registry row
           // is created together with it so retries cannot double-create.
+          const existing = await this.platform.client.tenantDatabase.findUnique(
+            {
+              where: { organizationId: run.organizationId },
+            },
+          );
+          if (existing) {
+            await mark('COMPLETED', { databaseName: existing.databaseName });
+            break;
+          }
           const material = await this.executor().createTenantDatabase({
             organizationId: run.organizationId,
             slug: run.organization.slug,
@@ -313,9 +331,18 @@ export class ProvisioningService {
           break;
         }
         case 'ACTIVATE_ORGANIZATION': {
-          await this.organizations.transition(run.organizationId, 'ACTIVE', {
-            reason: 'provisioning completed',
-          });
+          const organization =
+            await this.platform.client.organization.findUnique({
+              where: { id: run.organizationId },
+              select: { status: true },
+            });
+          if (!organization)
+            throw new NotFoundException('ORGANIZATION_NOT_FOUND');
+          if (organization.status !== 'ACTIVE') {
+            await this.organizations.transition(run.organizationId, 'ACTIVE', {
+              reason: 'provisioning completed',
+            });
+          }
           await mark('COMPLETED');
           break;
         }

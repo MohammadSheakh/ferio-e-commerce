@@ -415,7 +415,7 @@ All surfaces live in the ferio-platform-admin console:
 ### MT-4 gate
 
 - [ ] A new organization can be created from Platform Admin and reach a working isolated storefront/admin environment without manual SQL.
-- [ ] Replaying provisioning is idempotent.
+- [x] Replaying provisioning is idempotent. (active subdomain, registered tenant database, and already-active organization state are safely reused on step replay)
 - [ ] Failed provisioning is diagnosable and recoverable.
 
 ---
