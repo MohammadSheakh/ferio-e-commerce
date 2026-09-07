@@ -280,13 +280,13 @@ Create a separate control-plane schema/database for platform metadata.
 
 ## 5.3 Identity + tenant membership
 
-- [ ] Define global identity vs tenant membership behavior.
+- [x] Define global identity vs tenant membership behavior. (Global authentication identity is checked against tenant-local membership/customer records; PO-014)
 - [ ] **PARTIAL:** Verify an authenticated account is a member/customer/rider of the resolved tenant before protected tenant actions. (staff membership gate live behind flag; rider binding remains enforced tenant-locally via approved personnel records; customer accounts tenant-local by database separation)
-- [ ] Define same-email behavior across independent tenant businesses.
-- [ ] Define whether customer identity is tenant-local initially.
-- [ ] Prevent a valid session from tenant A being replayed against tenant B.
+- [x] Define same-email behavior across independent tenant businesses. (The same email may exist in independent tenant-local records; organization membership remains the authorization boundary)
+- [x] Define whether customer identity is tenant-local initially. (Customer profiles and user-to-customer links are resolved from the trusted tenant database; PO-015)
+- [x] Prevent a valid session from tenant A being replayed against tenant B. (Tenant membership and tenant-local identity lookups reject replay; focused auth/session coverage)
 - [x] Bind Tenant Admin session authorization to resolved tenant membership. (`TenantMembershipGuard` covers all current `admin/*` controller classes; settings, delivery-personnel, conversations, and socket-ticket method-level routes have focused coverage; `architecture:check` fails on future unguarded admin controller classes)
-- [ ] Bind rider authorization to tenant + approved personnel record.
+- [x] Bind rider authorization to tenant + approved personnel record. (Delivery-personnel authorization requires the resolved tenant and approved personnel record)
 - [ ] **PARTIAL:** Add negative tests for forged hosts and cross-tenant cookies/tokens. (unit suites cover forged/malformed hosts, unknown-domain fail-closed, cross-org session replay denial; full multi-client E2E remains MT-14)
 
 ### MT-2 gate
@@ -693,12 +693,12 @@ This is the largest migration slice. Existing feature behavior should remain sta
 - [ ] **PARTIAL:** Tenant-scope report queries. (`ReportsService` overview/export resolve via tenant client; deeper report families follow the same pattern)
 - [ ] **PARTIAL:** Tenant-scope exports. (orders export routed through tenant client; remaining export surfaces pending)
 - [x] Tenant-scope purchase activity/social proof.
-- [ ] Clarify that "Global Order History" means tenant-global only.
+- [x] Clarify that "Global Order History" means tenant-global only. (The customer history view is global within one tenant database, never across organizations)
 - [ ] **PARTIAL:** Tenant-scope feature flags/settings. (`SettingsService` — all settings CRUD/pagination/delete paths now resolve through the tenant client; platform-vs-tenant feature-flag separation still open)
 - [ ] Separate platform feature flags from tenant feature flags.
 - [ ] Tenant-scope operations health while keeping platform health separate.
 - [ ] Ensure Platform Admin aggregate metrics use approved metadata/aggregation and do not expose tenant PII by default.
-- [ ] Tenant-scope audit logs.
+- [x] Tenant-scope audit logs. (Audit writes automatically include trusted organization, tenant database, domain, hostname, and correlation context)
 - [ ] Add support-access audit linking when Platform Support views tenant data.
 
 ### 10.4A Transactional messaging outbox (pulled forward)
