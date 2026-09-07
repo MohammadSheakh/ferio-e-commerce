@@ -532,7 +532,7 @@ All surfaces live in the ferio-platform-admin console:
 - [ ] Downgrade does not destroy historical data.
 - [x] Limit exceeded is enforced concurrently. (evaluate() limit+usage semantics unit-tested; atomic counters in UsageService)
 - [x] Suspended subscription blocks only approved capabilities.
-- [ ] Internal/free entitlement is explicit and audited.
+- [x] Internal/free entitlement is explicit and audited. (`SubscriptionsService.startInternal()` requires the seeded `internal` plan, creates an ACTIVE subscription, and records `SUBSCRIPTION_INTERNAL_STARTED` with actor and plan evidence.)
 
 ### MT-6 gate
 

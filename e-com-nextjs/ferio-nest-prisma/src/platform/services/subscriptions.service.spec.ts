@@ -140,4 +140,36 @@ describe('SubscriptionsService lifecycle state machine', () => {
     ).toMatchObject({ data: { planId: 'plan-2' } });
     expect(audit.record).toHaveBeenCalled();
   });
+
+  it('audits explicit internal subscription activation', async () => {
+    platform.client.subscription.findUnique.mockResolvedValue(null);
+    platform.client.plan.findUnique.mockResolvedValue({
+      id: 'internal-plan',
+      key: 'internal',
+      isActive: true,
+    });
+    platform.client.subscription.create.mockResolvedValue({
+      id: 'internal-subscription',
+      organizationId: 'org-1',
+      planId: 'internal-plan',
+      status: 'ACTIVE',
+    });
+
+    await expect(
+      service.startInternal('org-1', 'platform-user-1'),
+    ).resolves.toMatchObject({ id: 'internal-subscription' });
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'SUBSCRIPTION_INTERNAL_STARTED',
+        entityId: 'internal-subscription',
+        actorId: 'platform-user-1',
+        newValue: {
+          organizationId: 'org-1',
+          planId: 'internal-plan',
+          planKey: 'internal',
+          status: 'ACTIVE',
+        },
+      }),
+    );
+  });
 });

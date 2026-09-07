@@ -144,7 +144,6 @@ export class SubscriptionsService {
    * (key 'internal') with ACTIVE status — never faked as a paid subscription.
    */
   async startInternal(organizationId: string, actorId?: string) {
-    void actorId;
     const existing = await this.platform.client.subscription.findUnique({
       where: { organizationId },
     });
@@ -154,9 +153,22 @@ export class SubscriptionsService {
     });
     if (!plan || !plan.isActive)
       throw new NotFoundException('INTERNAL_PLAN_NOT_SEEDED');
-    return this.platform.client.subscription.create({
+    const created = await this.platform.client.subscription.create({
       data: { organizationId, planId: plan.id, status: 'ACTIVE' },
     });
+    await this.audit.record({
+      action: 'SUBSCRIPTION_INTERNAL_STARTED',
+      entityType: 'Subscription',
+      entityId: created.id,
+      actorId,
+      newValue: {
+        organizationId,
+        planId: plan.id,
+        planKey: 'internal',
+        status: 'ACTIVE',
+      },
+    });
+    return created;
   }
 
   /** Plan changes never destroy data; entitlements simply re-evaluate. */
