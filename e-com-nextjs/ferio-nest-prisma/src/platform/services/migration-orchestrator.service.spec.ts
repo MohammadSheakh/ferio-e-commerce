@@ -14,6 +14,7 @@ describe('MigrationOrchestratorService (MT-11 / ADR-0005)', () => {
   type MigrationRun = {
     id: string;
     status: string;
+    canaryOrganizationId?: string;
     concurrencyLimit: number;
     failureThreshold: number;
     results: MigrationResult[];
@@ -39,6 +40,7 @@ describe('MigrationOrchestratorService (MT-11 / ADR-0005)', () => {
   function build(
     registries: Registry[],
     existingResults: Array<{ tenantDatabaseId: string; success: boolean }> = [],
+    canaryOrganizationId?: string,
   ) {
     const platform: MigrationPlatform = {
       client: {
@@ -112,6 +114,7 @@ describe('MigrationOrchestratorService (MT-11 / ADR-0005)', () => {
         const base: MigrationRun = {
           id: where.id,
           status: runState[where.id] ?? 'PENDING',
+          canaryOrganizationId,
           concurrencyLimit: 2,
           failureThreshold: 2,
           results: existingResults
@@ -167,6 +170,33 @@ describe('MigrationOrchestratorService (MT-11 / ADR-0005)', () => {
       labels: {},
       value: 1,
     });
+  });
+
+  it('migrates the requested canary organization before the ordered fleet', async () => {
+    const built = build(
+      [
+        { id: 'tdb-1', organizationId: 'org-1', status: 'READY' },
+        { id: 'tdb-2', organizationId: 'org-2', status: 'READY' },
+      ],
+      [],
+      'org-2',
+    );
+    built.databases.getDecryptedConnection.mockImplementation((id: string) =>
+      Promise.resolve({
+        host: id,
+        port: 5432,
+        database: id,
+        user: 'u',
+        password: 'p',
+      }),
+    );
+
+    const outcome = await built.service.processRun('run-1');
+
+    expect(outcome.status).toBe('COMPLETED');
+    const firstConnectionCall = built.databases.getDecryptedConnection.mock
+      .calls[0] as unknown as [string];
+    expect(firstConnectionCall[0]).toBe('tdb-2');
   });
 
   it('retries transient tenant migration failures before recording success', async () => {

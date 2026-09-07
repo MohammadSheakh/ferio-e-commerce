@@ -196,6 +196,7 @@ enum TenantMigrationRunStatus {
 model TenantMigrationRun {
   id                 String                  @id @default(cuid())
   targetSchemaVersion String
+  canaryOrganizationId String?
   status             TenantMigrationRunStatus @default(PENDING)
   concurrencyLimit   Int                     @default(2)
   failureThreshold   Int                     @default(3)

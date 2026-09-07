@@ -96,6 +96,7 @@ export class MigrationOrchestratorService {
     const run = await this.platform.client.tenantMigrationRun.create({
       data: {
         targetSchemaVersion: input.canaryOrganizationId ? 'pending' : 'fleet',
+        canaryOrganizationId: input.canaryOrganizationId,
         status: 'PENDING',
         concurrencyLimit,
         failureThreshold,
@@ -146,6 +147,33 @@ export class MigrationOrchestratorService {
       })
     ).filter((r) => !doneOrgs.has(r.id));
 
+    const requestedCanary = run.canaryOrganizationId
+      ? registries.find(
+          (registry) => registry.organizationId === run.canaryOrganizationId,
+        )
+      : undefined;
+    if (run.canaryOrganizationId && !requestedCanary) {
+      const error = 'CANARY_ORGANIZATION_NOT_READY';
+      await this.platform.client.tenantMigrationRun.update({
+        where: { id: run.id },
+        data: { status: 'FAILED' },
+      });
+      await this.auditNote(
+        'TENANT_MIGRATION_CANARY_FAILED',
+        run.id,
+        undefined,
+        {
+          organizationId: run.canaryOrganizationId,
+          error,
+        },
+      );
+      return {
+        status: 'FAILED',
+        migrated: [],
+        failures: [{ organizationId: run.canaryOrganizationId, error }],
+      };
+    }
+
     const failures: Array<{ organizationId: string; error: string }> = [];
     let consecutiveFailures = 0;
     const migrated: string[] = [];
@@ -156,7 +184,10 @@ export class MigrationOrchestratorService {
     });
 
     // ── Phase 1: canary = first tenant in the ordered list ──
-    const first = registries.shift();
+    const first = requestedCanary ?? registries.shift();
+    if (requestedCanary) {
+      registries.splice(registries.indexOf(requestedCanary), 1);
+    }
     if (!first) {
       await this.markCompleted(run.id);
       return { status: 'COMPLETED', migrated, failures };

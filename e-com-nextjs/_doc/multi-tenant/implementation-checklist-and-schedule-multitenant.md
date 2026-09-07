@@ -835,6 +835,7 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 - [x] Provisioning retry. (console "Run provisioning" action replays the resumable orchestrator; per-step timeline evidences recovery)
 
 - [ ] Tenant migration canary/batch control.
+- [x] Persist and honor the requested migration canary organization. (`TenantMigrationRun.canaryOrganizationId` is stored in the platform plane and the orchestrator migrates that organization before the remaining ordered fleet)
 - [ ] Pause rollout.
 - [ ] Retry failed tenant.
 - [ ] DB health probe.
