@@ -16,6 +16,7 @@ const NAV = [
   { href: "/plans", label: "Plans" },
   { href: "/billing", label: "Billing" },
   { href: "/database-health", label: "Database Health" },
+  { href: "/domain-health", label: "Domain Health" },
   { href: "/migrations", label: "Migrations" },
   { href: "/support-access", label: "Support Access" },
 ];

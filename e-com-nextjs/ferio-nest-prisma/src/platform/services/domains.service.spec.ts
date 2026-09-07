@@ -21,6 +21,7 @@ describe('DomainsService lifecycle (MT-1)', () => {
           create: jest.fn(),
           findUnique: jest.fn(),
           findFirst: jest.fn(),
+          findMany: jest.fn(),
           update: jest.fn(),
           updateMany: jest.fn(),
         },
@@ -88,5 +89,61 @@ describe('DomainsService lifecycle (MT-1)', () => {
       'ferio-verify=token123',
     );
     expect(activated.status).toBe('ACTIVE');
+  });
+
+  it('returns credential-free health diagnostics for every domain', async () => {
+    platform.client.tenantDomain.findMany.mockResolvedValue([
+      {
+        id: 'dom-1',
+        hostname: 'acme.ferio.test',
+        type: 'PLATFORM_SUBDOMAIN',
+        status: 'ACTIVE',
+        isPrimary: true,
+        organization: { id: 'org-1', name: 'Acme', status: 'ACTIVE' },
+      },
+      {
+        id: 'dom-2',
+        hostname: 'shop.acme.test',
+        type: 'CUSTOM',
+        status: 'PENDING_VERIFICATION',
+        isPrimary: false,
+        organization: { id: 'org-1', name: 'Acme', status: 'ACTIVE' },
+      },
+      {
+        id: 'dom-3',
+        hostname: 'paused.ferio.test',
+        type: 'PLATFORM_SUBDOMAIN',
+        status: 'ACTIVE',
+        isPrimary: true,
+        organization: { id: 'org-2', name: 'Paused', status: 'SUSPENDED' },
+      },
+    ]);
+
+    await expect(service.health()).resolves.toEqual({
+      totalDomains: 3,
+      healthyCount: 1,
+      unhealthyCount: 2,
+      byStatus: { ACTIVE: 2, PENDING_VERIFICATION: 1 },
+      domains: [
+        expect.objectContaining({
+          id: 'dom-1',
+          healthy: true,
+          issue: null,
+        }),
+        expect.objectContaining({
+          id: 'dom-2',
+          healthy: false,
+          issue: 'DOMAIN_PENDING_VERIFICATION',
+        }),
+        expect.objectContaining({
+          id: 'dom-3',
+          healthy: false,
+          issue: 'ORGANIZATION_SUSPENDED',
+        }),
+      ],
+    });
+    expect(JSON.stringify(await service.health())).not.toContain(
+      'verificationToken',
+    );
   });
 });

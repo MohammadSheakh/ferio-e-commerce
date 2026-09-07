@@ -192,6 +192,13 @@ export class PlatformAdminController {
     };
   }
 
+  /** MT-9 §12.1/§12.4 — credential-free domain routing diagnostics. */
+  @Get('domain-health')
+  @PlatformPermissions('organization:read')
+  domainHealth() {
+    return this.domains.health();
+  }
+
   @Get('organizations/:id')
   @PlatformPermissions('organization:read')
   getOrganization(@Param('id') id: string) {

@@ -800,7 +800,7 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 - [x] Active/trial/past-due/suspended subscription counts.
 - [x] Provisioning failures.
 - [x] Tenant migration fleet status. (`GET /platform/database-health` + Database Health console page: every registered tenant database vs the canonical migration-chain head, with behind-count summary)
-- [ ] Domain health.
+- [x] Domain health. (Platform Admin `GET /platform/domain-health` reports credential-free per-domain status, organization status, and actionable routing issues; console page added.)
 - [x] Tenant DB health. (fleet view surfaces registry status + schema version per tenant database)
 - [x] Platform billing outcomes. (`GET /platform/billing/invoices` + `/billing/payment-attempts`; Billing console page with invoice/payment tables and PAID/OPEN states)
 - [x] Usage/limit alerts. (`usage_warning_threshold_crossed` counter + structured warn exactly once per crossing; per-org Usage card on the console organization detail renders NEAR LIMIT states and a "Recount from facts" reconcile action)

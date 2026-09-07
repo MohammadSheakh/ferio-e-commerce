@@ -204,6 +204,56 @@ export class DomainsService {
     return updated;
   }
 
+  /**
+   * Credential-free operator diagnostics for every registered domain. A
+   * domain is healthy only when both its own state and its organization state
+   * are ACTIVE; verification tokens are intentionally excluded from this
+   * projection.
+   */
+  async health() {
+    const rows = await this.platform.client.tenantDomain.findMany({
+      orderBy: { hostname: 'asc' },
+      select: {
+        id: true,
+        hostname: true,
+        type: true,
+        status: true,
+        isPrimary: true,
+        organization: { select: { id: true, name: true, status: true } },
+      },
+    });
+    const byStatus = rows.reduce<Record<string, number>>((counts, row) => {
+      counts[row.status] = (counts[row.status] ?? 0) + 1;
+      return counts;
+    }, {});
+
+    const domains = rows.map((row) => ({
+      id: row.id,
+      hostname: row.hostname,
+      type: row.type,
+      status: row.status,
+      isPrimary: row.isPrimary,
+      organizationId: row.organization.id,
+      organizationName: row.organization.name,
+      organizationStatus: row.organization.status,
+      healthy: row.status === 'ACTIVE' && row.organization.status === 'ACTIVE',
+      issue:
+        row.status !== 'ACTIVE'
+          ? `DOMAIN_${row.status}`
+          : row.organization.status !== 'ACTIVE'
+            ? `ORGANIZATION_${row.organization.status}`
+            : null,
+    }));
+
+    return {
+      totalDomains: domains.length,
+      healthyCount: domains.filter((domain) => domain.healthy).length,
+      unhealthyCount: domains.filter((domain) => !domain.healthy).length,
+      byStatus,
+      domains,
+    };
+  }
+
   normalizeHostname(input: string): string {
     return input.trim().toLowerCase().replace(/\.$/, '');
   }
