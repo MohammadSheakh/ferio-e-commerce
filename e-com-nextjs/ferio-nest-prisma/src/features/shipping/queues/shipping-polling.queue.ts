@@ -1,5 +1,5 @@
 import { tryGetTenantContext } from '../../../tenancy/context/tenant-context';
-import type { TenantFanoutService } from '../../../tenancy/services/tenant-fanout.service';
+import { TenantFanoutService } from '../../../tenancy/services/tenant-fanout.service';
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { ConfigService } from '@nestjs/config';

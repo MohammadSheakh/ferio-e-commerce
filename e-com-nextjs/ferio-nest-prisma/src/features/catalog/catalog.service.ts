@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -61,6 +62,7 @@ export class CatalogService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly entitlements: EntitlementsService,
+    @Inject(TenantDbService)
     private readonly tenantDb: TenantDbService | undefined,
   ) {}
 

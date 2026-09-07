@@ -39,6 +39,7 @@ export class StaffAccessService {
     private readonly orgMembers: {
       countActiveMembers(organizationId: string): Promise<number>;
     },
+    @Inject(TenantDbService)
     private readonly tenantDb: TenantDbService | undefined,
   ) {}
 

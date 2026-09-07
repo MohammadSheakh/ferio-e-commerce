@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -80,6 +81,7 @@ export class OrderService {
     private readonly customerNotifications: CustomerNotificationsService,
     private readonly entitlements: EntitlementsService,
     private readonly usage: UsageService,
+    @Inject(TenantDbService)
     private readonly tenantDb: TenantDbService | undefined,
   ) {}
 

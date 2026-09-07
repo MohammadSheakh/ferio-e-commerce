@@ -1,5 +1,5 @@
 import type { PrismaClient } from '@prisma/client';
-import type { TenantFanoutService } from '../../../tenancy/services/tenant-fanout.service';
+import { TenantFanoutService } from '../../../tenancy/services/tenant-fanout.service';
 import { tryGetTenantContext } from '../../../tenancy/context/tenant-context';
 import { TenantDbService } from '../../../tenancy/services/tenant-db.service';
 import {
