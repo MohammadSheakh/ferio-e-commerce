@@ -274,8 +274,8 @@ Create a separate control-plane schema/database for platform metadata.
 - [x] Prevent code from mutating tenant context during a request. (Object.freeze + no setters exported)
 - [ ] **PARTIAL:** Propagate trusted tenant context to background jobs. (`TenantDatabaseMaterial` now rides the immutable request context; BullMQ envelope propagation lands with MT-8 job work.)
 - [ ] Propagate tenant scope to WebSocket authorization.
-- [ ] Include tenant identity in audit events.
-- [ ] Include safe tenant identity in structured logs/metrics.
+- [x] Include tenant identity in audit events. (`AuditService` appends safe organization, tenant database, domain, hostname, and correlation metadata at the shared write boundary.)
+- [x] Include safe tenant identity in structured logs/metrics. (`TenancyObservabilityService` registers the immutable context with `StructuredLogger`; no credentials or raw headers are emitted.)
 - [x] Do not expose DB credentials in context returned to frontend clients. (context carries registry IDs only; publicView strips secrets)
 
 ## 5.3 Identity + tenant membership

@@ -18,6 +18,8 @@ export interface TenantDatabaseMaterial {
 }
 
 export interface TenantContext {
+  /** Safe request correlation value; never contains credentials or raw headers. */
+  readonly correlationId: string;
   readonly organizationId: string;
   /** Registry ID of the resolved tenant database — the only key the
    * connection manager accepts. */

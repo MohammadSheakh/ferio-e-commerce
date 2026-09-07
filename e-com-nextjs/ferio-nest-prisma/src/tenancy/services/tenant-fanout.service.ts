@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { StructuredLogger, TenantMetrics } from '@app/common';
+import { getCorrelationId, StructuredLogger, TenantMetrics } from '@app/common';
 import { PlatformPrismaService } from '../../platform/platform-prisma.service';
 import {
   runWithTenantContext,
@@ -127,6 +127,7 @@ export class TenantFanoutService {
 
   private contextFor(registry: TenantDatabaseMaterial): TenantContext {
     return Object.freeze({
+      correlationId: getCorrelationId(),
       organizationId: registry.organizationId,
       tenantDatabaseId: registry.id,
       database: Object.freeze({

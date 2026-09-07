@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { getCorrelationId } from '@app/common';
 import { PlatformPrismaService } from '../../platform/platform-prisma.service';
 import { TenantDatabaseManager } from './tenant-database.manager';
 import {
@@ -42,6 +43,7 @@ export class TenantCallbackRunner {
 
     return runWithTenantContext(
       {
+        correlationId: getCorrelationId(),
         organizationId,
         tenantDatabaseId: registry.id,
         database: {

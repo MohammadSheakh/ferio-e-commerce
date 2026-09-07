@@ -17,7 +17,7 @@ import {
   type TenantDatabaseMaterial,
 } from '../context/tenant-context';
 import { setDomainCacheInvalidator } from '../../platform/utils/domain-cache-invalidation';
-import { TenantMetrics } from '@app/common';
+import { getCorrelationId, TenantMetrics } from '@app/common';
 
 const POSITIVE_CACHE_TTL_SECONDS = 60;
 const NEGATIVE_CACHE_TTL_SECONDS = 15;
@@ -398,6 +398,7 @@ export class TenantContextMiddleware implements NestMiddleware {
         ).tenantOrganizationId = resolved.organizationId;
         runWithTenantContext(
           {
+            correlationId: getCorrelationId(),
             organizationId: resolved.organizationId,
             tenantDatabaseId: resolved.tenantDatabaseId,
             database: resolved.database,
