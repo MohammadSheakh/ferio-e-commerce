@@ -1088,7 +1088,7 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 - [ ] Secret scan.
 - [x] SAST/lint/typecheck.
 - [x] Production builds for all web apps/backend. (CI matrix: backend, Customer Web, Admin Web, Platform Admin)
-- [ ] Prisma migration validation.
+- [x] Prisma migration validation. (CI runs `check:migrations` before deployment; it validates both PostgreSQL migration roots, naming, SQL presence, duplicate names, and lock providers)
 - [x] Tenant-isolation integration suite mandatory in CI. (backend workflow runs cross-tenant integration and performance suites against disposable PostgreSQL)
 - [x] Prevent merge if critical isolation tests fail. (integration, capacity, queue-smoke, typecheck, lint, and audit failures fail their required CI jobs)
 
@@ -1399,24 +1399,24 @@ For each high-risk resource, create tenant A and tenant B with overlapping numer
 
 Every merge affecting tenant-aware code should run:
 
-- [ ] Backend lint/typecheck/build.
-- [ ] Backend unit suite.
-- [ ] Control-plane Prisma migration validation.
-- [ ] Tenant-plane Prisma migration validation.
-- [ ] Disposable control-plane PostgreSQL integration tests.
-- [ ] At least two disposable tenant PostgreSQL databases.
-- [ ] Cross-tenant isolation suite.
-- [ ] Redis/BullMQ isolation tests for affected modules.
-- [ ] WebSocket isolation tests for affected realtime modules.
-- [ ] Storefront production build.
-- [ ] Tenant Admin production build.
-- [ ] Platform Admin production build.
-- [ ] Rider surface production build.
-- [ ] Secret scan.
-- [ ] Dependency/security audit.
+- [x] Backend lint/typecheck/build. (required backend CI job)
+- [x] Backend unit suite. (required backend CI job)
+- [x] Control-plane Prisma migration validation. (platform migration deploy plus static migration preflight)
+- [x] Tenant-plane Prisma migration validation. (tenant migration deploy plus static migration preflight)
+- [x] Disposable control-plane PostgreSQL integration tests. (CI PostgreSQL service)
+- [x] At least two disposable tenant PostgreSQL databases. (tenant bootstrap/integration suites create isolated scratch databases)
+- [x] Cross-tenant isolation suite. (required integration job)
+- [x] Redis/BullMQ isolation tests for affected modules. (required queue-smoke job)
+- [x] WebSocket isolation tests for affected realtime modules. (integration suite and multi-instance suite when Redis is available)
+- [x] Storefront production build. (Customer Web CI job)
+- [x] Tenant Admin production build. (Admin Web CI job)
+- [x] Platform Admin production build. (Platform Admin CI job)
+- [x] Rider surface production build. (included in the Tenant Admin workspace build)
+- [x] Secret scan. (required gitleaks job)
+- [x] Dependency/security audit. (critical production dependency audit matrix)
 - [ ] Migration compatibility check.
-- [ ] No use of production tenant credentials in CI.
-- [ ] Fail build on critical tenant-isolation regression.
+- [x] No use of production tenant credentials in CI. (CI uses disposable PostgreSQL/Redis credentials and synthetic JWT secrets)
+- [x] Fail build on critical tenant-isolation regression. (required integration, queue, typecheck, lint, and build jobs)
 
 Before production deployment:
 

@@ -69,6 +69,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Generate Prisma clients (tenant + platform)
         run: pnpm prisma:generate
+      - name: Validate committed Prisma migrations
+        run: pnpm check:migrations
       - name: Verify backend architecture boundaries
         run: pnpm architecture:check
       - name: Lint active application entrypoints
