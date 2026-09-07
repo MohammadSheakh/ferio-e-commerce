@@ -87,6 +87,11 @@ export class EntitlementsService {
     }
 
     const requested = options.requestedCount ?? 1;
+    if (!Number.isSafeInteger(requested) || requested < 0) {
+      throw new RangeError(
+        'requestedCount must be a non-negative safe integer',
+      );
+    }
     const current =
       options.currentOverride !== undefined
         ? BigInt(options.currentOverride)
@@ -95,7 +100,7 @@ export class EntitlementsService {
             featureKey,
             options.periodKey,
           );
-    if (Number(current) + requested > entitlement.limit) {
+    if (current + BigInt(requested) > BigInt(entitlement.limit)) {
       TenantMetrics.increment('entitlement_denied', {
         code: 'PLAN_LIMIT_REACHED',
         featureKey,

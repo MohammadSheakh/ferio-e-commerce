@@ -26,6 +26,7 @@ describe('EntitlementsService evaluation matrix (ADR-0006)', () => {
 
   beforeEach(() => {
     platform = { client: { subscription: { findUnique: jest.fn() } } };
+    usage.getValue.mockClear();
     usage.getValue.mockResolvedValue(BigInt(0));
     service = new EntitlementsService(platform as never, usage);
   });
@@ -102,5 +103,37 @@ describe('EntitlementsService evaluation matrix (ADR-0006)', () => {
     expect(
       await service.evaluate('org', 'staff_seats', { requestedCount: 2 }),
     ).toMatchObject({ allowed: false, code: 'PLAN_LIMIT_REACHED' });
+  });
+
+  it('compares large limits without converting bigint usage to number', async () => {
+    mockSubscription({
+      status: 'ACTIVE',
+      entitlements: [
+        {
+          featureKey: 'orders_per_month',
+          enabled: true,
+          limit: Number.MAX_SAFE_INTEGER,
+        },
+      ],
+    });
+    usage.getValue.mockResolvedValue(BigInt(Number.MAX_SAFE_INTEGER));
+
+    await expect(
+      service.evaluate('org', 'orders_per_month', { requestedCount: 1 }),
+    ).resolves.toMatchObject({ allowed: false, code: 'PLAN_LIMIT_REACHED' });
+  });
+
+  it('rejects invalid requested counts before usage lookup', async () => {
+    mockSubscription({
+      status: 'ACTIVE',
+      entitlements: [
+        { featureKey: 'orders_per_month', enabled: true, limit: 10 },
+      ],
+    });
+
+    await expect(
+      service.evaluate('org', 'orders_per_month', { requestedCount: -1 }),
+    ).rejects.toThrow('requestedCount must be a non-negative safe integer');
+    expect(usage.getValue).not.toHaveBeenCalled();
   });
 });

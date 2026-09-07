@@ -483,10 +483,10 @@ All surfaces live in the ferio-platform-admin console:
 - [x] Define advanced reports/CRM/marketing entitlement.
 - [x] Define warehouse entitlement. (warehouses_max 1/3/10 — enforcement lands with multi-warehouse support)
 - [ ] Define integration/provider entitlement if applicable.
-- [ ] Store entitlement evaluation server-side.
-- [ ] Do not rely on hidden/disabled frontend controls for enforcement.
-- [ ] Add owner-visible current plan and usage.
-- [ ] Add upgrade-required errors with stable machine codes.
+- [x] Store entitlement evaluation server-side. (`EntitlementsService.evaluate` is the single control-plane evaluator; catalog, orders, and staff invitations call it before monetizable work.)
+- [x] Do not rely on hidden/disabled frontend controls for enforcement. (The three Release MT-6 hooks enforce limits in backend services and return stable denial codes.)
+- [x] Add owner-visible current plan and usage. (`GET /tenancy/my-plan` returns the active plan, entitlements, and live usage for the Tenant Admin Plan Usage card.)
+- [x] Add upgrade-required errors with stable machine codes. (`ENTITLEMENT_NOT_FOUND`, `FEATURE_DISABLED`, `PLAN_LIMIT_REACHED`, and `SUBSCRIPTION_INACTIVE` are returned by server-side gates.)
 
 ## 9.2 Subscription lifecycle
 

@@ -578,7 +578,7 @@ export class CatalogService {
       });
       const decision = await this.entitlements
         .evaluate(ctx.organizationId, 'products_max', {
-          requestedCount: currentCount + 1,
+          requestedCount: 1,
           currentOverride: currentCount,
         })
         .catch(() => null);
