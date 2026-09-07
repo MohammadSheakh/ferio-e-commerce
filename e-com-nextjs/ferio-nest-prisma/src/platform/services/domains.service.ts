@@ -59,7 +59,7 @@ export class DomainsService {
         data: {
           hostname,
           type: 'PLATFORM_SUBDOMAIN',
-          status: 'ACTIVE',
+          status: 'PENDING_ACTIVATION',
           isPrimary: true,
           organizationId,
         },
@@ -83,6 +83,34 @@ export class DomainsService {
       }
       throw error;
     }
+  }
+
+  /** Activate a reserved platform subdomain only after tenant readiness. */
+  async activatePlatformSubdomain(domainId: string, actorId?: string) {
+    const domain = await this.platform.client.tenantDomain.findUnique({
+      where: { id: domainId },
+    });
+    if (!domain) throw new NotFoundException('DOMAIN_NOT_FOUND');
+    if (domain.type !== 'PLATFORM_SUBDOMAIN') {
+      throw new ConflictException('DOMAIN_NOT_PLATFORM_SUBDOMAIN');
+    }
+    if (domain.status === 'ACTIVE') return domain;
+    if (domain.status !== 'PENDING_ACTIVATION') {
+      throw new ConflictException('DOMAIN_NOT_READY_FOR_ACTIVATION');
+    }
+    const updated = await this.platform.client.tenantDomain.update({
+      where: { id: domainId },
+      data: { status: 'ACTIVE' },
+    });
+    invalidateDomainCache(updated.hostname);
+    await this.audit.record({
+      action: 'TENANT_DOMAIN_ACTIVATED',
+      entityType: 'TenantDomain',
+      entityId: domainId,
+      actorId,
+      newValue: { hostname: domain.hostname },
+    });
+    return updated;
   }
 
   /**

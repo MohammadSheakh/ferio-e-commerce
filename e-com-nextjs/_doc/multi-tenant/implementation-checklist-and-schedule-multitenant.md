@@ -353,9 +353,9 @@ Create a separate control-plane schema/database for platform metadata.
 
 Provisioning should behave as an idempotent state machine, not a controller script.
 
-- [ ] Platform Admin creates organization.
-- [ ] Reserve unique organization slug.
-- [ ] Reserve default tenant subdomain.
+- [x] Platform Admin creates organization. (`POST /platform/organizations` creates the PROVISIONING organization and owner membership)
+- [x] Reserve unique organization slug. (control-plane uniqueness plus service-level normalization/validation)
+- [x] Reserve default tenant subdomain. (unique subdomain is created as `PENDING_ACTIVATION`, not traffic-visible)
 - [x] Create tenant DB registry record.
 - [ ] **PARTIAL:** Create physical database/schema according to infrastructure strategy. (default executor issues CREATE DATABASE on the platform server + canonical migration set applied via `TenantSchemaBootstrapper`; managed hosting remains owner-blocked)
 - [x] Generate/store tenant DB credential securely. (AES-256-GCM at rest, decrypted only inside pool creation/bootstrap)
@@ -366,8 +366,8 @@ Provisioning should behave as an idempotent state machine, not a controller scri
 - [x] Create/attach initial owner membership. (created atomically with the organization; owner-membership conflicts cannot leave an orphan organization)
 - [x] Run DB health check. (read-only `SELECT 1` plus required migration-ledger and baseline-table verification before registry READY stamping)
 - [x] Run minimal tenant smoke test. (provisioning records a separate `SMOKE_TEST` step and verifies the migration ledger, `CommerceSettings`, and `CodVerificationPolicy` tables against the new database)
-- [ ] Activate domain only after readiness.
-- [ ] Mark organization `READY/ACTIVE` only after all required steps succeed.
+- [x] Activate domain only after readiness. (`PENDING_ACTIVATION` becomes `ACTIVE` only in the final provisioning step after migrations, seed, health, and smoke test)
+- [x] Mark organization `READY/ACTIVE` only after all required steps succeed. (failed steps transition to `PROVISIONING_FAILED`; successful finalization transitions to `ACTIVE`)
 - [x] Persist every provisioning step/result.
 - [x] Make retries resume safely. (resume-from-first-incomplete-step; idempotency-key replay returns completed runs)
 - [x] Prevent duplicate DB/domain creation on repeated requests. (unique org slug/domain hostname/registry orgId/idempotencyKey)
@@ -387,14 +387,14 @@ Provisioning should behave as an idempotent state machine, not a controller scri
 
 ## 7.3 Organization lifecycle
 
-- [ ] Implement `PROVISIONING`.
-- [ ] Implement `ACTIVE`.
-- [ ] Implement `SUSPENDED`.
-- [ ] Implement `PROVISIONING_FAILED`.
-- [ ] Implement `CLOSURE_PENDING` if approved.
-- [ ] Implement archived/deleted lifecycle according to retention policy.
-- [ ] Define which public/storefront operations remain visible during subscription suspension.
-- [ ] Prevent destructive deletion while legal/financial retention applies.
+- [x] Implement `PROVISIONING`. (organization state machine)
+- [x] Implement `ACTIVE`. (organization state machine)
+- [x] Implement `SUSPENDED`. (organization state machine plus suspension mutation guard)
+- [x] Implement `PROVISIONING_FAILED`. (failed provisioning transitions are durable and resumable)
+- [x] Implement `CLOSURE_PENDING` if approved. (closure workflow disables domains before retention)
+- [x] Implement archived/deleted lifecycle according to retention policy. (`CLOSED` then `ARCHIVED`; physical destruction remains provider/retention controlled)
+- [x] Define which public/storefront operations remain visible during subscription suspension. (browsable storefront, commerce writes denied by policy)
+- [x] Prevent destructive deletion while legal/financial retention applies. (90-day closure retention gate with explicit audited override)
 - [ ] Add export-before-closure workflow if required.
 
 ## 7.4 Provisioning operations UI

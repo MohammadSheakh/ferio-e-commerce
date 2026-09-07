@@ -77,6 +77,7 @@ enum TenantDomainType {
 
 enum TenantDomainStatus {
   ACTIVE
+  PENDING_ACTIVATION
   PENDING_VERIFICATION
   VERIFICATION_FAILED
   DISABLED

@@ -34,7 +34,10 @@ describe('ProvisioningService idempotency boundary', () => {
       },
     };
     const organizations = { transition: jest.fn() };
-    const domains = { reserveSubdomain: jest.fn() };
+    const domains = {
+      reserveSubdomain: jest.fn(),
+      activatePlatformSubdomain: jest.fn(),
+    };
     const databases = {
       register: jest.fn(),
       getDecryptedConnection: jest.fn(),
@@ -136,6 +139,11 @@ describe('ProvisioningService idempotency boundary', () => {
     const built = build();
     built.platform.client.organization.findUnique.mockResolvedValue({
       status: 'ACTIVE',
+    });
+    built.platform.client.tenantDomain.findFirst.mockResolvedValue({
+      id: 'dom-1',
+      type: 'PLATFORM_SUBDOMAIN',
+      status: 'PENDING_ACTIVATION',
     });
     built.platform.client.provisioningStep = {
       update: jest.fn().mockResolvedValue({}),

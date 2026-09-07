@@ -109,12 +109,18 @@ export class OrganizationsService {
       );
     }
 
-    const [updated] = await this.platform.client.$transaction([
-      this.platform.client.organization.update({
-        where: { id: organizationId },
+    const updated = await this.platform.client.$transaction(async (tx) => {
+      // Compare-and-set prevents two operators from both transitioning the
+      // same lifecycle state after reading the same previous status.
+      const result = await tx.organization.updateMany({
+        where: { id: organizationId, status: organization.status },
         data: { status: to },
-      }),
-      this.platform.client.organizationLifecycleEvent.create({
+      });
+      if (result.count !== 1) {
+        throw new ConflictException('ORGANIZATION_TRANSITION_RACE');
+      }
+
+      await tx.organizationLifecycleEvent.create({
         data: {
           organizationId,
           fromStatus: organization.status,
@@ -122,8 +128,14 @@ export class OrganizationsService {
           actorId: options.actorId,
           reason: options.reason,
         },
-      }),
-    ]);
+      });
+
+      return (
+        (await tx.organization.findUnique({
+          where: { id: organizationId },
+        })) ?? { ...organization, status: to }
+      );
+    });
 
     await this.audit.record({
       action: 'ORGANIZATION_STATUS_CHANGED',

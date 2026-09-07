@@ -211,7 +211,6 @@ export class ProvisioningService {
             where: {
               organizationId: run.organizationId,
               type: 'PLATFORM_SUBDOMAIN',
-              status: 'ACTIVE',
             },
           });
           const domain =
@@ -343,6 +342,14 @@ export class ProvisioningService {
               reason: 'provisioning completed',
             });
           }
+          const domain = await this.platform.client.tenantDomain.findFirst({
+            where: {
+              organizationId: run.organizationId,
+              type: 'PLATFORM_SUBDOMAIN',
+            },
+          });
+          if (!domain) throw new ConflictException('TENANT_DOMAIN_MISSING');
+          await this.domains.activatePlatformSubdomain(domain.id);
           await mark('COMPLETED');
           break;
         }

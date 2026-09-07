@@ -7,6 +7,7 @@ type OrganizationsPlatform = {
       create: jest.Mock;
       findUnique: jest.Mock;
       update: jest.Mock;
+      updateMany: jest.Mock;
     };
     organizationMember: { create: jest.Mock };
     organizationLifecycleEvent: { create: jest.Mock };
@@ -43,6 +44,7 @@ describe('OrganizationsService lifecycle state machine', () => {
           create: jest.fn(),
           findUnique: jest.fn(),
           update: jest.fn().mockResolvedValue(org('ACTIVE')),
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         },
         organizationMember: { create: jest.fn() },
         organizationLifecycleEvent: { create: jest.fn() },
@@ -162,5 +164,20 @@ describe('OrganizationsService lifecycle state machine', () => {
     } else {
       await expect(attempt).rejects.toBeInstanceOf(ConflictException);
     }
+  });
+
+  it('rejects a stale concurrent lifecycle transition without writing history', async () => {
+    platform.client.organization.findUnique.mockResolvedValueOnce(
+      org('ACTIVE'),
+    );
+    platform.client.organization.updateMany.mockResolvedValueOnce({ count: 0 });
+
+    await expect(
+      service.transition('org-1', 'SUSPENDED', { reason: 'stale operator' }),
+    ).rejects.toThrow('ORGANIZATION_TRANSITION_RACE');
+    expect(
+      platform.client.organizationLifecycleEvent.create,
+    ).not.toHaveBeenCalled();
+    expect(audit.record).not.toHaveBeenCalled();
   });
 });

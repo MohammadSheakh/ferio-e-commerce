@@ -32,7 +32,7 @@ describe('DomainsService lifecycle (MT-1)', () => {
     service = new DomainsService(platform as never, audit as never);
   });
 
-  it('reserves an active primary subdomain from the org slug', async () => {
+  it('reserves a pending primary subdomain from the org slug', async () => {
     platform.client.organization.findUnique.mockResolvedValue({ id: 'org-1' });
     platform.client.tenantDomain.create.mockImplementation(
       ({ data }: { data: Record<string, unknown> }) =>
@@ -42,8 +42,31 @@ describe('DomainsService lifecycle (MT-1)', () => {
     const domain = await service.reserveSubdomain('org-1', 'acme-store');
 
     expect(domain.hostname).toBe('acme-store.ferio.test');
-    expect(domain.status).toBe('ACTIVE');
+    expect(domain.status).toBe('PENDING_ACTIVATION');
     expect(domain.isPrimary).toBe(true);
+  });
+
+  it('activates a platform subdomain only through the readiness gate', async () => {
+    platform.client.tenantDomain.findUnique.mockResolvedValue({
+      id: 'dom-1',
+      hostname: 'acme-store.ferio.test',
+      type: 'PLATFORM_SUBDOMAIN',
+      status: 'PENDING_ACTIVATION',
+    });
+    platform.client.tenantDomain.update.mockResolvedValue({
+      id: 'dom-1',
+      hostname: 'acme-store.ferio.test',
+      type: 'PLATFORM_SUBDOMAIN',
+      status: 'ACTIVE',
+    });
+
+    await expect(
+      service.activatePlatformSubdomain('dom-1'),
+    ).resolves.toMatchObject({ status: 'ACTIVE' });
+    expect(platform.client.tenantDomain.update).toHaveBeenCalledWith({
+      where: { id: 'dom-1' },
+      data: { status: 'ACTIVE' },
+    });
   });
 
   it('rejects reserved subdomains before touching the database', async () => {
