@@ -260,7 +260,7 @@ Create a separate control-plane schema/database for platform metadata.
 - [x] Reject unknown domains. (negative-cached, stable code)
 - [x] Reject inactive/unverified domains.
 - [x] Reject suspended organizations according to policy. (`TENANT_SUSPENDED` 503)
-- [ ] **PARTIAL:** Support development host mapping without weakening production behavior. (`TENANCY_ENABLED` staged-rollout flag added: disabled = passthrough legacy mode; enabled = strict fail-closed resolution. Per-host dev mapping table still pending.)
+- [x] Support development host mapping without weakening production behavior. (`TENANT_DEV_HOST_MAP` supports exact local aliases only when `NODE_ENV` is not production; production ignores the mapping and resolves the request host directly.)
 - [x] Cache domain resolution only with tenant-aware keys. (key IS the trusted hostname; positive 60s / negative 15s TTL)
 - [x] Implement explicit invalidation on domain/status changes. (`invalidate(hostname)`)
 - [x] Define negative-cache TTL for unknown domains. (15s window; only definitive unknown/inactive answers are cached — outages never are; storm test proves 299 subsequent misses cost zero control-plane queries)
@@ -427,7 +427,7 @@ All surfaces live in the ferio-platform-admin console:
 - [x] Define canonical hostname format, e.g. `{tenant}.ferio...`. (`PLATFORM_PUBLIC_DOMAIN` + slug; enforced in DomainsService)
 - [ ] **PARTIAL:** Configure wildcard DNS. (Decision made: *.ferio.com → storefront infrastructure, PO-007/008; DNS record creation itself is an ops task on the production domain)
 - [ ] Configure wildcard TLS/certificate strategy.
-- [ ] **PARTIAL:** Add local-development tenant-domain strategy. (LEGACY passthrough mode keeps localhost working; per-host dev mapping table pending)
+- [x] Configure local-development tenant-domain strategy. (`TENANT_DEV_HOST_MAP` maps browser hosts such as `localhost:3000` to registered tenant domains without changing production routing.)
 - [ ] Add canonical redirect rules.
 - [x] Add reserved subdomain list (`www`, `admin`, `api`, `app`, etc.). (`RESERVED_SUBDOMAINS`)
 - [ ] Prevent organization slugs from colliding with reserved/system routes.

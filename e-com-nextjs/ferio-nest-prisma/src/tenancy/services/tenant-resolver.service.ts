@@ -121,9 +121,39 @@ export class TenantResolverService implements OnModuleInit {
           HttpStatus.BAD_REQUEST,
         );
       }
-      return forwardedHost;
+      return this.mapDevelopmentHost(forwardedHost);
     }
-    return headersOrRequest.hostname;
+    return this.mapDevelopmentHost(headersOrRequest.hostname);
+  }
+
+  /**
+   * Local-only host aliases keep browser development usable while preserving
+   * the production rule that the request host must be a registered domain.
+   * Format: `localhost=store.ferio.local,admin.local=other.ferio.local`.
+   */
+  private mapDevelopmentHost(hostname: string | undefined): string | undefined {
+    if (process.env.NODE_ENV === 'production' || !hostname) return hostname;
+    const mapping = process.env.TENANT_DEV_HOST_MAP?.trim();
+    if (!mapping) return hostname;
+
+    const source = this.devHostKey(hostname);
+    for (const entry of mapping.split(',')) {
+      const [rawSource, rawTarget, ...extra] = entry
+        .split('=')
+        .map((value) => value.trim());
+      if (!rawSource || !rawTarget || extra.length > 0) continue;
+      if (this.devHostKey(rawSource) !== source) continue;
+      return normalizeTenantHost(rawTarget);
+    }
+    return hostname;
+  }
+
+  private devHostKey(hostname: string): string {
+    return hostname
+      .trim()
+      .toLowerCase()
+      .replace(/:\d+$/, '')
+      .replace(/\.$/, '');
   }
 
   private singleForwardedHost(value: string | string[]): string {

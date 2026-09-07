@@ -86,6 +86,33 @@ describe('TenantResolverService fail-closed resolution (MT-2 gate)', () => {
     ).toBe('store.example.com');
   });
 
+  it('maps an explicit local development host to a registered tenant domain', () => {
+    process.env.NODE_ENV = 'development';
+    process.env.TENANT_DEV_HOST_MAP =
+      'localhost:3000=acme.ferio.local,admin.local=other.ferio.local';
+
+    expect(
+      service.effectiveHostFrom({
+        headers: {},
+        hostname: 'localhost:3000',
+        remoteAddress: '127.0.0.1',
+      }),
+    ).toBe('acme.ferio.local');
+  });
+
+  it('ignores development host mappings in production', () => {
+    process.env.NODE_ENV = 'production';
+    process.env.TENANT_DEV_HOST_MAP = 'localhost=acme.ferio.local';
+
+    expect(
+      service.effectiveHostFrom({
+        headers: {},
+        hostname: 'localhost',
+        remoteAddress: '127.0.0.1',
+      }),
+    ).toBe('localhost');
+  });
+
   it('accepts one forwarded host from a configured proxy CIDR', () => {
     process.env.NODE_ENV = 'production';
     process.env.TENANT_TRUSTED_PROXY_CIDRS = '172.16.0.0/12,10.20.30.40/32';
