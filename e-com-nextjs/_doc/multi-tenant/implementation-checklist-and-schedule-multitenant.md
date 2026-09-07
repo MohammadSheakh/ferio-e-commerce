@@ -226,7 +226,7 @@ Create a separate control-plane schema/database for platform metadata.
 ## 4.3 Control-plane authorization
 
 - [x] Create separate Platform Admin guards. (`PlatformAuthGuard`, realm=platform tokens, role→permission map)
-- [ ] Define platform permissions for organization, subscription, billing, domain, provisioning, migration, support access, and platform health.
+- [x] Define platform permissions for organization, subscription, billing, domain, provisioning, migration, support access, and platform health. (`PLATFORM_PERMISSION` is the typed canonical catalog; health diagnostics require `platform_health:read`.)
 - [x] Ensure tenant staff roles cannot invoke Platform Admin APIs. (realm mismatch rejected)
 - [ ] Ensure Platform Admin identity alone does not grant direct tenant commerce access.
 - [ ] Require explicit support-access workflow for tenant-data access.

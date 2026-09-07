@@ -26,6 +26,7 @@ import { RetentionSweepService } from '../tenancy/services/retention-sweep.servi
 import { TenantSchemaBootstrapper } from '../tenancy/services/tenant-schema.bootstrapper';
 import {
   PlatformAuthGuard,
+  PLATFORM_PERMISSION,
   PlatformPermissions,
 } from './guards/platform-auth.guard';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
@@ -168,7 +169,7 @@ export class PlatformAdminController {
    * database vs the canonical migration chain head.
    */
   @Get('database-health')
-  @PlatformPermissions('organization:read')
+  @PlatformPermissions(PLATFORM_PERMISSION.PLATFORM_HEALTH_READ)
   async databaseHealth() {
     const migrations = this.tenantSchemaBootstrapper.listMigrations();
     const canonicalHead = migrations.at(-1) ?? null;
@@ -194,7 +195,7 @@ export class PlatformAdminController {
 
   /** MT-9 §12.1/§12.4 — credential-free domain routing diagnostics. */
   @Get('domain-health')
-  @PlatformPermissions('organization:read')
+  @PlatformPermissions(PLATFORM_PERMISSION.PLATFORM_HEALTH_READ)
   domainHealth() {
     return this.domains.health();
   }

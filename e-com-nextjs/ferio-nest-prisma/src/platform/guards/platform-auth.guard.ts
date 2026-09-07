@@ -18,8 +18,34 @@ export interface PlatformPrincipal {
 
 type PlatformRequest = Request & { platformPrincipal?: PlatformPrincipal };
 
+export const PLATFORM_PERMISSION = {
+  ORGANIZATION_READ: 'organization:read',
+  ORGANIZATION_WRITE: 'organization:write',
+  SUBSCRIPTION_READ: 'subscription:read',
+  SUBSCRIPTION_WRITE: 'subscription:write',
+  BILLING_READ: 'saas_billing:read',
+  BILLING_WRITE: 'saas_billing:write',
+  DOMAIN_WRITE: 'domain:write',
+  PROVISIONING_RUN: 'provisioning:run',
+  MIGRATION_RUN: 'migration:run',
+  SUPPORT_ACCESS_REQUEST: 'support_access:request',
+  PLATFORM_HEALTH_READ: 'platform_health:read',
+  TENANT_DATABASE_READ: 'tenant_db:read',
+  USAGE_READ: 'usage:read',
+  AUDIT_READ: 'audit:read',
+} as const;
+
+export type PlatformPermission =
+  (typeof PLATFORM_PERMISSION)[keyof typeof PLATFORM_PERMISSION];
+
+type PlatformRole = 'SUPERADMIN' | 'OPS' | 'SUPPORT' | 'BILLING';
+type PlatformGrantedPermission = PlatformPermission | '*';
+
 /** Role → permission map; SUPERADMIN is the only wildcard realm role. */
-const ROLE_PERMISSIONS: Record<string, string[]> = {
+const ROLE_PERMISSIONS: Record<
+  PlatformRole,
+  readonly PlatformGrantedPermission[]
+> = {
   SUPERADMIN: ['*'],
   OPS: [
     'organization:read',
@@ -30,6 +56,7 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     'tenant_db:read',
     'usage:read',
     'audit:read',
+    'platform_health:read',
   ],
   SUPPORT: [
     'organization:read',
@@ -47,17 +74,22 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
 };
 
 export const PLATFORM_PERMISSIONS_KEY = 'platform_permissions';
-export const PlatformPermissions = (...permissions: string[]) =>
+export const PlatformPermissions = (...permissions: PlatformPermission[]) =>
   SetMetadata(PLATFORM_PERMISSIONS_KEY, permissions);
 
 function permissionsFor(principal: PlatformPrincipal): Set<string> {
   const granted = new Set<string>();
   for (const role of principal.roles) {
+    if (!isPlatformRole(role)) continue;
     for (const permission of ROLE_PERMISSIONS[role] ?? []) {
       granted.add(permission);
     }
   }
   return granted;
+}
+
+function isPlatformRole(value: string): value is PlatformRole {
+  return value in ROLE_PERMISSIONS;
 }
 
 /**

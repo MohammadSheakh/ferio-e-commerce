@@ -3,7 +3,7 @@ import {
   UnauthorizedException,
   type ExecutionContext,
 } from '@nestjs/common';
-import { PlatformAuthGuard } from './platform-auth.guard';
+import { PLATFORM_PERMISSION, PlatformAuthGuard } from './platform-auth.guard';
 
 type GuardRequest = {
   method: string;
@@ -135,6 +135,27 @@ describe('PlatformAuthGuard (separate authorization realm)', () => {
     );
     expect(request.platformPrincipal).toMatchObject({
       platformUserId: 'platform-user-1',
+    });
+  });
+
+  it('keeps platform health behind its dedicated permission', async () => {
+    const { guard, jwt, reflector } = build();
+    jwt.verifyAsync.mockResolvedValue({
+      realm: 'platform',
+      sub: 'platform-user-1',
+      roles: ['SUPPORT'],
+    });
+    reflector.getAllAndOverride.mockReturnValue([
+      PLATFORM_PERMISSION.PLATFORM_HEALTH_READ,
+    ]);
+    const request: GuardRequest = {
+      method: 'GET',
+      path: '/api/v1/platform/domain-health',
+      headers: { authorization: 'Bearer platform-token' },
+    };
+
+    await expect(guard.canActivate(contextFor(request))).rejects.toMatchObject({
+      message: 'PLATFORM_PERMISSION_DENIED',
     });
   });
 });
