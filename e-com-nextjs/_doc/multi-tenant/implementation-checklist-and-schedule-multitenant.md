@@ -1004,8 +1004,8 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 
 - [ ] Restore control plane to isolated environment.
 - [ ] Restore one tenant independently.
-- [ ] Restore tenant without overwriting another.
-- [ ] Verify schema version after restore.
+- [x] Restore tenant without overwriting another. (restore helper requires a new `restore_drill_*` database and refuses an existing target)
+- [x] Verify schema version after restore. (restore helper requires a completed `_prisma_migrations` row and prints the restored migration name)
 - [ ] Verify object/media references.
 - [ ] Verify financial ledgers/reconciliation.
 - [ ] Document DNS/domain behavior during disaster recovery.
