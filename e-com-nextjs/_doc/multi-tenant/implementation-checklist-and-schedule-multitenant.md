@@ -651,7 +651,7 @@ This is the largest migration slice. Existing feature behavior should remain sta
 ## 10.9 Returns, refunds, RTO, settlement, reconciliation
 
 - [x] Existing post-purchase/reconciliation foundations exist.
-- [ ] Tenant-scope every return/refund/RTO/settlement record.
+- [x] Tenant-scope every return/refund/RTO/settlement record. (`ReturnsService`, `RefundsService`, `RtoService`, `SettlementsService`, and reconciliation resolve through the tenant client; two-tenant read-isolation suites cover return, refund, RTO, and settlement identifiers)
 - [x] Tenant-scope scheduled reconciliation runs.
 - [x] Tenant-scope settlement imports and evidence. (`SettlementImportsService` resolves every import/classify/persist/claim path through the tenant client)
 - [ ] Tenant-scope BullMQ job IDs.
@@ -673,9 +673,9 @@ This is the largest migration slice. Existing feature behavior should remain sta
 - [x] Existing store pickup/outlet workflow exists.
 - [x] Tenant-scope all records and settings. (`ServiceBookingService`, `WarrantyService`, `ProductContentService` (reviews/banners), `ProductRequestService`, `StoreLocationsService` all resolve through the tenant client with explicit legacy fallback)
 - [x] Tenant-scope media/evidence. (Warranty evidence now uses the shared R2 `STORAGE_STRATEGY`; `R2Strategy` derives private `tenants/{organizationId}/...` keys from trusted tenant context.)
-- [ ] Tenant-scope outlet inventory/pickup configuration.
+- [x] Tenant-scope outlet inventory/pickup configuration. (`StoreLocationsService` resolves public stores and availability checks through the tenant client; identical store identifiers are read from separate tenant databases in isolation coverage)
 - [ ] Tenant-scope moderation and Admin queues.
-- [ ] Add cross-tenant ownership tests.
+- [x] Add cross-tenant ownership tests. (two-tenant suites cover returns, refunds, RTO, settlements, store pickup locations, and storefront analytics with overlapping lookup identifiers)
 
 ## 10.11 Chat and real-time communication
 
