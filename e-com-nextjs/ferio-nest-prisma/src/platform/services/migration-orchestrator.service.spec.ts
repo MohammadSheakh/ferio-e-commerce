@@ -347,4 +347,29 @@ describe('MigrationOrchestratorService (MT-11 / ADR-0005)', () => {
     );
     expect(built.bootstrapper.bootstrap).not.toHaveBeenCalled();
   });
+
+  it('retries failed tenant results while preserving successful tenants', async () => {
+    const built = build(
+      [
+        { id: 'tdb-1', organizationId: 'org-1', status: 'READY' },
+        { id: 'tdb-2', organizationId: 'org-2', status: 'READY' },
+      ],
+      [
+        { tenantDatabaseId: 'tdb-1', success: true },
+        { tenantDatabaseId: 'tdb-2', success: false },
+      ],
+    );
+    built.runState['run-1'] = 'BATCHING';
+
+    const outcome = await built.service.processRun('run-1');
+
+    expect(outcome.status).toBe('COMPLETED');
+    expect(outcome.migrated).toEqual(['org-2']);
+    expect(built.databases.getDecryptedConnection).toHaveBeenCalledWith(
+      'tdb-2',
+    );
+    expect(built.databases.getDecryptedConnection).not.toHaveBeenCalledWith(
+      'tdb-1',
+    );
+  });
 });

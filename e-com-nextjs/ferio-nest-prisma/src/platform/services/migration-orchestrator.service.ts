@@ -126,14 +126,20 @@ export class MigrationOrchestratorService {
       include: { results: true },
     });
     if (!run) throw new NotFoundException('MIGRATION_RUN_NOT_FOUND');
-    if (['COMPLETED', 'PAUSED', 'FAILED'].includes(run.status)) {
+    if (run.status === 'COMPLETED') {
       const successes = run.results
         .filter((r) => r.success)
         .map((r) => r.tenantDatabaseId);
       return { status: run.status, migrated: successes, failures: [] };
     }
 
-    const doneOrgs = new Set(run.results.map((r) => r.tenantDatabaseId));
+    // Failed results are evidence for the operator, not completed work. A
+    // queued resume must retry them while preserving successful tenants.
+    const doneOrgs = new Set(
+      run.results
+        .filter((result) => result.success)
+        .map((r) => r.tenantDatabaseId),
+    );
 
     const registries = (
       await this.platform.client.tenantDatabase.findMany({
@@ -270,7 +276,7 @@ export class MigrationOrchestratorService {
 
   async resume(runId: string): Promise<{ runId: string }> {
     const run = await this.getRun(runId);
-    if (run.status !== 'PAUSED') {
+    if (!['PAUSED', 'FAILED'].includes(run.status)) {
       throw new BadRequestException(`MIGRATION_NOT_RESUMABLE:${run.status}`);
     }
     await this.platform.client.tenantMigrationRun.update({
