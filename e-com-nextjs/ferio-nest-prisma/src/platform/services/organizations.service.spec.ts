@@ -14,6 +14,10 @@ type OrganizationsPlatform = {
   };
 };
 
+type TransactionOperation =
+  | ((client: OrganizationsPlatform['client']) => Promise<unknown>)
+  | readonly Promise<unknown>[];
+
 function firstCallInput<T>(mock: jest.Mock): T {
   const call = mock.mock.calls[0] as unknown as [T] | undefined;
   if (!call) throw new Error('Expected mock call');
@@ -42,7 +46,11 @@ describe('OrganizationsService lifecycle state machine', () => {
         },
         organizationMember: { create: jest.fn() },
         organizationLifecycleEvent: { create: jest.fn() },
-        $transaction: jest.fn((ops) => Promise.all(ops)),
+        $transaction: jest.fn((operation: TransactionOperation) =>
+          typeof operation === 'function'
+            ? operation(platform.client)
+            : Promise.all(operation),
+        ),
       },
     };
     audit = { record: jest.fn().mockResolvedValue({}) };
@@ -76,12 +84,47 @@ describe('OrganizationsService lifecycle state machine', () => {
   });
 
   it('rejects duplicate slugs with a stable code', async () => {
-    const conflict = Object.assign(new Error('unique'), { code: 'P2002' });
+    const conflict = Object.assign(new Error('unique'), {
+      code: 'P2002',
+      meta: { target: ['slug'] },
+    });
     platform.client.organization.create.mockRejectedValueOnce(conflict);
 
     await expect(
-      service.create({ name: 'A', slug: 'acme', ownerEmail: 'o@e.com' }),
+      service.create({ name: 'Acme', slug: 'acme', ownerEmail: 'o@e.com' }),
     ).rejects.toThrow('ORGANIZATION_SLUG_TAKEN');
+  });
+
+  it('maps an owner membership uniqueness conflict separately', async () => {
+    platform.client.organization.create.mockResolvedValueOnce(
+      org('PROVISIONING'),
+    );
+    platform.client.organizationMember.create.mockRejectedValueOnce(
+      Object.assign(new Error('unique'), {
+        code: 'P2002',
+        meta: { target: ['organizationId_email'] },
+      }),
+    );
+
+    await expect(
+      service.create({ name: 'Acme', slug: 'acme', ownerEmail: 'o@e.com' }),
+    ).rejects.toThrow('ORGANIZATION_OWNER_CONFLICT');
+    expect(audit.record).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['ORGANIZATION_NAME_INVALID', { name: ' ' }],
+    ['ORGANIZATION_OWNER_EMAIL_INVALID', { ownerEmail: 'invalid-email' }],
+  ])('rejects invalid service input with %s', async (code, overrides) => {
+    await expect(
+      service.create({
+        name: 'Acme',
+        slug: 'acme',
+        ownerEmail: 'owner@example.com',
+        ...overrides,
+      }),
+    ).rejects.toThrow(new ConflictException(code));
+    expect(platform.client.$transaction).not.toHaveBeenCalled();
   });
 
   it.each([

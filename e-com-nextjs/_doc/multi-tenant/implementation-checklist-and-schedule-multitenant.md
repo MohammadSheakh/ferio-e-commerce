@@ -363,7 +363,7 @@ Provisioning should behave as an idempotent state machine, not a controller scri
 - [x] Run tenant seed.
 - [x] Seed default tenant settings. (CommerceSettings store identity + COD verification ALWAYS baseline, ON CONFLICT-safe)
 - [ ] Seed default permissions/owner role.
-- [ ] Create/attach initial owner membership.
+- [x] Create/attach initial owner membership. (created atomically with the organization; owner-membership conflicts cannot leave an orphan organization)
 - [x] Run DB health check. (bootstrap success + registry READY stamping)
 - [ ] Run minimal tenant smoke test.
 - [ ] Activate domain only after readiness.

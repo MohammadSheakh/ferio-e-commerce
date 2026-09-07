@@ -37,21 +37,34 @@ export class OrganizationsService {
     if (!slug) {
       throw new ConflictException('ORGANIZATION_SLUG_INVALID');
     }
+    const name = input.name.trim();
+    if (name.length < 2) {
+      throw new ConflictException('ORGANIZATION_NAME_INVALID');
+    }
+    const ownerEmail = input.ownerEmail.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ownerEmail)) {
+      throw new ConflictException('ORGANIZATION_OWNER_EMAIL_INVALID');
+    }
     try {
-      const organization = await this.platform.client.organization.create({
-        data: {
-          name: input.name.trim(),
-          slug,
-          status: 'PROVISIONING',
+      const organization = await this.platform.client.$transaction(
+        async (tx) => {
+          const created = await tx.organization.create({
+            data: {
+              name,
+              slug,
+              status: 'PROVISIONING',
+            },
+          });
+          await tx.organizationMember.create({
+            data: {
+              organizationId: created.id,
+              email: ownerEmail,
+              role: 'OWNER',
+            },
+          });
+          return created;
         },
-      });
-      await this.platform.client.organizationMember.create({
-        data: {
-          organizationId: organization.id,
-          email: input.ownerEmail.trim().toLowerCase(),
-          role: 'OWNER',
-        },
-      });
+      );
       await this.audit.record({
         action: 'ORGANIZATION_CREATED',
         entityType: 'Organization',
@@ -61,12 +74,14 @@ export class OrganizationsService {
       });
       return organization;
     } catch (error: unknown) {
-      if (
-        typeof error === 'object' &&
-        error !== null &&
-        'code' in error &&
-        error.code === 'P2002'
-      ) {
+      if (isUniqueViolation(error)) {
+        const target = error.meta?.target;
+        if (
+          Array.isArray(target) &&
+          target.some((field) => field === 'organizationId_email')
+        ) {
+          throw new ConflictException('ORGANIZATION_OWNER_CONFLICT');
+        }
         throw new ConflictException('ORGANIZATION_SLUG_TAKEN');
       }
       throw error;
@@ -169,4 +184,18 @@ export class OrganizationsService {
       .replace(/-{2,}/g, '-')
       .replace(/^-|-$/g, '');
   }
+}
+
+type UniqueViolation = {
+  code: 'P2002';
+  meta?: { target?: unknown };
+};
+
+function isUniqueViolation(error: unknown): error is UniqueViolation {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    error.code === 'P2002'
+  );
 }
