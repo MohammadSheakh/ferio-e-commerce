@@ -742,11 +742,11 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 ## 11.2 BullMQ
 
 - [ ] Inventory every queue.
-- [x] Add tenant ID to trusted job envelope. (transactional dispatch + payment expiry jobs carry `organizationId` from the fan-out context; type-extended)
+- [x] Add tenant ID to trusted job envelope. (scheduled and operator-triggered shipping, transactional dispatch, and payment expiry jobs carry `organizationId` from the resolved context; type-extended)
 - [x] Validate tenant registry record before job DB access.
 - [x] Resolve tenant DB inside worker from control plane. (`TenantFanoutService.forOrganization` → registry → bounded manager → immutable context)
 - [x] Tenant-scope job IDs/deduplication keys. (`t:{orgId}:...` prefixes)
-- [x] Tenant-scope scheduled jobs. (courier polling, courier callback-retry, reconciliation scans — all fan out per READY tenant; retries carry org envelopes captured at enqueue time)
+- [x] Tenant-scope scheduled jobs. (courier polling, courier callback-retry, reconciliation scans — all fan out per READY tenant; scheduled and manual retries carry org envelopes captured at enqueue time)
 - [x] Prevent a poisoned/forged job from selecting arbitrary DB URL. (workers only accept organizationId and resolve via registry — never connection strings)
 - [ ] **PARTIAL:** Add dead-letter/failure evidence with tenant context. (fan-out failures recorded per-org in sweep outcomes + structured logs; BullMQ dead-letter retention policy pending)
 - [ ] **PARTIAL:** Add per-tenant operational metrics where useful. (fanout outcomes expose processed/tenantFailures per sweep; durable metrics storage remains §22 work)

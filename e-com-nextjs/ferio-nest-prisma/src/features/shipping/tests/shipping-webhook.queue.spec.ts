@@ -2,6 +2,7 @@ import type { ConfigService } from '@nestjs/config';
 import type { Queue } from 'bullmq';
 import type { PrismaService } from '@app/database';
 import type { AuditService } from '../../audit/services/audit.service';
+import { runWithTenantContext } from '../../../tenancy/context/tenant-context';
 import {
   COURIER_CALLBACK_RETRY_JOB,
   COURIER_CALLBACK_SCHEDULER_ID,
@@ -11,6 +12,7 @@ import {
 } from '../queues/shipping-webhook.queue';
 
 describe('ShippingWebhookQueue', () => {
+  const originalTenancy = process.env.TENANCY_ENABLED;
   const queue = {
     upsertJobScheduler: jest.fn(),
     getJobCounts: jest.fn(),
@@ -70,6 +72,11 @@ describe('ShippingWebhookQueue', () => {
       attemptCount: 1,
     });
     audit.record.mockResolvedValue({});
+  });
+
+  afterEach(() => {
+    if (originalTenancy === undefined) delete process.env.TENANCY_ENABLED;
+    else process.env.TENANCY_ENABLED = originalTenancy;
   });
 
   it('registers the configured retry sweep scheduler', async () => {
@@ -136,6 +143,66 @@ describe('ShippingWebhookQueue', () => {
         entityId: 'log-1',
         actor,
       }),
+    );
+  });
+
+  it('uses tenant storage and stamps operator retries in tenant mode', async () => {
+    process.env.TENANCY_ENABLED = 'true';
+    const tenantPrisma = {
+      shipmentWebhookLog: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'log-tenant',
+          authValid: true,
+          processed: false,
+          attemptCount: 1,
+        }),
+      },
+    };
+    const tenantDb = { get: jest.fn().mockResolvedValue(tenantPrisma) };
+    const tenantService = new ShippingWebhookQueue(
+      queue as unknown as Queue<CourierCallbackJobData>,
+      config as unknown as ConfigService,
+      prisma as unknown as PrismaService,
+      audit as unknown as AuditService,
+      tenantDb as never,
+    );
+    const actor = {
+      userId: 'admin-1',
+      role: 'admin',
+      email: 'admin@ferio.local',
+    } as const;
+
+    await runWithTenantContext(
+      {
+        organizationId: 'org-a',
+        tenantDatabaseId: 'tdb-a',
+        database: {
+          id: 'tdb-a',
+          host: 'db.internal',
+          port: 5432,
+          databaseName: 'tenant_a',
+          username: 'tenant_a',
+          credentialCipher: 'ciphertext',
+        },
+        domainId: 'domain-a',
+        hostname: 'a.ferio.local',
+        subscriptionStatus: 'ACTIVE',
+      },
+      async () => {
+        await tenantService.enqueueRetry('log-tenant', actor);
+      },
+    );
+
+    expect(tenantDb.get).toHaveBeenCalledTimes(1);
+    expect(prisma.shipmentWebhookLog.findUnique).not.toHaveBeenCalled();
+    expect(queue.add).toHaveBeenCalledWith(
+      COURIER_CALLBACK_RETRY_JOB,
+      {
+        callbackLogId: 'log-tenant',
+        initiatedByActorId: 'admin-1',
+        organizationId: 'org-a',
+      },
+      { jobId: 't:org-a:courier-callback-retry-log-tenant-2' },
     );
   });
 });

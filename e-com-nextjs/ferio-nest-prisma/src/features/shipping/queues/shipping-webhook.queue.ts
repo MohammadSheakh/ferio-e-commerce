@@ -164,7 +164,8 @@ export class ShippingWebhookQueue implements OnModuleInit {
   }
 
   async enqueueRetry(callbackLogId: string, actor: UserPayload) {
-    const callback = await this.prisma.shipmentWebhookLog.findUnique({
+    const client = await this.databaseForRequest();
+    const callback = await client.shipmentWebhookLog.findUnique({
       where: { id: callbackLogId },
     });
     if (!callback) throw new NotFoundException('Courier callback not found');
@@ -184,11 +185,24 @@ export class ShippingWebhookQueue implements OnModuleInit {
     if (callback.attemptCount >= this.maxAttempts()) {
       throw new ConflictException('Courier callback retry limit reached');
     }
+    const organizationId = tryGetTenantContext()?.organizationId;
+    if (
+      (process.env.TENANCY_ENABLED || 'false') === 'true' &&
+      !organizationId
+    ) {
+      throw new Error('TENANT_CONTEXT_REQUIRED_FOR_COURIER_CALLBACK');
+    }
     const jobId = this.retryJobId(callback.id, callback.attemptCount);
     const job = await this.queue.add(
       COURIER_CALLBACK_RETRY_JOB,
-      { callbackLogId: callback.id, initiatedByActorId: actor.userId },
-      { jobId },
+      {
+        callbackLogId: callback.id,
+        initiatedByActorId: actor.userId,
+        ...(organizationId ? { organizationId } : {}),
+      },
+      {
+        jobId: organizationId ? `t:${organizationId}:${jobId}` : jobId,
+      },
     );
     await this.audit.record({
       action: 'COURIER_CALLBACK_RETRY_QUEUED',
