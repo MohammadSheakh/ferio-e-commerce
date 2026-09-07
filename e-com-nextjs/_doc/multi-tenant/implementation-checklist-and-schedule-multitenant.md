@@ -1052,21 +1052,21 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 
 ## 16.2 Security tests
 
-- [ ] Host-header manipulation tests.
-- [ ] Cross-tenant JWT/session replay tests.
+- [x] Host-header manipulation tests. (trusted-proxy, forwarded-host chain, and direct-client rejection cases cover resolver input)
+- [x] Cross-tenant JWT/session replay tests. (tenant membership guard rejects a valid member session against another resolved organization)
 - [ ] IDOR tests using same IDs across tenant DBs.
-- [ ] Tenant Admin → Platform Admin privilege escalation tests.
+- [x] Tenant Admin → Platform Admin privilege escalation tests. (platform realm guard rejects tenant tokens and enforces platform permissions)
 - [ ] Platform Support access expiry/revocation tests.
 - [ ] Cross-tenant saved-cart token tests.
 - [ ] Cross-tenant wallet tests.
 - [ ] Cross-tenant payment callback tests.
 - [ ] Cross-tenant rider assignment/GPS tests.
-- [ ] Cross-tenant WebSocket room tests.
+- [x] Cross-tenant WebSocket room tests. (single-instance and Redis-adapter multi-instance integration suites assert same-tenant delivery only)
 - [ ] Cross-tenant Redis collision tests.
 - [ ] Cross-tenant file/object access tests.
-- [ ] Unknown/suspended/deleted tenant tests.
+- [x] Unknown/suspended/deleted tenant tests. (resolver covers unknown/inactive domains, suspended browsing, closure, and unavailable registries)
 - [ ] SSR/BFF tenant-confusion tests.
-- [ ] Cache poisoning/leak tests.
+- [x] Cache poisoning/leak tests. (resolver cache validation binds entries to normalized hostnames and tests negative/positive isolation)
 
 ## 16.3 Performance and scale
 
@@ -1084,13 +1084,13 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 
 ## 16.4 Dependency/security hygiene
 
-- [ ] **PARTIAL:** CI dependency audit. (strict typecheck incl. specs now a CI gate; dependency-audit job pending)
+- [x] CI dependency audit. (critical production dependency audit runs for backend and every web/mobile workspace)
 - [ ] Secret scan.
 - [x] SAST/lint/typecheck.
 - [x] Production builds for all web apps/backend. (CI matrix: backend, Customer Web, Admin Web, Platform Admin)
 - [ ] Prisma migration validation.
-- [ ] Tenant-isolation integration suite mandatory in CI.
-- [ ] Prevent merge if critical isolation tests fail.
+- [x] Tenant-isolation integration suite mandatory in CI. (backend workflow runs cross-tenant integration and performance suites against disposable PostgreSQL)
+- [x] Prevent merge if critical isolation tests fail. (integration, capacity, queue-smoke, typecheck, lint, and audit failures fail their required CI jobs)
 
 ### MT-13 gate
 
