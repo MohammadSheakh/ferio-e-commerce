@@ -1056,7 +1056,7 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 - [x] Cross-tenant JWT/session replay tests. (tenant membership guard rejects a valid member session against another resolved organization)
 - [ ] IDOR tests using same IDs across tenant DBs.
 - [x] Tenant Admin → Platform Admin privilege escalation tests. (platform realm guard rejects tenant tokens and enforces platform permissions)
-- [ ] Platform Support access expiry/revocation tests.
+- [x] Platform Support access expiry/revocation tests. (active lookup requires exact organization/user, unexpired `expiresAt`, and `revokedAt: null`; revoke is idempotent)
 - [ ] Cross-tenant saved-cart token tests.
 - [ ] Cross-tenant wallet tests.
 - [ ] Cross-tenant payment callback tests.
