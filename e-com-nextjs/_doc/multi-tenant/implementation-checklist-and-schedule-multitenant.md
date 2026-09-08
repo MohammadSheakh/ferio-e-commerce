@@ -433,8 +433,8 @@ All surfaces live in the ferio-platform-admin console:
 - [x] Prevent organization slugs from colliding with reserved/system routes. (`OrganizationsService` rejects the canonical reserved subdomain set before opening the control-plane transaction.)
 - [x] Ensure storefront SSR/server requests resolve tenant before fetching tenant data. (Customer Web root layout gates rendering on backend `/tenancy/status`; all server-side BFF fetches forward `x-forwarded-host` via the instrumentation-registered provider)
 - [ ] **PARTIAL:** Make metadata/SEO tenant-aware. (layout metadata falls back neutrally on non-active states; per-tenant SEO titles/descriptions arrive with MT-7 settings reads)
-- [ ] Make sitemap/robots tenant-aware.
-- [ ] Make tenant branding cache-aware.
+- [x] Make sitemap/robots tenant-aware. (Customer Web resolves tenant status first, derives public URLs from the forwarded host, and disables indexing for inactive/unknown stores.)
+- [x] Make tenant branding cache-aware. (Store configuration uses `no-store`; server-side API requests forward the original storefront host, preventing shared branding cache reuse.)
 
 ## 8.2 Custom domains — P1 / plan-gated
 
@@ -456,7 +456,7 @@ All surfaces live in the ferio-platform-admin console:
 - [x] Provisioning/not-ready page.
 - [x] Suspended store page according to approved business policy.
 - [ ] Domain verification pending state.
-- [ ] Tenant branding load failure fallback that does not display another tenant's branding.
+- [x] Tenant branding load failure fallback that does not display another tenant's branding. (Unavailable hosts render the dedicated tenant state page; active-store fetch failures use only the static application fallback and never another host's response.)
 - [ ] Tenant-specific support contacts/policies.
 
 ### MT-5 gate
@@ -553,11 +553,11 @@ This is the largest migration slice. Existing feature behavior should remain sta
 - [x] Existing Hero Showcase capability exists.
 - [x] Route every catalog read/write through tenant DB context. (entire `CatalogService` — all 17 prisma-touching methods including admin writes, inventory views and adjustments — resolves via the tenant-aware `db()` helper; explicit legacy fallback outside resolved requests)
 - [x] Make brand slug uniqueness tenant-local. (automatic under database-per-tenant; identical slugs proven coexisting across two bootstrapped databases)
-- [ ] Make Hero content tenant-local.
+- [x] Make Hero content tenant-local. (Public settings/hero reads forward the resolved storefront host and the backend settings service reads the tenant client.)
 - [x] Make catalog search/filter cache tenant-aware. (catalog reads resolve per tenant; no shared cache layer exists to leak across)
 - [ ] Tenant-scope product media object keys/metadata.
 - [x] Prove tenant A unpublished/product IDs cannot be queried from tenant B. (`tenant-bootstrap.integration-spec.ts`: identical product IDs/slugs seeded into two real PostgreSQL databases; A publishes, B stays draft; publish-filtered read returns 1 in A, 0 in B)
-- [ ] Prove storefront SEO/catalog caches cannot cross tenants.
+- [x] Prove storefront SEO/catalog caches cannot cross tenants. (Customer Web forwards the original host on server fetches, derives sitemap URLs from that host, and emits no inactive/unknown tenant URLs; catalog/settings reads remain tenant-routed.)
 
 ## 10.2 Inventory
 

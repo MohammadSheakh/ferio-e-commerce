@@ -21,10 +21,19 @@ const inter = Inter({
 });
 
 export async function generateMetadata(): Promise<Metadata> {
+  const tenant = await getTenantStatus();
+  if (tenant.code !== "ACTIVE" && tenant.code !== "LEGACY") {
+    return {
+      title: "Store unavailable",
+      description: "This storefront is not currently available.",
+      robots: { index: false, follow: false },
+    };
+  }
   const store = await getStoreConfig().catch(() => fallbackStoreConfig);
   return {
     title: `${store.storeName} — Shop Online`,
     description: `Browse current products, delivery options, and order support from ${store.storeName}.`,
+    robots: { index: true, follow: true },
   };
 }
 
