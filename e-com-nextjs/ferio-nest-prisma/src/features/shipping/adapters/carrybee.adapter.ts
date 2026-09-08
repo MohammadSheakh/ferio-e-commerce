@@ -15,13 +15,19 @@ import {
 import {
   normalizeCourierStatus,
   secureWebhookCredentialEquals,
+  shippingText,
 } from '../utils/shipping.util';
+import { tenantAwareCourierConfig } from '../utils/courier-credentials.util';
 
 @Injectable()
 export class CarrybeeAdapter implements CourierAdapter {
   readonly code = 'CARRYBEE' as const;
 
-  constructor(private readonly config: ConfigService) {}
+  private readonly config: ConfigService;
+
+  constructor(config: ConfigService) {
+    this.config = tenantAwareCourierConfig(config);
+  }
 
   private get baseUrl() {
     return this.config.get<string>(
@@ -107,7 +113,7 @@ export class CarrybeeAdapter implements CourierAdapter {
       throw new BadGatewayException('CarryBee returned no consignment ID');
     }
 
-    const rawStatus = String(payload.status || 'order_created');
+    const rawStatus = shippingText(payload.status, 'order_created');
     const trackingUrl = `https://carrybee.com/track?consignment_id=${externalShipmentId}`;
 
     return {
@@ -137,20 +143,22 @@ export class CarrybeeAdapter implements CourierAdapter {
   }
 
   parseWebhook(payload: Record<string, unknown>): CourierWebhookEvent {
-    const rawStatus = String(payload.status || payload.event || 'unknown');
+    const rawStatus = shippingText(payload.status || payload.event, 'unknown');
     return {
-      providerEventId: payload.event_id ? String(payload.event_id) : undefined,
+      providerEventId: payload.event_id
+        ? shippingText(payload.event_id)
+        : undefined,
       externalShipmentId: payload.consignment_id
-        ? String(payload.consignment_id)
+        ? shippingText(payload.consignment_id)
         : undefined,
       orderReference: payload.merchant_order_id
-        ? String(payload.merchant_order_id)
+        ? shippingText(payload.merchant_order_id)
         : undefined,
       rawStatus,
       normalizedStatus: normalizeCourierStatus('CARRYBEE', rawStatus),
       occurredAt:
         payload.timestamp || payload.updated_at
-          ? new Date(String(payload.timestamp || payload.updated_at))
+          ? new Date(shippingText(payload.timestamp || payload.updated_at))
           : new Date(),
     };
   }

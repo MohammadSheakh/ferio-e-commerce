@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { formatTaka } from "@/lib/catalog";
 import { useCart } from "@/components/CartContext";
+import { getErrorMessage } from "@/lib/error-message";
 
 type SavedCartItem = {
   id: string;
@@ -50,8 +51,8 @@ export default function SavedCartsPage() {
         throw new Error(payload.message || "Failed to load saved carts.");
       }
       setSavedCarts(payload.data || payload || []);
-    } catch (err: any) {
-      setError(err.message || "Unable to load saved carts.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Unable to load saved carts."));
     } finally {
       setLoading(false);
     }
@@ -74,8 +75,8 @@ export default function SavedCartsPage() {
       }
       await revalidate();
       setNotification(data.summary || "Cart items imported successfully!");
-    } catch (err: any) {
-      setError(err.message || "Could not import cart items.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Could not import cart items."));
     } finally {
       setActionLoading(null);
     }
@@ -92,8 +93,8 @@ export default function SavedCartsPage() {
       }
       setSavedCarts((prev) => prev.filter((c) => c.id !== id));
       setNotification("Saved cart removed.");
-    } catch (err: any) {
-      setError(err.message || "Could not delete cart.");
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, "Could not delete cart."));
     } finally {
       setActionLoading(null);
     }

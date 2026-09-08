@@ -23,6 +23,21 @@ const eligibilityCase = {
   refunds: [],
 };
 
+type RefundCreateData = {
+  orderId: string;
+  returnCaseId: string;
+  amount: number;
+  createdByActorId: string;
+};
+
+type RefundAttemptData = RefundCreateData & {
+  refundId: string;
+  attemptNumber: number;
+  outcome: string;
+  externalReference: string;
+  actorId: string;
+};
+
 describe('RefundsService', () => {
   const createdRefund = {
     id: 'refund-1',
@@ -51,7 +66,9 @@ describe('RefundsService', () => {
   const prisma = {
     commerceRefund: { findUnique: jest.fn(), findMany: jest.fn() },
     returnCase: { findUnique: jest.fn() },
-    $transaction: jest.fn((callback) => callback(transaction)),
+    $transaction: jest.fn((callback: (tx: typeof transaction) => unknown) =>
+      Promise.resolve(callback(transaction)),
+    ),
   };
   const audit = { record: jest.fn() };
   const service = new RefundsService(
@@ -79,16 +96,18 @@ describe('RefundsService', () => {
       ),
     ).resolves.toBe(createdRefund);
 
-    expect(transaction.commerceRefund.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          orderId: 'order-1',
-          returnCaseId: 'return-1',
-          amount: 1000,
-          createdByActorId: 'admin-1',
-        }),
-      }),
-    );
+    const refundCreate = transaction.commerceRefund.create.mock
+      .calls[0] as unknown as [
+      {
+        data: RefundCreateData;
+      },
+    ];
+    expect(refundCreate[0].data).toMatchObject({
+      orderId: 'order-1',
+      returnCaseId: 'return-1',
+      amount: 1000,
+      createdByActorId: 'admin-1',
+    });
     expect(transaction.order.update).toHaveBeenCalledWith({
       where: { id: 'order-1' },
       data: { refundStatus: 'PENDING' },
@@ -154,14 +173,18 @@ describe('RefundsService', () => {
       actor,
     );
 
-    expect(transaction.refundAttempt.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        refundId: 'refund-1',
-        attemptNumber: 1,
-        outcome: 'SUCCEEDED',
-        externalReference: 'receipt-1001',
-        actorId: 'admin-1',
-      }),
+    const attemptCreate = transaction.refundAttempt.create.mock
+      .calls[0] as unknown as [
+      {
+        data: RefundAttemptData;
+      },
+    ];
+    expect(attemptCreate[0].data).toMatchObject({
+      refundId: 'refund-1',
+      attemptNumber: 1,
+      outcome: 'SUCCEEDED',
+      externalReference: 'receipt-1001',
+      actorId: 'admin-1',
     });
     expect(transaction.order.update).toHaveBeenCalledWith({
       where: { id: 'order-1' },

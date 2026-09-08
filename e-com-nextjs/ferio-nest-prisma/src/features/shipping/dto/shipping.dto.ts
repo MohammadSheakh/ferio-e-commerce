@@ -33,3 +33,12 @@ export class UpdateShipmentProviderDto {
   @IsBoolean()
   isActive: boolean;
 }
+
+export class UpdateCourierProviderConfigDto {
+  @IsObject()
+  credentials: Record<string, string>;
+
+  @IsOptional()
+  @IsBoolean()
+  enabled?: boolean;
+}

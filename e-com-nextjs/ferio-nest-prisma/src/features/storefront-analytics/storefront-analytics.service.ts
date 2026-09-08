@@ -1,13 +1,14 @@
-import {
-  BadRequestException, Injectable,
-  Optional,
-} from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma, StorefrontAnalyticsEventType } from '@prisma/client';
 import { createHmac } from 'node:crypto';
 import type { PrismaClient } from '@prisma/client';
 import { PrismaService } from '@app/database';
-import { TenantDbService } from '../../tenancy/tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../tenancy/services/tenant-db.service';
+import { toTenantJsonInput } from '../../core/database/json-input.util';
 import { CreateStorefrontAnalyticsEventDto } from './storefront-analytics.dto';
 import { CommerceSettingsService } from '../settings/services/commerce-settings.service';
 import {
@@ -36,16 +37,16 @@ export class StorefrontAnalyticsService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly settings: CommerceSettingsService,
-  
-    @Optional() private readonly tenantDb?: TenantDbService,) {}
+
+    private readonly tenantDb?: TenantDbService,
+  ) {}
 
   /**
    * MT-7/MT-8: tenant client inside resolved storefront/admin requests;
    * explicit legacy fallback otherwise. Never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    const tenant = await this.tenantDb?.tryGet();
-    return tenant ?? (this.prisma as PrismaClient);
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
   async create(dto: CreateStorefrontAnalyticsEventDto) {
     const db = await this.db();
@@ -68,7 +69,7 @@ export class StorefrontAnalyticsService {
           variantId: dto.variantId,
           searchTerm,
           searchResultCount: dto.searchResultCount,
-          filters: filters as Prisma.InputJsonValue | undefined,
+          filters: toTenantJsonInput(filters),
           quantity: dto.quantity,
           path: sanitizeAnalyticsPath(dto.path),
         },
@@ -226,7 +227,10 @@ export class StorefrontAnalyticsService {
     });
 
     const purchaseMap = new Map(
-      purchases.map((p) => [p.productIdSnapshot, p._count?.productIdSnapshot ?? 0]),
+      purchases.map((p) => [
+        p.productIdSnapshot,
+        p._count?.productIdSnapshot ?? 0,
+      ]),
     );
 
     return views
@@ -234,7 +238,10 @@ export class StorefrontAnalyticsService {
         const product = productMap.get(v.productId!);
         const viewCount = v._count.productId;
         const purchaseCount = purchaseMap.get(v.productId!) ?? 0;
-        const conversionRate = viewCount > 0 ? ((purchaseCount / viewCount) * 100).toFixed(1) + '%' : '0%';
+        const conversionRate =
+          viewCount > 0
+            ? ((purchaseCount / viewCount) * 100).toFixed(1) + '%'
+            : '0%';
         const price = product?.variants?.[0]?.price ?? 0;
         return {
           productId: v.productId,
@@ -269,9 +276,11 @@ export class StorefrontAnalyticsService {
     });
 
     const countMap = new Map(eventCounts.map((e) => [e.type, e._count.type]));
-    const productViews = countMap.get(StorefrontAnalyticsEventType.PRODUCT_VIEW) ?? 0;
+    const productViews =
+      countMap.get(StorefrontAnalyticsEventType.PRODUCT_VIEW) ?? 0;
     const searchCount = countMap.get(StorefrontAnalyticsEventType.SEARCH) ?? 0;
-    const addToCartCount = countMap.get(StorefrontAnalyticsEventType.ADD_TO_CART) ?? 0;
+    const addToCartCount =
+      countMap.get(StorefrontAnalyticsEventType.ADD_TO_CART) ?? 0;
     const checkoutBeginCount =
       countMap.get(StorefrontAnalyticsEventType.CHECKOUT_BEGIN) ?? 0;
 
@@ -289,7 +298,10 @@ export class StorefrontAnalyticsService {
       ORDER BY "date" ASC
     `);
 
-    const dailyMap = new Map<string, { date: string; revenue: number; orders: number }>();
+    const dailyMap = new Map<
+      string,
+      { date: string; revenue: number; orders: number }
+    >();
     for (let i = boundedDays - 1; i >= 0; i--) {
       const d = new Date(
         Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) -
@@ -311,7 +323,10 @@ export class StorefrontAnalyticsService {
     const totalRevenue = dailyTrend.reduce((sum, row) => sum + row.revenue, 0);
     const totalOrders = dailyTrend.reduce((sum, row) => sum + row.orders, 0);
     const topSearches = await this.getTopSearches(boundedDays, 10);
-    const zeroResultSearches = await this.getZeroResultSearches(boundedDays, 10);
+    const zeroResultSearches = await this.getZeroResultSearches(
+      boundedDays,
+      10,
+    );
     const viewedButNotPurchased = await this.getViewedButNotPurchased(
       boundedDays,
       10,

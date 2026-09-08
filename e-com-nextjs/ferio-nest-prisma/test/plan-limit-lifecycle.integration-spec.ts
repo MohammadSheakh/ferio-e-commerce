@@ -13,16 +13,15 @@
  *      intact (§9.2 data-preservation requirement).
  */
 import { Pool } from 'pg';
-import { ForbiddenException } from '@nestjs/common';
 
-import { TenantSchemaBootstrapper } from '../src/tenancy/tenant-schema.bootstrapper';
-import { TenantDatabaseManager } from '../src/tenancy/tenant-database.manager';
-import { TenantDbService } from '../src/tenancy/tenant-db.service';
+import { TenantSchemaBootstrapper } from '../src/tenancy/services/tenant-schema.bootstrapper';
+import { TenantDatabaseManager } from '../src/tenancy/services/tenant-database.manager';
+import { TenantDbService } from '../src/tenancy/services/tenant-db.service';
 import { encryptSecret } from '../src/platform/utils/secret-box';
 import {
   runWithTenantContext,
   type TenantContext,
-} from '../src/tenancy/tenant-context';
+} from '../src/tenancy/context/tenant-context';
 
 import { EntitlementsService } from '../src/platform/services/entitlements.service';
 import { UsageService } from '../src/platform/services/usage.service';
@@ -35,6 +34,25 @@ const conditionalDescribe = TEST_DATABASE_URL ? describe : describe.skip;
 
 const CREDENTIAL_KEY = 'ci-platform-db-credential-key-at-least-32-chars';
 const ORG_ID = 'org-plan-test';
+
+interface FakeEntitlement {
+  featureKey: string;
+  enabled: boolean;
+  limit: number;
+}
+
+interface FakeSubscription {
+  id: string;
+  organizationId: string;
+  status: 'ACTIVE';
+  planId: string;
+  plan: {
+    id: string;
+    key: string;
+    displayName: string;
+    entitlements: FakeEntitlement[];
+  };
+}
 
 function serverConfig() {
   const url = new URL(TEST_DATABASE_URL as string);
@@ -66,7 +84,7 @@ async function dropScratchDatabase(name: string): Promise<void> {
 
 /** In-memory control-plane double: subscription row + usage counters. */
 function fakePlatform() {
-  let subscription: any = {
+  let subscription: FakeSubscription = {
     id: 'sub-1',
     organizationId: ORG_ID,
     status: 'ACTIVE',
@@ -82,28 +100,59 @@ function fakePlatform() {
     },
   };
   const counters = new Map<string, bigint>();
-  const keyOf = (w: { organizationId_metric_periodKey: Record<string, string> }) =>
-    Object.values(w.organizationId_metric_periodKey).join(':');
+  const keyOf = (w: {
+    organizationId_metric_periodKey: Record<string, string>;
+  }) => Object.values(w.organizationId_metric_periodKey).join(':');
   return {
     client: {
       subscription: {
         findUnique: jest.fn().mockImplementation(() =>
-          Promise.resolve(subscription ? JSON.parse(JSON.stringify(subscription)) : null),
+          Promise.resolve({
+            ...subscription,
+            plan: {
+              ...subscription.plan,
+              entitlements: subscription.plan.entitlements.map(
+                (entitlement) => ({ ...entitlement }),
+              ),
+            },
+          }),
         ),
       },
       usageCounter: {
-        upsert: jest.fn().mockImplementation(({ where, create, update }: any) => {
-          const k = keyOf(where);
-          if (!counters.has(k)) counters.set(k, create.value);
-          else if (typeof update.value === 'bigint') counters.set(k, update.value);
-          else if (update.value?.increment !== undefined)
-            counters.set(k, counters.get(k)! + update.value.increment);
-          return Promise.resolve({ value: counters.get(k)! });
-        }),
-        findUnique: jest.fn().mockImplementation(({ where }: any) =>
-          Promise.resolve(
-            counters.has(keyOf(where)) ? { value: counters.get(keyOf(where))! } : null,
-          ),
+        upsert: jest.fn().mockImplementation(
+          ({
+            where,
+            create,
+            update,
+          }: {
+            where: {
+              organizationId_metric_periodKey: Record<string, string>;
+            };
+            create: { value: bigint };
+            update: { value: bigint | { increment: bigint } };
+          }) => {
+            const k = keyOf(where);
+            if (!counters.has(k)) counters.set(k, create.value);
+            else if (typeof update.value === 'bigint')
+              counters.set(k, update.value);
+            else if (update.value?.increment !== undefined)
+              counters.set(k, counters.get(k)! + update.value.increment);
+            return Promise.resolve({ value: counters.get(k)! });
+          },
+        ),
+        findUnique: jest.fn().mockImplementation(
+          ({
+            where,
+          }: {
+            where: {
+              organizationId_metric_periodKey: Record<string, string>;
+            };
+          }) =>
+            Promise.resolve(
+              counters.has(keyOf(where))
+                ? { value: counters.get(keyOf(where))! }
+                : null,
+            ),
         ),
       },
     },
@@ -115,7 +164,9 @@ function fakePlatform() {
           ...subscription.plan,
           id: planId,
           key: planId,
-          entitlements: [{ featureKey: 'orders_per_month', enabled: true, limit }],
+          entitlements: [
+            { featureKey: 'orders_per_month', enabled: true, limit },
+          ],
         },
       };
     },
@@ -128,178 +179,213 @@ function fakePlatform() {
   };
 }
 
-conditionalDescribe('MT-6 gate: plan-limit lifecycle on one real tenant', () => {
-  jest.setTimeout(180_000);
+conditionalDescribe(
+  'MT-6 gate: plan-limit lifecycle on one real tenant',
+  () => {
+    jest.setTimeout(180_000);
 
-  it('enforces the limit, unlocks on upgrade, preserves data on downgrade', async () => {
-    process.env.PLATFORM_DB_CREDENTIAL_KEY = CREDENTIAL_KEY;
-    process.env.TENANT_DB_MAX_CLIENTS = '10';
-    const bootstrapper = new TenantSchemaBootstrapper();
-    const manager = new TenantDatabaseManager();
-    const tenantDb = new TenantDbService(manager);
+    it('enforces the limit, unlocks on upgrade, preserves data on downgrade', async () => {
+      process.env.PLATFORM_DB_CREDENTIAL_KEY = CREDENTIAL_KEY;
+      process.env.TENANT_DB_MAX_CLIENTS = '10';
+      const bootstrapper = new TenantSchemaBootstrapper();
+      const manager = new TenantDatabaseManager();
+      const tenantDb = new TenantDbService(manager);
 
-    const dbName = await createScratchDatabase('ferio_plan_a');
-    const conn = { ...serverConfig(), database: dbName };
-    try {
-      await bootstrapper.bootstrap(conn);
+      const dbName = await createScratchDatabase('ferio_plan_a');
+      const conn = { ...serverConfig(), database: dbName };
+      try {
+        await bootstrapper.bootstrap(conn);
 
-      const material = {
-        id: `tdb-${dbName.slice(-8)}`,
-        host: conn.host,
-        port: conn.port,
-        databaseName: dbName,
-        username: conn.user,
-        credentialCipher: encryptSecret(conn.password, CREDENTIAL_KEY),
-      };
-      const context = Object.freeze({
-        organizationId: ORG_ID,
-        tenantDatabaseId: material.id,
-        database: Object.freeze({ ...material }),
-        domainId: 'dom-plan',
-        hostname: 'plan-test.ferio.test',
-        subscriptionStatus: 'ACTIVE' as const,
-      }) as TenantContext;
+        const material = {
+          id: `tdb-${dbName.slice(-8)}`,
+          host: conn.host,
+          port: conn.port,
+          databaseName: dbName,
+          username: conn.user,
+          credentialCipher: encryptSecret(conn.password, CREDENTIAL_KEY),
+        };
+        const context = Object.freeze({
+          organizationId: ORG_ID,
+          tenantDatabaseId: material.id,
+          database: Object.freeze({ ...material }),
+          domainId: 'dom-plan',
+          hostname: 'plan-test.ferio.test',
+          subscriptionStatus: 'ACTIVE' as const,
+        }) as TenantContext;
 
-      const control = fakePlatform();
-      const usage = new UsageService(control as never);
-      const entitlements = new EntitlementsService(control as never, usage);
-      const configStub = { get: (_k: string, fb: unknown) => fb };
-      const auditStub = { record: jest.fn().mockResolvedValue({}) };
-      const notificationsStub = { notifyCustomer: jest.fn().mockResolvedValue({}) };
+        const control = fakePlatform();
+        const usage = new UsageService(control as never);
+        const entitlements = new EntitlementsService(control as never, usage);
+        const configStub = { get: (_k: string, fb: unknown) => fb };
+        const auditStub = { record: jest.fn().mockResolvedValue({}) };
+        const notificationsStub = {
+          notifyCustomer: jest.fn().mockResolvedValue({}),
+        };
 
-      const carts = new CartService({} as never, configStub as never, tenantDb);
-      const checkout = new CheckoutService(
-        {} as never,
-        carts,
-        auditStub as never,
-        configStub as never,
-        tenantDb,
-      );
-      const messagesAuto = new Proxy({}, { get: () => () => Promise.resolve({}) });
-      const orders = new OrderService(
-        {} as never,
-        carts,
-        messagesAuto as never,
-        auditStub as never,
-        configStub as never,
-        {} as never,
-        notificationsStub as never,
-        tenantDb,
-        entitlements,
-        usage,
-      );
+        const carts = new CartService(
+          {} as never,
+          configStub as never,
+          tenantDb,
+        );
+        const checkout = new CheckoutService(
+          {} as never,
+          carts,
+          auditStub as never,
+          configStub as never,
+          tenantDb,
+        );
+        const messagesAuto = new Proxy(
+          {},
+          { get: () => () => Promise.resolve({}) },
+        );
+        const orders = new OrderService(
+          {} as never,
+          carts,
+          messagesAuto as never,
+          auditStub as never,
+          configStub as never,
+          {} as never,
+          notificationsStub as never,
+          tenantDb,
+          entitlements,
+          usage,
+        );
 
-      // Published product + finite stock + Dhaka delivery zone.
-      const variantId = await runWithTenantContext(context, async () => {
-        const db = await tenantDb.get();
-        const zone = await db.deliveryZone.create({
-          data: {
-            id: 'zone-plan',
-            name: 'Plan Zone',
-            deliveryFee: 0,
-            freeDeliveryThreshold: 1_000_000,
-            isActive: true,
-          },
+        // Published product + finite stock + Dhaka delivery zone.
+        const variantId = await runWithTenantContext(context, async () => {
+          const db = await tenantDb.get();
+          const zone = await db.deliveryZone.create({
+            data: {
+              id: 'zone-plan',
+              name: 'Plan Zone',
+              deliveryFee: 0,
+              freeDeliveryThreshold: 1_000_000,
+              isActive: true,
+            },
+          });
+          await db.deliveryZoneDistrict.create({
+            data: {
+              id: 'dzd-plan-dhaka',
+              zoneId: zone.id,
+              name: 'Dhaka',
+              normalizedName: 'dhaka',
+            },
+          });
+          const category = await db.category.create({
+            data: { name: 'Plan Category', slug: 'plan-category' },
+          });
+          const product = await db.product.create({
+            data: {
+              name: 'Plan Product',
+              slug: 'plan-product',
+              description: 'MT-6 gate fixture',
+              status: 'ACTIVE',
+              publishedAt: new Date(Date.now() - 60_000),
+              categoryId: category.id,
+            },
+          });
+          const variant = await db.productVariant.create({
+            data: {
+              name: 'Default',
+              sku: 'PLAN-SKU-1',
+              price: 10_000,
+              productId: product.id,
+            },
+          });
+          const warehouse = await db.warehouse.create({
+            data: { code: 'PLAN-WH', name: 'Plan Warehouse' },
+          });
+          await db.inventoryStock.create({
+            data: {
+              warehouseId: warehouse.id,
+              variantId: variant.id,
+              onHand: 25,
+            },
+          });
+          return variant.id;
         });
-        await db.deliveryZoneDistrict.create({
-          data: {
-            id: 'dzd-plan-dhaka',
-            zoneId: zone.id,
-            name: 'Dhaka',
-            normalizedName: 'dhaka',
-          },
-        });
-        const category = await db.category.create({
-          data: { name: 'Plan Category', slug: 'plan-category' },
-        });
-        const product = await db.product.create({
-          data: {
-            name: 'Plan Product',
-            slug: 'plan-product',
-            description: 'MT-6 gate fixture',
-            status: 'ACTIVE',
-            publishedAt: new Date(Date.now() - 60_000),
-            categoryId: category.id,
-          },
-        });
-        const variant = await db.productVariant.create({
-          data: { name: 'Default', sku: 'PLAN-SKU-1', price: 10_000, productId: product.id },
-        });
-        const warehouse = await db.warehouse.create({
-          data: { code: 'PLAN-WH', name: 'Plan Warehouse' },
-        });
-        await db.inventoryStock.create({
-          data: { warehouseId: warehouse.id, variantId: variant.id, onHand: 25 },
-        });
-        return variant.id;
-      });
 
-      let sequence = 0;
-      const placeOne = async (): Promise<string> => {
-        sequence += 1;
-        return runWithTenantContext(context, async () => {
-          const added = await carts.addItem({ variantId, quantity: 1 }, undefined);
-          const token = added.cartToken!;
-          await checkout.preview(
-            {
-              name: 'Plan Customer',
-              phone: '01712345678',
-              district: 'Dhaka',
-              area: 'Gulshan',
-              detailedAddress: 'House 1, Road 1',
-              paymentMethod: 'COD',
-              termsAccepted: true,
-            } as never,
-            token,
-          );
-          const confirmation = await orders.placeOrder(
-            'COD',
-            token,
-            `plan-gate-idempotency-key-${String(sequence).padStart(4, '0')}`,
-          );
-          return confirmation.id;
+        let sequence = 0;
+        const placeOne = async (): Promise<string> => {
+          sequence += 1;
+          return runWithTenantContext(context, async () => {
+            const added = await carts.addItem(
+              { variantId, quantity: 1 },
+              undefined,
+            );
+            const token = added.cartToken!;
+            await checkout.preview(
+              {
+                name: 'Plan Customer',
+                phone: '01712345678',
+                district: 'Dhaka',
+                area: 'Gulshan',
+                detailedAddress: 'House 1, Road 1',
+                paymentMethod: 'COD',
+                termsAccepted: true,
+              } as never,
+              token,
+            );
+            const confirmation = await orders.placeOrder(
+              'COD',
+              token,
+              `plan-gate-idempotency-key-${String(sequence).padStart(4, '0')}`,
+            );
+            return confirmation.id;
+          });
+        };
+
+        // ── Under the limit: two placements succeed, metered in real time ──
+        const firstId = await placeOne();
+        const secondId = await placeOne();
+        expect(firstId).toBeTruthy();
+        expect(secondId).not.toBe(firstId);
+        expect(control.usageValue()).toBe(BigInt(2));
+
+        // ── Third placement hits the STARTER limit (2/month) ──
+        await expect(placeOne()).rejects.toThrow('PLAN_LIMIT_REACHED');
+        const countAtDenial = await runWithTenantContext(context, async () => {
+          const db = await tenantDb.get();
+          return db.order.count();
         });
-      };
+        expect(countAtDenial).toBe(2); // no partial state
 
-      // ── Under the limit: two placements succeed, metered in real time ──
-      const firstId = await placeOne();
-      const secondId = await placeOne();
-      expect(firstId).toBeTruthy();
-      expect(secondId).not.toBe(firstId);
-      expect(control.usageValue()).toBe(BigInt(2));
-
-      // ── Third placement hits the STARTER limit (2/month) ──
-      await expect(placeOne()).rejects.toThrow('PLAN_LIMIT_REACHED');
-      const countAtDenial = await runWithTenantContext(context, async () => {
-        const db = await tenantDb.get();
-        return db.order.count();
-      });
-      expect(countAtDenial).toBe(2); // no partial state
-
-      // ── Upgrade to BUSINESS: capability unlocks without data changes ──
-      control.setPlan('plan-business', 1000);
-      const thirdId = await placeOne();
-      expect(thirdId).toBeTruthy();
-      const afterUpgrade = await runWithTenantContext(context, async () => {
-        const db = await tenantDb.get();
-        return db.order.findMany({
-          orderBy: { createdAt: 'asc' },
-          select: { id: true },
+        // ── Upgrade to BUSINESS: capability unlocks without data changes ──
+        control.setPlan('plan-business', 1000);
+        const thirdId = await placeOne();
+        expect(thirdId).toBeTruthy();
+        const afterUpgrade = await runWithTenantContext(context, async () => {
+          const db = await tenantDb.get();
+          return db.order.findMany({
+            orderBy: { createdAt: 'asc' },
+            select: { id: true },
+          });
         });
-      });
-      expect(afterUpgrade.map((o) => o.id)).toEqual([firstId, secondId, thirdId]);
+        expect(afterUpgrade.map((o) => o.id)).toEqual([
+          firstId,
+          secondId,
+          thirdId,
+        ]);
 
-      // ── Downgrade back to STARTER: blocked again, history preserved ──
-      control.setPlan('plan-starter', 2);
-      await expect(placeOne()).rejects.toThrow('PLAN_LIMIT_REACHED');
-      const finalOrders = await runWithTenantContext(context, async () => {
-        const db = await tenantDb.get();
-        return db.order.findMany({ select: { id: true }, orderBy: { createdAt: 'asc' } });
-      });
-      expect(finalOrders.map((o) => o.id)).toEqual([firstId, secondId, thirdId]);
-    } finally {
-      await manager.onModuleDestroy();
-      await dropScratchDatabase(dbName).catch(() => undefined);
-    }
-  });
-});
+        // ── Downgrade back to STARTER: blocked again, history preserved ──
+        control.setPlan('plan-starter', 2);
+        await expect(placeOne()).rejects.toThrow('PLAN_LIMIT_REACHED');
+        const finalOrders = await runWithTenantContext(context, async () => {
+          const db = await tenantDb.get();
+          return db.order.findMany({
+            select: { id: true },
+            orderBy: { createdAt: 'asc' },
+          });
+        });
+        expect(finalOrders.map((o) => o.id)).toEqual([
+          firstId,
+          secondId,
+          thirdId,
+        ]);
+      } finally {
+        await manager.onModuleDestroy();
+        await dropScratchDatabase(dbName).catch(() => undefined);
+      }
+    });
+  },
+);

@@ -16,7 +16,9 @@ describe('TransactionalMessageDispatcher', () => {
   };
 
   function setup(results: Array<Record<string, unknown>>) {
-    const update = jest.fn(async ({ data }) => ({ id: message.id, ...data }));
+    const update = jest.fn(({ data }: { data: Record<string, unknown> }) =>
+      Promise.resolve({ id: message.id, ...data }),
+    );
     const prisma = {
       commerceMessage: {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
@@ -32,10 +34,14 @@ describe('TransactionalMessageDispatcher', () => {
         }),
       },
       commerceMessageAttempt: {
-        create: jest.fn(async ({ data }) => ({
-          id: `attempt-${data.attemptNumber}`,
-          ...data,
-        })),
+        create: jest.fn(
+          ({
+            data,
+          }: {
+            data: { attemptNumber: number } & Record<string, unknown>;
+          }) =>
+            Promise.resolve({ id: `attempt-${data.attemptNumber}`, ...data }),
+        ),
         update: jest.fn().mockResolvedValue({}),
       },
     };
@@ -44,7 +50,9 @@ describe('TransactionalMessageDispatcher', () => {
         { channel: 'WHATSAPP', provider: 'fake-whatsapp', configured: true },
         { channel: 'SMS', provider: 'fake-sms', configured: true },
       ]),
-      dispatch: jest.fn().mockImplementation(async () => results.shift()),
+      dispatch: jest
+        .fn()
+        .mockImplementation(() => Promise.resolve(results.shift())),
     };
     return {
       dispatcher: new TransactionalMessageDispatcher(
@@ -66,22 +74,25 @@ describe('TransactionalMessageDispatcher', () => {
     await dispatcher.execute(message.id);
 
     expect(adapters.dispatch).toHaveBeenCalledTimes(2);
-    expect(adapters.dispatch).toHaveBeenLastCalledWith(
-      'SMS',
-      expect.objectContaining({
-        templateVersion: 3,
-        subject: 'Order FER-1 confirmed',
-        body: 'Order FER-1 is confirmed.',
-      }),
-    );
-    expect(update).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          selectedChannel: 'SMS',
-          status: 'SENT',
-        }),
-      }),
-    );
+    const dispatchCall = (adapters.dispatch.mock.calls as unknown[][]).at(-1);
+    const dispatchPayload = dispatchCall?.[1] as {
+      templateVersion: number;
+      subject: string;
+      body: string;
+    };
+    expect(dispatchCall?.[0]).toBe('SMS');
+    expect(dispatchPayload).toMatchObject({
+      templateVersion: 3,
+      subject: 'Order FER-1 confirmed',
+      body: 'Order FER-1 is confirmed.',
+    });
+    const sentUpdate = (update.mock.calls as unknown[][]).at(-1)?.[0] as {
+      data: { selectedChannel: string; status: string };
+    };
+    expect(sentUpdate.data).toMatchObject({
+      selectedChannel: 'SMS',
+      status: 'SENT',
+    });
   });
 
   it('stops fallback when the first provider outcome is unknown', async () => {
@@ -93,13 +104,12 @@ describe('TransactionalMessageDispatcher', () => {
     await dispatcher.execute(message.id);
 
     expect(adapters.dispatch).toHaveBeenCalledTimes(1);
-    expect(update).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          status: 'BLOCKED',
-          terminalReason: expect.stringContaining('avoid duplicate delivery'),
-        }),
-      }),
+    const blockedUpdate = (update.mock.calls as unknown[][]).at(-1)?.[0] as {
+      data: { status: string; terminalReason: string };
+    };
+    expect(blockedUpdate.data.status).toBe('BLOCKED');
+    expect(blockedUpdate.data.terminalReason).toContain(
+      'avoid duplicate delivery',
     );
   });
 
@@ -107,12 +117,13 @@ describe('TransactionalMessageDispatcher', () => {
     const previous = process.env.TENANCY_ENABLED;
     process.env.TENANCY_ENABLED = 'true';
     const { dispatcher, prisma } = setup([{ status: 'ACCEPTED' }]);
-    const tenantDb = { tryGet: jest.fn().mockResolvedValue(prisma) };
-    (dispatcher as unknown as { tenantDb: typeof tenantDb }).tenantDb = tenantDb;
+    const tenantDb = { getOrLegacy: jest.fn().mockResolvedValue(prisma) };
+    (dispatcher as unknown as { tenantDb: typeof tenantDb }).tenantDb =
+      tenantDb;
 
     try {
       await dispatcher.execute(message.id);
-      expect(tenantDb.tryGet).toHaveBeenCalledTimes(1);
+      expect(tenantDb.getOrLegacy).toHaveBeenCalledTimes(1);
     } finally {
       if (previous === undefined) delete process.env.TENANCY_ENABLED;
       else process.env.TENANCY_ENABLED = previous;
@@ -123,6 +134,15 @@ describe('TransactionalMessageDispatcher', () => {
     const previous = process.env.TENANCY_ENABLED;
     process.env.TENANCY_ENABLED = 'true';
     const { dispatcher } = setup([]);
+    const tenantDb = {
+      getOrLegacy: jest
+        .fn()
+        .mockRejectedValue(
+          new Error('TRANSACTIONAL_MESSAGE_TENANT_CONTEXT_REQUIRED'),
+        ),
+    };
+    (dispatcher as unknown as { tenantDb: typeof tenantDb }).tenantDb =
+      tenantDb;
 
     try {
       await expect(dispatcher.execute(message.id)).rejects.toThrow(

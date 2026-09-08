@@ -36,6 +36,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ready": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AppController_getReadiness"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/platform/organizations": {
         parameters: {
             query?: never;
@@ -116,6 +132,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/platform/domain-health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PlatformAdminController_domainHealth"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/platform/organizations/{id}": {
         parameters: {
             query?: never;
@@ -126,6 +158,22 @@ export interface paths {
         get: operations["PlatformAdminController_getOrganization"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/organizations/{id}/domain-cache/invalidate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PlatformAdminController_invalidateOrganizationDomainCache"];
         delete?: never;
         options?: never;
         head?: never;
@@ -212,54 +260,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/platform/plans": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["PlatformAdminController_listPlans"];
-        put?: never;
-        post: operations["PlatformAdminController_createPlan"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/platform/organizations/{id}/subscription/trial": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["PlatformAdminController_startTrial"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/platform/organizations/{id}/subscription/status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch: operations["PlatformAdminController_transitionSubscription"];
-        trace?: never;
-    };
     "/api/v1/platform/dashboard": {
         parameters: {
             query?: never;
@@ -268,6 +268,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["PlatformAdminController_dashboard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/system-health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PlatformAdminController_systemHealth"];
         put?: never;
         post?: never;
         delete?: never;
@@ -286,86 +302,6 @@ export interface paths {
         get: operations["PlatformAdminController_provisioningTimeline"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/platform/auth/login": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["PlatformAdminController_login"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/platform/migrations": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["PlatformAdminController_listMigrations"];
-        put?: never;
-        post: operations["PlatformAdminController_startMigration"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/platform/migrations/{runId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["PlatformAdminController_getMigration"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/platform/migrations/{runId}/pause": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["PlatformAdminController_pauseMigration"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/platform/migrations/{runId}/resume": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["PlatformAdminController_resumeMigration"];
         delete?: never;
         options?: never;
         head?: never;
@@ -404,6 +340,214 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/platform/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PlatformAuthController_login"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/plans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PlatformCatalogController_listPlans"];
+        put?: never;
+        post: operations["PlatformCatalogController_createPlan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/plans/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["PlatformCatalogController_updatePlan"];
+        trace?: never;
+    };
+    "/api/v1/platform/organizations/{id}/subscription/trial": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PlatformCatalogController_startTrial"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/organizations/{id}/subscription/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["PlatformCatalogController_transitionSubscription"];
+        trace?: never;
+    };
+    "/api/v1/platform/organizations/{organizationId}/domains/custom": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PlatformDomainsController_addCustomDomain"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/organizations/{organizationId}/domains/{domainId}/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PlatformDomainsController_verifyCustomDomain"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/organizations/{organizationId}/domains/{domainId}/primary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PlatformDomainsController_setPrimary"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/organizations/{organizationId}/domains/{domainId}/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PlatformDomainsController_disable"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/migrations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PlatformMigrationsController_listMigrations"];
+        put?: never;
+        post: operations["PlatformMigrationsController_startMigration"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/migrations/{runId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PlatformMigrationsController_getMigration"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/migrations/{runId}/pause": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PlatformMigrationsController_pauseMigration"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/migrations/{runId}/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["PlatformMigrationsController_resumeMigration"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/platform/support-access": {
         parameters: {
             query?: never;
@@ -411,9 +555,9 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["PlatformAdminController_listSupportAccess"];
+        get: operations["PlatformSupportAccessController_listSupportAccess"];
         put?: never;
-        post: operations["PlatformAdminController_requestSupportAccess"];
+        post: operations["PlatformSupportAccessController_requestSupportAccess"];
         delete?: never;
         options?: never;
         head?: never;
@@ -429,7 +573,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["PlatformAdminController_revokeSupportAccess"];
+        post: operations["PlatformSupportAccessController_revokeSupportAccess"];
         delete?: never;
         options?: never;
         head?: never;
@@ -446,6 +590,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["PlatformBillingController_pay"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/billing/invoices/{id}/receipt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PlatformBillingController_receipt"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -478,6 +638,38 @@ export interface paths {
         get: operations["PlatformBillingCallbackController_callback"];
         put?: never;
         post: operations["PlatformBillingCallbackController_postCallback"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/feature-flags": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["PlatformFeatureFlagsController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/feature-flags/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["PlatformFeatureFlagsController_upsert"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -746,10 +938,10 @@ export interface paths {
             cookie?: never;
         };
         /** Get all product requests (Admin) */
-        get: operations["ProductRequestController_getAllRequests"];
+        get: operations["AdminProductRequestController_getAllRequests"];
         put?: never;
         /** Submit a product request */
-        post: operations["ProductRequestController_createRequest"];
+        post: operations["PublicProductRequestController_createRequest"];
         delete?: never;
         options?: never;
         head?: never;
@@ -770,7 +962,7 @@ export interface paths {
         options?: never;
         head?: never;
         /** Update product request status (Admin) */
-        patch: operations["ProductRequestController_updateStatus"];
+        patch: operations["AdminProductRequestController_updateStatus"];
         trace?: never;
     };
     "/api/v1/product-requests/{id}": {
@@ -784,7 +976,7 @@ export interface paths {
         put?: never;
         post?: never;
         /** Delete product request (Admin) */
-        delete: operations["ProductRequestController_deleteRequest"];
+        delete: operations["AdminProductRequestController_deleteRequest"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2012,6 +2204,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/storage/presign-get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["StorageController_presignGet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/storage/presign-put": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["StorageController_presignPut"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/checkout/delivery-options": {
         parameters: {
             query?: never;
@@ -2738,6 +2962,22 @@ export interface paths {
         options?: never;
         head?: never;
         patch: operations["AdminShippingController_updateProvider"];
+        trace?: never;
+    };
+    "/api/v1/admin/shipping/providers/{code}/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["AdminShippingController_updateProviderConfig"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/admin/shipping/orders/{orderId}": {
@@ -3530,6 +3770,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/payments/providers/{provider}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["AdminCommercePaymentsController_updateProvider"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/payments/recovery/queue-health": {
         parameters: {
             query?: never;
@@ -4176,6 +4432,22 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        CreateOrganizationDto: Record<string, never>;
+        TransitionOrganizationDto: Record<string, never>;
+        ProvisionOrganizationDto: Record<string, never>;
+        InitiateClosureDto: Record<string, never>;
+        FinalizeClosureDto: Record<string, never>;
+        CreatePlanDto: Record<string, never>;
+        UpdatePlanDto: Record<string, never>;
+        StartTrialDto: Record<string, never>;
+        TransitionSubscriptionDto: Record<string, never>;
+        AddCustomDomainDto: Record<string, never>;
+        VerifyCustomDomainDto: Record<string, never>;
+        StartMigrationDto: Record<string, never>;
+        CreateSupportAccessDto: Record<string, never>;
+        CreatePlatformInvoiceDto: Record<string, never>;
+        ManualBillingActionDto: Record<string, never>;
+        UpsertPlatformFeatureFlagDto: Record<string, never>;
         GuestSocketTicketDto: Record<string, never>;
         CreateConversationDto: {
             /**
@@ -4478,9 +4750,16 @@ export interface components {
             /** @example Ferio */
             storeName?: string;
             legalName?: Record<string, never> | null;
+            logoUrl?: Record<string, never> | null;
+            address?: Record<string, never> | null;
             /** @example +8801712345678 */
             supportPhone?: Record<string, never> | null;
             supportEmail?: Record<string, never> | null;
+            facebookUrl?: Record<string, never> | null;
+            instagramUrl?: Record<string, never> | null;
+            whatsappUrl?: Record<string, never> | null;
+            /** @enum {string} */
+            themePreset?: "default" | "warm" | "cool";
             /** @enum {string} */
             currency?: "BDT";
             /** @example Asia/Dhaka */
@@ -4538,6 +4817,7 @@ export interface components {
         CreateWalletTopUpDto: Record<string, never>;
         ReviewWalletTopUpDto: Record<string, never>;
         UpdateShipmentProviderDto: Record<string, never>;
+        UpdateCourierProviderConfigDto: Record<string, never>;
         CreateShipmentDto: Record<string, never>;
         CheckStoreAvailabilityDto: {
             /** @example clx...storeId */
@@ -4611,6 +4891,7 @@ export interface components {
         ReconciliationActionDto: Record<string, never>;
         InitiateCommercePaymentDto: Record<string, never>;
         RetryCommercePaymentDto: Record<string, never>;
+        UpdatePaymentProviderConfigDto: Record<string, never>;
         SubmitYoutubeReviewDto: Record<string, never>;
         ModerateYoutubeReviewDto: Record<string, never>;
         CreateReviewBannerDto: Record<string, never>;
@@ -4628,7 +4909,11 @@ export interface components {
         CompleteStaffAccessDto: Record<string, never>;
         InviteStaffDto: Record<string, never>;
         UpdateStaffAccessDto: Record<string, never>;
-        CreateStorefrontAnalyticsEventDto: Record<string, never>;
+        CreateStorefrontAnalyticsEventDto: {
+            /** @enum {string} */
+            type: "PRODUCT_VIEW" | "SEARCH" | "FILTER" | "ADD_TO_CART" | "CHECKOUT_BEGIN";
+            searchResultCount?: number;
+        };
     };
     responses: never;
     parameters: never;
@@ -4672,6 +4957,23 @@ export interface operations {
             };
         };
     };
+    AppController_getReadiness: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     PlatformAdminController_listOrganizations: {
         parameters: {
             query?: never;
@@ -4696,7 +4998,11 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateOrganizationDto"];
+            };
+        };
         responses: {
             201: {
                 headers: {
@@ -4747,7 +5053,11 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePlatformInvoiceDto"];
+            };
+        };
         responses: {
             201: {
                 headers: {
@@ -4791,6 +5101,23 @@ export interface operations {
             };
         };
     };
+    PlatformAdminController_domainHealth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     PlatformAdminController_getOrganization: {
         parameters: {
             query?: never;
@@ -4803,6 +5130,25 @@ export interface operations {
         requestBody?: never;
         responses: {
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PlatformAdminController_invalidateOrganizationDomainCache: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4876,7 +5222,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransitionOrganizationDto"];
+            };
+        };
         responses: {
             200: {
                 headers: {
@@ -4895,81 +5245,13 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProvisionOrganizationDto"];
+            };
+        };
         responses: {
             201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    PlatformAdminController_listPlans: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    PlatformAdminController_createPlan: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    PlatformAdminController_startTrial: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    PlatformAdminController_transitionSubscription: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4978,6 +5260,23 @@ export interface operations {
         };
     };
     PlatformAdminController_dashboard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PlatformAdminController_systemHealth: {
         parameters: {
             query?: never;
             header?: never;
@@ -5013,114 +5312,6 @@ export interface operations {
             };
         };
     };
-    PlatformAdminController_login: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    PlatformAdminController_listMigrations: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    PlatformAdminController_startMigration: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    PlatformAdminController_getMigration: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                runId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    PlatformAdminController_pauseMigration: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                runId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    PlatformAdminController_resumeMigration: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                runId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
     PlatformAdminController_initiateClosure: {
         parameters: {
             query?: never;
@@ -5130,7 +5321,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InitiateClosureDto"];
+            };
+        };
         responses: {
             201: {
                 headers: {
@@ -5149,7 +5344,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FinalizeClosureDto"];
+            };
+        };
         responses: {
             201: {
                 headers: {
@@ -5159,26 +5358,7 @@ export interface operations {
             };
         };
     };
-    PlatformAdminController_listSupportAccess: {
-        parameters: {
-            query: {
-                organizationId: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    PlatformAdminController_requestSupportAccess: {
+    PlatformAuthController_login: {
         parameters: {
             query?: never;
             header?: never;
@@ -5195,7 +5375,334 @@ export interface operations {
             };
         };
     };
-    PlatformAdminController_revokeSupportAccess: {
+    PlatformCatalogController_listPlans: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PlatformCatalogController_createPlan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePlanDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PlatformCatalogController_updatePlan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdatePlanDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PlatformCatalogController_startTrial: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartTrialDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PlatformCatalogController_transitionSubscription: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TransitionSubscriptionDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PlatformDomainsController_addCustomDomain: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organizationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddCustomDomainDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PlatformDomainsController_verifyCustomDomain: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organizationId: string;
+                domainId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerifyCustomDomainDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PlatformDomainsController_setPrimary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organizationId: string;
+                domainId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PlatformDomainsController_disable: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                organizationId: string;
+                domainId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PlatformMigrationsController_listMigrations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PlatformMigrationsController_startMigration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartMigrationDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PlatformMigrationsController_getMigration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PlatformMigrationsController_pauseMigration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PlatformMigrationsController_resumeMigration: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                runId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PlatformSupportAccessController_listSupportAccess: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PlatformSupportAccessController_requestSupportAccess: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSupportAccessDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PlatformSupportAccessController_revokeSupportAccess: {
         parameters: {
             query?: never;
             header?: never;
@@ -5223,9 +5730,32 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ManualBillingActionDto"];
+            };
+        };
         responses: {
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PlatformBillingController_receipt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -5252,11 +5782,7 @@ export interface operations {
     };
     PlatformBillingCallbackController_callback: {
         parameters: {
-            query: {
-                ref: string;
-                outcome: string;
-                val_id: string;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -5273,11 +5799,7 @@ export interface operations {
     };
     PlatformBillingCallbackController_postCallback: {
         parameters: {
-            query: {
-                ref: string;
-                outcome: string;
-                val_id: string;
-            };
+            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
@@ -5285,6 +5807,44 @@ export interface operations {
         requestBody?: never;
         responses: {
             201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PlatformFeatureFlagsController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    PlatformFeatureFlagsController_upsert: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpsertPlatformFeatureFlagDto"];
+            };
+        };
+        responses: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -5706,7 +6266,7 @@ export interface operations {
             };
         };
     };
-    ProductRequestController_getAllRequests: {
+    AdminProductRequestController_getAllRequests: {
         parameters: {
             query?: {
                 status?: string;
@@ -5728,7 +6288,7 @@ export interface operations {
             };
         };
     };
-    ProductRequestController_createRequest: {
+    PublicProductRequestController_createRequest: {
         parameters: {
             query?: never;
             header?: never;
@@ -5749,7 +6309,7 @@ export interface operations {
             };
         };
     };
-    ProductRequestController_updateStatus: {
+    AdminProductRequestController_updateStatus: {
         parameters: {
             query?: never;
             header?: never;
@@ -5772,7 +6332,7 @@ export interface operations {
             };
         };
     };
-    ProductRequestController_deleteRequest: {
+    AdminProductRequestController_deleteRequest: {
         parameters: {
             query?: never;
             header?: never;
@@ -7440,6 +8000,40 @@ export interface operations {
             };
         };
     };
+    StorageController_presignGet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    StorageController_presignPut: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     PublicCheckoutController_getDeliveryOptions: {
         parameters: {
             query?: never;
@@ -8370,6 +8964,29 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["UpdateShipmentProviderDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminShippingController_updateProviderConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCourierProviderConfigDto"];
             };
         };
         responses: {
@@ -9610,6 +10227,29 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminCommercePaymentsController_updateProvider: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdatePaymentProviderConfigDto"];
+            };
+        };
         responses: {
             200: {
                 headers: {

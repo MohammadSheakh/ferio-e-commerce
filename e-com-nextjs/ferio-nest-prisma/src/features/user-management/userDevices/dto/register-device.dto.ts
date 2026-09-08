@@ -2,7 +2,6 @@ import { IsString, IsNotEmpty, IsOptional, IsEnum } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { DeviceType } from '../enums/TDevice.enum';
 
-
 /**
  * Register Device DTO
  */
@@ -20,7 +19,9 @@ export class RegisterDeviceDto {
     description: 'Device type',
     enum: DeviceType,
   })
-  @IsEnum(DeviceType, { message: 'Device type must be web, ios, android, or desktop' })
+  @IsEnum(DeviceType, {
+    message: 'Device type must be web, ios, android, or desktop',
+  })
   @IsNotEmpty({ message: 'Device type is required' })
   deviceType: DeviceType;
 

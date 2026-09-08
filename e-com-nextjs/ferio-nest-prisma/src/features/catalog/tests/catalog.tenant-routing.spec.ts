@@ -1,5 +1,5 @@
 import { PrismaService } from '@app/database';
-import { TenantDbService } from '../../../tenancy/tenant-db.service';
+import { TenantDbService } from '../../../tenancy/services/tenant-db.service';
 import { CatalogService } from '../catalog.service';
 import { CommerceSettingsService } from '../../settings/services/commerce-settings.service';
 
@@ -7,18 +7,30 @@ describe('CatalogService tenant routing (MT-7 slice 1)', () => {
   const legacyPrisma = {
     category: { findMany: jest.fn().mockResolvedValue([{ id: 'legacy-cat' }]) },
     brand: { findMany: jest.fn().mockResolvedValue([]) },
-    product: { findMany: jest.fn().mockResolvedValue([]), count: jest.fn().mockResolvedValue(0), findFirst: jest.fn() },
+    product: {
+      findMany: jest.fn().mockResolvedValue([]),
+      count: jest.fn().mockResolvedValue(0),
+      findFirst: jest.fn(),
+    },
   };
   const audit = { record: jest.fn() };
 
   const tenantClient = {
-    category: { findMany: jest.fn().mockResolvedValue([{ id: 'tenant-a-cat' }]) },
+    category: {
+      findMany: jest.fn().mockResolvedValue([{ id: 'tenant-a-cat' }]),
+    },
     brand: { findMany: jest.fn().mockResolvedValue([]) },
-    product: { findMany: jest.fn().mockResolvedValue([]), count: jest.fn().mockResolvedValue(0), findFirst: jest.fn() },
+    product: {
+      findMany: jest.fn().mockResolvedValue([]),
+      count: jest.fn().mockResolvedValue(0),
+      findFirst: jest.fn(),
+    },
   };
 
   const tenantDbFor = (client: Record<string, unknown> | undefined) =>
-    ({ tryGet: jest.fn().mockResolvedValue(client) }) as unknown as TenantDbService;
+    ({
+      getOrLegacy: jest.fn().mockResolvedValue(client ?? legacyPrisma),
+    }) as unknown as TenantDbService;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -28,6 +40,7 @@ describe('CatalogService tenant routing (MT-7 slice 1)', () => {
     const service = new CatalogService(
       legacyPrisma as unknown as PrismaService,
       audit as never,
+      {} as never,
       tenantDbFor(tenantClient),
     );
 
@@ -43,6 +56,7 @@ describe('CatalogService tenant routing (MT-7 slice 1)', () => {
     const service = new CatalogService(
       legacyPrisma as unknown as PrismaService,
       audit as never,
+      {} as never,
       tenantDbFor(undefined),
     );
 
@@ -56,6 +70,8 @@ describe('CatalogService tenant routing (MT-7 slice 1)', () => {
     const service = new CatalogService(
       legacyPrisma as unknown as PrismaService,
       audit as never,
+      {} as never,
+      undefined,
     );
 
     await service.getCategories(true);
@@ -67,35 +83,38 @@ describe('CatalogService tenant routing (MT-7 slice 1)', () => {
     const service = new CatalogService(
       legacyPrisma as unknown as PrismaService,
       audit as never,
+      {} as never,
       tenantDbFor(tenantClient),
     );
 
     await service.getPublicProductBySlug('some-slug').catch(() => undefined);
 
-    expect(tenantClient.product.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          slug: 'some-slug',
-          status: 'ACTIVE',
-          publishedAt: expect.objectContaining({ lte: expect.any(Date) }),
-          variants: { some: { isActive: true } },
-        }),
-      }),
-    );
+    const calls = tenantClient.product.findFirst.mock.calls as unknown as Array<
+      [{ where: Record<string, unknown> }]
+    >;
+    const where = calls[0][0].where;
+    expect(where.slug).toBe('some-slug');
+    expect(where.status).toBe('ACTIVE');
+    const publishedAt = where.publishedAt as { lte?: unknown };
+    expect(publishedAt.lte).toBeInstanceOf(Date);
+    expect(where.variants).toEqual({ some: { isActive: true } });
     expect(legacyPrisma.product.findFirst).not.toHaveBeenCalled();
   });
 });
 
-
 describe('CommerceSettingsService tenant routing (MT-7 slice 2 - branding)', () => {
   const legacyPrisma = {
     commerceSettings: {
-      upsert: jest.fn().mockResolvedValue({ id: 'default', storeName: 'Legacy Store' }),
+      upsert: jest
+        .fn()
+        .mockResolvedValue({ id: 'default', storeName: 'Legacy Store' }),
     },
   };
   const tenantClient = {
     commerceSettings: {
-      upsert: jest.fn().mockResolvedValue({ id: 'default', storeName: 'Tenant A Store' }),
+      upsert: jest
+        .fn()
+        .mockResolvedValue({ id: 'default', storeName: 'Tenant A Store' }),
     },
   };
   const audit = { record: jest.fn() };
@@ -108,7 +127,9 @@ describe('CommerceSettingsService tenant routing (MT-7 slice 2 - branding)', () 
       legacyPrisma as unknown as PrismaService,
       audit as never,
       config,
-      { tryGet: jest.fn().mockResolvedValue(tenantClient) } as unknown as TenantDbService,
+      {
+        getOrLegacy: jest.fn().mockResolvedValue(tenantClient),
+      } as unknown as TenantDbService,
     );
 
     const result = await service.get();
@@ -123,7 +144,9 @@ describe('CommerceSettingsService tenant routing (MT-7 slice 2 - branding)', () 
       legacyPrisma as unknown as PrismaService,
       audit as never,
       config,
-      { tryGet: jest.fn().mockResolvedValue(undefined) } as unknown as TenantDbService,
+      {
+        getOrLegacy: jest.fn().mockResolvedValue(legacyPrisma),
+      } as unknown as TenantDbService,
     );
 
     const result = await service.get();

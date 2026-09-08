@@ -23,6 +23,32 @@ export type ApiEnvelope<T> = {
   correlationId?: string;
 };
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+export function parseApiEnvelope<T>(payload: unknown): ApiEnvelope<T> {
+  if (!isRecord(payload)) {
+    return { success: false, data: undefined as T };
+  }
+
+  const message = Array.isArray(payload.message)
+    ? payload.message.filter((item): item is string => typeof item === "string")
+    : typeof payload.message === "string"
+      ? payload.message
+      : undefined;
+
+  return {
+    success: payload.success === true,
+    data: payload.data as T,
+    ...(message !== undefined ? { message } : {}),
+    ...(typeof payload.code === "string" ? { code: payload.code } : {}),
+    ...(typeof payload.correlationId === "string"
+      ? { correlationId: payload.correlationId }
+      : {}),
+  };
+}
+
 export class FerioApiError extends Error {
   constructor(
     message: string,
@@ -55,7 +81,7 @@ export async function getPublicApi<T>(
     },
   );
 
-  const payload = (await response.json()) as ApiEnvelope<T>;
+  const payload = parseApiEnvelope<T>(await response.json().catch(() => null));
 
   if (!response.ok) {
     const message = Array.isArray(payload.message)

@@ -1,12 +1,12 @@
-import {
-  BadRequestException, Injectable,
-  Optional,
-} from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PERMISSIONS, roleHasPermission, type UserPayload } from '@app/common';
 import type { PrismaClient } from '@prisma/client';
 import { PrismaService } from '@app/database';
-import { TenantDbService } from '../../../tenancy/tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../../tenancy/services/tenant-db.service';
 import { randomUUID } from 'node:crypto';
 import { ReportQueryDto } from '../dto/report-query.dto';
 import { csvCell, maskExportName, reportPeriod } from '../utils/report.util';
@@ -159,7 +159,7 @@ function createReportAccumulator(): ReportOrderAcc & {
 
   return {
     ...acc,
-    add(order: ReportOrder): void {
+    add(this: ReportOrderAcc, order: ReportOrder): void {
       if (!this.currency) this.currency = order.currency;
       this.placed += 1;
       if (isConfirmed(order)) {
@@ -212,9 +212,7 @@ function createReportAccumulator(): ReportOrderAcc & {
         this.codCollectionVariances += 1;
       }
 
-      if (
-        ['PARTIAL', 'REFUNDED', 'FAILED'].includes(order.refundStatus)
-      ) {
+      if (['PARTIAL', 'REFUNDED', 'FAILED'].includes(order.refundStatus)) {
         this.refundAffectedOrders += 1;
       }
       for (const refund of order.refunds) {
@@ -262,16 +260,16 @@ export class ReportsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
-  
-    @Optional() private readonly tenantDb?: TenantDbService,) {}
+
+    private readonly tenantDb?: TenantDbService,
+  ) {}
 
   /**
    * MT-7/MT-8: tenant client inside resolved storefront/admin requests;
    * explicit legacy fallback otherwise. Never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    const tenant = await this.tenantDb?.tryGet();
-    return tenant ?? (this.prisma as PrismaClient);
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
   async overview(query: ReportQueryDto) {
     const db = await this.db();
@@ -314,12 +312,12 @@ export class ReportsService {
             ],
           }
         : baseWhere;
-      const batch = (await db.order.findMany({
+      const batch = await db.order.findMany({
         where: pageWhere,
         select: reportOrderSelect,
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         take: REPORT_CHUNK_SIZE,
-      })) as unknown as ReportOrder[];
+      });
       if (batch.length === 0) break;
       for (const order of batch) acc.add(order);
       if (batch.length < REPORT_CHUNK_SIZE) break;

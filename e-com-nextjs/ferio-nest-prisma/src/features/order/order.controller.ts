@@ -10,7 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { TenantMembershipGuard } from '../../tenancy/tenant-membership.guard';
+import { TenantMembershipGuard } from '../../tenancy/guards/tenant-membership.guard';
 import {
   AuthGuard,
   GLOBAL_RATE_LIMITS,
@@ -62,7 +62,9 @@ export class PublicOrderController {
   @Post('wallet')
   @UseGuards(AuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Pay for a valid checkout draft from customer wallet' })
+  @ApiOperation({
+    summary: 'Pay for a valid checkout draft from customer wallet',
+  })
   placeWalletOrder(
     @Headers('x-cart-token') cartToken: string | undefined,
     @Headers('idempotency-key') idempotencyKey: string | undefined,

@@ -2,17 +2,20 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
-  Optional,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import type { PrismaClient } from '@prisma/client';
 import type { UserPayload } from '@app/common';
 import { PrismaService } from '@app/database';
-import { TenantDbService } from '../../../tenancy/tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../../tenancy/services/tenant-db.service';
 import { AuditService } from '../../audit/services/audit.service';
 import { normalizeBangladeshPhone } from '../../checkout/utils/checkout.util';
 import { UpdateCommerceSettingsDto } from '../dto/commerce-settings.dto';
+import { tryGetTenantContext } from '../../../tenancy/context/tenant-context';
 
 const defaultCommerceSettings = {
   id: 'default',
@@ -20,6 +23,7 @@ const defaultCommerceSettings = {
   currency: 'BDT',
   timezone: 'Asia/Dhaka',
   orderPrefix: 'FER',
+  themePreset: 'default',
 } satisfies Prisma.CommerceSettingsCreateInput;
 
 @Injectable()
@@ -28,13 +32,12 @@ export class CommerceSettingsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly config: ConfigService,
-    @Optional() private readonly tenantDb?: TenantDbService,
+    private readonly tenantDb?: TenantDbService,
   ) {}
 
   /** Tenant client inside resolved storefront requests; legacy otherwise. */
   private async db(): Promise<PrismaClient> {
-    const tenant = await this.tenantDb?.tryGet();
-    return tenant ?? (this.prisma as PrismaClient);
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
 
   async get() {
@@ -51,8 +54,14 @@ export class CommerceSettingsService {
     return {
       storeName: settings.storeName,
       legalName: settings.legalName,
+      logoUrl: settings.logoUrl,
+      address: settings.address,
       supportPhone: settings.supportPhone,
       supportEmail: settings.supportEmail,
+      facebookUrl: settings.facebookUrl,
+      instagramUrl: settings.instagramUrl,
+      whatsappUrl: settings.whatsappUrl,
+      themePreset: settings.themePreset,
       currency: settings.currency,
       timezone: settings.timezone,
       defaultReturnWindowDays: settings.defaultReturnWindowDays,
@@ -72,7 +81,7 @@ export class CommerceSettingsService {
   }
 
   async update(dto: UpdateCommerceSettingsDto, actor: UserPayload) {
-    if (dto.prepaidEnabled && !this.hasConfiguredPaymentProvider()) {
+    if (dto.prepaidEnabled && !(await this.hasConfiguredPaymentProvider())) {
       throw new ConflictException(
         'Configure SSLCommerz or aamarPay credentials before enabling prepaid checkout',
       );
@@ -82,8 +91,14 @@ export class CommerceSettingsService {
     const data: Prisma.CommerceSettingsUpdateInput = {
       storeName: this.clean(dto.storeName),
       legalName: this.cleanNullable(dto.legalName),
+      logoUrl: this.cleanNullable(dto.logoUrl),
+      address: this.cleanNullable(dto.address),
       supportPhone: this.normalizePhone(dto.supportPhone),
       supportEmail: this.cleanNullable(dto.supportEmail)?.toLowerCase(),
+      facebookUrl: this.cleanNullable(dto.facebookUrl),
+      instagramUrl: this.cleanNullable(dto.instagramUrl),
+      whatsappUrl: this.cleanNullable(dto.whatsappUrl),
+      themePreset: dto.themePreset,
       currency: dto.currency,
       timezone: this.clean(dto.timezone),
       orderPrefix: this.clean(dto.orderPrefix)?.toUpperCase(),
@@ -143,7 +158,15 @@ export class CommerceSettingsService {
     });
   }
 
-  private hasConfiguredPaymentProvider() {
+  private async hasConfiguredPaymentProvider() {
+    if (tryGetTenantContext()) {
+      const db = await this.db();
+      const configured = await db.commercePaymentProviderConfig.findFirst({
+        where: { enabled: true },
+        select: { id: true },
+      });
+      return Boolean(configured);
+    }
     return Boolean(
       ((this.config.get('SSLCOMMERZ_STORE_ID') ||
         this.config.get('SSL_STORE_ID')) &&

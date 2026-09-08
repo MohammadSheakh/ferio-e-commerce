@@ -3,12 +3,14 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
-  Optional,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '@app/database';
 import type { PrismaClient } from '@prisma/client';
-import { TenantDbService } from '../../tenancy/tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../tenancy/services/tenant-db.service';
 import { ConfigService } from '@nestjs/config';
 import type { UserPayload } from '@app/common';
 import { CartService } from '../cart/cart.service';
@@ -42,7 +44,7 @@ export class CheckoutService {
     private readonly cartService: CartService,
     private readonly audit: AuditService,
     private readonly config: ConfigService,
-    @Optional() private readonly tenantDb?: TenantDbService,
+    private readonly tenantDb?: TenantDbService,
   ) {}
 
   /**
@@ -50,8 +52,7 @@ export class CheckoutService {
    * database client; outside one it explicitly falls back to the legacy DB.
    */
   private async db(): Promise<PrismaClient> {
-    const tenant = await this.tenantDb?.tryGet();
-    return tenant ?? (this.prisma as PrismaClient);
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
 
   async getPaymentOptions() {

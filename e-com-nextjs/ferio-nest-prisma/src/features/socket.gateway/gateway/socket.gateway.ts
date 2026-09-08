@@ -8,9 +8,10 @@ import {
   ConnectedSocket,
   MessageBody,
 } from '@nestjs/websockets';
-import { Server, Socket } from 'socket.io';
-import { Logger, UseGuards, Inject } from '@nestjs/common';
+import { Server } from 'socket.io';
+import { Logger, Inject } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { randomBytes } from 'node:crypto';
 import { createAdapter } from '@socket.io/redis-adapter';
 import { Redis } from 'ioredis';
 
@@ -18,12 +19,28 @@ import {
   SocketAuthService,
   scopedSocketRoom,
 } from '../services/socket-auth.service';
-import { tryGetTenantContext } from '../../../tenancy/tenant-context';
+import type { AuthenticatedSocket } from '../services/socket-auth.service';
+import { tryGetTenantContext } from '../../../tenancy/context/tenant-context';
 import { SocketRoomService } from '../services/socket-room.service';
-import { WsJwtGuard } from '../guards/ws-jwt.guard';
 import { REDIS_PUB_CLIENT, REDIS_SUB_CLIENT } from '@app/redis';
 import { FirebaseService } from '@app/notification';
 import { errorMessage } from '@app/common';
+
+type SocketPayload = Record<string, unknown>;
+
+function asSocketPayload(value: unknown): SocketPayload {
+  return typeof value === 'object' && value !== null
+    ? (value as SocketPayload)
+    : {};
+}
+
+function asStringPayload(value: unknown): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(asSocketPayload(value)).filter(
+      (entry): entry is [string, string] => typeof entry[1] === 'string',
+    ),
+  );
+}
 
 const socketAllowedOrigins = [
   process.env.CUSTOMER_WEB_URL || 'http://localhost:3000',
@@ -95,7 +112,7 @@ export class SocketGateway
   /**
    * Handle Client Connection
    */
-  async handleConnection(@ConnectedSocket() client: Socket) {
+  async handleConnection(@ConnectedSocket() client: AuthenticatedSocket) {
     try {
       // Authenticate user
       const user = await this.socketAuthService.authenticateSocket(client);
@@ -125,8 +142,8 @@ export class SocketGateway
       // MT-8 §11.3: every join is namespaced by the ticket's organization so
       // identical identifiers across tenants can never share a channel.
       const orgRoom = (room: string) => scopedSocketRoom(user, room);
-      client.join(orgRoom(user.userId));
-      client.join(orgRoom(`conv-${user.userId}`));
+      await client.join(orgRoom(user.userId));
+      await client.join(orgRoom(`conv-${user.userId}`));
       this.logger.log(
         `✅ User ${user.userId} joined rooms: ${user.userId}, conv-${user.userId}`,
       );
@@ -138,19 +155,20 @@ export class SocketGateway
           // MT-8 §11.3: tenant-bound admins join ONLY org-prefixed rooms so
           // one tenant's chats/notifications can never reach another's
           // console. Raw rooms exist solely for legacy (unbound) sockets.
-          client.join(orgRoom('role::admin'));
-          client.join(orgRoom('role::super-admin'));
-          client.join(orgRoom('admin-room'));
+          await client.join(orgRoom('role::admin'));
+          await client.join(orgRoom('role::super-admin'));
+          await client.join(orgRoom('admin-room'));
+          await client.join(orgRoom('delivery-live-map'));
           if (!user.organizationId) {
-            client.join(`role::${user.role}`);
-            client.join(`role::${lowerRole}`);
+            await client.join(`role::${user.role}`);
+            await client.join(`role::${lowerRole}`);
           }
           this.logger.log(
             `✅ Admin user ${user.userId} joined admin role rooms`,
           );
         } else if (!user.organizationId) {
-          client.join(`role::${user.role}`);
-          client.join(`role::${lowerRole}`);
+          await client.join(`role::${user.role}`);
+          await client.join(`role::${lowerRole}`);
         }
       }
 
@@ -200,7 +218,7 @@ export class SocketGateway
   /**
    * Handle Client Disconnection
    */
-  async handleDisconnect(@ConnectedSocket() client: Socket) {
+  async handleDisconnect(@ConnectedSocket() client: AuthenticatedSocket) {
     const user = client.data.user;
     const userId = user?.userId;
 
@@ -228,7 +246,7 @@ export class SocketGateway
    */
   @SubscribeMessage('page-view')
   handlePageView(
-    @ConnectedSocket() client: Socket,
+    @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: { page: string; title?: string },
   ) {
     if (!data || typeof data.page !== 'string') return;
@@ -272,7 +290,7 @@ export class SocketGateway
       userId: string;
     }> = [];
 
-    for (const [socketId, info] of this.activePageViews.entries()) {
+    for (const [, info] of this.activePageViews.entries()) {
       if (info.organizationId !== organizationId) continue;
       totalActive++;
       let rawPage = info.page.split('?')[0];
@@ -321,7 +339,7 @@ export class SocketGateway
    * Admin Request for Immediate Live Page Stats Hydration
    */
   @SubscribeMessage('request-live-page-stats')
-  handleRequestLivePageStats(@ConnectedSocket() client: Socket) {
+  handleRequestLivePageStats(@ConnectedSocket() client: AuthenticatedSocket) {
     const user = client.data.user;
     if (!user || !this.socketAuthService.isAdmin(user.role)) {
       return { success: false, message: 'Administrator access required' };
@@ -390,13 +408,16 @@ export class SocketGateway
    */
   @SubscribeMessage('join')
   async handleJoinRoom(
-    @ConnectedSocket() client: Socket,
+    @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: { conversationId: string },
   ) {
     try {
       const userId = client.data.userId;
       const { conversationId } = data;
 
+      if (!userId) {
+        return { success: false, message: 'Authentication required' };
+      }
       if (!conversationId) {
         return { success: false, message: 'conversationId is required' };
       }
@@ -411,7 +432,7 @@ export class SocketGateway
       }
 
       // Join Socket.IO room
-      client.join(scopedSocketRoom(client.data?.user, conversationId));
+      await client.join(scopedSocketRoom(client.data?.user, conversationId));
 
       // Update Redis state
       await this.socketRoomService.joinRoom(
@@ -456,19 +477,22 @@ export class SocketGateway
    */
   @SubscribeMessage('leave')
   async handleLeaveRoom(
-    @ConnectedSocket() client: Socket,
+    @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: { conversationId: string },
   ) {
     try {
       const userId = client.data.userId;
       const { conversationId } = data;
 
+      if (!userId) {
+        return { success: false, message: 'Authentication required' };
+      }
       if (!conversationId) {
         return { success: false, message: 'conversationId is required' };
       }
 
       // Leave Socket.IO room
-      client.leave(scopedSocketRoom(client.data?.user, conversationId));
+      await client.leave(scopedSocketRoom(client.data?.user, conversationId));
 
       // Update Redis state
       await this.socketRoomService.leaveRoom(
@@ -498,16 +522,20 @@ export class SocketGateway
    */
   @SubscribeMessage('new-message-received')
   async handleNewMessage(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() data: any,
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() data: unknown,
   ) {
     try {
-      const { conversationId } = data || {};
+      const input = asSocketPayload(data);
+      const conversationId =
+        typeof input.conversationId === 'string'
+          ? input.conversationId.trim()
+          : undefined;
       const user = client.data?.user;
       const userId = user?.userId;
       const targetConvId = conversationId || `conv-${userId}`;
       const text =
-        typeof data?.text === 'string' ? data.text.trim().slice(0, 4000) : '';
+        typeof input.text === 'string' ? input.text.trim().slice(0, 4000) : '';
 
       if (
         !userId ||
@@ -532,13 +560,19 @@ export class SocketGateway
 
       const payload = {
         _messageId:
-          data?._messageId ||
-          `msg_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+          (typeof input._messageId === 'string' && input._messageId.trim()
+            ? input._messageId.trim()
+            : undefined) ||
+          `msg_${Date.now()}_${randomBytes(4).toString('hex')}`,
         conversationId: targetConvId,
         text: text || '',
         senderId: userId,
         senderName: user.name || (isGuest ? 'Guest Visitor' : 'Customer'),
-        createdAt: data?.createdAt || new Date().toISOString(),
+        createdAt:
+          typeof input.createdAt === 'string' &&
+          !Number.isNaN(Date.parse(input.createdAt))
+            ? input.createdAt
+            : new Date().toISOString(),
         isGuest,
         guestId: targetGuestId,
         isAdmin,
@@ -555,8 +589,7 @@ export class SocketGateway
         : `conv-${targetConvId}`;
 
       // 1. Target Room Emission — tenant-scoped by the sender's binding
-      const senderUser: { organizationId?: string } | null =
-        (client?.data?.user as { organizationId?: string } | null) ?? null;
+      const senderUser = client.data?.user ?? null;
       this.server
         .to(scopedSocketRoom(senderUser, targetConvId))
         .emit('new-message-received', payload);
@@ -583,9 +616,7 @@ export class SocketGateway
         }),
       ]);
 
-      const senderOrg = (
-        client?.data?.user as { organizationId?: string } | undefined
-      )?.organizationId;
+      const senderOrg = client.data?.user?.organizationId;
       const roomsToEmit = new Set<string>([
         scopedSocketRoom({ organizationId: senderOrg }, rawConvId),
         scopedSocketRoom({ organizationId: senderOrg }, prefConvId),
@@ -704,7 +735,7 @@ export class SocketGateway
             ? `conv-${linkedUser.customerId}`
             : prefConvId;
 
-        let validSenderUser: any = null;
+        let validSenderUser: { id: string } | null = null;
 
         if (payload.isGuest) {
           validSenderUser = await db.user.upsert({
@@ -717,10 +748,12 @@ export class SocketGateway
               role: 'user',
               isDeleted: false,
             },
+            select: { id: true },
           });
         } else {
           validSenderUser = await db.user.findFirst({
             where: { id: payload.senderId, isDeleted: false },
+            select: { id: true },
           });
         }
 
@@ -772,14 +805,14 @@ export class SocketGateway
             );
           }
         }
-      } catch (dbErr: any) {
+      } catch (dbErr: unknown) {
         this.logger.warn(
-          `⚠️ Could not persist chat message to DB: ${dbErr.message}`,
+          `⚠️ Could not persist chat message to DB: ${errorMessage(dbErr)}`,
         );
       }
 
       return { success: true, data: payload };
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.logger.error(`❌ handleNewMessage error: ${errorMessage(error)}`);
       return { success: false, message: 'Failed to process message' };
     }
@@ -787,8 +820,8 @@ export class SocketGateway
 
   @SubscribeMessage('send-message')
   async handleSendMessageAlias(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() data: any,
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() data: unknown,
   ) {
     return this.handleNewMessage(client, data);
   }
@@ -798,13 +831,16 @@ export class SocketGateway
    */
   @SubscribeMessage('join-task')
   async handleJoinTaskRoom(
-    @ConnectedSocket() client: Socket,
+    @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: { taskId: string },
   ) {
     try {
       const userId = client.data.userId;
       const { taskId } = data;
 
+      if (!userId) {
+        return { success: false, message: 'Authentication required' };
+      }
       if (!taskId) {
         return { success: false, message: 'taskId is required' };
       }
@@ -814,7 +850,7 @@ export class SocketGateway
       const taskRoom = scopedSocketRoom(client.data?.user, taskId);
 
       // Join Socket.IO room
-      client.join(taskRoom);
+      await client.join(taskRoom);
 
       // Update Redis state
       await this.socketRoomService.joinTaskRoom(
@@ -851,13 +887,16 @@ export class SocketGateway
    */
   @SubscribeMessage('leave-task')
   async handleLeaveTaskRoom(
-    @ConnectedSocket() client: Socket,
+    @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: { taskId: string },
   ) {
     try {
       const userId = client.data.userId;
       const { taskId } = data;
 
+      if (!userId) {
+        return { success: false, message: 'Authentication required' };
+      }
       if (!taskId) {
         return { success: false, message: 'taskId is required' };
       }
@@ -865,7 +904,7 @@ export class SocketGateway
       const taskRoom = scopedSocketRoom(client.data?.user, taskId);
 
       // Leave Socket.IO room
-      client.leave(taskRoom);
+      await client.leave(taskRoom);
 
       // Update Redis state
       await this.socketRoomService.leaveTaskRoom(
@@ -893,8 +932,7 @@ export class SocketGateway
    */
   @SubscribeMessage('only-related-online-users')
   async handleGetRelatedOnlineUsers(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() _data: { userId?: string },
+    @ConnectedSocket() client: AuthenticatedSocket,
   ) {
     try {
       const user = client.data.user;
@@ -926,7 +964,7 @@ export class SocketGateway
    */
   @SubscribeMessage('get-family-activity-feed')
   async handleGetFamilyActivityFeed(
-    @ConnectedSocket() client: Socket,
+    @ConnectedSocket() client: AuthenticatedSocket,
     @MessageBody() data: { businessUserId: string; limit?: number },
   ) {
     try {
@@ -974,10 +1012,7 @@ export class SocketGateway
    * @param userId - User ID
    * @param notification - Notification data
    */
-  async emitNotificationToUser(
-    userId: string,
-    notification: any,
-  ): Promise<boolean> {
+  emitNotificationToUser(userId: string, notification: unknown): boolean {
     try {
       const eventName = `notification::${userId}`;
 
@@ -1002,7 +1037,7 @@ export class SocketGateway
    * @param userId - User ID
    * @param count - Unread count
    */
-  async emitUnreadCountUpdate(userId: string, count: number): Promise<void> {
+  emitUnreadCountUpdate(userId: string, count: number): void {
     try {
       const eventName = `notification:unread-count::${userId}`;
 
@@ -1020,6 +1055,26 @@ export class SocketGateway
     }
   }
 
+  /** Broadcast rider location only to admins in the current tenant. */
+  emitRiderLocation(payload: {
+    riderId: string;
+    latitude: number;
+    longitude: number;
+    occurredAt: string;
+  }): boolean {
+    try {
+      for (const room of this.ambientRooms('delivery-live-map')) {
+        this.server.to(room).emit('rider-location-updated', payload);
+      }
+      return true;
+    } catch (error) {
+      this.logger.error(
+        `Failed to emit rider location: ${errorMessage(error)}`,
+      );
+      return false;
+    }
+  }
+
   /**
    * Broadcast to Role
    *
@@ -1027,7 +1082,7 @@ export class SocketGateway
    * @param event - Event name
    * @param data - Data to emit
    */
-  async broadcastToRole(role: string, event: string, data: any): Promise<void> {
+  broadcastToRole(role: string, event: string, data: unknown): void {
     try {
       const roomName = `role::${role}`;
 
@@ -1063,7 +1118,11 @@ export class SocketGateway
    * @param event - Event name
    * @param data - Data to emit
    */
-  async emitToUser(userId: string, event: string, data: any): Promise<boolean> {
+  async emitToUser(
+    userId: string,
+    event: string,
+    data: unknown,
+  ): Promise<boolean> {
     try {
       const isOnline = await this.isUserOnline(userId);
       if (isOnline) {
@@ -1075,13 +1134,19 @@ export class SocketGateway
       }
 
       // Offline: push notification
-      const user: any = await this.socketAuthService.getUserProfile(userId);
-      if (user?.fcmToken) {
+      const user = await this.socketAuthService.getUserProfile(userId);
+      const fcmToken = user?.devices[0]?.fcmToken;
+      const payload = asSocketPayload(data);
+      if (fcmToken) {
         await this.firebaseService.sendPushNotification(
-          user.fcmToken,
-          data.title || 'New Notification',
-          data.message || 'You have a new message',
-          data,
+          fcmToken,
+          typeof payload.title === 'string'
+            ? payload.title
+            : 'New Notification',
+          typeof payload.message === 'string'
+            ? payload.message
+            : 'You have a new message',
+          asStringPayload(data),
         );
         this.logger.log(`📱 Push notification sent to offline user ${userId}`);
         return true;
@@ -1101,7 +1166,7 @@ export class SocketGateway
    * @param event - Event name
    * @param data - Data to emit
    */
-  async emitToRoom(roomId: string, event: string, data: any): Promise<boolean> {
+  emitToRoom(roomId: string, event: string, data: unknown): boolean {
     try {
       for (const room of this.ambientRooms(roomId)) {
         this.server.to(room).emit(event, data);

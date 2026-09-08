@@ -14,7 +14,10 @@ describe('audit snapshots', () => {
   });
 
   it('keeps operational values and truncates oversized text', () => {
-    const value = safeAuditJson({ status: 'CONFIRMED', note: 'x'.repeat(2100) });
+    const value = safeAuditJson({
+      status: 'CONFIRMED',
+      note: 'x'.repeat(2100),
+    });
     expect(value).toMatchObject({ status: 'CONFIRMED' });
     expect((value as { note: string }).note.length).toBe(2001);
   });

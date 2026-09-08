@@ -3,6 +3,7 @@ import { backendApiUrl } from "@/lib/customer-session";
 import { cookies } from "next/headers";
 import { withCorrelationId } from "@/lib/correlation";
 import { hostForwardHeadersFromRequest } from "@/lib/host-forward";
+import { getErrorMessage } from "@/lib/error-message";
 
 export async function POST(
   request: Request,
@@ -38,9 +39,9 @@ export async function POST(
     }
 
     return response;
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
-      { message: error.message || "Failed to import shared cart." },
+      { message: getErrorMessage(error, "Failed to import shared cart.") },
       { status: 500 },
     );
   }

@@ -50,7 +50,9 @@ export class UsageService {
     periodKey = currentPeriodKey(),
   ): Promise<bigint> {
     const normalized =
-      typeof value === 'bigint' ? value : BigInt(Math.max(0, Math.trunc(value)));
+      typeof value === 'bigint'
+        ? value
+        : BigInt(Math.max(0, Math.trunc(value)));
     const row = await this.platform.client.usageCounter.upsert({
       where: {
         organizationId_metric_periodKey: { organizationId, metric, periodKey },
@@ -61,7 +63,11 @@ export class UsageService {
     return row.value;
   }
 
-  async getValue(organizationId: string, metric: string, periodKey = currentPeriodKey()) {
+  async getValue(
+    organizationId: string,
+    metric: string,
+    periodKey = currentPeriodKey(),
+  ) {
     const row = await this.platform.client.usageCounter.findUnique({
       where: {
         organizationId_metric_periodKey: { organizationId, metric, periodKey },
@@ -70,11 +76,17 @@ export class UsageService {
     return row?.value ?? BigInt(0);
   }
 
-  async snapshot(organizationId: string, metrics: string[], periodKey = currentPeriodKey()) {
+  async snapshot(
+    organizationId: string,
+    metrics: string[],
+    periodKey = currentPeriodKey(),
+  ) {
     const rows = await this.platform.client.usageCounter.findMany({
       where: { organizationId, periodKey, metric: { in: metrics } },
     });
-    return Object.fromEntries(rows.map((row) => [row.metric, row.value.toString()]));
+    return Object.fromEntries(
+      rows.map((row) => [row.metric, row.value.toString()]),
+    );
   }
 
   /**

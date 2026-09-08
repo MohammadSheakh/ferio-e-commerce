@@ -4,17 +4,19 @@ import {
   Inject,
   Injectable,
   NotFoundException,
-  Optional,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { tryGetTenantContext } from '../../tenancy/tenant-context';
+import { tryGetTenantContext } from '../../tenancy/context/tenant-context';
 import { Prisma, UserRole } from '@prisma/client';
 import type { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { createHash, randomBytes } from 'node:crypto';
 import type { UserPayload } from '@app/common';
 import { PrismaService } from '@app/database';
-import { TenantDbService } from '../../tenancy/tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../tenancy/services/tenant-db.service';
 import { AuditService } from '../audit/services/audit.service';
 import { EmailService } from '../authentication/email/email.service';
 import { InviteStaffDto, UpdateStaffAccessDto } from './staff-access.dto';
@@ -26,15 +28,19 @@ export class StaffAccessService {
     private readonly audit: AuditService,
     private readonly email: EmailService,
     private readonly config: ConfigService,
-    @Optional() private readonly tenantDb?: TenantDbService,
-    @Optional() @Inject('PLAN_GATE')
-    private readonly planGate?: {
-      assertStaffSeat(organizationId: string, currentMemberCount: number): Promise<void>;
+    @Inject('PLAN_GATE')
+    private readonly planGate: {
+      assertStaffSeat(
+        organizationId: string,
+        currentMemberCount: number,
+      ): Promise<void>;
     },
-    @Optional() @Inject('ORG_MEMBERS_COUNTER')
-    private readonly orgMembers?: {
+    @Inject('ORG_MEMBERS_COUNTER')
+    private readonly orgMembers: {
       countActiveMembers(organizationId: string): Promise<number>;
     },
+    @Inject(TenantDbService)
+    private readonly tenantDb: TenantDbService | undefined,
   ) {}
 
   /**
@@ -42,8 +48,7 @@ export class StaffAccessService {
    * outside resolved requests. Never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    const tenant = await this.tenantDb?.tryGet();
-    return tenant ?? (this.prisma as unknown as PrismaClient);
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
 
   async list() {
@@ -90,10 +95,10 @@ export class StaffAccessService {
     const db = await this.db();
     // MT-10 §13.2A: staff-seat entitlement enforced server-side for tenants.
     const tenantContext = tryGetTenantContext();
-    if (tenantContext && this.planGate && this.orgMembers) {
-      const currentMemberCount = await this.orgMembers
-        .countActiveMembers(tenantContext.organizationId)
-        .catch(() => 0);
+    if (tenantContext) {
+      const currentMemberCount = await this.orgMembers.countActiveMembers(
+        tenantContext.organizationId,
+      );
       await this.planGate.assertStaffSeat(
         tenantContext.organizationId,
         currentMemberCount,

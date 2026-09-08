@@ -3,13 +3,15 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
-  Optional,
 } from '@nestjs/common';
 import type { PrismaClient } from '@prisma/client';
 import { Prisma } from '@prisma/client';
 import type { UserPayload } from '@app/common';
 import { PrismaService } from '@app/database';
-import { TenantDbService } from '../../tenancy/tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../tenancy/services/tenant-db.service';
 import { AuditService } from '../audit/services/audit.service';
 import { InspectRtoCaseDto } from './dto/rto.dto';
 
@@ -40,16 +42,16 @@ export class RtoService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
-  
-    @Optional() private readonly tenantDb?: TenantDbService,) {}
+
+    private readonly tenantDb?: TenantDbService,
+  ) {}
 
   /**
    * MT-7: inside a tenant-resolved request this returns the resolved tenant
    * database client; outside one it explicitly falls back to the legacy DB.
    */
   private async db(): Promise<PrismaClient> {
-    const tenant = await this.tenantDb?.tryGet();
-    return tenant ?? (this.prisma as PrismaClient);
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
   async list() {
     const db = await this.db();

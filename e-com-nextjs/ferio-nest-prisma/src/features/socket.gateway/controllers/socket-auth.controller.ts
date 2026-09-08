@@ -10,11 +10,14 @@ import { IsString, Matches } from 'class-validator';
 import { AuthGuard, Public, User } from '@app/common';
 import type { UserPayload } from '@app/common';
 import { SocketAuthService } from '../services/socket-auth.service';
-import { tryGetTenantContext } from '../../../tenancy/tenant-context';
+import { tryGetTenantContext } from '../../../tenancy/context/tenant-context';
+import { TenantMembershipGuard } from '../../../tenancy/guards/tenant-membership.guard';
 
 class GuestSocketTicketDto {
   @IsString()
-  @Matches(/^gst_[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i)
+  @Matches(
+    /^gst_[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+  )
   guestId: string;
 }
 
@@ -23,7 +26,7 @@ export class SocketAuthController {
   constructor(private readonly socketAuthService: SocketAuthService) {}
 
   @Post('ticket')
-  @UseGuards(AuthGuard)
+  @UseGuards(AuthGuard, TenantMembershipGuard)
   async issueAuthenticatedTicket(@User() user: UserPayload) {
     const token = await this.socketAuthService.issueSocketTicket({
       ...user,
@@ -39,7 +42,8 @@ export class SocketAuthController {
       dto.guestId,
       tryGetTenantContext()?.organizationId,
     );
-    if (!token) throw new BadRequestException('A valid guest chat ID is required');
+    if (!token)
+      throw new BadRequestException('A valid guest chat ID is required');
     return { token, expiresInSeconds: 300 };
   }
 }

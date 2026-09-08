@@ -12,6 +12,7 @@ import { StructuredLogger } from '@app/common';
 @Injectable()
 export class PlatformPrismaService implements OnModuleInit, OnModuleDestroy {
   readonly client: PrismaClient;
+  private readonly pool: Pool;
   private readonly logger = new StructuredLogger(PlatformPrismaService.name);
 
   constructor() {
@@ -21,8 +22,16 @@ export class PlatformPrismaService implements OnModuleInit, OnModuleDestroy {
         'PLATFORM_DATABASE_URL is required: the control plane cannot share the legacy single-tenant DATABASE_URL.',
       );
     }
-    const pool = new Pool({ connectionString: url, max: 5 });
-    this.client = new PrismaClient({ adapter: new PrismaPg(pool) });
+    this.pool = new Pool({ connectionString: url, max: 5 });
+    this.client = new PrismaClient({ adapter: new PrismaPg(this.pool) });
+  }
+
+  get poolMetrics() {
+    return {
+      totalCount: this.pool.totalCount,
+      idleCount: this.pool.idleCount,
+      waitingCount: this.pool.waitingCount,
+    };
   }
 
   async onModuleInit(): Promise<void> {

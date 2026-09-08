@@ -10,7 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { TenantMembershipGuard } from '../../tenancy/tenant-membership.guard';
+import { TenantMembershipGuard } from '../../tenancy/guards/tenant-membership.guard';
 import {
   AuthGuard,
   PERMISSIONS,
@@ -41,7 +41,11 @@ export class CustomerWalletController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
-    return this.wallet.summary(actor.userId, Number(page) || 1, Number(limit) || 20);
+    return this.wallet.summary(
+      actor.userId,
+      Number(page) || 1,
+      Number(limit) || 20,
+    );
   }
 
   @Post('top-ups')

@@ -7,6 +7,7 @@ import {
   PaymentGateway,
   ValidatePaymentResult,
 } from './payment.gateway';
+import type { PaymentCredentials } from '../utils/payment-credentials.util';
 
 /**
  * SSLCommerz Payment Gateway Implementation
@@ -26,8 +27,8 @@ export class SslcommerzGateway extends PaymentGateway {
   /**
    * Checks if SSLCommerz store credentials are configured in .env
    */
-  isConfigured() {
-    return Boolean(this.storeId() && this.password());
+  isConfigured(credentials?: PaymentCredentials) {
+    return Boolean(this.storeId(credentials) && this.password(credentials));
   }
 
   /**
@@ -35,10 +36,10 @@ export class SslcommerzGateway extends PaymentGateway {
    * Sends order & customer details to SSLCommerz gwprocess API
    * and returns GatewayPageURL for user redirect.
    */
-  async initiate(input: InitiatePaymentInput): Promise<InitiatePaymentResult> {
+  async initiate(input: InitiatePaymentInput, credentials?: PaymentCredentials): Promise<InitiatePaymentResult> {
     const body = new URLSearchParams({
-      store_id: this.storeId(),
-      store_passwd: this.password(),
+      store_id: this.storeId(credentials),
+      store_passwd: this.password(credentials),
       total_amount: this.providerAmount(input.amount), // Convert minor unit (poisha) to major BDT amount
       currency: input.currency,
       tran_id: input.merchantTransactionId, // Unique merchant transaction ID (e.g. FER...)
@@ -71,7 +72,7 @@ export class SslcommerzGateway extends PaymentGateway {
 
     // Call SSLCommerz Session API
     const raw = await this.json(
-      await fetch(`${this.baseUrl()}/gwprocess/v4/api.php`, {
+      await fetch(`${this.baseUrl(credentials)}/gwprocess/v4/api.php`, {
         method: 'POST',
         headers: correlationHeaders({
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -80,15 +81,15 @@ export class SslcommerzGateway extends PaymentGateway {
       }),
     );
 
-    const redirectUrl = String(raw.GatewayPageURL ?? '');
+    const redirectUrl = this.text(raw.GatewayPageURL);
     if (!redirectUrl)
       throw new Error(
-        String(raw.failedreason ?? 'SSLCommerz initiation failed'),
+        this.text(raw.failedreason, 'SSLCommerz initiation failed'),
       );
 
     return {
       redirectUrl,
-      providerSessionId: String(raw.sessionkey ?? ''),
+      providerSessionId: this.text(raw.sessionkey),
       raw,
     };
   }
@@ -99,8 +100,9 @@ export class SslcommerzGateway extends PaymentGateway {
    */
   async validate(
     payload: Record<string, unknown>,
+    credentials?: PaymentCredentials,
   ): Promise<ValidatePaymentResult> {
-    const validationId = String(payload.val_id ?? '');
+    const validationId = this.text(payload.val_id);
 
     // Without a val_id there is nothing this server can verify with the
     // provider. Browser-reported fail/cancel outcomes are recorded as an
@@ -109,7 +111,7 @@ export class SslcommerzGateway extends PaymentGateway {
     if (!validationId)
       return {
         outcome: 'UNVERIFIED_REPORT' as const,
-        merchantTransactionId: String(
+        merchantTransactionId: this.text(
           payload.tran_id ?? payload.merchantTransactionId ?? '',
         ),
         raw: payload,
@@ -118,30 +120,30 @@ export class SslcommerzGateway extends PaymentGateway {
     // Query SSLCommerz server-to-server validation endpoint
     const query = new URLSearchParams({
       val_id: validationId,
-      store_id: this.storeId(),
-      store_passwd: this.password(),
+      store_id: this.storeId(credentials),
+      store_passwd: this.password(credentials),
       format: 'json',
     });
     const raw = await this.json(
       await fetch(
-        `${this.baseUrl()}/validator/api/validationserverAPI.php?${query}`,
+        `${this.baseUrl(credentials)}/validator/api/validationserverAPI.php?${query}`,
         { headers: correlationHeaders() },
       ),
     );
 
-    const status = String(raw.status ?? '').toUpperCase();
+    const status = this.text(raw.status).toUpperCase();
     return {
       outcome: ['VALID', 'VALIDATED'].includes(status)
         ? 'SUCCEEDED'
         : status === 'PENDING'
           ? 'PENDING'
           : 'FAILED',
-      merchantTransactionId: String(raw.tran_id ?? payload.tran_id ?? ''),
+      merchantTransactionId: this.text(raw.tran_id ?? payload.tran_id),
       amount: this.minorAmount(raw.amount),
-      currency: String(raw.currency_type ?? payload.currency ?? ''),
-      providerTransactionId: String(raw.bank_tran_id ?? ''),
+      currency: this.text(raw.currency_type ?? payload.currency),
+      providerTransactionId: this.text(raw.bank_tran_id),
       validationId,
-      riskLevel: String(raw.risk_level ?? '0'),
+      riskLevel: this.text(raw.risk_level, '0'),
       raw: { ...payload, ...raw },
     };
   }
@@ -153,28 +155,28 @@ export class SslcommerzGateway extends PaymentGateway {
   /**
    * Resolves SSLCommerz Store ID (supports both SSLCOMMERZ_STORE_ID and SSL_STORE_ID)
    */
-  private storeId() {
-    return this.value('SSLCOMMERZ_STORE_ID') || this.value('SSL_STORE_ID');
+  private storeId(credentials?: PaymentCredentials) {
+    return this.value('SSLCOMMERZ_STORE_ID', '', credentials) || this.value('SSL_STORE_ID', '', credentials);
   }
 
   /**
    * Resolves SSLCommerz Store Password (supports both SSLCOMMERZ_STORE_PASSWORD and SSL_STORE_PASSWORD)
    */
-  private password() {
+  private password(credentials?: PaymentCredentials) {
     return (
-      this.value('SSLCOMMERZ_STORE_PASSWORD') ||
-      this.value('SSL_STORE_PASSWORD')
+      this.value('SSLCOMMERZ_STORE_PASSWORD', '', credentials) ||
+      this.value('SSL_STORE_PASSWORD', '', credentials)
     );
   }
 
   /**
    * Resolves SSLCommerz Base API URL depending on Sandbox vs Live configuration
    */
-  private baseUrl() {
+  private baseUrl(credentials?: PaymentCredentials) {
     const isLive =
-      this.value('is_live') === 'true' ||
-      this.value('SSLCOMMERZ_IS_LIVE') === 'true';
+      this.value('is_live', '', credentials) === 'true' ||
+      this.value('SSLCOMMERZ_IS_LIVE', '', credentials) === 'true';
     if (isLive) return 'https://securepay.sslcommerz.com';
-    return this.value('SSLCOMMERZ_BASE_URL', 'https://sandbox.sslcommerz.com');
+    return this.value('SSLCOMMERZ_BASE_URL', 'https://sandbox.sslcommerz.com', credentials);
   }
 }

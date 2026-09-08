@@ -5,7 +5,7 @@ import { PublicServiceController } from '../../service-booking/service-booking.c
 import type { ServiceBookingService } from '../../service-booking/service-booking.service';
 import { WarrantyController } from '../../warranty/warranty.controller';
 import type { WarrantyService } from '../../warranty/warranty.service';
-import type { CloudinaryStrategy } from '../../attachments/strategies/cloudinary.strategy';
+import type { StorageStrategy } from '../../storage/strategies/r2.strategy';
 import { StorefrontAnalyticsService } from '../../storefront-analytics/storefront-analytics.service';
 import type { CommerceSettingsService } from '../services/commerce-settings.service';
 
@@ -45,7 +45,7 @@ describe('staged feature flag enforcement', () => {
     const upload = { uploadFile: jest.fn() };
     const controller = new WarrantyController(
       warranty as unknown as WarrantyService,
-      upload as unknown as CloudinaryStrategy,
+      upload as unknown as StorageStrategy,
       settings as unknown as CommerceSettingsService,
     );
 

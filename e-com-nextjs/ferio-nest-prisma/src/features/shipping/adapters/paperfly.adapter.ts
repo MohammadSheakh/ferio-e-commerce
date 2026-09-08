@@ -15,13 +15,19 @@ import {
 import {
   normalizeCourierStatus,
   secureWebhookCredentialEquals,
+  shippingText,
 } from '../utils/shipping.util';
+import { tenantAwareCourierConfig } from '../utils/courier-credentials.util';
 
 @Injectable()
 export class PaperflyAdapter implements CourierAdapter {
   readonly code = 'PAPERFLY' as const;
 
-  constructor(private readonly config: ConfigService) {}
+  private readonly config: ConfigService;
+
+  constructor(config: ConfigService) {
+    this.config = tenantAwareCourierConfig(config);
+  }
 
   private get baseUrl() {
     return this.config.get<string>(
@@ -133,23 +139,25 @@ export class PaperflyAdapter implements CourierAdapter {
   }
 
   parseWebhook(payload: Record<string, unknown>): CourierWebhookEvent {
-    const rawStatus = String(payload.status || payload.event || 'unknown');
+    const rawStatus = shippingText(payload.status || payload.event, 'unknown');
     return {
-      providerEventId: payload.event_id ? String(payload.event_id) : undefined,
+      providerEventId: payload.event_id
+        ? shippingText(payload.event_id)
+        : undefined,
       externalShipmentId:
         payload.tracking_id || payload.trackingNumber || payload.order_id
-          ? String(
+          ? shippingText(
               payload.tracking_id || payload.trackingNumber || payload.order_id,
             )
           : undefined,
       orderReference:
         payload.merchantOrderReference || payload.merOrderRef
-          ? String(payload.merchantOrderReference || payload.merOrderRef)
+          ? shippingText(payload.merchantOrderReference || payload.merOrderRef)
           : undefined,
       rawStatus,
       normalizedStatus: normalizeCourierStatus('PAPERFLY', rawStatus),
       occurredAt: payload.updated_at
-        ? new Date(String(payload.updated_at))
+        ? new Date(shippingText(payload.updated_at))
         : new Date(),
     };
   }

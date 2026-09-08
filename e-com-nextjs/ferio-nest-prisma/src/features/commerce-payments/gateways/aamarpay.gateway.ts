@@ -7,6 +7,7 @@ import {
   PaymentGateway,
   ValidatePaymentResult,
 } from './payment.gateway';
+import type { PaymentCredentials } from '../utils/payment-credentials.util';
 
 @Injectable()
 export class AamarpayGateway extends PaymentGateway {
@@ -16,10 +17,10 @@ export class AamarpayGateway extends PaymentGateway {
     super(config);
   }
 
-  async initiate(input: InitiatePaymentInput): Promise<InitiatePaymentResult> {
+  async initiate(input: InitiatePaymentInput, credentials?: PaymentCredentials): Promise<InitiatePaymentResult> {
     const request = {
-      store_id: this.storeId(),
-      signature_key: this.signatureKey(),
+      store_id: this.storeId(credentials),
+      signature_key: this.signatureKey(credentials),
       cus_name: input.customer.name,
       cus_email: input.customer.email,
       cus_phone: input.customer.phone,
@@ -38,22 +39,23 @@ export class AamarpayGateway extends PaymentGateway {
       type: 'json',
     };
     const raw = await this.json(
-      await fetch(`${this.baseUrl()}/jsonpost.php`, {
+      await fetch(`${this.baseUrl(credentials)}/jsonpost.php`, {
         method: 'POST',
         headers: correlationHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(request),
       }),
     );
-    const redirectUrl = String(raw.payment_url ?? '');
-    if (String(raw.result) !== 'true' || !redirectUrl)
+    const redirectUrl = this.text(raw.payment_url);
+    if (this.text(raw.result) !== 'true' || !redirectUrl)
       throw new Error('aamarPay initiation failed');
     return { redirectUrl, raw };
   }
 
   async validate(
     payload: Record<string, unknown>,
+    credentials?: PaymentCredentials,
   ): Promise<ValidatePaymentResult> {
-    const merchantTransactionId = String(
+    const merchantTransactionId = this.text(
       payload.mer_txnid ??
         payload.tran_id ??
         payload.merchantTransactionId ??
@@ -61,16 +63,16 @@ export class AamarpayGateway extends PaymentGateway {
     );
     const query = new URLSearchParams({
       request_id: merchantTransactionId,
-      signature_key: this.signatureKey(),
-      store_id: this.storeId(),
+      signature_key: this.signatureKey(credentials),
+      store_id: this.storeId(credentials),
       type: 'json',
     });
     const raw = await this.json(
-      await fetch(`${this.baseUrl()}/api/v1/trxcheck/request.php?${query}`, {
+      await fetch(`${this.baseUrl(credentials)}/api/v1/trxcheck/request.php?${query}`, {
         headers: correlationHeaders(),
       }),
     );
-    const status = String(raw.pay_status ?? raw.status ?? '').toLowerCase();
+    const status = this.text(raw.pay_status ?? raw.status).toLowerCase();
     return {
       outcome:
         status === 'successful' || status === 'success'
@@ -80,15 +82,16 @@ export class AamarpayGateway extends PaymentGateway {
             : status.includes('fail') || status === 'invalid-data'
               ? 'FAILED'
               : 'PENDING',
-      merchantTransactionId: String(
+      merchantTransactionId: this.text(
         raw.mer_txnid ?? raw.request_id ?? merchantTransactionId,
       ),
       // Trust only provider-reported values at this trust boundary; falling
       // back to callback payload would let callers influence amount/currency
       // comparisons. Missing provider values fail the equality check closed.
-      amount: raw.amount !== undefined ? this.minorAmount(raw.amount) : undefined,
-      currency: String(raw.currency ?? raw.currency_merchant ?? ''),
-      providerTransactionId: String(raw.pg_txnid ?? raw.bank_txn ?? ''),
+      amount:
+        raw.amount !== undefined ? this.minorAmount(raw.amount) : undefined,
+      currency: this.text(raw.currency ?? raw.currency_merchant),
+      providerTransactionId: this.text(raw.pg_txnid ?? raw.bank_txn),
       raw,
     };
   }
@@ -96,13 +99,13 @@ export class AamarpayGateway extends PaymentGateway {
   protected credentialKeys() {
     return ['AAMARPAY_STORE_ID', 'AAMARPAY_SIGNATURE_KEY'];
   }
-  private storeId() {
-    return this.value('AAMARPAY_STORE_ID');
+  private storeId(credentials?: PaymentCredentials) {
+    return this.value('AAMARPAY_STORE_ID', '', credentials);
   }
-  private signatureKey() {
-    return this.value('AAMARPAY_SIGNATURE_KEY');
+  private signatureKey(credentials?: PaymentCredentials) {
+    return this.value('AAMARPAY_SIGNATURE_KEY', '', credentials);
   }
-  private baseUrl() {
-    return this.value('AAMARPAY_BASE_URL', 'https://sandbox.aamarpay.com');
+  private baseUrl(credentials?: PaymentCredentials) {
+    return this.value('AAMARPAY_BASE_URL', 'https://sandbox.aamarpay.com', credentials);
   }
 }

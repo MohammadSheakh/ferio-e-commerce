@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PlatformPrismaService } from '../platform-prisma.service';
+import { toPlatformJsonInput } from '../utils/json-input.util';
 
 export interface RecordAuditInput {
   action: string;
@@ -25,9 +26,9 @@ export class PlatformAuditService {
         entityId: input.entityId,
         actorId: input.actorId,
         source: input.source ?? 'PLATFORM_ADMIN',
-        previousValue: (input.previousValue ?? undefined) as never,
-        newValue: (input.newValue ?? undefined) as never,
-        metadata: (input.metadata ?? undefined) as never,
+        previousValue: toPlatformJsonInput(input.previousValue),
+        newValue: toPlatformJsonInput(input.newValue),
+        metadata: toPlatformJsonInput(input.metadata),
       },
     });
   }

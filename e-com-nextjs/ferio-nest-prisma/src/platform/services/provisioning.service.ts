@@ -10,9 +10,10 @@ import { PlatformAuditService } from './platform-audit.service';
 import { OrganizationsService } from './organizations.service';
 import { DomainsService } from './domains.service';
 import { TenantDatabasesService } from './tenant-databases.service';
-import { TenantSchemaBootstrapper } from '../../tenancy/tenant-schema.bootstrapper';
-import { LocalPostgresProvisioner } from './local-postgres-provisioner';
+import { TenantSchemaBootstrapper } from '../../tenancy/services/tenant-schema.bootstrapper';
 import type { TenantDatabaseProvisioner } from './tenant-database-provisioner.interface';
+import { TenantMetrics } from '@app/common';
+import { toPlatformJsonInput } from '../utils/json-input.util';
 
 /**
  * Pluggable physical infrastructure executor. The orchestration state machine
@@ -25,7 +26,13 @@ export interface ProvisioningExecutor {
   createTenantDatabase(params: {
     organizationId: string;
     slug: string;
-  }): Promise<{ host: string; port: number; databaseName: string; username: string; password: string }>;
+  }): Promise<{
+    host: string;
+    port: number;
+    databaseName: string;
+    username: string;
+    password: string;
+  }>;
 }
 
 export const PROVISIONING_STEPS = [
@@ -36,6 +43,7 @@ export const PROVISIONING_STEPS = [
   'SEED_TENANT',
   'ATTACH_OWNER_MEMBERSHIP',
   'HEALTH_CHECK',
+  'SMOKE_TEST',
   'ACTIVATE_ORGANIZATION',
 ] as const;
 
@@ -48,42 +56,79 @@ export class ProvisioningService {
     private readonly domains: DomainsService,
     private readonly databases: TenantDatabasesService,
     private readonly bootstrapper: TenantSchemaBootstrapper,
-  
-    @Inject('TENANT_DB_PROVISIONER') private dbProvisioner: TenantDatabaseProvisioner,) {}
+
+    @Inject('TENANT_DB_PROVISIONER')
+    private readonly dbProvisioner: TenantDatabaseProvisioner,
+  ) {}
 
   /**
    * Idempotent entry point: the idempotencyKey makes replays safe — a repeated
    * call returns the existing run instead of creating duplicate databases or
    * domains. Failed runs resume from their first non-completed step.
    */
-  async start(organizationId: string, options: { actorId?: string; idempotencyKey?: string } = {}) {
+  async start(
+    organizationId: string,
+    options: { actorId?: string; idempotencyKey?: string } = {},
+  ) {
+    TenantMetrics.increment('provisioning_run_started');
     const organization = await this.platform.client.organization.findUnique({
       where: { id: organizationId },
     });
     if (!organization) throw new NotFoundException('ORGANIZATION_NOT_FOUND');
 
     const idempotencyKey =
-      options.idempotencyKey ?? `prov:${organizationId}:${randomBytes(4).toString('hex')}`;
+      options.idempotencyKey ??
+      `prov:${organizationId}:${randomBytes(4).toString('hex')}`;
     const existingRun = await this.platform.client.provisioningRun.findUnique({
       where: { idempotencyKey },
       include: { steps: true },
     });
     if (existingRun) {
+      if (existingRun.organizationId !== organizationId) {
+        throw new ConflictException('PROVISIONING_IDEMPOTENCY_KEY_CONFLICT');
+      }
       if (existingRun.status === 'COMPLETED') return existingRun;
       return this.resume(existingRun.id, options.actorId);
     }
 
-    const run = await this.platform.client.provisioningRun.create({
-      data: {
-        organizationId,
-        idempotencyKey,
-        status: 'PENDING',
-        steps: {
-          create: PROVISIONING_STEPS.map((name) => ({ name, status: 'PENDING' })),
+    let run: { id: string };
+    try {
+      run = await this.platform.client.provisioningRun.create({
+        data: {
+          organizationId,
+          idempotencyKey,
+          status: 'PENDING',
+          steps: {
+            create: PROVISIONING_STEPS.map((name) => ({
+              name,
+              status: 'PENDING',
+            })),
+          },
         },
-      },
-      include: { steps: true },
-    });
+        include: { steps: true },
+      });
+    } catch (error: unknown) {
+      if (
+        !(
+          typeof error === 'object' &&
+          error !== null &&
+          'code' in error &&
+          error.code === 'P2002'
+        )
+      ) {
+        throw error;
+      }
+      const racedRun = await this.platform.client.provisioningRun.findUnique({
+        where: { idempotencyKey },
+        include: { steps: true },
+      });
+      if (!racedRun) throw error;
+      if (racedRun.organizationId !== organizationId) {
+        throw new ConflictException('PROVISIONING_IDEMPOTENCY_KEY_CONFLICT');
+      }
+      if (racedRun.status === 'COMPLETED') return racedRun;
+      return this.resume(racedRun.id, options.actorId);
+    }
     return this.resume(run.id, options.actorId);
   }
 
@@ -117,13 +162,15 @@ export class ProvisioningService {
         actorId,
         metadata: { runId: run.id },
       });
+      TenantMetrics.increment('provisioning_run_completed');
       return completed;
     } catch (error) {
       await this.platform.client.provisioningRun.update({
         where: { id: run.id },
         data: {
           status: 'FAILED',
-          errorSummary: error instanceof Error ? error.message : 'provisioning failed',
+          errorSummary:
+            error instanceof Error ? error.message : 'provisioning failed',
         },
       });
       await this.organizations
@@ -132,12 +179,17 @@ export class ProvisioningService {
           reason: error instanceof Error ? error.message : undefined,
         })
         .catch(() => undefined);
+      TenantMetrics.increment('provisioning_run_failed');
       throw error;
     }
   }
 
   private async executeStep(
-    run: { id: string; organizationId: string; organization: { slug: string; name: string } },
+    run: {
+      id: string;
+      organizationId: string;
+      organization: { slug: string; name: string };
+    },
     stepName: string,
     stepRowId: string,
   ) {
@@ -146,9 +198,12 @@ export class ProvisioningService {
         where: { id: stepRowId },
         data: {
           status,
-          detail: (detail ?? undefined) as never,
+          detail: toPlatformJsonInput(detail),
           startedAt: status === 'RUNNING' ? new Date() : undefined,
-          completedAt: status === 'COMPLETED' || status === 'FAILED' ? new Date() : undefined,
+          completedAt:
+            status === 'COMPLETED' || status === 'FAILED'
+              ? new Date()
+              : undefined,
         },
       });
 
@@ -156,21 +211,41 @@ export class ProvisioningService {
     try {
       switch (stepName) {
         case 'RESERVE_SUBDOMAIN': {
-          const domain = await this.domains.reserveSubdomain(
-            run.organizationId,
-            run.organization.slug,
-          );
+          const existing = await this.platform.client.tenantDomain.findFirst({
+            where: {
+              organizationId: run.organizationId,
+              type: 'PLATFORM_SUBDOMAIN',
+            },
+          });
+          const domain =
+            existing ??
+            (await this.domains.reserveSubdomain(
+              run.organizationId,
+              run.organization.slug,
+            ));
           await mark('COMPLETED', { hostname: domain.hostname });
           break;
         }
         case 'REGISTER_TENANT_DATABASE': {
           // Physical creation is delegated to the executor below; registry row
           // is created together with it so retries cannot double-create.
+          const existing = await this.platform.client.tenantDatabase.findUnique(
+            {
+              where: { organizationId: run.organizationId },
+            },
+          );
+          if (existing) {
+            await mark('COMPLETED', { databaseName: existing.databaseName });
+            break;
+          }
           const material = await this.executor().createTenantDatabase({
             organizationId: run.organizationId,
             slug: run.organization.slug,
           });
-          await this.databases.register({ organizationId: run.organizationId, ...material });
+          await this.databases.register({
+            organizationId: run.organizationId,
+            ...material,
+          });
           await mark('COMPLETED', { databaseName: material.databaseName });
           break;
         }
@@ -183,13 +258,20 @@ export class ProvisioningService {
           // Apply the canonical tenant migration artifact set to the fresh
           // database, then stamp the resulting schema version in the registry
           // (ADR-0005 packaging).
-          const registry = await this.platform.client.tenantDatabase.findUnique({
-            where: { organizationId: run.organizationId },
-          });
+          const registry = await this.platform.client.tenantDatabase.findUnique(
+            {
+              where: { organizationId: run.organizationId },
+            },
+          );
           if (!registry) throw new ConflictException('TENANT_DATABASE_MISSING');
-          const connection = await this.databases.getDecryptedConnection(registry.id);
+          const connection = await this.databases.getDecryptedConnection(
+            registry.id,
+          );
           const result = await this.bootstrapper.bootstrap(connection);
-          await this.databases.setSchemaVersion(registry.id, result.schemaVersion);
+          await this.databases.setSchemaVersion(
+            registry.id,
+            result.schemaVersion,
+          );
           await mark('COMPLETED', {
             schemaVersion: result.schemaVersion,
             appliedCount: result.applied.length,
@@ -201,7 +283,9 @@ export class ProvisioningService {
             where: { organizationId: run.organizationId },
           });
           if (!seeded) throw new ConflictException('TENANT_DATABASE_MISSING');
-          const seedConnection = await this.databases.getDecryptedConnection(seeded.id);
+          const seedConnection = await this.databases.getDecryptedConnection(
+            seeded.id,
+          );
           await this.bootstrapper.seedBaseline({
             ...seedConnection,
             organizationName: run.organization.name,
@@ -212,22 +296,64 @@ export class ProvisioningService {
         case 'ATTACH_OWNER_MEMBERSHIP': {
           // Owner membership rows are created during organization creation;
           // recorded here for evidence completeness.
-          await mark('COMPLETED', { note: 'owner membership created at organization creation' });
+          await mark('COMPLETED', {
+            note: 'owner membership created at organization creation',
+          });
           break;
         }
         case 'HEALTH_CHECK': {
-          const registry = await this.platform.client.tenantDatabase.findUnique({
-            where: { organizationId: run.organizationId },
-          });
+          const registry = await this.platform.client.tenantDatabase.findUnique(
+            {
+              where: { organizationId: run.organizationId },
+            },
+          );
           if (!registry) throw new ConflictException('TENANT_DATABASE_MISSING');
-          await this.databases.markReady(registry.id, registry.schemaVersion ?? '');
-          await mark('COMPLETED');
+          const connection = await this.databases.getDecryptedConnection(
+            registry.id,
+          );
+          await this.bootstrapper.verifyReady(connection);
+          await this.databases.markReady(
+            registry.id,
+            registry.schemaVersion ?? '',
+          );
+          await mark('COMPLETED', { databaseReachable: true });
+          break;
+        }
+        case 'SMOKE_TEST': {
+          const registry = await this.platform.client.tenantDatabase.findUnique(
+            {
+              where: { organizationId: run.organizationId },
+            },
+          );
+          if (!registry) throw new ConflictException('TENANT_DATABASE_MISSING');
+          const connection = await this.databases.getDecryptedConnection(
+            registry.id,
+          );
+          await this.bootstrapper.verifyReady(connection);
+          await mark('COMPLETED', { baselineTablesVerified: true });
           break;
         }
         case 'ACTIVATE_ORGANIZATION': {
-          await this.organizations.transition(run.organizationId, 'ACTIVE', {
-            reason: 'provisioning completed',
+          const organization =
+            await this.platform.client.organization.findUnique({
+              where: { id: run.organizationId },
+              select: { status: true },
+            });
+          if (!organization)
+            throw new NotFoundException('ORGANIZATION_NOT_FOUND');
+          if (organization.status !== 'ACTIVE') {
+            await this.organizations.transition(run.organizationId, 'ACTIVE', {
+              reason: 'provisioning completed',
+            });
+          }
+          const domain = await this.platform.client.tenantDomain.findFirst({
+            where: {
+              organizationId: run.organizationId,
+              type: 'PLATFORM_SUBDOMAIN',
+            },
           });
+          if (!domain) throw new ConflictException('TENANT_DOMAIN_MISSING');
+          await this.domains.activatePlatformSubdomain(domain.id);
           await mark('COMPLETED');
           break;
         }
@@ -242,13 +368,8 @@ export class ProvisioningService {
     }
   }
 
-  private provisionerRef: TenantDatabaseProvisioner | null = null;
-
-  /** Physical creation boundary (PO-022): replace via DI when managed hosting lands. */
+  /** Physical creation boundary selected by the module's DI token. */
   private executor(): ProvisioningExecutor {
-    if (!this.dbProvisioner) {
-      this.dbProvisioner = new LocalPostgresProvisioner(this.platform);
-    }
     return this.dbProvisioner;
   }
 }

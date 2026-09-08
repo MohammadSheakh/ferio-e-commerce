@@ -6,10 +6,18 @@ import {
   Optional,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
-import { Prisma } from '@prisma/client';
+import {
+  DeliveryPersonnelStatus,
+  DeliveryVehicleType,
+  OrderShipmentStatus,
+  Prisma,
+} from '@prisma/client';
 import type { PrismaClient } from '@prisma/client';
 import { PrismaService } from '@app/database';
-import { TenantDbService } from '../../tenancy/tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../tenancy/services/tenant-db.service';
 import { AuditService } from '../audit/services/audit.service';
 import {
   ApplyDeliveryPersonnelDto,
@@ -22,6 +30,7 @@ import {
   UpdateDeliveryPersonnelDto,
   UpdateLocationDto,
 } from './delivery-personnel.dto';
+import { SocketGateway } from '../socket.gateway/gateway/socket.gateway';
 
 function normalizePhone(phone: string): string {
   const digits = phone.replace(/\D/g, '');
@@ -34,21 +43,36 @@ function normalizePhone(phone: string): string {
   return '+' + digits;
 }
 
+type DeliveryPersonnelPatch = {
+  name?: string;
+  phoneOriginal?: string;
+  phoneNormalized?: string;
+  email?: string | null;
+  nidNumber?: string;
+  vehicleType?: DeliveryVehicleType;
+  operatingZone?: string;
+  drivingLicense?: string;
+  emergencyPhone?: string;
+  status?: DeliveryPersonnelStatus;
+  userId?: string;
+};
+
 @Injectable()
 export class DeliveryPersonnelService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
-  
-    @Optional() private readonly tenantDb?: TenantDbService,) {}
+
+    private readonly tenantDb?: TenantDbService,
+    @Optional() private readonly socket?: SocketGateway,
+  ) {}
 
   /**
    * MT-7: tenant client inside resolved storefront/worker contexts; explicit
    * legacy fallback otherwise. Never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    const tenant = await this.tenantDb?.tryGet();
-    return tenant ?? (this.prisma as PrismaClient);
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
   /**
    * Public Self-Registration for Bangladesh Candidates
@@ -156,9 +180,12 @@ export class DeliveryPersonnelService {
           email: emailNorm,
           nidNumber: dto.nidNumber?.trim() || existingRider.nidNumber,
           vehicleType: dto.vehicleType || existingRider.vehicleType,
-          operatingZone: dto.operatingZone?.trim() || existingRider.operatingZone,
-          drivingLicense: dto.drivingLicense?.trim() || existingRider.drivingLicense,
-          emergencyPhone: dto.emergencyPhone?.trim() || existingRider.emergencyPhone,
+          operatingZone:
+            dto.operatingZone?.trim() || existingRider.operatingZone,
+          drivingLicense:
+            dto.drivingLicense?.trim() || existingRider.drivingLicense,
+          emergencyPhone:
+            dto.emergencyPhone?.trim() || existingRider.emergencyPhone,
           status: 'APPROVED',
           userId,
         },
@@ -269,7 +296,7 @@ export class DeliveryPersonnelService {
               provisionedNewAccount: !personnel.userId,
             },
           },
-          tx as any,
+          tx,
         );
         return updated;
       });
@@ -278,7 +305,7 @@ export class DeliveryPersonnelService {
     return db.deliveryPersonnel.update({
       where: { id },
       data: {
-        status: dto.status as any,
+        status: dto.status,
         notes: dto.notes ? dto.notes.trim() : personnel.notes,
       },
     });
@@ -297,7 +324,7 @@ export class DeliveryPersonnelService {
       throw new NotFoundException('Delivery personnel record not found.');
     }
 
-    const updateData: any = {};
+    const updateData: DeliveryPersonnelPatch = {};
 
     if (dto.name) updateData.name = dto.name.trim();
     if (dto.phone) {
@@ -307,11 +334,15 @@ export class DeliveryPersonnelService {
     if (dto.email !== undefined) {
       updateData.email = dto.email ? dto.email.toLowerCase().trim() : null;
     }
-    if (dto.nidNumber !== undefined) updateData.nidNumber = dto.nidNumber?.trim();
+    if (dto.nidNumber !== undefined)
+      updateData.nidNumber = dto.nidNumber?.trim();
     if (dto.vehicleType) updateData.vehicleType = dto.vehicleType;
-    if (dto.operatingZone !== undefined) updateData.operatingZone = dto.operatingZone?.trim();
-    if (dto.drivingLicense !== undefined) updateData.drivingLicense = dto.drivingLicense?.trim();
-    if (dto.emergencyPhone !== undefined) updateData.emergencyPhone = dto.emergencyPhone?.trim();
+    if (dto.operatingZone !== undefined)
+      updateData.operatingZone = dto.operatingZone?.trim();
+    if (dto.drivingLicense !== undefined)
+      updateData.drivingLicense = dto.drivingLicense?.trim();
+    if (dto.emergencyPhone !== undefined)
+      updateData.emergencyPhone = dto.emergencyPhone?.trim();
     if (dto.status) updateData.status = dto.status;
 
     let userId = personnel.userId;
@@ -331,7 +362,8 @@ export class DeliveryPersonnelService {
             password: hashedPassword,
             name: updateData.name || personnel.name,
             email: email,
-            phoneNumber: updateData.phoneNormalized || personnel.phoneNormalized,
+            phoneNumber:
+              updateData.phoneNormalized || personnel.phoneNormalized,
           },
         });
       } else {
@@ -340,7 +372,8 @@ export class DeliveryPersonnelService {
             name: updateData.name || personnel.name,
             email: email,
             password: hashedPassword,
-            phoneNumber: updateData.phoneNormalized || personnel.phoneNormalized,
+            phoneNumber:
+              updateData.phoneNormalized || personnel.phoneNormalized,
             role: 'delivery_man',
             isEmailVerified: true,
           },
@@ -348,7 +381,10 @@ export class DeliveryPersonnelService {
         userId = newUser.id;
         updateData.userId = userId;
       }
-    } else if (userId && (updateData.name || updateData.email || updateData.phoneNormalized)) {
+    } else if (
+      userId &&
+      (updateData.name || updateData.email || updateData.phoneNormalized)
+    ) {
       await db.user.update({
         where: { id: userId },
         data: {
@@ -371,7 +407,7 @@ export class DeliveryPersonnelService {
    */
   async listAll(query: QueryDeliveryPersonnelDto) {
     const db = await this.db();
-    const where: any = {};
+    const where: Prisma.DeliveryPersonnelWhereInput = {};
 
     if (query.status) {
       where.status = query.status;
@@ -478,7 +514,9 @@ export class DeliveryPersonnelService {
   private async resolveDeliveryPersonnel(userId: string) {
     const db = await this.db();
     if (!userId) {
-      throw new BadRequestException('User ID is missing from authorization token.');
+      throw new BadRequestException(
+        'User ID is missing from authorization token.',
+      );
     }
     let personnel = await db.deliveryPersonnel.findUnique({
       where: { userId },
@@ -491,7 +529,9 @@ export class DeliveryPersonnelService {
           where: {
             OR: [
               { email: { equals: user.email, mode: 'insensitive' } },
-              ...(user.phoneNumber ? [{ phoneNormalized: user.phoneNumber }] : []),
+              ...(user.phoneNumber
+                ? [{ phoneNormalized: user.phoneNumber }]
+                : []),
             ],
           },
         });
@@ -510,7 +550,9 @@ export class DeliveryPersonnelService {
     }
 
     if (!personnel || personnel.status !== 'APPROVED') {
-      throw new NotFoundException('No active rider profile is linked to this account.');
+      throw new NotFoundException(
+        'No active rider profile is linked to this account.',
+      );
     }
 
     return personnel;
@@ -531,7 +573,7 @@ export class DeliveryPersonnelService {
     const db = await this.db();
     const personnel = await this.resolveDeliveryPersonnel(userId);
     // If turning online, update lastLocationAt timestamp
-    const updateData: any = {};
+    const updateData: Prisma.DeliveryPersonnelUpdateInput = {};
     if (isOnline) {
       updateData.lastLocationAt = new Date();
     }
@@ -553,7 +595,14 @@ export class DeliveryPersonnelService {
       orderBy: { createdAt: 'desc' },
       include: {
         address: true,
-        customer: { select: { id: true, name: true, phoneOriginal: true, phoneNormalized: true } },
+        customer: {
+          select: {
+            id: true,
+            name: true,
+            phoneOriginal: true,
+            phoneNormalized: true,
+          },
+        },
         items: true,
       },
     });
@@ -575,12 +624,15 @@ export class DeliveryPersonnelService {
     const db = await this.db();
     const personnel = await this.resolveDeliveryPersonnel(userId);
 
-    const shipmentStatusMap: Record<string, any> = {
-      PICKED_UP: 'PICKED_UP',
-      IN_TRANSIT: 'OUT_FOR_DELIVERY',
-      OUT_FOR_DELIVERY: 'OUT_FOR_DELIVERY',
-      DELIVERED: 'DELIVERED',
-      DELIVERY_FAILED: 'DELIVERY_FAILED',
+    const shipmentStatusMap: Record<
+      UpdateDeliveryOrderStatusDto['status'],
+      OrderShipmentStatus
+    > = {
+      PICKED_UP: OrderShipmentStatus.PICKED_UP,
+      IN_TRANSIT: OrderShipmentStatus.OUT_FOR_DELIVERY,
+      OUT_FOR_DELIVERY: OrderShipmentStatus.OUT_FOR_DELIVERY,
+      DELIVERED: OrderShipmentStatus.DELIVERED,
+      DELIVERY_FAILED: OrderShipmentStatus.DELIVERY_FAILED,
     };
     const newShipmentStatus = shipmentStatusMap[dto.status];
     if (!newShipmentStatus) {
@@ -607,16 +659,16 @@ export class DeliveryPersonnelService {
           throw new NotFoundException('Assigned order not found.');
         }
 
-        const terminalOrBlocked = [
-          'CANCELLED',
-          'DELIVERED',
-          'COMPLETED',
+        const terminalOrBlocked = ['CANCELLED', 'DELIVERED', 'COMPLETED'];
+        const terminalShipmentStatuses: OrderShipmentStatus[] = [
+          OrderShipmentStatus.DELIVERED,
+          OrderShipmentStatus.RETURNED,
+          OrderShipmentStatus.CANCELLED,
+          OrderShipmentStatus.RTO,
         ];
         if (
           terminalOrBlocked.includes(order.status) ||
-          ['DELIVERED', 'RETURNED', 'CANCELLED', 'RTO'].includes(
-            order.shipmentStatus as any,
-          )
+          terminalShipmentStatuses.includes(order.shipmentStatus)
         ) {
           throw new ConflictException(
             `Order in status ${order.status}/${order.shipmentStatus} cannot be updated by a rider.`,
@@ -693,7 +745,7 @@ export class DeliveryPersonnelService {
                 codCashPendingStaffConfirmation: order.paymentMethod === 'COD',
               },
             },
-            tx as any,
+            tx,
           );
         }
 
@@ -772,7 +824,7 @@ export class DeliveryPersonnelService {
       },
     });
 
-    return db.deliveryPersonnel.update({
+    const updated = await db.deliveryPersonnel.update({
       where: { id: personnel.id },
       data: {
         currentLat: dto.latitude,
@@ -780,6 +832,14 @@ export class DeliveryPersonnelService {
         lastLocationAt: new Date(),
       },
     });
+    this.socket?.emitRiderLocation({
+      riderId: personnel.id,
+      latitude: dto.latitude,
+      longitude: dto.longitude,
+      occurredAt:
+        updated.lastLocationAt?.toISOString() ?? new Date().toISOString(),
+    });
+    return updated;
   }
 
   /**
@@ -798,7 +858,11 @@ export class DeliveryPersonnelService {
       where: { deliveryPersonnelId: id },
     });
 
-    return { message: 'Location waypoint history cleared.', currentLat: personnel.currentLat, currentLng: personnel.currentLng };
+    return {
+      message: 'Location waypoint history cleared.',
+      currentLat: personnel.currentLat,
+      currentLng: personnel.currentLng,
+    };
   }
 
   /**
@@ -820,7 +884,13 @@ export class DeliveryPersonnelService {
           lastLocationAt: true,
           locationHistory: {
             orderBy: { sequence: 'asc' },
-            select: { id: true, latitude: true, longitude: true, sequence: true, createdAt: true },
+            select: {
+              id: true,
+              latitude: true,
+              longitude: true,
+              sequence: true,
+              createdAt: true,
+            },
           },
         },
       }),

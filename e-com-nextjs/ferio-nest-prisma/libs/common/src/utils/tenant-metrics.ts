@@ -18,9 +18,25 @@ export type TenantMetricName =
   | 'entitlement_denied'
   | 'db_acquire_failure'
   | 'db_breaker_opened'
+  | 'db_client_evicted'
+  | 'db_capacity_exhausted'
   | 'queue_tenant_failure'
+  | 'migration_run_started'
+  | 'migration_tenant_succeeded'
+  | 'migration_tenant_failed'
+  | 'migration_run_paused'
+  | 'migration_run_completed'
+  | 'provisioning_run_started'
+  | 'provisioning_run_completed'
+  | 'provisioning_run_failed'
+  | 'platform_billing_invoice_created'
+  | 'platform_billing_payment_initiated'
+  | 'platform_billing_payment_session_created'
+  | 'platform_billing_payment_succeeded'
+  | 'platform_billing_payment_failed'
   | 'usage_threshold_crossed'
-  | 'usage_reconciliation_drift';
+  | 'usage_reconciliation_drift'
+  | 'backup_freshness_observed';
 
 const MAX_LABEL_KEYS = 4;
 const MAX_LABEL_VALUE = 128;
@@ -40,10 +56,11 @@ export type TenantMetricsSnapshot = {
   counters: TenantMetricSeries[];
 };
 
-function stableLabelKey(name: TenantMetricName, labels: TenantMetricLabels): string {
-  const keys = Object.keys(labels)
-    .sort()
-    .slice(0, MAX_LABEL_KEYS);
+function stableLabelKey(
+  name: TenantMetricName,
+  labels: TenantMetricLabels,
+): string {
+  const keys = Object.keys(labels).sort().slice(0, MAX_LABEL_KEYS);
   const parts = keys.map(
     (key) =>
       `${key}=${String(labels[key] ?? '')
@@ -57,7 +74,10 @@ export class TenantMetrics {
   private static observedSince = new Date();
   private static totalIncrements = 0;
   private static readonly counts = new Map<string, number>();
-  private static readonly labelSets = new Map<string, { name: TenantMetricName; labels: TenantMetricLabels }>();
+  private static readonly labelSets = new Map<
+    string,
+    { name: TenantMetricName; labels: TenantMetricLabels }
+  >();
 
   static increment(
     name: TenantMetricName,

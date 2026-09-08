@@ -10,6 +10,7 @@ type SidebarLink = {
   href: string;
   label: string;
   permission?: string;
+  entitlement?: string;
   staffVisible?: boolean;
   ownerOnly?: boolean;
   borderClass: string;
@@ -41,6 +42,7 @@ const links: SidebarLink[] = [
     href: "/dashboard/payments",
     label: "Payments",
     permission: "payments.read",
+    entitlement: "online_payments",
     borderClass: "border-l-amber-500 border-r-amber-500",
     hoverClass: "hover:bg-amber-50 text-amber-950",
     activeClass: "bg-amber-500 text-white font-semibold border-l-amber-600 border-r-amber-600",
@@ -57,6 +59,7 @@ const links: SidebarLink[] = [
     href: "/dashboard/returns",
     label: "Returns",
     permission: "returns.read",
+    entitlement: "returns_rto",
     borderClass: "border-l-amber-500 border-r-amber-500",
     hoverClass: "hover:bg-amber-50 text-amber-950",
     activeClass: "bg-amber-500 text-white font-semibold border-l-amber-600 border-r-amber-600",
@@ -83,6 +86,7 @@ const links: SidebarLink[] = [
     href: "/dashboard/inventory",
     label: "Inventory",
     permission: "catalog.read",
+    entitlement: "inventory",
     borderClass: "border-l-emerald-500 border-r-emerald-500",
     hoverClass: "hover:bg-emerald-50 text-emerald-950",
     activeClass: "bg-emerald-600 text-white font-semibold border-l-emerald-700 border-r-emerald-700",
@@ -125,6 +129,7 @@ const links: SidebarLink[] = [
     href: "/dashboard/delivery-men",
     label: "Delivery Personnel",
     permission: "delivery-personnel.read",
+    entitlement: "rider_management",
     borderClass: "border-l-blue-500 border-r-blue-500",
     hoverClass: "hover:bg-blue-50 text-blue-950",
     activeClass: "bg-blue-600 text-white font-semibold border-l-blue-700 border-r-blue-700",
@@ -133,6 +138,7 @@ const links: SidebarLink[] = [
     href: "/dashboard/delivery-map",
     label: "Live Delivery Map",
     permission: "delivery-personnel.read",
+    entitlement: "live_rider_tracking",
     borderClass: "border-l-blue-500 border-r-blue-500",
     hoverClass: "hover:bg-blue-50 text-blue-950",
     activeClass: "bg-blue-600 text-white font-semibold border-l-blue-700 border-r-blue-700",
@@ -141,6 +147,7 @@ const links: SidebarLink[] = [
     href: "/dashboard/shipping",
     label: "Shipping",
     permission: "shipping.read",
+    entitlement: "couriers_basic",
     borderClass: "border-l-blue-500 border-r-blue-500",
     hoverClass: "hover:bg-blue-50 text-blue-950",
     activeClass: "bg-blue-600 text-white font-semibold border-l-blue-700 border-r-blue-700",
@@ -225,6 +232,7 @@ const links: SidebarLink[] = [
     href: "/dashboard/reports",
     label: "Reports",
     permission: "reports.read",
+    entitlement: "basic_reports",
     borderClass: "border-l-rose-500 border-r-rose-500",
     hoverClass: "hover:bg-rose-50 text-rose-950",
     activeClass: "bg-rose-600 text-white font-semibold border-l-rose-700 border-r-rose-700",
@@ -233,6 +241,7 @@ const links: SidebarLink[] = [
     href: "/dashboard/analytics",
     label: "Analytics",
     permission: "reports.read",
+    entitlement: "advanced_reports",
     borderClass: "border-l-rose-500 border-r-rose-500",
     hoverClass: "hover:bg-rose-50 text-rose-950",
     activeClass: "bg-rose-600 text-white font-semibold border-l-rose-700 border-r-rose-700",
@@ -241,6 +250,7 @@ const links: SidebarLink[] = [
     href: "/dashboard/charts",
     label: "Executive Charts & Graphs",
     permission: "reports.read",
+    entitlement: "advanced_reports",
     borderClass: "border-l-rose-500 border-r-rose-500",
     hoverClass: "hover:bg-rose-50 text-rose-950",
     activeClass: "bg-rose-600 text-white font-semibold border-l-rose-700 border-r-rose-700",
@@ -276,24 +286,45 @@ const links: SidebarLink[] = [
 export default function Sidebar() {
   const pathname = usePathname();
   const [session, setSession] = useState<AdminSession | null>();
+  const [features, setFeatures] = useState<Record<string, boolean> | null>(null);
 
   useEffect(() => {
-    void fetch("/api/auth/session", { cache: "no-store" })
-      .then(async (response) => {
-        const payload = (await response.json()) as { data?: AdminSession };
-        setSession(response.ok && payload.data ? payload.data : null);
+    void Promise.all([
+      fetch("/api/auth/session", { cache: "no-store" }),
+      fetch("/api/admin/plan-status", { cache: "no-store" }),
+    ])
+      .then(async ([sessionResponse, planResponse]) => {
+        const sessionPayload = (await sessionResponse.json()) as { data?: AdminSession };
+        const planPayload = (await planResponse.json()) as {
+          data?: { code?: string; features?: Record<string, boolean> };
+        };
+        setSession(sessionResponse.ok && sessionPayload.data ? sessionPayload.data : null);
+        setFeatures(
+          planResponse.ok && planPayload.data?.code === "ACTIVE"
+            ? planPayload.data.features ?? {}
+            : null,
+        );
       })
-      .catch(() => setSession(null));
+      .catch(() => {
+        setSession(null);
+        setFeatures(null);
+      });
   }, []);
 
   const visibleLinks = links.filter((link) => {
     if (session === undefined) return false;
-    if (!session || session.role === "admin") return true;
+    if (!session) return false;
     if (link.ownerOnly) return false;
     if (link.staffVisible) return true;
-    return Boolean(
-      link.permission && session.permissions.includes(link.permission),
+    const permissionAllowed = Boolean(
+      session.role === "admin" ||
+        (link.permission && session.permissions.includes(link.permission)),
     );
+    const entitlementAllowed =
+      features === null ||
+      !link.entitlement ||
+      features[link.entitlement] !== false;
+    return permissionAllowed && entitlementAllowed;
   });
 
   return (

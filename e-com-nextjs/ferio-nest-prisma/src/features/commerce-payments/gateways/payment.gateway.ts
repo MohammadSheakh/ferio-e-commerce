@@ -1,5 +1,6 @@
 import { ConfigService } from '@nestjs/config';
 import type { CommercePaymentProvider } from '@prisma/client';
+import type { PaymentCredentials } from '../utils/payment-credentials.util';
 
 export type PaymentCustomer = {
   name: string;
@@ -52,18 +53,20 @@ export abstract class PaymentGateway {
 
   abstract initiate(
     input: InitiatePaymentInput,
+    credentials?: PaymentCredentials,
   ): Promise<InitiatePaymentResult>;
   abstract validate(
     payload: Record<string, unknown>,
+    credentials?: PaymentCredentials,
   ): Promise<ValidatePaymentResult>;
   protected abstract credentialKeys(): string[];
 
-  isConfigured() {
-    return this.credentialKeys().every((key) => Boolean(this.value(key)));
+  isConfigured(credentials?: PaymentCredentials) {
+    return this.credentialKeys().every((key) => Boolean(this.value(key, '', credentials)));
   }
 
-  protected value(key: string, fallback = '') {
-    return this.config.get<string>(key, fallback);
+  protected value(key: string, fallback = '', credentials?: PaymentCredentials) {
+    return credentials?.[key] ?? this.config.get<string>(key, fallback);
   }
 
   protected providerAmount(minorAmount: number) {
@@ -73,6 +76,14 @@ export abstract class PaymentGateway {
   protected minorAmount(value: unknown) {
     const amount = Number(value);
     return Number.isFinite(amount) ? Math.round(amount * 100) : undefined;
+  }
+
+  protected text(value: unknown, fallback = ''): string {
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number' || typeof value === 'boolean') {
+      return String(value);
+    }
+    return fallback;
   }
 
   protected async json(response: Response) {

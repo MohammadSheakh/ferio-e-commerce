@@ -10,6 +10,7 @@ import { Request, Response } from 'express';
 import { sanitizeUrlForLogs } from '../utils/log-sanitizer';
 import { RequestMetrics } from '../utils/request-metrics';
 import { StructuredLogger } from '../utils/structured-logger';
+import type { AuthenticatedRequest } from '../types/http-request.type';
 
 /**
  * Logging Interceptor
@@ -36,17 +37,15 @@ import { StructuredLogger } from '../utils/structured-logger';
 export class LoggingInterceptor implements NestInterceptor {
   private readonly logger = new StructuredLogger(LoggingInterceptor.name);
 
-  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
-    const request = context.switchToHttp().getRequest<Request>();
+  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
+    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const response = context.switchToHttp().getResponse<Response>();
 
-    const { method, url, headers } = request;
-    const userAgent = headers['user-agent'] || '';
+    const { method, url } = request;
     const ip = this.getClientIP(request);
 
     // Get user ID if authenticated
-    const user = request as any;
-    const userId = user.user?.userId || 'anonymous';
+    const userId = request.user?.userId || 'anonymous';
 
     // Start time for response time calculation
     const now = Date.now();

@@ -2,6 +2,10 @@ import type { PrismaService } from '@app/database';
 import type { AuditService } from '../../audit/services/audit.service';
 import { ReportsService } from '../services/reports.service';
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
 const baseOrder = {
   id: 'order-1',
   status: 'CONFIRMED',
@@ -28,7 +32,11 @@ const baseOrder = {
 
 describe('ReportsService', () => {
   const prisma = { order: { findMany: jest.fn() } };
-  const audit = { record: jest.fn().mockResolvedValue({ id: 'audit-1' }) };
+  const audit = {
+    record: jest
+      .fn<Promise<{ id: string }>, [unknown]>()
+      .mockResolvedValue({ id: 'audit-1' }),
+  };
   const service = new ReportsService(
     prisma as unknown as PrismaService,
     audit as unknown as AuditService,
@@ -125,9 +133,7 @@ describe('ReportsService', () => {
           total: 100,
         })),
       )
-      .mockResolvedValueOnce([
-        { ...baseOrder, id: 'order-tail', total: 250 },
-      ]);
+      .mockResolvedValueOnce([{ ...baseOrder, id: 'order-tail', total: 250 }]);
 
     const report = await service.overview({
       dateFrom: '2026-08-01',
@@ -191,12 +197,14 @@ describe('ReportsService', () => {
     expect(result.content).toContain('"\'+88017****3456"');
     expect(result.content).toContain('"[masked]"');
     expect(result.content).toContain("'=Road Bike");
-    expect(audit.record).toHaveBeenCalledWith(
-      expect.objectContaining({
-        action: 'REPORT_ORDERS_EXPORTED',
-        metadata: expect.objectContaining({ customerFields: 'masked' }),
-      }),
-    );
+    const auditCalls = audit.record.mock.calls;
+    const auditPayload = auditCalls.at(-1)?.[0];
+    expect(isRecord(auditPayload)).toBe(true);
+    if (!isRecord(auditPayload)) return;
+    expect(auditPayload.action).toBe('REPORT_ORDERS_EXPORTED');
+    expect(isRecord(auditPayload.metadata)).toBe(true);
+    if (!isRecord(auditPayload.metadata)) return;
+    expect(auditPayload.metadata.customerFields).toBe('masked');
   });
 
   it('reveals bounded customer fields with customer permission', async () => {

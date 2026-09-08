@@ -45,7 +45,7 @@ describe('SocketRoomService tenant isolation', () => {
     await rooms.joinTaskRoom('user-1', 'task-1', 'org-a');
     await rooms.joinTaskRoom('user-1', 'task-1', 'org-b');
 
-    const keys = pipeline.sadd.mock.calls.map(([key]) => key);
+    const keys = (pipeline.sadd.mock.calls as unknown[][]).map(([key]) => key);
     expect(keys).toContain('org:org-a:chat:room_users:conversation-1');
     expect(keys).toContain('org:org-b:chat:room_users:conversation-1');
     expect(keys).toContain('org:org-a:task:rooms:task-1');
@@ -86,6 +86,14 @@ describe('SocketRoomService tenant isolation', () => {
     );
   });
 
+  it('skips malformed activity entries without failing the feed', async () => {
+    redis.lrange.mockResolvedValueOnce(['{"action":"valid"}', '{broken']);
+
+    await expect(
+      service().getActivityFeed('family-1', 10, 'org-a'),
+    ).resolves.toEqual([{ action: 'valid' }]);
+  });
+
   it('resolves family membership inside the signed organization', async () => {
     process.env.TENANCY_ENABLED = 'true';
     const tenantUser = {
@@ -96,10 +104,12 @@ describe('SocketRoomService tenant isolation', () => {
       }),
     };
     const tenantDb = {
-      tryGet: jest.fn().mockResolvedValue({ user: tenantUser }),
+      getOrLegacy: jest.fn().mockResolvedValue({ user: tenantUser }),
     };
     const fanout = {
-      forOrganization: jest.fn((_organizationId, operation) => operation()),
+      forOrganization: jest.fn(
+        <T>(_organizationId: string, operation: () => T): T => operation(),
+      ),
     };
     const socket = { join: jest.fn() };
 

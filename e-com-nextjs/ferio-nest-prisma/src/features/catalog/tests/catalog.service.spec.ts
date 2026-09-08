@@ -5,33 +5,49 @@ import { AuditService } from '../../audit/services/audit.service';
 
 const actor = { userId: 'admin-1', email: 'admin@ferio.test', role: 'admin' };
 const audit = { record: jest.fn() } as unknown as AuditService;
+const entitlements = {} as never;
 
 describe('CatalogService', () => {
   it('creates a category with a normalized slug', async () => {
-    const create = jest.fn().mockImplementation(({ data }) => ({
-      id: 'category-1',
-      ...data,
-    }));
+    const create = jest
+      .fn()
+      .mockImplementation(({ data }: { data: Record<string, unknown> }) => ({
+        id: 'category-1',
+        ...data,
+      }));
+    const transaction = {
+      category: { create },
+      auditLog: { create: jest.fn() },
+    };
     const prisma = {
       category: { create },
-      $transaction: jest.fn((callback) => callback({
-        category: { create },
-        auditLog: { create: jest.fn() },
-      })),
+      $transaction: jest.fn(
+        (callback: (value: typeof transaction) => unknown) =>
+          callback(transaction),
+      ),
     } as unknown as PrismaService;
-    const service = new CatalogService(prisma, audit);
+    const service = new CatalogService(prisma, audit, entitlements, undefined);
 
-    const category = await service.createCategory({
-      name: '  Home & Living  ',
-    }, actor);
+    const category = (await service.createCategory(
+      {
+        name: '  Home & Living  ',
+      },
+      actor,
+    )) as { slug: string };
 
-    expect(create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        name: 'Home & Living',
-        slug: 'home-living',
-        isActive: true,
-        sortOrder: 0,
-      }),
+    const createCall = (create.mock.calls as unknown[][])[0]?.[0] as {
+      data: {
+        name: string;
+        slug: string;
+        isActive: boolean;
+        sortOrder: number;
+      };
+    };
+    expect(createCall.data).toMatchObject({
+      name: 'Home & Living',
+      slug: 'home-living',
+      isActive: true,
+      sortOrder: 0,
     });
     expect(category.slug).toBe('home-living');
   });
@@ -39,11 +55,11 @@ describe('CatalogService', () => {
   it('requires an explicit slug when a name cannot create a safe URL', async () => {
     const prisma = {
       category: { create: jest.fn() },
-      $transaction: jest.fn((callback) => callback({
-        category: { create: jest.fn() },
-      })),
+      $transaction: jest.fn((callback: (value: unknown) => unknown) =>
+        callback({ category: { create: jest.fn() } }),
+      ),
     } as unknown as PrismaService;
-    const service = new CatalogService(prisma, audit);
+    const service = new CatalogService(prisma, audit, entitlements, undefined);
 
     await expect(
       service.createCategory({ name: 'শাড়ি' }, actor),
@@ -54,7 +70,7 @@ describe('CatalogService', () => {
     const prisma = {
       category: { findFirst: jest.fn() },
     } as unknown as PrismaService;
-    const service = new CatalogService(prisma, audit);
+    const service = new CatalogService(prisma, audit, entitlements, undefined);
 
     await expect(
       service.createProduct(
@@ -89,9 +105,12 @@ describe('CatalogService', () => {
       inventoryMovement: { create: jest.fn() },
     };
     const prisma = {
-      $transaction: jest.fn((callback) => callback(transaction)),
+      $transaction: jest.fn(
+        (callback: (value: typeof transaction) => unknown) =>
+          callback(transaction),
+      ),
     } as unknown as PrismaService;
-    const service = new CatalogService(prisma, audit);
+    const service = new CatalogService(prisma, audit, entitlements, undefined);
 
     await expect(
       service.adjustInventory(
@@ -111,7 +130,7 @@ describe('CatalogService', () => {
     const prisma = {
       category: { findFirst: jest.fn() },
     } as unknown as PrismaService;
-    const service = new CatalogService(prisma, audit);
+    const service = new CatalogService(prisma, audit, entitlements, undefined);
 
     await expect(
       service.createProduct(
@@ -129,7 +148,7 @@ describe('CatalogService', () => {
 
   it('rejects negative purchase receipts', async () => {
     const prisma = {} as PrismaService;
-    const service = new CatalogService(prisma, audit);
+    const service = new CatalogService(prisma, audit, entitlements, undefined);
 
     await expect(
       service.adjustInventory(
@@ -155,7 +174,7 @@ describe('CatalogService', () => {
       },
       product: { count: jest.fn().mockResolvedValue(2) },
     } as unknown as PrismaService;
-    const service = new CatalogService(prisma, audit);
+    const service = new CatalogService(prisma, audit, entitlements, undefined);
 
     await expect(
       service.updateCategory('category-1', { isActive: false }, actor),
@@ -172,7 +191,7 @@ describe('CatalogService', () => {
         }),
       },
     } as unknown as PrismaService;
-    const service = new CatalogService(prisma, audit);
+    const service = new CatalogService(prisma, audit, entitlements, undefined);
 
     await expect(
       service.deleteCategory('category-1', actor),
@@ -192,9 +211,12 @@ describe('CatalogService', () => {
     };
     const prisma = {
       category: { findUnique: jest.fn().mockResolvedValue(category) },
-      $transaction: jest.fn((callback) => callback(transaction)),
+      $transaction: jest.fn(
+        (callback: (value: typeof transaction) => unknown) =>
+          callback(transaction),
+      ),
     } as unknown as PrismaService;
-    const service = new CatalogService(prisma, audit);
+    const service = new CatalogService(prisma, audit, entitlements, undefined);
 
     await expect(service.deleteCategory('category-1', actor)).resolves.toEqual({
       id: 'category-1',
@@ -217,7 +239,7 @@ describe('CatalogService', () => {
         update,
       },
     } as unknown as PrismaService;
-    const service = new CatalogService(prisma, audit);
+    const service = new CatalogService(prisma, audit, entitlements, undefined);
 
     await expect(
       service.updateProductStatus('product-1', { status: 'ACTIVE' }, actor),

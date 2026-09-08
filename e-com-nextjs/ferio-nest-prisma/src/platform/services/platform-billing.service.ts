@@ -3,13 +3,22 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { correlationHeaders } from '@app/common';
-import { StructuredLogger } from '@app/common';
+import { randomBytes } from 'node:crypto';
+import { correlationHeaders, StructuredLogger, TenantMetrics } from '@app/common';
 import { PlatformPrismaService } from '../platform-prisma.service';
 import { PlatformAuditService } from './platform-audit.service';
+import { toPlatformJsonInput } from '../utils/json-input.util';
 
 const SSLC_SANDBOX = 'https://sandbox.sslcommerz.com';
 const SSLC_LIVE = 'https://securepay.sslcommerz.com';
+
+function providerText(value: unknown, fallback = ''): string {
+  return typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean'
+    ? String(value)
+    : fallback;
+}
 
 export interface InvoiceWithAttempts {
   id: string;
@@ -18,6 +27,24 @@ export interface InvoiceWithAttempts {
   currency: string;
   paid: boolean;
   organizationId: string;
+}
+
+export interface PlatformReceipt {
+  receiptNumber: string;
+  invoiceNumber: string;
+  organizationId: string;
+  amountMinor: number;
+  currency: string;
+  periodStart: Date;
+  periodEnd: Date;
+  paidAt: Date | null;
+  provider: string | null;
+  providerReference: string | null;
+}
+
+interface ManualBillingAction {
+  actorId?: string;
+  reason: string;
 }
 
 /**
@@ -41,7 +68,11 @@ export class PlatformBillingService {
     private readonly audit: PlatformAuditService,
   ) {}
 
-  private credentials(): { storeId: string; password: string; baseUrl: string } | null {
+  private credentials(): {
+    storeId: string;
+    password: string;
+    baseUrl: string;
+  } | null {
     const storeId =
       process.env.PLATFORM_SSLCOMMERZ_STORE_ID ||
       process.env.SSL_STORE_ID ||
@@ -55,7 +86,9 @@ export class PlatformBillingService {
     return {
       storeId,
       password,
-      baseUrl: isLive ? SSLC_LIVE : process.env.PLATFORM_SSLCOMMERZ_BASE_URL || SSLC_SANDBOX,
+      baseUrl: isLive
+        ? SSLC_LIVE
+        : process.env.PLATFORM_SSLCOMMERZ_BASE_URL || SSLC_SANDBOX,
     };
   }
 
@@ -68,7 +101,17 @@ export class PlatformBillingService {
     organizationId: string;
     periodStart: Date;
     periodEnd: Date;
+    actorId?: string;
+    reason: string;
   }): Promise<InvoiceWithAttempts> {
+    this.assertManualReason(input.reason);
+    if (
+      Number.isNaN(input.periodStart.getTime()) ||
+      Number.isNaN(input.periodEnd.getTime()) ||
+      input.periodEnd <= input.periodStart
+    ) {
+      throw new BadRequestException('INVOICE_PERIOD_INVALID');
+    }
     const subscription = await this.platform.client.subscription.findUnique({
       where: { organizationId: input.organizationId },
       include: { plan: true },
@@ -85,11 +128,12 @@ export class PlatformBillingService {
     });
     if (existing && !existing.paid) return existing;
 
-    const number = `SI-${new Date().toISOString().slice(0, 7).replace('-', '')}-${Math.random()
-      .toString(36)
-      .slice(2, 7)
+    const number = `SI-${new Date().toISOString().slice(0, 7).replace('-', '')}-${randomBytes(
+      4,
+    )
+      .toString('hex')
       .toUpperCase()}`;
-    return this.platform.client.saasInvoice.create({
+    const created = await this.platform.client.saasInvoice.create({
       data: {
         number,
         organizationId: input.organizationId,
@@ -100,6 +144,21 @@ export class PlatformBillingService {
         currency: 'BDT',
       },
     });
+    await this.audit.record({
+      action: 'SAAS_INVOICE_MANUALLY_CREATED',
+      entityType: 'SaasInvoice',
+      entityId: created.id,
+      actorId: input.actorId,
+      newValue: {
+        organizationId: input.organizationId,
+        periodStart: input.periodStart,
+        periodEnd: input.periodEnd,
+        amountMinor: created.amountMinor,
+      },
+      metadata: { reason: input.reason.trim() },
+    });
+    TenantMetrics.increment('platform_billing_invoice_created');
+    return created;
   }
 
   /**
@@ -107,9 +166,14 @@ export class PlatformBillingService {
    * redirect URL. The attempt record is created BEFORE the gateway call and
    * carries the unguessable reference that callbacks must present.
    */
-  async initiatePayment(invoiceId: string): Promise<{ redirectUrl?: string; reference: string }> {
+  async initiatePayment(
+    invoiceId: string,
+    action: ManualBillingAction,
+  ): Promise<{ redirectUrl?: string; reference: string }> {
+    this.assertManualReason(action.reason);
     const creds = this.credentials();
-    if (!creds) throw new BadRequestException('PLATFORM_BILLING_NOT_CONFIGURED');
+    if (!creds)
+      throw new BadRequestException('PLATFORM_BILLING_NOT_CONFIGURED');
 
     const invoice = await this.platform.client.saasInvoice.findUnique({
       where: { id: invoiceId },
@@ -120,9 +184,10 @@ export class PlatformBillingService {
       throw new BadRequestException('INVOICE_AMOUNT_INVALID');
     }
 
-    const reference = `SAAS-${invoice.number}-${Date.now().toString(36).toUpperCase()}${Math.random()
-      .toString(36)
-      .slice(2, 6)
+    const reference = `SAAS-${invoice.number}-${Date.now().toString(36).toUpperCase()}-${randomBytes(
+      4,
+    )
+      .toString('hex')
       .toUpperCase()}`;
 
     await this.platform.client.saasPaymentAttempt.create({
@@ -134,6 +199,15 @@ export class PlatformBillingService {
         amountMinor: invoice.amountMinor,
       },
     });
+    await this.audit.record({
+      action: 'SAAS_PAYMENT_MANUALLY_INITIATED',
+      entityType: 'SaasPaymentAttempt',
+      entityId: reference,
+      actorId: action.actorId,
+      newValue: { invoiceId: invoice.id, amountMinor: invoice.amountMinor },
+      metadata: { reason: action.reason.trim() },
+    });
+    TenantMetrics.increment('platform_billing_payment_initiated');
 
     const publicBase = (
       process.env.PUBLIC_API_URL || 'http://localhost:6733'
@@ -141,8 +215,6 @@ export class PlatformBillingService {
     const cbBase = publicBase.endsWith('/api/v1')
       ? publicBase
       : `${publicBase}/api/v1`;
-    const callbackQs = `ref=${encodeURIComponent(reference)}`;
-
     const body = new URLSearchParams({
       store_id: creds.storeId,
       store_passwd: creds.password,
@@ -170,22 +242,30 @@ export class PlatformBillingService {
     try {
       const response = await fetch(`${creds.baseUrl}/gwprocess/v4/api.php`, {
         method: 'POST',
-        headers: correlationHeaders({ 'Content-Type': 'application/x-www-form-urlencoded' }),
+        headers: correlationHeaders({
+          'Content-Type': 'application/x-www-form-urlencoded',
+        }),
         body,
       });
       const raw = (await response.json()) as Record<string, unknown>;
-      redirectUrl = String(raw.GatewayPageURL ?? '');
-      if (!redirectUrl) throw new Error(String(raw.failedreason ?? 'session failed'));
+      redirectUrl = providerText(raw.GatewayPageURL);
+      if (!redirectUrl)
+        throw new Error(providerText(raw.failedreason, 'session failed'));
       await this.platform.client.saasPaymentAttempt.updateMany({
         where: { reference, status: 'INITIATED' },
-        data: { raw: raw as never },
+        data: { raw: toPlatformJsonInput(raw) },
       });
+      TenantMetrics.increment('platform_billing_payment_session_created');
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       await this.platform.client.saasPaymentAttempt.updateMany({
         where: { reference, status: 'INITIATED' },
-        data: { status: 'FAILED', raw: { initiationError: message } as never },
+        data: {
+          status: 'FAILED',
+          raw: toPlatformJsonInput({ initiationError: message }),
+        },
       });
+      TenantMetrics.increment('platform_billing_payment_failed');
       throw new BadRequestException('PAYMENT_SESSION_FAILED');
     }
     return { redirectUrl, reference };
@@ -196,6 +276,12 @@ export class PlatformBillingService {
     // use a stable platform address — real owner contact lives on invoices.
     void organizationId;
     return 'billing@ferio.local';
+  }
+
+  private assertManualReason(reason: string): void {
+    if (reason.trim().length < 10) {
+      throw new BadRequestException('BILLING_REASON_REQUIRED');
+    }
   }
 
   /**
@@ -227,14 +313,18 @@ export class PlatformBillingService {
     if (input.outcome === 'success') {
       if (!input.valId) {
         // A success claim without a verifiable val_id is rejected outright.
-        await this.markFailed(attempt.reference, 'success claim without val_id');
+        await this.markFailed(
+          attempt.reference,
+          'success claim without val_id',
+        );
         throw new BadRequestException('PAYMENT_VALIDATION_REQUIRED');
       }
       const validation = await this.validateWithSslcommerz(input.valId);
-      if (
-        validation.status !== 'VALID' && validation.status !== 'VALIDATED'
-      ) {
-        await this.markFailed(attempt.reference, `validation ${validation.status}`);
+      if (validation.status !== 'VALID' && validation.status !== 'VALIDATED') {
+        await this.markFailed(
+          attempt.reference,
+          `validation ${validation.status}`,
+        );
         return { applied: true };
       }
       if (validation.tranId !== attempt.reference) {
@@ -251,7 +341,7 @@ export class PlatformBillingService {
         where: { reference: attempt.reference, status: 'INITIATED' },
         data: {
           status: 'SUCCEEDED',
-          raw: { ...input, validation } as never,
+          raw: toPlatformJsonInput({ ...input, validation }),
         },
       });
       if (updated.count === 0) return { applied: false, duplicate: true };
@@ -270,13 +360,15 @@ export class PlatformBillingService {
           valId: input.valId,
         },
       });
+      TenantMetrics.increment('platform_billing_payment_succeeded');
       return { applied: true, paid: true };
     }
 
     // fail / cancel / unknown-ipn outcomes are terminal evidence only.
     if (input.outcome !== 'ipn') {
       const alreadyFinal = attempt.status !== 'INITIATED';
-      if (!alreadyFinal) await this.markFailed(attempt.reference, `gateway ${input.outcome}`);
+      if (!alreadyFinal)
+        await this.markFailed(attempt.reference, `gateway ${input.outcome}`);
       return { applied: !alreadyFinal, duplicate: alreadyFinal };
     }
     return { applied: false };
@@ -285,8 +377,12 @@ export class PlatformBillingService {
   private async markFailed(reference: string, reason: string): Promise<void> {
     await this.platform.client.saasPaymentAttempt.updateMany({
       where: { reference, status: 'INITIATED' },
-      data: { status: 'FAILED', raw: { failureReason: reason } as never },
+      data: {
+        status: 'FAILED',
+        raw: toPlatformJsonInput({ failureReason: reason }),
+      },
     });
+    TenantMetrics.increment('platform_billing_payment_failed');
     this.logger.warn('platform_payment_failed', { reference });
   }
 
@@ -298,7 +394,8 @@ export class PlatformBillingService {
     currency: string;
   }> {
     const creds = this.credentials();
-    if (!creds) throw new BadRequestException('PLATFORM_BILLING_NOT_CONFIGURED');
+    if (!creds)
+      throw new BadRequestException('PLATFORM_BILLING_NOT_CONFIGURED');
     const qs = new URLSearchParams({
       val_id: valId,
       store_id: creds.storeId,
@@ -311,10 +408,10 @@ export class PlatformBillingService {
     );
     const raw = (await response.json()) as Record<string, unknown>;
     return {
-      status: String(raw.status ?? '').toUpperCase(),
-      tranId: String(raw.tran_id ?? ''),
-      amount: String(raw.amount ?? ''),
-      currency: String(raw.currency ?? 'BDT'),
+      status: providerText(raw.status).toUpperCase(),
+      tranId: providerText(raw.tran_id),
+      amount: providerText(raw.amount),
+      currency: providerText(raw.currency, 'BDT'),
     };
   }
 
@@ -341,7 +438,44 @@ export class PlatformBillingService {
     return this.platform.client.saasPaymentAttempt.findMany({
       where: { invoiceId },
       orderBy: { createdAt: 'desc' },
-      select: { reference: true, provider: true, status: true, amountMinor: true, createdAt: true },
+      select: {
+        reference: true,
+        provider: true,
+        status: true,
+        amountMinor: true,
+        createdAt: true,
+      },
     });
+  }
+
+  /** Return a bounded receipt projection only after control-plane payment. */
+  async receipt(invoiceId: string): Promise<PlatformReceipt> {
+    const invoice = await this.platform.client.saasInvoice.findUnique({
+      where: { id: invoiceId },
+      include: {
+        paymentAttempts: {
+          where: { status: 'SUCCEEDED' },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: { provider: true, reference: true, updatedAt: true },
+        },
+      },
+    });
+    if (!invoice) throw new NotFoundException('INVOICE_NOT_FOUND');
+    if (!invoice.paid) throw new BadRequestException('RECEIPT_NOT_AVAILABLE');
+
+    const successfulAttempt = invoice.paymentAttempts[0] ?? null;
+    return {
+      receiptNumber: `RC-${invoice.number}`,
+      invoiceNumber: invoice.number,
+      organizationId: invoice.organizationId,
+      amountMinor: invoice.amountMinor,
+      currency: invoice.currency,
+      periodStart: invoice.periodStart,
+      periodEnd: invoice.periodEnd,
+      paidAt: successfulAttempt?.updatedAt ?? null,
+      provider: successfulAttempt?.provider ?? null,
+      providerReference: successfulAttempt?.reference ?? null,
+    };
   }
 }

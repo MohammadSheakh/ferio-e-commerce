@@ -1,4 +1,4 @@
-import{
+import {
   Injectable,
   NestInterceptor,
   ExecutionContext,
@@ -7,21 +7,22 @@ import{
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
+import type { UploadRequest } from '../types/http-request.type';
 
 /**
  * File Upload Processing Interceptor
- * 
+ *
  * 📚 INDUSTRY STANDARD IMPLEMENTATION
- * 
+ *
  * Processes uploaded files:
  * - Uploads to Cloudinary/S3
  * - Stores URLs in request object
  * - Makes URLs available to controller
- * 
+ *
  * Usage:
  * @UseInterceptors(FileFieldsInterceptor([...]))
  * @UseInterceptors(new FileUploadProcessingInterceptor('attachments', 'folder'))
- * async upload(@UploadedFiles() files: ..., @Request() req: any) {
+ * async upload(@UploadedFiles() files: ...) {
  *   // req.uploadedFiles contains URLs
  * }
  */
@@ -32,11 +33,8 @@ export class FileUploadProcessingInterceptor implements NestInterceptor {
     private folder: string = 'attachments',
   ) {}
 
-  async intercept(
-    context: ExecutionContext,
-    next: CallHandler,
-  ): Promise<Observable<any>> {
-    const request = context.switchToHttp().getRequest();
+  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
+    const request = context.switchToHttp().getRequest<UploadRequest>();
     const files = request.files?.[this.fieldName] as Express.Multer.File[];
 
     if (!files || files.length === 0) {
@@ -51,11 +49,12 @@ export class FileUploadProcessingInterceptor implements NestInterceptor {
       };
 
       // Also store in body for DTO validation
-      request.body[this.fieldName] = files;
+      const body = request.body as unknown as Record<string, unknown>;
+      body[this.fieldName] = files;
 
       return next.handle().pipe(
-        map((data) => ({
-          ...data,
+        map((data: unknown) => ({
+          ...(typeof data === 'object' && data !== null ? data : { data }),
           uploadedFiles: request.uploadedFiles,
         })),
       );

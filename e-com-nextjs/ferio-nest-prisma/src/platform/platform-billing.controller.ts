@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Get,
@@ -10,12 +9,17 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import type { Request } from 'express';
 import {
   PlatformAuthGuard,
   PlatformPermissions,
 } from './guards/platform-auth.guard';
 import { PlatformBillingService } from './services/platform-billing.service';
+import {
+  CreatePlatformInvoiceDto,
+  ManualBillingActionDto,
+  PlatformBillingCallbackQueryDto,
+} from './dto/billing.dto';
+import type { PlatformRequest } from './platform-request.type';
 
 /**
  * Operator endpoints (platform-realm guarded) for SaaS billing
@@ -30,24 +34,36 @@ export class PlatformBillingController {
   @Post('invoices')
   @PlatformPermissions('saas_billing:write')
   ensureInvoice(
-    @Body()
-    body: { organizationId: string; periodStart: string; periodEnd: string },
+    @Body() body: CreatePlatformInvoiceDto,
+    @Req() request: PlatformRequest,
   ) {
-    if (!body.organizationId || !body.periodStart || !body.periodEnd) {
-      throw new BadRequestException('organizationId, periodStart, periodEnd required');
-    }
     return this.billing.ensureInvoice({
       organizationId: body.organizationId,
       periodStart: new Date(body.periodStart),
       periodEnd: new Date(body.periodEnd),
+      actorId: request.platformPrincipal?.platformUserId,
+      reason: body.reason,
     });
   }
 
   /** Starts an SSLCommerz hosted session; operator redirects the payer. */
   @Post('invoices/:id/pay')
   @PlatformPermissions('saas_billing:write')
-  pay(@Param('id') id: string) {
-    return this.billing.initiatePayment(id);
+  pay(
+    @Param('id') id: string,
+    @Body() body: ManualBillingActionDto,
+    @Req() request: PlatformRequest,
+  ) {
+    return this.billing.initiatePayment(id, {
+      actorId: request.platformPrincipal?.platformUserId,
+      reason: body.reason,
+    });
+  }
+
+  @Get('invoices/:id/receipt')
+  @PlatformPermissions('saas_billing:read')
+  receipt(@Param('id') id: string) {
+    return this.billing.receipt(id);
   }
 
   @Get('billing-configured')
@@ -69,21 +85,17 @@ export class PlatformBillingCallbackController {
 
   @Get('callback')
   async callback(
-    @Query('ref') ref: string,
-    @Query('outcome') outcome: 'success' | 'fail' | 'cancel' | 'ipn',
-    @Query('val_id') valId?: string,
-    @Req() _request?: Request,
+    @Query() query: PlatformBillingCallbackQueryDto,
   ): Promise<{ applied: boolean; duplicate?: boolean; paid?: boolean }> {
-    if (!ref || !outcome) throw new BadRequestException('CALLBACK_PARAMETERS_REQUIRED');
-    return this.billing.applyCallbackOutcome({ reference: ref, valId, outcome });
+    return this.billing.applyCallbackOutcome({
+      reference: query.ref,
+      valId: query.val_id,
+      outcome: query.outcome,
+    });
   }
 
   @Post('callback')
-  postCallback(
-    @Query('ref') ref: string,
-    @Query('outcome') outcome: 'success' | 'fail' | 'cancel' | 'ipn',
-    @Query('val_id') valId?: string,
-  ) {
-    return this.callback(ref, outcome, valId);
+  postCallback(@Query() query: PlatformBillingCallbackQueryDto) {
+    return this.callback(query);
   }
 }

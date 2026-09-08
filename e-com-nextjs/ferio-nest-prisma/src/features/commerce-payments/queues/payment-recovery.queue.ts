@@ -1,7 +1,6 @@
-import type { TenantContext } from '../../../tenancy/tenant-context';
-import { tryGetTenantContext } from '../../../tenancy/tenant-context';
-import { TenantFanoutService } from '../../../tenancy/tenant-fanout.service';
-import { Injectable, OnModuleInit, Optional } from '@nestjs/common';
+import { tryGetTenantContext } from '../../../tenancy/context/tenant-context';
+import { TenantFanoutService } from '../../../tenancy/services/tenant-fanout.service';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { ConfigService } from '@nestjs/config';
 import type { Queue } from 'bullmq';
@@ -13,7 +12,10 @@ import { CommercePaymentsService } from '../services/commerce-payments.service';
 export const PAYMENT_EXPIRY_JOB = 'expire-prepaid-attempt';
 export const PAYMENT_EXPIRY_SWEEP_JOB = 'sweep-expired-prepaid-attempts';
 export const PAYMENT_RECOVERY_SCHEDULER_ID = 'ferio-payment-expiry-recovery';
-export type PaymentRecoveryJobData = { attemptId?: string; organizationId?: string };
+export type PaymentRecoveryJobData = {
+  attemptId?: string;
+  organizationId?: string;
+};
 
 @Injectable()
 export class PaymentRecoveryQueue implements OnModuleInit {
@@ -24,7 +26,7 @@ export class PaymentRecoveryQueue implements OnModuleInit {
     private readonly config: ConfigService,
     private readonly payments: CommercePaymentsService,
     private readonly audit: AuditService,
-    @Optional() private readonly fanout?: TenantFanoutService,
+    private readonly fanout?: TenantFanoutService,
   ) {}
 
   async onModuleInit() {

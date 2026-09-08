@@ -1,17 +1,15 @@
-import {
-  Injectable,
-  Logger,
-  Optional,
-  ServiceUnavailableException,
-} from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Prisma, PrismaClient } from '@prisma/client';
 
 import { RedisService } from '@app/redis';
 import { PrismaService } from '@app/database';
-import { scopedRedisKey } from '../../../tenancy/redis-keys.util';
+import { scopedRedisKey } from '../../../tenancy/utils/redis-keys.util';
 import { USER_CACHE_CONFIG } from './user.constants';
 import { UpdateProfileDto } from './dto/update-profile.dto';
-import { TenantDbService } from '../../../tenancy/tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../../tenancy/services/tenant-db.service';
 
 const publicUserSelect = {
   id: true,
@@ -43,6 +41,42 @@ type UserWithPasswordRecord = Prisma.UserGetPayload<{
   select: typeof userWithPasswordSelect;
 }>;
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isPublicUserCache(value: unknown): value is PublicUserRecord {
+  return (
+    isRecord(value) &&
+    typeof value.email === 'string' &&
+    typeof value.role === 'string' &&
+    typeof value.id === 'string' &&
+    typeof value.isDeleted === 'boolean'
+  );
+}
+
+function parsePublicUserCache(
+  value: unknown,
+): PublicUserRecord | null | undefined {
+  if (value === null) return null;
+  return isPublicUserCache(value) ? value : undefined;
+}
+
+function isUserStatisticsCache(
+  value: unknown,
+): value is { totalChildren: number } {
+  if (!isRecord(value) || typeof value.totalChildren !== 'number') {
+    return false;
+  }
+  return true;
+}
+
+function parseUserStatisticsCache(
+  value: unknown,
+): { totalChildren: number } | undefined {
+  return isUserStatisticsCache(value) ? value : undefined;
+}
+
 @Injectable()
 export class UserService {
   private readonly logger = new Logger(UserService.name);
@@ -50,16 +84,11 @@ export class UserService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly redisService: RedisService,
-    @Optional() private readonly tenantDb?: TenantDbService,
+    private readonly tenantDb?: TenantDbService,
   ) {}
 
   private async db(): Promise<PrismaClient> {
-    const tenant = await this.tenantDb?.tryGet();
-    if (tenant) return tenant;
-    if ((process.env.TENANCY_ENABLED || 'false') === 'true') {
-      throw new ServiceUnavailableException('TENANT_IDENTITY_CONTEXT_REQUIRED');
-    }
-    return this.prisma as PrismaClient;
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
 
   private getCacheKey(type: 'profile' | 'stats', id: string): string {
@@ -131,6 +160,7 @@ export class UserService {
       this.getCacheKey('profile', id),
       () => this.fetchUserById(id),
       USER_CACHE_CONFIG.PROFILE,
+      parsePublicUserCache,
     );
   }
 
@@ -163,6 +193,7 @@ export class UserService {
       this.getCacheKey('stats', userId),
       () => this.fetchUserStatistics(userId),
       USER_CACHE_CONFIG.STATISTICS,
+      parseUserStatisticsCache,
     );
   }
 

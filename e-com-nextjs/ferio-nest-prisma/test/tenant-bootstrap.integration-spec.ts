@@ -11,7 +11,7 @@
  *      a product written to tenant A is invisible to tenant B.
  */
 import { Pool } from 'pg';
-import { TenantSchemaBootstrapper } from '../src/tenancy/tenant-schema.bootstrapper';
+import { TenantSchemaBootstrapper } from '../src/tenancy/services/tenant-schema.bootstrapper';
 
 const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL;
 
@@ -75,8 +75,13 @@ conditionalDescribe('TenantSchemaBootstrapper (real PostgreSQL)', () => {
     expect(second.applied).toHaveLength(0);
     expect(second.schemaVersion).toBe(result.schemaVersion);
 
+    await expect(bootstrapper.verifyReady(connection)).resolves.toBeUndefined();
+
     // Baseline seed: defaults exist, COD verification at its safest mode.
-    await bootstrapper.seedBaseline({ ...connection, organizationName: 'Tenant A' });
+    await bootstrapper.seedBaseline({
+      ...connection,
+      organizationName: 'Tenant A',
+    });
     const pool = new Pool({ ...connection, max: 1 });
     const settings = await pool.query<{ storeName: string }>(
       'SELECT "storeName" FROM "CommerceSettings" WHERE id = $1',
@@ -90,13 +95,17 @@ conditionalDescribe('TenantSchemaBootstrapper (real PostgreSQL)', () => {
     expect(cod.rows[0]?.mode).toBe('ALWAYS');
     // Seed re-run must not duplicate or error.
     await expect(
-      bootstrapper.seedBaseline({ ...connection, organizationName: 'Overwritten?' }),
+      bootstrapper.seedBaseline({
+        ...connection,
+        organizationName: 'Overwritten?',
+      }),
     ).resolves.toBeUndefined();
     const unchanged = await pool.query<{ storeName: string }>(
       'SELECT "storeName" FROM "CommerceSettings" WHERE id = $1',
       ['default'],
     );
     expect(unchanged.rows[0]?.storeName).toBe('Tenant A');
+    await expect(bootstrapper.verifyReady(connection)).resolves.toBeUndefined();
     await pool.end();
   }, 240_000);
 
@@ -118,8 +127,12 @@ conditionalDescribe('TenantSchemaBootstrapper (real PostgreSQL)', () => {
       `INSERT INTO "Brand" ("id", "name", "slug", "createdAt", "updatedAt") VALUES ('shared-brand-1', 'Shared Brand', 'shared-brand', now(), now())`,
     );
 
-    const seenInA = await poolA.query(`SELECT "name" FROM "Brand" WHERE id = 'shared-brand-1'`);
-    const seenInB = await poolB.query(`SELECT "name" FROM "Brand" WHERE id = 'shared-brand-1'`);
+    const seenInA = await poolA.query(
+      `SELECT "name" FROM "Brand" WHERE id = 'shared-brand-1'`,
+    );
+    const seenInB = await poolB.query(
+      `SELECT "name" FROM "Brand" WHERE id = 'shared-brand-1'`,
+    );
     expect(seenInA.rowCount).toBe(1);
     expect(seenInB.rowCount).toBe(0); // tenant B cannot see tenant A's row
 
@@ -127,7 +140,9 @@ conditionalDescribe('TenantSchemaBootstrapper (real PostgreSQL)', () => {
     await poolB.query(
       `INSERT INTO "Brand" ("id", "name", "slug", "createdAt", "updatedAt") VALUES ('shared-brand-1', 'B Own Brand', 'shared-brand', now(), now())`,
     );
-    const bOwn = await poolB.query(`SELECT "name" FROM "Brand" WHERE id = 'shared-brand-1'`);
+    const bOwn = await poolB.query(
+      `SELECT "name" FROM "Brand" WHERE id = 'shared-brand-1'`,
+    );
     expect(bOwn.rows[0].name).toBe('B Own Brand');
 
     // Transaction rollback in A leaves B untouched.
@@ -140,7 +155,9 @@ conditionalDescribe('TenantSchemaBootstrapper (real PostgreSQL)', () => {
     } catch {
       await poolA.query('ROLLBACK').catch(() => undefined);
     }
-    const rollbackCheck = await poolA.query(`SELECT COUNT(*)::int AS c FROM "Brand"`);
+    const rollbackCheck = await poolA.query(
+      `SELECT COUNT(*)::int AS c FROM "Brand"`,
+    );
     expect(rollbackCheck.rows[0].c).toBe(1);
 
     await Promise.all([poolA.end(), poolB.end()]);

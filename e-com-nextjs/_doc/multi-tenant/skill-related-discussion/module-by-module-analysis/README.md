@@ -2,7 +2,7 @@
 
 This directory contains the module-by-module review requested against
 `backend-analysis-2.md`, the current NestJS codebase, and
-`ferio-backend-architecture/SKILL.md`.
+`ferio-backend-architecture-old/SKILL.md`.
 
 ## Rating Method
 

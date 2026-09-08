@@ -2,12 +2,14 @@ import type { ConfigService } from '@nestjs/config';
 import type { Queue } from 'bullmq';
 import type { PrismaService } from '@app/database';
 import type { RedisService } from '@app/redis';
-import { RequestMetrics } from '@app/common';
+import { RequestMetrics, TenantMetrics } from '@app/common';
 import type { PaymentGatewayRegistry } from '../../commerce-payments/gateways/payment-gateway.registry';
 import type { ShippingService } from '../../shipping/services/shipping.service';
 import { OperationsHealthService } from '../operations-health.service';
 
 describe('OperationsHealthService', () => {
+  beforeEach(() => TenantMetrics.reset());
+
   beforeEach(() => RequestMetrics.resetForTests());
 
   it('combines runtime, queue, commerce, provider, and backup evidence', async () => {
@@ -82,23 +84,27 @@ describe('OperationsHealthService', () => {
 
     const health = await service.getHealth();
 
-    expect(health).toEqual(
-      expect.objectContaining({
-        runtimeStatus: 'HEALTHY',
-        launchReady: true,
-        launchBlockers: [],
-        requests: expect.objectContaining({ total: 1, p95DurationMs: 12 }),
-        commerce: expect.objectContaining({ available: true, ordersPlaced: 2 }),
-        backup: expect.objectContaining({
-          status: 'CURRENT',
-          restoreStatus: 'VERIFIED',
-        }),
-      }),
-    );
+    expect(health.runtimeStatus).toBe('HEALTHY');
+    expect(health.launchReady).toBe(true);
+    expect(health.launchBlockers).toEqual([]);
+    expect(health.process.instanceId).toEqual(expect.any(String));
+    expect(health.requests).toMatchObject({ total: 1, p95DurationMs: 12 });
+    expect(health.commerce).toMatchObject({ available: true, ordersPlaced: 2 });
+    expect(health.backup).toMatchObject({
+      status: 'CURRENT',
+      restoreStatus: 'VERIFIED',
+    });
+    expect(TenantMetrics.snapshot().counters).toContainEqual({
+      name: 'backup_freshness_observed',
+      labels: { restoreStatus: 'VERIFIED', status: 'CURRENT' },
+      value: 1,
+    });
     expect(health.queues).toHaveLength(6);
   });
 
   it('reports unavailable dependencies and missing launch evidence without throwing', async () => {
+    const previousTenancy = process.env.TENANCY_ENABLED;
+    process.env.TENANCY_ENABLED = 'true';
     const failingQueue = {
       getJobCounts: jest
         .fn()
@@ -138,12 +144,19 @@ describe('OperationsHealthService', () => {
       undefined,
     );
 
-    const health = await service.getHealth();
+    try {
+      const health = await service.getHealth();
 
-    expect(health.runtimeStatus).toBe('UNAVAILABLE');
-    expect(health.launchReady).toBe(false);
-    expect(health.launchBlockers).toHaveLength(4);
-    expect(health.dependencies.database.detail).toBe('PostgreSQL probe failed');
-    expect(JSON.stringify(health)).not.toContain('secret queue error');
+      expect(health.runtimeStatus).toBe('UNAVAILABLE');
+      expect(health.launchReady).toBe(false);
+      expect(health.launchBlockers).toHaveLength(4);
+      expect(health.dependencies.database.detail).toBe(
+        'PostgreSQL probe failed',
+      );
+      expect(JSON.stringify(health)).not.toContain('secret queue error');
+    } finally {
+      if (previousTenancy === undefined) delete process.env.TENANCY_ENABLED;
+      else process.env.TENANCY_ENABLED = previousTenancy;
+    }
   });
 });

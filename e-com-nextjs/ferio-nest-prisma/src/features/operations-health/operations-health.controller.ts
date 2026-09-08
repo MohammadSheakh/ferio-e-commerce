@@ -1,5 +1,5 @@
 import { Controller, Get, UseGuards } from '@nestjs/common';
-import { TenantMembershipGuard } from '../../tenancy/tenant-membership.guard';
+import { TenantMembershipGuard } from '../../tenancy/guards/tenant-membership.guard';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import {
   AuthGuard,

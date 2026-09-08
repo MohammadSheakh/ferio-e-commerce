@@ -12,12 +12,13 @@ describe('ConversationService participant authorization', () => {
       },
     };
     const socketGateway = { emitToRoom: jest.fn() };
+    const tenantDb = { getOrLegacy: jest.fn().mockResolvedValue(prisma) };
     const service = new ConversationService(
       prisma as never,
       socketGateway as never,
       {} as never,
       {} as never,
-      {} as never,
+      tenantDb as never,
     );
     return { service, prisma, socketGateway };
   }

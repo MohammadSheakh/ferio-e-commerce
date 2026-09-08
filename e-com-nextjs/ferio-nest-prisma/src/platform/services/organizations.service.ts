@@ -6,6 +6,7 @@ import {
 import { OrganizationStatus } from '../generated/platform-client';
 import { PlatformPrismaService } from '../platform-prisma.service';
 import { PlatformAuditService } from './platform-audit.service';
+import { RESERVED_SUBDOMAINS } from './domains.service';
 
 /** Legal transitions of the organization lifecycle state machine. */
 const ALLOWED_TRANSITIONS: Record<OrganizationStatus, OrganizationStatus[]> = {
@@ -37,21 +38,37 @@ export class OrganizationsService {
     if (!slug) {
       throw new ConflictException('ORGANIZATION_SLUG_INVALID');
     }
+    if (RESERVED_SUBDOMAINS.has(slug)) {
+      throw new ConflictException('ORGANIZATION_SLUG_RESERVED');
+    }
+    const name = input.name.trim();
+    if (name.length < 2) {
+      throw new ConflictException('ORGANIZATION_NAME_INVALID');
+    }
+    const ownerEmail = input.ownerEmail.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ownerEmail)) {
+      throw new ConflictException('ORGANIZATION_OWNER_EMAIL_INVALID');
+    }
     try {
-      const organization = await this.platform.client.organization.create({
-        data: {
-          name: input.name.trim(),
-          slug,
-          status: 'PROVISIONING',
+      const organization = await this.platform.client.$transaction(
+        async (tx) => {
+          const created = await tx.organization.create({
+            data: {
+              name,
+              slug,
+              status: 'PROVISIONING',
+            },
+          });
+          await tx.organizationMember.create({
+            data: {
+              organizationId: created.id,
+              email: ownerEmail,
+              role: 'OWNER',
+            },
+          });
+          return created;
         },
-      });
-      await this.platform.client.organizationMember.create({
-        data: {
-          organizationId: organization.id,
-          email: input.ownerEmail.trim().toLowerCase(),
-          role: 'OWNER',
-        },
-      });
+      );
       await this.audit.record({
         action: 'ORGANIZATION_CREATED',
         entityType: 'Organization',
@@ -61,12 +78,14 @@ export class OrganizationsService {
       });
       return organization;
     } catch (error: unknown) {
-      if (
-        typeof error === 'object' &&
-        error !== null &&
-        'code' in error &&
-        error.code === 'P2002'
-      ) {
+      if (isUniqueViolation(error)) {
+        const target = error.meta?.target;
+        if (
+          Array.isArray(target) &&
+          target.some((field) => field === 'organizationId_email')
+        ) {
+          throw new ConflictException('ORGANIZATION_OWNER_CONFLICT');
+        }
         throw new ConflictException('ORGANIZATION_SLUG_TAKEN');
       }
       throw error;
@@ -90,12 +109,18 @@ export class OrganizationsService {
       );
     }
 
-    const [updated] = await this.platform.client.$transaction([
-      this.platform.client.organization.update({
-        where: { id: organizationId },
+    const updated = await this.platform.client.$transaction(async (tx) => {
+      // Compare-and-set prevents two operators from both transitioning the
+      // same lifecycle state after reading the same previous status.
+      const result = await tx.organization.updateMany({
+        where: { id: organizationId, status: organization.status },
         data: { status: to },
-      }),
-      this.platform.client.organizationLifecycleEvent.create({
+      });
+      if (result.count !== 1) {
+        throw new ConflictException('ORGANIZATION_TRANSITION_RACE');
+      }
+
+      await tx.organizationLifecycleEvent.create({
         data: {
           organizationId,
           fromStatus: organization.status,
@@ -103,8 +128,14 @@ export class OrganizationsService {
           actorId: options.actorId,
           reason: options.reason,
         },
-      }),
-    ]);
+      });
+
+      return (
+        (await tx.organization.findUnique({
+          where: { id: organizationId },
+        })) ?? { ...organization, status: to }
+      );
+    });
 
     await this.audit.record({
       action: 'ORGANIZATION_STATUS_CHANGED',
@@ -169,4 +200,18 @@ export class OrganizationsService {
       .replace(/-{2,}/g, '-')
       .replace(/^-|-$/g, '');
   }
+}
+
+type UniqueViolation = {
+  code: 'P2002';
+  meta?: { target?: unknown };
+};
+
+function isUniqueViolation(error: unknown): error is UniqueViolation {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    error.code === 'P2002'
+  );
 }

@@ -9,7 +9,7 @@ import {
 import { PurchaseActivityService } from './services/purchase-activity.service';
 
 @Module({
-  imports: [ TenancyModule,PrismaModule, AuthModule],
+  imports: [TenancyModule, PrismaModule, AuthModule],
   controllers: [PurchaseActivityController, AdminPurchaseActivityController],
   providers: [PurchaseActivityService],
 })

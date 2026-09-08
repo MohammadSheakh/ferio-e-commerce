@@ -3,12 +3,16 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
-  Optional,
 } from '@nestjs/common';
 import { randomBytes, timingSafeEqual } from 'crypto';
-import type { PrismaClient } from '@prisma/client';import { Prisma } from '@prisma/client';
+import type { PrismaClient } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '@app/database';
-import { TenantDbService } from '../../tenancy/tenant-db.service';import type { UserPayload } from '@app/common';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../tenancy/services/tenant-db.service';
+import type { UserPayload } from '@app/common';
 import { normalizeBangladeshPhone } from '../checkout/utils/checkout.util';
 import {
   CreateWarrantyClaimDto,
@@ -37,16 +41,16 @@ const adminClaimInclude = {
 export class WarrantyService {
   constructor(
     private prisma: PrismaService,
-    @Optional() private readonly tenantDb?: TenantDbService,
+    private readonly tenantDb?: TenantDbService,
   ) {}
 
   /**
    * MT-7: tenant client inside resolved contexts; explicit legacy fallback.
    */
   private async db(): Promise<PrismaClient> {
-    const tenant = await this.tenantDb?.tryGet();
-    return tenant ?? (this.prisma as PrismaClient);
-  }  private async verifiedOrder(dto: VerifyWarrantyOrderDto) {
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
+  }
+  private async verifiedOrder(dto: VerifyWarrantyOrderDto) {
     const db = await this.db();
     const reference = dto.reference.trim().toUpperCase();
     const phone = normalizeBangladeshPhone(dto.phone);

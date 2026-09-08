@@ -8,7 +8,6 @@ export * from './decorators/use-file-upload-pipeline.decorator';
 
 // Filters
 export * from './filters/http-exception.filter';
-// export * from './filters/mongoose-exception.filter';
 
 // Guards
 export * from './guards/auth.guard';
@@ -36,9 +35,6 @@ export * from './constants/rate-limit.constants';
 export * from './constants/redis.constants';
 export * from './constants/permissions.constants';
 
-// Generic
-export * from './generic/generic.service';
-export * from './generic/generic.controller';
 export * from './utils/prisma.utils';
 export * from './utils/log-sanitizer';
 export * from './utils/request-context';
@@ -47,6 +43,3 @@ export * from './utils/tenant-metrics';
 export * from './utils/error-message';
 export * from './utils/error-code';
 export * from './utils/structured-logger';
-
-// Base
-// export * from './base/base.entity';

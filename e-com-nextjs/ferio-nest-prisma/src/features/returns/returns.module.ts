@@ -7,7 +7,7 @@ import { ReturnsController } from './controllers/returns.controller';
 import { ReturnsService } from './services/returns.service';
 
 @Module({
-  imports: [ TenancyModule,PrismaModule, AuthModule, AuditModule],
+  imports: [TenancyModule, PrismaModule, AuthModule, AuditModule],
   controllers: [ReturnsController],
   providers: [ReturnsService],
 })

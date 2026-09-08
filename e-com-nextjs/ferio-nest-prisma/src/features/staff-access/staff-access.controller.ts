@@ -17,7 +17,7 @@ import {
   User,
 } from '@app/common';
 import type { UserPayload } from '@app/common';
-import { TenantMembershipGuard } from '../../tenancy/tenant-membership.guard';
+import { TenantMembershipGuard } from '../../tenancy/guards/tenant-membership.guard';
 import {
   CompleteStaffAccessDto,
   InviteStaffDto,

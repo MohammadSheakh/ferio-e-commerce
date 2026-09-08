@@ -8,10 +8,11 @@ import {
   Post,
   Query,
   Res,
+  Put,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { TenantMembershipGuard } from '../../../tenancy/tenant-membership.guard';
+import { TenantMembershipGuard } from '../../../tenancy/guards/tenant-membership.guard';
 import type { Response } from 'express';
 import { CommercePaymentProvider } from '@prisma/client';
 import {
@@ -35,10 +36,11 @@ import {
   RetryCommercePaymentDto,
 } from '../dto/commerce-payment.dto';
 import { PaymentRecoveryQueue } from '../queues/payment-recovery.queue';
-import { verifyCallbackToken } from '../../../tenancy/callback-tenant.util';
-import { TenantCallbackRunner } from '../../../tenancy/tenant-callback.runner';
+import { verifyCallbackToken } from '../../../tenancy/utils/callback-tenant.util';
+import { TenantCallbackRunner } from '../../../tenancy/services/tenant-callback.runner';
 import { PaymentLedgerQueryDto } from '../dto/payment-ledger.dto';
-import { TenantReturnOriginService } from '../../../tenancy/tenant-return-origin.service';
+import { TenantReturnOriginService } from '../../../tenancy/services/tenant-return-origin.service';
+import { UpdatePaymentProviderConfigDto } from '../dto/payment-provider-config.dto';
 
 @ApiTags('Payments')
 @Controller('payments')
@@ -58,7 +60,12 @@ export class PublicCommercePaymentsController {
   @UseGuards(SlidingWindowRateLimitGuard)
   @RateLimit(GLOBAL_RATE_LIMITS.strict)
   initiate(@Body() dto: InitiateCommercePaymentDto) {
-    return this.payments.initiate(dto.orderId, dto.reference, dto.phone, dto.provider);
+    return this.payments.initiate(
+      dto.orderId,
+      dto.reference,
+      dto.phone,
+      dto.provider,
+    );
   }
 
   @Post('retry')
@@ -140,7 +147,6 @@ export class PublicCommercePaymentsController {
     response: Response,
     customerOrigin?: string,
   ) {
-
     // IPN background notifications do not redirect browser
     if (eventType === 'ipn') return response.status(200).json(result);
 
@@ -212,6 +218,19 @@ export class AdminCommercePaymentsController {
   @Get('providers')
   providers() {
     return this.payments.providers();
+  }
+
+  @Put('providers/:provider')
+  @Permissions(PERMISSIONS.PAYMENTS_MANAGE)
+  updateProvider(
+    @Param('provider') provider: CommercePaymentProvider,
+    @Body() dto: UpdatePaymentProviderConfigDto,
+    @User() actor: UserPayload,
+  ) {
+    if (!Object.values(CommercePaymentProvider).includes(provider)) {
+      throw new BadRequestException('Unknown payment provider');
+    }
+    return this.payments.updateProviderConfig(provider, dto, actor);
   }
 
   @Get('recovery/queue-health')

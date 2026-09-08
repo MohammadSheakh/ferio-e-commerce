@@ -23,10 +23,15 @@ describe('AppController', () => {
     });
 
     it('returns an operational health response', () => {
-      expect(appController.getHealth()).toEqual({
-        status: 'ok',
-        timestamp: expect.any(String),
-      });
+      const health = appController.getHealth();
+      expect(health.status).toBe('ok');
+      expect(typeof health.timestamp).toBe('string');
+    });
+
+    it('fails readiness closed when infrastructure providers are unavailable', async () => {
+      await expect(appController.getReadiness()).rejects.toThrow(
+        'READINESS_DEPENDENCIES_UNAVAILABLE',
+      );
     });
   });
 });

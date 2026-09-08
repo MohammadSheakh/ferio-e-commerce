@@ -6,7 +6,12 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 
 import { UserProfileService } from './userProfile.service';
 import { UpdateUserProfileDto } from './dto/update-userProfile.dto';
@@ -15,7 +20,7 @@ import type { UserPayload } from '@app/common';
 
 /**
  * UserProfile Controller
- * 
+ *
  * Manages user profile operations
  */
 @ApiTags('User Profile')
@@ -31,11 +36,14 @@ export class UserProfileController {
    * Get current user profile details
    */
   @Get('details')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get my profile details',
     description: 'Get current user profile with extended information',
   })
-  @ApiResponse({ status: 200, description: 'Profile details retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Profile details retrieved successfully',
+  })
   async getProfileDetails(@User() user: UserPayload) {
     return await this.userProfileService.findByUserIdWithCache(user.userId);
   }
@@ -45,16 +53,20 @@ export class UserProfileController {
    * Update current user profile details
    */
   @Put('details')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Update my profile details',
-    description: 'Update current user profile information (location, dob, gender, etc.)',
+    description:
+      'Update current user profile information (location, dob, gender, etc.)',
   })
   @ApiResponse({ status: 200, description: 'Profile updated successfully' })
   async updateProfileDetails(
     @User() user: UserPayload,
     @Body() updateProfileDto: UpdateUserProfileDto,
   ) {
-    return await this.userProfileService.updateByUserId(user.userId, updateProfileDto);
+    return await this.userProfileService.updateByUserId(
+      user.userId,
+      updateProfileDto,
+    );
   }
 
   /**
@@ -62,16 +74,23 @@ export class UserProfileController {
    * Update support mode preference
    */
   @Put('support-mode')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Update support mode',
-    description: 'Update user support mode preference (calm/encouraging/logical)',
+    description:
+      'Update user support mode preference (calm/encouraging/logical)',
   })
-  @ApiResponse({ status: 200, description: 'Support mode updated successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Support mode updated successfully',
+  })
   async updateSupportMode(
     @User() user: UserPayload,
     @Body('supportMode') supportMode: string,
   ) {
-    return await this.userProfileService.updateSupportMode(user.userId, supportMode);
+    return await this.userProfileService.updateSupportMode(
+      user.userId,
+      supportMode,
+    );
   }
 
   /**
@@ -79,16 +98,23 @@ export class UserProfileController {
    * Update notification style preference
    */
   @Put('notification-style')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Update notification style',
-    description: 'Update user notification style preference (gentle/firm/neutral)',
+    description:
+      'Update user notification style preference (gentle/firm/neutral)',
   })
-  @ApiResponse({ status: 200, description: 'Notification style updated successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Notification style updated successfully',
+  })
   async updateNotificationStyle(
     @User() user: UserPayload,
     @Body('notificationStyle') notificationStyle: string,
   ) {
-    return await this.userProfileService.updateNotificationStyle(user.userId, notificationStyle);
+    return await this.userProfileService.updateNotificationStyle(
+      user.userId,
+      notificationStyle,
+    );
   }
 
   /**
@@ -96,11 +122,14 @@ export class UserProfileController {
    * Get profile with user details
    */
   @Get('full')
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Get full profile',
     description: 'Get user profile with user details',
   })
-  @ApiResponse({ status: 200, description: 'Full profile retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Full profile retrieved successfully',
+  })
   async getFullProfile(@User() user: UserPayload) {
     return await this.userProfileService.getProfileWithUser(user.userId);
   }

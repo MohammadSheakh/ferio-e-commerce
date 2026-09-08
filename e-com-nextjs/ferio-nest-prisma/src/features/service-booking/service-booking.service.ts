@@ -4,14 +4,16 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
-  Optional,
 } from '@nestjs/common';
 import { randomBytes } from 'crypto';
 import { PrismaService } from '@app/database';
-import { TenantDbService } from '../../tenancy/tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../tenancy/services/tenant-db.service';
 import type { UserPayload } from '@app/common';
 import { normalizeBangladeshPhone } from '../checkout/utils/checkout.util';
-import { assertTenantCommerceWritable } from '../../tenancy/commerce-write-guard.util';
+import { assertTenantCommerceWritable } from '../../tenancy/utils/commerce-write-guard.util';
 import {
   CreateBookingDto,
   SaveServiceDto,
@@ -21,7 +23,7 @@ import {
 export class ServiceBookingService {
   constructor(
     private prisma: PrismaService,
-    @Optional() private readonly tenantDb?: TenantDbService,
+    private readonly tenantDb?: TenantDbService,
   ) {}
 
   /**
@@ -29,8 +31,7 @@ export class ServiceBookingService {
    * fallback outside resolved requests. Never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    const tenant = await this.tenantDb?.tryGet();
-    return tenant ?? (this.prisma as PrismaClient);
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
   private slug(v: string) {
     return v
@@ -46,19 +47,22 @@ export class ServiceBookingService {
       include: { category: true },
       orderBy: { createdAt: 'desc' },
     });
-  }async service(slug: string) {
+  }
+  async service(slug: string) {
     const db = await this.db();
     return db.serviceOffering.findFirst({
       where: { slug, status: 'ACTIVE' },
       include: { category: true },
     });
-  }async adminServices() {
+  }
+  async adminServices() {
     const db = await this.db();
     return db.serviceOffering.findMany({
       include: { category: true, _count: { select: { bookings: true } } },
       orderBy: { createdAt: 'desc' },
     });
-  }async save(dto: SaveServiceDto, id?: string) {
+  }
+  async save(dto: SaveServiceDto, id?: string) {
     assertTenantCommerceWritable();
     const db = await this.db();
     const data = {
@@ -69,7 +73,8 @@ export class ServiceBookingService {
     return id
       ? db.serviceOffering.update({ where: { id }, data })
       : db.serviceOffering.create({ data });
-  }async delete(id: string) {
+  }
+  async delete(id: string) {
     assertTenantCommerceWritable();
     const db = await this.db();
     return db.serviceOffering.delete({ where: { id } });
@@ -110,7 +115,8 @@ export class ServiceBookingService {
       },
       include: { history: true },
     });
-  }async bookings() {
+  }
+  async bookings() {
     const db = await this.db();
     return db.serviceBooking.findMany({
       include: { service: true, history: { orderBy: { createdAt: 'asc' } } },

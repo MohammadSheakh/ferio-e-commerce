@@ -6,7 +6,6 @@ import {
   Query,
   Param,
   UseGuards,
-  Request,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
@@ -35,7 +34,7 @@ import {
   StructuredLogger,
   User,
 } from '@app/common';
-import { TenantMembershipGuard } from '../../../tenancy/tenant-membership.guard';
+import { TenantMembershipGuard } from '../../../tenancy/guards/tenant-membership.guard';
 
 /**
  * Conversation Controller
@@ -219,12 +218,14 @@ export class ConversationController {
       conversationId,
     });
 
-    // TODO: Implement getParticipants method in service
-    // For now, return placeholder
+    const participants = await this.conversationService.getParticipants(
+      conversationId,
+      userId,
+    );
     return {
       success: true,
       message: 'Participants retrieved successfully',
-      data: [],
+      data: participants,
     };
   }
 

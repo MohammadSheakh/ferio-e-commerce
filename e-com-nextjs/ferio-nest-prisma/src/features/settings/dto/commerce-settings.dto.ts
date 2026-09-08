@@ -29,6 +29,18 @@ export class UpdateCommerceSettingsDto {
   @MaxLength(160)
   legalName?: string | null;
 
+  @ApiPropertyOptional({ nullable: true })
+  @IsOptional()
+  @IsUrl({ protocols: ['https'], require_protocol: true })
+  @MaxLength(500)
+  logoUrl?: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  address?: string | null;
+
   @ApiPropertyOptional({ nullable: true, example: '+8801712345678' })
   @IsOptional()
   @IsString()
@@ -40,6 +52,29 @@ export class UpdateCommerceSettingsDto {
   @IsEmail()
   @MaxLength(160)
   supportEmail?: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  @IsOptional()
+  @IsUrl({ protocols: ['https'], require_protocol: true })
+  @MaxLength(500)
+  facebookUrl?: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  @IsOptional()
+  @IsUrl({ protocols: ['https'], require_protocol: true })
+  @MaxLength(500)
+  instagramUrl?: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  @IsOptional()
+  @IsUrl({ protocols: ['https'], require_protocol: true })
+  @MaxLength(500)
+  whatsappUrl?: string | null;
+
+  @ApiPropertyOptional({ enum: ['default', 'warm', 'cool'] })
+  @IsOptional()
+  @IsIn(['default', 'warm', 'cool'])
+  themePreset?: 'default' | 'warm' | 'cool';
 
   @ApiPropertyOptional({ enum: ['BDT'] })
   @IsOptional()

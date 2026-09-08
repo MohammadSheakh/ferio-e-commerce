@@ -2,6 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Topbar from "@/components/Topbar";
+import type {
+  LeafletApi,
+  LeafletLayerGroup,
+  LeafletMap,
+} from "@/lib/leaflet-types";
 
 type LocationHistoryItem = {
   id: string;
@@ -332,20 +337,20 @@ export default function DeliveryMapPage() {
   const [isFullScreen, setIsFullScreen] = useState<boolean>(false);
 
   const mapRef = useRef<HTMLDivElement>(null);
-  const leafletInstanceRef = useRef<any>(null);
-  const layerGroupRef = useRef<any>(null);
+  const leafletInstanceRef = useRef<LeafletMap | null>(null);
+  const layerGroupRef = useRef<LeafletLayerGroup | null>(null);
 
   // Expose remove/hide single pin handlers to window for Leaflet popup button clicks
   useEffect(() => {
-    (window as any).removeOrderPinFromMap = (orderId: string) => {
+    window.removeOrderPinFromMap = (orderId: string) => {
       setRemovedPinIds((prev) => new Set([...prev, orderId]));
     };
-    (window as any).removeRiderPinFromMap = (riderId: string) => {
+    window.removeRiderPinFromMap = (riderId: string) => {
       setHiddenRiderIds((prev) => new Set([...prev, riderId]));
     };
     return () => {
-      delete (window as any).removeOrderPinFromMap;
-      delete (window as any).removeRiderPinFromMap;
+      delete window.removeOrderPinFromMap;
+      delete window.removeRiderPinFromMap;
     };
   }, []);
 
@@ -362,9 +367,10 @@ export default function DeliveryMapPage() {
 
   // Recalculate Leaflet map viewport size when toggling between normal view and full page mode
   useEffect(() => {
-    if (leafletInstanceRef.current) {
+    const map = leafletInstanceRef.current;
+    if (map) {
       const timer = setTimeout(() => {
-        leafletInstanceRef.current.invalidateSize();
+        map.invalidateSize();
       }, 150);
       return () => clearTimeout(timer);
     }
@@ -416,7 +422,7 @@ export default function DeliveryMapPage() {
     }
 
     const loadLeafletScript = () => {
-      if ((window as any).L) {
+      if (window.L) {
         initMap();
         return;
       }
@@ -440,7 +446,7 @@ export default function DeliveryMapPage() {
   }, []);
 
   const initMap = useCallback(() => {
-    const L = (window as any).L;
+    const L: LeafletApi | undefined = window.L;
     if (!L || !mapRef.current) return;
 
     if (!leafletInstanceRef.current) {
@@ -468,10 +474,11 @@ export default function DeliveryMapPage() {
   }, [riders, orders, statusFilter, removedPinIds, hiddenRiderIds]);
 
   const renderMarkers = () => {
-    const L = (window as any).L;
-    if (!L || !layerGroupRef.current) return;
+    const L: LeafletApi | undefined = window.L;
+    const layerGroup = layerGroupRef.current;
+    if (!L || !layerGroup) return;
 
-    layerGroupRef.current.clearLayers();
+    layerGroup.clearLayers();
 
     const bounds: [number, number][] = [];
 
@@ -499,7 +506,7 @@ export default function DeliveryMapPage() {
         });
 
         const marker = L.marker([loc.latitude, loc.longitude], { icon }).addTo(
-          layerGroupRef.current,
+          layerGroup,
         );
 
         const timeStr = new Date(loc.createdAt).toLocaleTimeString();
@@ -548,7 +555,7 @@ export default function DeliveryMapPage() {
           weight: 3,
           opacity: 0.8,
           dashArray: "5, 10",
-        }).addTo(layerGroupRef.current);
+        }).addTo(layerGroup);
       }
 
       // Latest Current Location Pin for Rider
@@ -565,7 +572,7 @@ export default function DeliveryMapPage() {
         });
 
         const currentMarker = L.marker([rider.currentLat, rider.currentLng], { icon }).addTo(
-          layerGroupRef.current,
+          layerGroup,
         );
 
         const timeStr = rider.lastLocationAt
@@ -681,7 +688,7 @@ export default function DeliveryMapPage() {
           `${order.address?.detailedAddress || ""}, ${order.address?.area || ""}, ${order.address?.district || ""}`,
         );
 
-        const marker = L.marker([lat, lng], { icon }).addTo(layerGroupRef.current);
+        const marker = L.marker([lat, lng], { icon }).addTo(layerGroup);
 
         const popupHtml = `
           <div style="font-size: 12px; font-family: system-ui, -apple-system, sans-serif; min-width: 240px; padding: 2px;">

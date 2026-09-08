@@ -2,6 +2,11 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
+import type {
+  LeafletApi,
+  LeafletLayerGroup,
+  LeafletMap,
+} from "@/lib/leaflet-types";
 
 type LocationHistoryItem = {
   id: string;
@@ -21,6 +26,13 @@ type RiderMapItem = {
   currentLng: number | null;
   lastLocationAt: string | null;
   locationHistory: LocationHistoryItem[];
+};
+
+type RiderMapResponse = {
+  data?: {
+    riders?: RiderMapItem[];
+  };
+  message?: string;
 };
 
 function escapeHtml(value: unknown) {
@@ -157,8 +169,8 @@ export default function RiderLocationMapModal({
   const [mapError, setMapError] = useState("");
 
   const mapRef = useRef<HTMLDivElement>(null);
-  const leafletInstanceRef = useRef<any>(null);
-  const layerGroupRef = useRef<any>(null);
+  const leafletInstanceRef = useRef<LeafletMap | null>(null);
+  const layerGroupRef = useRef<LeafletLayerGroup | null>(null);
 
   const fetchRiderData = useCallback(async () => {
     setLoading(true);
@@ -167,13 +179,11 @@ export default function RiderLocationMapModal({
       const res = await fetch("/api/delivery-personnel/map-data", {
         cache: "no-store",
       });
-      const payload = await res.json();
+      const payload = (await res.json()) as RiderMapResponse;
       if (!res.ok || !payload.data) {
         throw new Error(payload.message || "Failed to load location data.");
       }
-      const found = (payload.data.riders || []).find(
-        (r: any) => r.id === riderId,
-      );
+      const found = (payload.data.riders || []).find((rider) => rider.id === riderId);
       if (found) {
         setRider(found);
       } else {
@@ -206,7 +216,7 @@ export default function RiderLocationMapModal({
     }
 
     const loadLeafletScript = () => {
-      if ((window as any).L) {
+      if (window.L) {
         initMap();
         return;
       }
@@ -227,7 +237,7 @@ export default function RiderLocationMapModal({
   }, []);
 
   const initMap = useCallback(() => {
-    const L = (window as any).L;
+    const L = window.L;
     if (!L || !mapRef.current) return;
 
     if (!leafletInstanceRef.current) {
@@ -256,10 +266,11 @@ export default function RiderLocationMapModal({
   }, [rider]);
 
   const renderRiderMap = () => {
-    const L = (window as any).L;
-    if (!L || !layerGroupRef.current || !rider) return;
+    const L = window.L;
+    const layerGroup = layerGroupRef.current;
+    if (!L || !layerGroup || !rider) return;
 
-    layerGroupRef.current.clearLayers();
+    layerGroup.clearLayers();
     const bounds: [number, number][] = [];
     const points: [number, number][] = [];
     const color = "#e11d48"; // Distinct red indicator
@@ -281,7 +292,7 @@ export default function RiderLocationMapModal({
       });
 
       const marker = L.marker([loc.latitude, loc.longitude], { icon }).addTo(
-        layerGroupRef.current,
+        layerGroup,
       );
 
       const timeStr = new Date(loc.createdAt).toLocaleTimeString();
@@ -312,7 +323,7 @@ export default function RiderLocationMapModal({
         weight: 4,
         opacity: 0.85,
         dashArray: "6, 8",
-      }).addTo(layerGroupRef.current);
+      }).addTo(layerGroup);
     }
 
     // Render Current Location Pin
@@ -329,7 +340,7 @@ export default function RiderLocationMapModal({
       });
 
       const currentMarker = L.marker([rider.currentLat, rider.currentLng], { icon }).addTo(
-        layerGroupRef.current,
+        layerGroup,
       );
 
       const timeStr = rider.lastLocationAt

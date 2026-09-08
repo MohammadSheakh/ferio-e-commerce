@@ -172,13 +172,23 @@ export class StructuredLogger {
       );
     }
 
-    const method = metadata.method ? String(metadata.method).toUpperCase() : '';
-    const path = metadata.path ? String(metadata.path) : '';
-    const statusCode = metadata.statusCode ? String(metadata.statusCode) : '';
+    const method = metadata.method
+      ? sanitizeLogText(metadata.method).toUpperCase()
+      : '';
+    const path = metadata.path ? sanitizeLogText(metadata.path) : '';
+    const statusCode = metadata.statusCode
+      ? sanitizeLogText(metadata.statusCode)
+      : '';
     const duration =
-      metadata.durationMs !== undefined ? `${metadata.durationMs}ms` : '';
-    const userId = metadata.userId ? String(metadata.userId) : 'anonymous';
-    const clientIp = metadata.clientIp ? String(metadata.clientIp) : '';
+      metadata.durationMs !== undefined
+        ? `${sanitizeLogText(metadata.durationMs)}ms`
+        : '';
+    const userId = metadata.userId
+      ? sanitizeLogText(metadata.userId)
+      : 'anonymous';
+    const clientIp = metadata.clientIp
+      ? sanitizeLogText(metadata.clientIp)
+      : '';
 
     if (method && path) {
       if (level === 'error') {
@@ -199,9 +209,7 @@ export class StructuredLogger {
       metaKeys.length > 0
         ? ` ${JSON.stringify(sanitizeStructuredMetadata(metadata))}`
         : '';
-    const errStr = error
-      ? ` -> ${error instanceof Error ? error.message : String(error)}`
-      : '';
+    const errStr = error ? ` -> ${sanitizeLogText(error)}` : '';
 
     return `${event}${metaStr}${errStr}`;
   }

@@ -2,14 +2,16 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
-  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '@app/database';
-import { TenantDbService } from '../../tenancy/tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../tenancy/services/tenant-db.service';
 import { Prisma, type PrismaClient } from '@prisma/client';
 import { AuditService } from '../audit/services/audit.service';
 import type { UserPayload } from '@app/common';
-import { assertTenantCommerceWritable } from '../../tenancy/commerce-write-guard.util';
+import { assertTenantCommerceWritable } from '../../tenancy/utils/commerce-write-guard.util';
 import type {
   CheckStoreAvailabilityDto,
   CreateStoreLocationDto,
@@ -22,15 +24,14 @@ export class StoreLocationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
-    @Optional() private readonly tenantDb?: TenantDbService,
+    private readonly tenantDb?: TenantDbService,
   ) {}
 
   /**
    * MT-7: tenant client inside resolved contexts; explicit legacy fallback.
    */
   private async db(): Promise<PrismaClient> {
-    const tenant = await this.tenantDb?.tryGet();
-    return tenant ?? (this.prisma as PrismaClient);
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
   async listPublicStores() {
     const db = await this.db();

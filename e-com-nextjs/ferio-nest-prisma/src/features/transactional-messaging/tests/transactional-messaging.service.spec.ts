@@ -3,10 +3,10 @@ import { TransactionalMessagingService } from '../services/transactional-messagi
 
 describe('TransactionalMessagingService templates', () => {
   const actor = {
-      userId: 'admin-1',
-      email: 'admin@ferio.com',
-      role: 'admin',
-    } as unknown as import('@app/common').UserPayload;
+    userId: 'admin-1',
+    email: 'admin@ferio.com',
+    role: 'admin',
+  } as unknown as import('@app/common').UserPayload;
 
   function setup() {
     const current = {
@@ -20,20 +20,26 @@ describe('TransactionalMessagingService templates', () => {
       createdAt: new Date(),
       updatedAt: new Date(),
     };
-    const update = jest.fn(async ({ data }) => ({
-      ...current,
-      ...data,
-      version: current.version + 1,
-      updatedById: actor.userId,
-    }));
+    const update = jest.fn(({ data }: { data: Record<string, unknown> }) =>
+      Promise.resolve({
+        ...current,
+        ...data,
+        version: current.version + 1,
+        updatedById: actor.userId,
+      }),
+    );
     const messageUpsert = jest.fn().mockResolvedValue({ id: 'message-1' });
     const prisma = {
       commerceMessage: { upsert: messageUpsert },
       commerceMessageTemplate: {
         upsert: jest.fn().mockResolvedValue(current),
       },
-      $transaction: jest.fn(async (callback) =>
-        callback({ commerceMessageTemplate: { update } }),
+      $transaction: jest.fn(
+        (
+          callback: (value: {
+            commerceMessageTemplate: { update: typeof update };
+          }) => Promise<unknown>,
+        ) => callback({ commerceMessageTemplate: { update } }),
       ),
     };
     const audit = { record: jest.fn().mockResolvedValue({}) };
@@ -58,11 +64,10 @@ describe('TransactionalMessagingService templates', () => {
     );
 
     expect(result.version).toBe(3);
-    expect(update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ version: { increment: 1 } }),
-      }),
-    );
+    const updateCall = (update.mock.calls as unknown[][])[0]?.[0] as {
+      data: { version: { increment: number } };
+    };
+    expect(updateCall.data.version).toEqual({ increment: 1 });
     expect(audit.record).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'TRANSACTIONAL_MESSAGE_TEMPLATE_UPDATED',
@@ -92,15 +97,19 @@ describe('TransactionalMessagingService templates', () => {
       payload: { reference: 'FER-42' },
     });
 
-    expect(messageUpsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        create: expect.objectContaining({
-          templateKey: 'order-placed',
-          templateVersion: 2,
-          renderedSubject: 'Order FER-42 received',
-          renderedBody: 'Order FER-42 received.',
-        }),
-      }),
-    );
+    const upsertCall = (messageUpsert.mock.calls as unknown[][])[0]?.[0] as {
+      create: {
+        templateKey: string;
+        templateVersion: number;
+        renderedSubject: string;
+        renderedBody: string;
+      };
+    };
+    expect(upsertCall.create).toMatchObject({
+      templateKey: 'order-placed',
+      templateVersion: 2,
+      renderedSubject: 'Order FER-42 received',
+      renderedBody: 'Order FER-42 received.',
+    });
   });
 });

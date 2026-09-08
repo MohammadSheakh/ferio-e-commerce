@@ -17,6 +17,11 @@ import { PlatformAuditService } from './services/platform-audit.service';
 import { SupportAccessService } from './services/support-access.service';
 import { ProvisioningService } from './services/provisioning.service';
 import { PlatformAdminController } from './platform.controller';
+import { PlatformAuthController } from './platform-auth.controller';
+import { PlatformCatalogController } from './platform-catalog.controller';
+import { PlatformDomainsController } from './platform-domains.controller';
+import { PlatformMigrationsController } from './platform-migrations.controller';
+import { PlatformSupportAccessController } from './platform-support-access.controller';
 import { PlatformAuthService } from './services/platform-auth.service';
 import { PlatformPlanSeedService } from './services/platform-plan-seed.service';
 import { MigrationOrchestratorService } from './services/migration-orchestrator.service';
@@ -24,8 +29,10 @@ import { TenantMigrationProcessor } from './migration-orchestrator.processor';
 import { TenantClosureService } from './services/tenant-closure.service';
 import { PlanGateService } from './services/plan-gate.service';
 import { PlatformBillingService } from './services/platform-billing.service';
+import { PlatformOperationsHealthService } from './services/platform-operations-health.service';
+import { PlatformFeatureFlagsService } from './services/platform-feature-flags.service';
+import { PlatformFeatureFlagsController } from './platform-feature-flags.controller';
 import { LocalPostgresProvisioner } from './services/local-postgres-provisioner';
-import { TenantDatabaseProvisioner } from './services/tenant-database-provisioner.interface';
 import {
   PlatformBillingCallbackController,
   PlatformBillingController,
@@ -61,8 +68,14 @@ import {
   ],
   controllers: [
     PlatformAdminController,
+    PlatformAuthController,
+    PlatformCatalogController,
+    PlatformDomainsController,
+    PlatformMigrationsController,
+    PlatformSupportAccessController,
     PlatformBillingController,
     PlatformBillingCallbackController,
+    PlatformFeatureFlagsController,
   ],
   // Tenant migration queue processor registered below with providers.
   providers: [
@@ -74,6 +87,8 @@ import {
     PlanGateService,
     LocalPostgresProvisioner,
     PlatformBillingService,
+    PlatformOperationsHealthService,
+    PlatformFeatureFlagsService,
     {
       provide: 'TENANT_DB_PROVISIONER',
       useExisting: LocalPostgresProvisioner,

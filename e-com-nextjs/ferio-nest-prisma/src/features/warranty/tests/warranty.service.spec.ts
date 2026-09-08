@@ -1,10 +1,14 @@
 import type { PrismaService } from '@app/database';
 import { WarrantyService } from '../warranty.service';
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
 describe('WarrantyService', () => {
   const prisma = {
     warrantyClaim: {
-      findMany: jest.fn(),
+      findMany: jest.fn<Promise<unknown[]>, [unknown]>(),
       count: jest.fn(),
     },
     $transaction: jest.fn((operations) => Promise.all(operations)),
@@ -33,22 +37,22 @@ describe('WarrantyService', () => {
       limit: 20,
       totalPages: 3,
     });
-    expect(prisma.warrantyClaim.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        skip: 20,
-        take: 20,
-        where: expect.objectContaining({
-          status: 'UNDER_DIAGNOSIS',
-          OR: expect.arrayContaining([
-            {
-              reference: {
-                contains: 'WAR-1001',
-                mode: 'insensitive',
-              },
-            },
-          ]),
-        }),
-      }),
-    );
+    const calls = prisma.warrantyClaim.findMany.mock.calls;
+    const query = calls.at(-1)?.[0];
+    expect(isRecord(query)).toBe(true);
+    if (!isRecord(query)) return;
+    expect(query.skip).toBe(20);
+    expect(query.take).toBe(20);
+    expect(isRecord(query.where)).toBe(true);
+    if (!isRecord(query.where)) return;
+    expect(query.where.status).toBe('UNDER_DIAGNOSIS');
+    expect(Array.isArray(query.where.OR)).toBe(true);
+    if (!Array.isArray(query.where.OR)) return;
+    expect(query.where.OR).toContainEqual({
+      reference: {
+        contains: 'WAR-1001',
+        mode: 'insensitive',
+      },
+    });
   });
 });

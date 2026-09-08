@@ -9,6 +9,13 @@ interface SetupItem {
   href: string;
 }
 
+interface PlanStatusResponse {
+  code?: string;
+  plan?: { displayName: string };
+  subscription?: { status: string };
+  domains?: Array<{ status: string; isPrimary: boolean }>;
+}
+
 /**
  * Store Setup checklist (MT-10 §13.1, consolidated): surfaces onboarding
  * completion state from existing configuration endpoints with deep links.
@@ -22,12 +29,16 @@ export default function StoreSetupChecklist() {
       fetch("/api/commerce-settings").then((r) => r.json()).catch(() => null),
       fetch("/api/admin/delivery-zones").then((r) => r.json()).catch(() => null),
       fetch("/api/payments/providers").then((r) => r.json()).catch(() => null),
-    ]).then(([settingsRes, zonesRes, providersRes]) => {
+      fetch("/api/admin/plan-status").then((r) => r.json()).catch(() => null),
+      fetch("/api/catalog/products?limit=1").then((r) => r.json()).catch(() => null),
+    ]).then(([settingsRes, zonesRes, providersRes, planRes, productsRes]) => {
       const settings = settingsRes?.data ?? settingsRes ?? {};
       const zones = zonesRes?.data?.items ?? zonesRes?.items ?? [];
+      const products = productsRes?.data?.items ?? productsRes?.items ?? [];
       const providers = Array.isArray(providersRes?.data)
         ? providersRes.data
         : (providersRes?.data?.providers ?? providersRes?.providers ?? []);
+      const plan = (planRes?.data ?? planRes ?? {}) as PlanStatusResponse;
 
       const storeNamed = Boolean(settings.storeName && settings.storeName !== "Ferio" && settings.storeName !== "My Store");
       const supportSet = Boolean(settings.supportPhone || settings.supportEmail);
@@ -35,13 +46,24 @@ export default function StoreSetupChecklist() {
       const paymentConfigured = settings.codEnabled === true ||
         providers.some?.((p: { configured?: boolean }) => p.configured) === true;
       const codPolicyChosen = settings.codEnabled !== undefined;
+      const regionalSettingsSet = Boolean(settings.currency && settings.timezone);
+      const orderPrefixSet = Boolean(settings.orderPrefix);
+      const subscriptionActive = plan.code === "ACTIVE" && Boolean(plan.plan && plan.subscription);
+      const primaryDomainActive = plan.domains?.some(
+        (domain) => domain.isPrimary && domain.status === "ACTIVE",
+      ) === true;
 
       setItems([
         { key: "identity", label: "Store name and identity", done: storeNamed, href: "/dashboard/settings" },
         { key: "support", label: "Support contact for customers", done: supportSet, href: "/dashboard/settings" },
+        { key: "regional", label: "Currency and timezone", done: regionalSettingsSet, href: "/dashboard/settings" },
+        { key: "order-prefix", label: "Order reference prefix", done: orderPrefixSet, href: "/dashboard/settings" },
         { key: "zones", label: "Delivery zones and fees", done: hasZones, href: "/dashboard/delivery" },
         { key: "payments", label: "A payment method enabled (COD counts)", done: paymentConfigured, href: "/dashboard/payments" },
         { key: "cod", label: "Cash-on-delivery policy chosen", done: codPolicyChosen, href: "/dashboard/settings" },
+        { key: "catalog", label: "Add the first catalog product", done: Array.isArray(products) && products.length > 0, href: "/dashboard/products/new" },
+        { key: "subscription", label: "Subscription and plan active", done: subscriptionActive, href: "/dashboard/settings" },
+        { key: "domain", label: "Primary storefront domain active", done: primaryDomainActive, href: "/dashboard/settings" },
       ]);
     });
   }, []);

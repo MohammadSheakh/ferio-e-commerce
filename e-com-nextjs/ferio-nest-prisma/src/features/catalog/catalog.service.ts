@@ -2,16 +2,20 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '@app/database';
 import type { PrismaClient } from '@prisma/client';
-import { Optional } from '@nestjs/common';
-import { assertTenantCommerceWritable } from '../../tenancy/commerce-write-guard.util';
-import { TenantDbService } from '../../tenancy/tenant-db.service';
-import { tryGetTenantContext } from '../../tenancy/tenant-context';
+import { EntitlementsService } from '../../platform/services/entitlements.service';
+import { assertTenantCommerceWritable } from '../../tenancy/utils/commerce-write-guard.util';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../tenancy/services/tenant-db.service';
+import { tryGetTenantContext } from '../../tenancy/context/tenant-context';
 import type { UserPayload } from '@app/common';
 import { AuditService } from '../audit/services/audit.service';
 import {
@@ -57,8 +61,9 @@ export class CatalogService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
-    @Optional() private readonly tenantDb?: TenantDbService,
-    @Optional() private readonly entitlements?: import('../../platform/services/entitlements.service').EntitlementsService,
+    private readonly entitlements: EntitlementsService,
+    @Inject(TenantDbService)
+    private readonly tenantDb: TenantDbService | undefined,
   ) {}
 
   /**
@@ -68,8 +73,7 @@ export class CatalogService {
    * The fallback is EXPLICIT here — TenantDbService.tryGet() never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    const tenant = await this.tenantDb?.tryGet();
-    return tenant ?? (this.prisma as PrismaClient);
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
 
   private slugify(value: string): string {
@@ -108,7 +112,10 @@ export class CatalogService {
         'Second-hand products require a condition grade',
       );
     }
-    if (condition === 'SECOND_HAND' && (conditionNote?.trim().length ?? 0) < 10) {
+    if (
+      condition === 'SECOND_HAND' &&
+      (conditionNote?.trim().length ?? 0) < 10
+    ) {
       throw new BadRequestException(
         'Second-hand products require a condition disclosure of at least 10 characters',
       );
@@ -141,10 +148,7 @@ export class CatalogService {
         'Receipts and customer returns must increase stock',
       );
     }
-    if (
-      dto.adjustmentReason === 'DAMAGE_WRITE_OFF' &&
-      dto.quantityDelta > 0
-    ) {
+    if (dto.adjustmentReason === 'DAMAGE_WRITE_OFF' && dto.quantityDelta > 0) {
       throw new BadRequestException('Damage write-offs must reduce stock');
     }
     if (
@@ -188,8 +192,8 @@ export class CatalogService {
       const id =
         parsed.hostname === 'youtu.be'
           ? parsed.pathname.slice(1)
-          : parsed.searchParams.get('v') ??
-            parsed.pathname.match(/^\/shorts\/([^/]+)/)?.[1];
+          : (parsed.searchParams.get('v') ??
+            parsed.pathname.match(/^\/shorts\/([^/]+)/)?.[1]);
       if (!id || !/^[A-Za-z0-9_-]{6,20}$/.test(id)) {
         throw new BadRequestException('Valid YouTube video link required');
       }
@@ -546,10 +550,7 @@ export class CatalogService {
           ? {
               products: {
                 some: {
-                  OR: [
-                    { categoryId },
-                    { category: { parentId: categoryId } },
-                  ],
+                  OR: [{ categoryId }, { category: { parentId: categoryId } }],
                 },
               },
             }
@@ -571,17 +572,16 @@ export class CatalogService {
     const db = await this.db();
     // MT-10 §13.2: SKU entitlement enforced server-side for tenants.
     const ctx = tryGetTenantContext();
-    if (ctx && this.entitlements) {
+    if (ctx) {
       const currentCount = await db.product.count({
         where: { status: { not: 'ARCHIVED' } },
       });
-      const decision = await this.entitlements
-        .evaluate(ctx.organizationId, 'products_max', {
-          requestedCount: currentCount + 1,
-          currentOverride: currentCount,
-        })
-        .catch(() => null);
-      if (decision && !decision.allowed) {
+      const decision = await this.entitlements.evaluate(
+        ctx.organizationId,
+        'products_max',
+        { requestedCount: 1, currentOverride: currentCount },
+      );
+      if (!decision.allowed) {
         throw new ForbiddenException(decision.code ?? 'PLAN_LIMIT_REACHED');
       }
     }
@@ -657,9 +657,7 @@ export class CatalogService {
               create: dto.variants.map((variant) => ({
                 name: variant.name.trim(),
                 sku: variant.sku.trim().toUpperCase(),
-                attributes: variant.attributes as
-                  | Prisma.InputJsonValue
-                  | undefined,
+                attributes: variant.attributes,
                 price: variant.price,
                 compareAtPrice: variant.compareAtPrice,
                 isActive: variant.isActive ?? true,
@@ -850,8 +848,10 @@ export class CatalogService {
             slug: dto.slug,
             description: dto.description?.trim(),
             categoryId: dto.categoryId,
-            brand: resolvedBrandName !== undefined ? resolvedBrandName : undefined,
-            brandId: resolvedBrandId !== undefined ? resolvedBrandId : undefined,
+            brand:
+              resolvedBrandName !== undefined ? resolvedBrandName : undefined,
+            brandId:
+              resolvedBrandId !== undefined ? resolvedBrandId : undefined,
             isFeatured: dto.isFeatured,
             codAvailable: dto.codAvailable,
             deliveryNote: dto.deliveryNote?.trim(),

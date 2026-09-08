@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { customerSessionFetch } from "@/lib/customer-session";
+import { getErrorMessage } from "@/lib/error-message";
 
 export async function DELETE(
   _req: Request,
@@ -17,9 +18,9 @@ export async function DELETE(
     }
     const payload = await sessionRes.response.json();
     return NextResponse.json(payload);
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
-      { message: error.message || "Failed to delete saved cart." },
+      { message: getErrorMessage(error, "Failed to delete saved cart.") },
       { status: 500 },
     );
   }

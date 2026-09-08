@@ -1,14 +1,17 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { ConfigService } from '@nestjs/config';
 import type { Queue } from 'bullmq';
 import { PrismaService } from '@app/database';
 import { RedisService } from '@app/redis';
 import { QUEUE_NAMES } from '@app/queue';
-import { RequestMetrics } from '@app/common';
+import { RequestMetrics, TenantMetrics } from '@app/common';
 import { PaymentGatewayRegistry } from '../commerce-payments/gateways/payment-gateway.registry';
 import { ShippingService } from '../shipping/services/shipping.service';
-import { TenantDbService } from '../../tenancy/tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../tenancy/services/tenant-db.service';
 import type { PrismaClient } from '@prisma/client';
 
 type DependencyProbe = {
@@ -28,6 +31,13 @@ type CourierReadinessItem = CourierReadiness[number];
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+function processInstanceId(): string {
+  const configured = process.env.INSTANCE_ID?.trim();
+  if (configured) return configured;
+  const hostname = process.env.HOSTNAME?.trim();
+  return hostname || `pid-${process.pid}`;
+}
+
 @Injectable()
 export class OperationsHealthService {
   private readonly queues: Array<{ name: string; queue: Queue }>;
@@ -45,7 +55,7 @@ export class OperationsHealthService {
     @InjectQueue(QUEUE_NAMES.TRANSACTIONAL_MESSAGE)
     transactionalMessageQueue: Queue,
     @InjectQueue(QUEUE_NAMES.PAYMENT_RECOVERY) paymentRecoveryQueue: Queue,
-    @Optional() private readonly tenantDb?: TenantDbService,
+    private readonly tenantDb?: TenantDbService,
   ) {
     this.queues = [
       { name: 'Authentication email', queue: emailQueue },
@@ -58,14 +68,18 @@ export class OperationsHealthService {
   }
 
   private async db(): Promise<PrismaClient> {
-    return ((await this.tenantDb?.tryGet()) ?? this.prisma) as PrismaClient;
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
 
   async getHealth() {
     const [database, redis, queues, commerce, couriers] = await Promise.all([
       this.databaseProbe(),
       this.redisProbe(),
-      Promise.all(this.queues.map((queue: { name: string; queue: Queue }) => this.queueEvidence(queue))),
+      Promise.all(
+        this.queues.map((queue: { name: string; queue: Queue }) =>
+          this.queueEvidence(queue),
+        ),
+      ),
       this.commerceEvidence(),
       this.shipping.getProviders().catch(() => [] as CourierReadiness),
     ]);
@@ -81,7 +95,10 @@ export class OperationsHealthService {
       ...(payments.some((provider) => provider.configured)
         ? []
         : ['No prepaid payment provider is configured.']),
-      ...(couriers.some((provider: CourierReadinessItem) => provider.isActive && provider.configured)
+      ...(couriers.some(
+        (provider: CourierReadinessItem) =>
+          provider.isActive && provider.configured,
+      )
         ? []
         : ['No active courier has verified runtime configuration.']),
       ...(backup.status === 'CURRENT'
@@ -98,6 +115,7 @@ export class OperationsHealthService {
       launchReady: runtimeStatus === 'HEALTHY' && launchBlockers.length === 0,
       launchBlockers,
       process: {
+        instanceId: processInstanceId(),
         uptimeSeconds: Math.floor(process.uptime()),
         memory: {
           rssBytes: process.memoryUsage().rss,
@@ -257,17 +275,23 @@ export class OperationsHealthService {
     const restoreVerified =
       lastRestoreAt !== null &&
       Date.now() - lastRestoreAt.getTime() <= 180 * DAY_MS;
+    const status = current
+      ? 'CURRENT'
+      : enabled
+        ? 'STALE_OR_UNPROTECTED'
+        : 'MISSING';
+    const restoreStatus = restoreVerified ? 'VERIFIED' : 'MISSING_OR_STALE';
+    TenantMetrics.increment('backup_freshness_observed', {
+      status,
+      restoreStatus,
+    });
     return {
       source: 'DEPLOYMENT_ENVIRONMENT',
-      status: current
-        ? 'CURRENT'
-        : enabled
-          ? 'STALE_OR_UNPROTECTED'
-          : 'MISSING',
+      status,
       enabled,
       protectedStorage,
       lastSuccessAt: lastSuccessAt?.toISOString() ?? null,
-      restoreStatus: restoreVerified ? 'VERIFIED' : 'MISSING_OR_STALE',
+      restoreStatus,
       lastRestoreVerifiedAt: lastRestoreAt?.toISOString() ?? null,
     };
   }

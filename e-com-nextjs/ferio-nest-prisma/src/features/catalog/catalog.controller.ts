@@ -21,7 +21,7 @@ import {
 } from '@app/common';
 import type { UserPayload } from '@app/common';
 import { CatalogService } from './catalog.service';
-import { TenantMembershipGuard } from '../../tenancy/tenant-membership.guard';
+import { TenantMembershipGuard } from '../../tenancy/guards/tenant-membership.guard';
 import {
   AdjustInventoryDto,
   AdminProductQueryDto,

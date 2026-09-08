@@ -1,19 +1,20 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 import type { UserPayload as UserPayloadType } from '../types/user-payload.type';
+import type { AuthenticatedRequest } from '../types/http-request.type';
 /**
  * User Decorator
- * 
+ *
  * 📚 INDUSTRY STANDARD IMPLEMENTATION
- * 
+ *
  * Extracts user payload from request object
  * Type-safe access to authenticated user information
- * 
+ *
  * Usage:
  * @Get('profile')
  * async getProfile(@User() user: UserPayload) {
  *   // user.userId, user.email, user.role
  * }
- * 
+ *
  * With fields selection:
  * @Get('profile')
  * async getProfile(@User('email') email: string) {
@@ -24,8 +25,8 @@ import type { UserPayload as UserPayloadType } from '../types/user-payload.type'
 // Single decorator alias so @User() works
 export const UserDecorator = createParamDecorator(
   (data: keyof UserPayloadType | undefined, ctx: ExecutionContext) => {
-    const request = ctx.switchToHttp().getRequest();
-    const user: UserPayloadType = request.user;
+    const request = ctx.switchToHttp().getRequest<AuthenticatedRequest>();
+    const user = request.user;
 
     if (!user) return null;
     if (data) return user[data];

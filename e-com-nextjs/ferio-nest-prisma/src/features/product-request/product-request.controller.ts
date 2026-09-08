@@ -23,7 +23,7 @@ import {
   SlidingWindowRateLimitGuard,
   User,
 } from '@app/common';
-import { TenantMembershipGuard } from '../../tenancy/tenant-membership.guard';
+import { TenantMembershipGuard } from '../../tenancy/guards/tenant-membership.guard';
 import { ProductRequestService } from './product-request.service';
 import {
   CreateProductRequestDto,
@@ -52,7 +52,6 @@ export class PublicProductRequestController {
       data: result,
     };
   }
-
 }
 
 @ApiTags('Product Requests')

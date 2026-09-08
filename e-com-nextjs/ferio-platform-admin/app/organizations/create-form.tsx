@@ -1,5 +1,10 @@
 "use client";
 import { useState, FormEvent } from "react";
+import {
+  readJsonRecord,
+  responseDataString,
+  responseMessage,
+} from "@/lib/client-response";
 
 export function CreateOrganizationForm() {
   const [message, setMessage] = useState("");
@@ -19,13 +24,13 @@ export function CreateOrganizationForm() {
         ownerEmail: form.get("ownerEmail"),
       }),
     });
-    const data = await response.json().catch(() => ({}));
+    const data = await readJsonRecord(response);
     setWorking(false);
     if (response.ok) {
-      setMessage(`Created. Next: run provisioning for ${data.data?.slug ?? ""}.`);
+      setMessage(`Created. Next: run provisioning for ${responseDataString(data, "slug")}.`);
       window.location.reload();
     } else {
-      setMessage(data.message || "Creation failed.");
+      setMessage(responseMessage(data, "Creation failed."));
     }
   }
 

@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import type { ApiEnvelope } from "@/lib/backend";
+import { parseApiEnvelope } from "@/lib/backend";
 import type { CartState } from "@/lib/cart";
 import { withCorrelationId } from "@/lib/correlation";
 import { hostForwardHeaders } from "@/lib/host-forward";
@@ -39,7 +39,7 @@ export async function cartApi<T>(
       cache: "no-store",
     },
   );
-  const payload = (await response.json()) as ApiEnvelope<T>;
+  const payload = parseApiEnvelope<T>(await response.json().catch(() => null));
   if (!response.ok || payload.data === undefined) {
     const message = Array.isArray(payload.message)
       ? payload.message.join(" ")

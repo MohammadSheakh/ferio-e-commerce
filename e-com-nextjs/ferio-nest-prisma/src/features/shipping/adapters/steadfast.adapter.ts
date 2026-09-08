@@ -10,13 +10,19 @@ import {
 import {
   normalizeCourierStatus,
   secureWebhookCredentialEquals,
+  shippingText,
 } from '../utils/shipping.util';
+import { tenantAwareCourierConfig } from '../utils/courier-credentials.util';
 
 @Injectable()
 export class SteadfastAdapter implements CourierAdapter {
   readonly code = 'STEADFAST' as const;
 
-  constructor(private readonly config: ConfigService) {}
+  private readonly config: ConfigService;
+
+  constructor(config: ConfigService) {
+    this.config = tenantAwareCourierConfig(config);
+  }
 
   private get baseUrl() {
     return this.config.get<string>(
@@ -71,13 +77,13 @@ export class SteadfastAdapter implements CourierAdapter {
       );
     }
     const consignment = payload.consignment;
-    const externalShipmentId = String(consignment.consignment_id ?? '');
+    const externalShipmentId = shippingText(consignment.consignment_id);
     if (!externalShipmentId) {
       throw new BadGatewayException('Steadfast returned no consignment ID');
     }
-    const rawStatus = String(consignment.status ?? 'in_review');
+    const rawStatus = shippingText(consignment.status, 'in_review');
     const trackingNumber = consignment.tracking_code
-      ? String(consignment.tracking_code)
+      ? shippingText(consignment.tracking_code)
       : null;
     return {
       externalShipmentId,
@@ -106,22 +112,24 @@ export class SteadfastAdapter implements CourierAdapter {
   }
 
   parseWebhook(payload: Record<string, unknown>): CourierWebhookEvent {
-    const rawStatus = String(payload.status ?? 'unknown');
+    const rawStatus = shippingText(payload.status, 'unknown');
     return {
       providerEventId: payload.updated_at
-        ? `${String(payload.consignment_id)}:${String(payload.updated_at)}`
+        ? `${shippingText(payload.consignment_id)}:${shippingText(payload.updated_at)}`
         : undefined,
       externalShipmentId: payload.consignment_id
-        ? String(payload.consignment_id)
+        ? shippingText(payload.consignment_id)
         : undefined,
       trackingNumber: payload.tracking_code
-        ? String(payload.tracking_code)
+        ? shippingText(payload.tracking_code)
         : undefined,
-      orderReference: payload.invoice ? String(payload.invoice) : undefined,
+      orderReference: payload.invoice
+        ? shippingText(payload.invoice)
+        : undefined,
       rawStatus,
       normalizedStatus: normalizeCourierStatus('STEADFAST', rawStatus),
       occurredAt: payload.updated_at
-        ? new Date(String(payload.updated_at))
+        ? new Date(shippingText(payload.updated_at))
         : new Date(),
     };
   }

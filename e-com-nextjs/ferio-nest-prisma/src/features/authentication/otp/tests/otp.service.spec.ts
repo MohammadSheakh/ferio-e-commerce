@@ -14,9 +14,11 @@ describe('OtpService security events', () => {
         ),
       set: jest.fn().mockResolvedValue('OK'),
       del: jest.fn(),
-      getdel: jest.fn().mockResolvedValue(
-        JSON.stringify({ otpHash, createdAt: Date.now(), attempts: 2 }),
-      ),
+      call: jest
+        .fn()
+        .mockResolvedValue(
+          JSON.stringify({ otpHash, createdAt: Date.now(), attempts: 2 }),
+        ),
     };
     const service = new OtpService({
       getClient: jest.fn().mockResolvedValue(client),

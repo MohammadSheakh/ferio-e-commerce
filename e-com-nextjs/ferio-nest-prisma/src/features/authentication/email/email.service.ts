@@ -52,7 +52,7 @@ export class EmailService {
   /**
    * Send OTP Email Now
    */
-  async sendOtpEmailNow(
+  sendOtpEmailNow(
     email: string,
     otp: string,
     type: 'verify' | 'reset',
@@ -61,6 +61,8 @@ export class EmailService {
       template: 'OTP',
       purpose: type,
     });
+    void email;
+    void otp;
 
     // Production: Integrate with email provider
     // await this.sendEmail({
@@ -68,6 +70,7 @@ export class EmailService {
     //   subject,
     //   html: this.getOtpEmailTemplate(otp, type),
     // });
+    return Promise.resolve();
   }
 
   /**
@@ -84,10 +87,12 @@ export class EmailService {
   /**
    * Send Welcome Email Now
    */
-  async sendWelcomeEmailNow(email: string, name: string): Promise<void> {
+  sendWelcomeEmailNow(email: string, name: string): Promise<void> {
     this.logger.log('authentication_email_delivery_simulated', {
       template: 'WELCOME',
     });
+    void email;
+    void name;
 
     // Production: Send actual email
     // await this.sendEmail({
@@ -95,6 +100,7 @@ export class EmailService {
     //   subject: 'Welcome to Task Management!',
     //   html: this.getWelcomeEmailTemplate(name),
     // });
+    return Promise.resolve();
   }
 
   /**
@@ -112,10 +118,11 @@ export class EmailService {
   /**
    * Send Password Reset Confirmation Now
    */
-  async sendPasswordResetConfirmationNow(email: string): Promise<void> {
+  sendPasswordResetConfirmationNow(email: string): Promise<void> {
     this.logger.log('authentication_email_delivery_simulated', {
       template: 'PASSWORD_RESET_CONFIRMATION',
     });
+    void email;
 
     // Production: Send actual email
     // await this.sendEmail({
@@ -123,6 +130,7 @@ export class EmailService {
     //   subject: 'Password Reset Successful',
     //   html: this.getPasswordResetConfirmationTemplate(),
     // });
+    return Promise.resolve();
   }
 
   async sendStaffAccessEmail(
@@ -138,7 +146,7 @@ export class EmailService {
     this.logger.log('staff_access_email_queued', { purpose });
   }
 
-  async sendStaffAccessEmailNow(
+  sendStaffAccessEmailNow(
     email: string,
     token: string,
     purpose: 'INVITE' | 'RESET',
@@ -157,6 +165,7 @@ export class EmailService {
     // Production provider integration should send accessUrl.toString() to email.
     void email;
     void accessUrl;
+    return Promise.resolve();
   }
 
   /**
@@ -166,7 +175,7 @@ export class EmailService {
    *
    * @param options - Email options
    */
-  private async sendEmail(options: {
+  private sendEmail(options: {
     to: string;
     subject: string;
     html: string;
@@ -187,6 +196,7 @@ export class EmailService {
       template: 'GENERIC',
       subject: options.subject,
     });
+    return Promise.resolve();
   }
 
   /**

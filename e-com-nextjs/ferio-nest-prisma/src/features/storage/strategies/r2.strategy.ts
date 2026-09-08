@@ -16,7 +16,12 @@ export interface StorageUploadResult {
 export interface StorageStrategy {
   getStrategyName(): string;
   uploadFile(
-    file: { buffer: Buffer; originalname: string; mimetype: string; size: number },
+    file: {
+      buffer: Buffer;
+      originalname: string;
+      mimetype: string;
+      size: number;
+    },
     folder: string,
   ): Promise<StorageUploadResult>;
   deleteFile(publicIdOrUrl: string): Promise<void>;
@@ -31,7 +36,10 @@ export interface StorageStrategy {
 // Legacy strategy contract kept for reference (attachments module is
 // intentionally build-excluded dead code pending Postgres rewrite).
 export interface IFileUploadStrategy {
-  uploadFile(file: Express.Multer.File, folder: string): Promise<FileUploadResult>;
+  uploadFile(
+    file: Express.Multer.File,
+    folder: string,
+  ): Promise<FileUploadResult>;
   deleteFile(publicIdOrUrl: string): Promise<void>;
   getStrategyName(): string;
 }
@@ -40,7 +48,27 @@ interface FileUploadResult {
   publicId?: string;
 }
 
-import { tenantObjectKey } from '../../../tenancy/object-keys.util';
+import {
+  assertTenantObjectKey,
+  tenantObjectKey,
+} from '../../../tenancy/utils/object-keys.util';
+
+export function sanitizeStoragePath(value: string, fallback = 'misc'): string {
+  const segments = value
+    .normalize('NFKC')
+    .split(/[\\/]+/)
+    .map((segment) => sanitizeStorageSegment(segment))
+    .filter((segment) => segment.length > 0 && segment !== '.');
+  return segments.join('/') || fallback;
+}
+
+function sanitizeStorageSegment(value: string): string {
+  return value
+    .replace(/\.+/g, '.')
+    .replace(/[^A-Za-z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 120);
+}
 
 /**
  * Cloudflare R2 storage strategy (PO-017 / owner decision #6).
@@ -51,9 +79,9 @@ import { tenantObjectKey } from '../../../tenancy/object-keys.util';
  *
  * Isolation rules (§11.4):
  * - Every object key is tenant-namespaced via tenantObjectKey()
- *   (`tenants/{organizationId}/…`, legacy fallback) — the organization
- *   comes from ambient server-side context and can never be supplied by a
- *   client.
+ *   (`tenants/{organizationId}/…`; legacy mode is explicit) — the
+ *   organization comes from ambient server-side context and can never be
+ *   supplied by a client. Tenant mode fails closed without that context.
  * - Private evidence stays private: nothing is ever public-read.
  */
 @Injectable()
@@ -66,7 +94,9 @@ export class R2Strategy implements StorageStrategy {
   constructor() {
     const accountId = process.env.R2_ACCOUNT_ID;
     this.bucket = process.env.R2_BUCKET ?? '';
-    this.presignExpiresSeconds = Number(process.env.R2_PRESIGN_EXPIRES_SECONDS ?? 3600);
+    this.presignExpiresSeconds = Number(
+      process.env.R2_PRESIGN_EXPIRES_SECONDS ?? 3600,
+    );
 
     if (!accountId || !this.bucket || !process.env.R2_ACCESS_KEY_ID) {
       this.logger.warn(
@@ -98,15 +128,24 @@ export class R2Strategy implements StorageStrategy {
 
   /** Tenant-scoped object key; folder/legacy handling mirrors PO-017. */
   private keyFor(publicIdOrKeyOrFolder: string, filename?: string): string {
+    void filename;
     // A stored publicId IS the full key for R2.
     return publicIdOrKeyOrFolder;
   }
 
   async uploadFile(
-    file: { buffer: Buffer; originalname: string; mimetype: string; size: number },
+    file: {
+      buffer: Buffer;
+      originalname: string;
+      mimetype: string;
+      size: number;
+    },
     folder: string,
   ): Promise<StorageUploadResult> {
-    const key = tenantObjectKey(folder, `${Date.now()}-${file.originalname.replace(/\s+/g, '-')}`);
+    const key = tenantObjectKey(
+      folder,
+      `${Date.now()}-${file.originalname.replace(/\s+/g, '-')}`,
+    );
 
     await this.s3Client.send(
       new PutObjectCommand({
@@ -127,6 +166,7 @@ export class R2Strategy implements StorageStrategy {
     const key = publicIdOrUrl.includes('/')
       ? publicIdOrUrl.replace(/^.*?tenants\//, 'tenants/').split('?')[0]
       : publicIdOrUrl;
+    assertTenantObjectKey(key);
 
     await this.s3Client.send(
       new DeleteObjectCommand({ Bucket: this.bucket, Key: key }),
@@ -143,11 +183,11 @@ export class R2Strategy implements StorageStrategy {
     filename: string,
     contentType: string,
   ): Promise<{ key: string; url: string }> {
-    const safeFolder = folder.replace(/\.+/g, '.').replace(/^[\\/]+|[\\/]+$/g, '');
-    const safeName = filename.replace(/\s+/g, '-');
+    const safeFolder = sanitizeStoragePath(folder);
+    const safeName =
+      sanitizeStorageSegment(filename.replace(/[\\/]+/g, '-')) || 'upload.bin';
     const key = tenantObjectKey(safeFolder, `${Date.now()}-${safeName}`);
-    const presign = this.presigner();
-    const url = await presign(
+    const url = await s3Presign(
       this.s3Client,
       new PutObjectCommand({
         Bucket: this.bucket,
@@ -164,20 +204,11 @@ export class R2Strategy implements StorageStrategy {
    * R2_PRESIGN_EXPIRES_SECONDS (default 1h).
    */
   async getSignedUrl(key: string): Promise<string> {
-    return this.presigner()(
+    assertTenantObjectKey(key);
+    return s3Presign(
       this.s3Client,
       new GetObjectCommand({ Bucket: this.bucket, Key: key }),
       { expiresIn: this.presignExpiresSeconds },
     );
-  }
-
-  private presigner() {
-    // Loose typing: @aws-sdk/s3-request-presigner's generics fight the
-    // S3-compatible endpoint configuration; runtime behavior is identical.
-    return s3Presign as unknown as (
-      client: unknown,
-      command: unknown,
-      options?: { expiresIn?: number },
-    ) => Promise<string>;
   }
 }

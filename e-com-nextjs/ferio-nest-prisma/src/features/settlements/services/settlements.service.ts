@@ -3,14 +3,16 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
-  Optional,
 } from '@nestjs/common';
 import { createHash, randomBytes } from 'crypto';
 import type { PrismaClient } from '@prisma/client';
 import { Prisma } from '@prisma/client';
 import type { UserPayload } from '@app/common';
 import { PrismaService } from '@app/database';
-import { TenantDbService } from '../../../tenancy/tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../../tenancy/services/tenant-db.service';
 import { AuditService } from '../../audit/services/audit.service';
 import { CreateCourierSettlementDto } from '../dto/settlement.dto';
 
@@ -34,16 +36,16 @@ export class SettlementsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
-  
-    @Optional() private readonly tenantDb?: TenantDbService,) {}
+
+    private readonly tenantDb?: TenantDbService,
+  ) {}
 
   /**
    * MT-7: inside a tenant-resolved request this returns the resolved tenant
    * database client; outside one it explicitly falls back to the legacy DB.
    */
   private async db(): Promise<PrismaClient> {
-    const tenant = await this.tenantDb?.tryGet();
-    return tenant ?? (this.prisma as PrismaClient);
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
   async list() {
     const db = await this.db();
@@ -165,7 +167,13 @@ export class SettlementsService {
               );
             const collectionVariance =
               input.collectedAmount - shipment.codCollection.expectedAmount;
-            return { input, shipment, expectedRemittance, collectionVariance };
+            return {
+              input,
+              shipment,
+              codCollection: shipment.codCollection,
+              expectedRemittance,
+              collectionVariance,
+            };
           });
           const grossCollected = this.safeSum(
             calculatedItems.map((item) => item.input.collectedAmount),
@@ -207,11 +215,10 @@ export class SettlementsService {
               items: {
                 create: calculatedItems.map((item) => ({
                   shipmentId: item.shipment.id,
-                  codCollectionId: item.shipment.codCollection!.id,
+                  codCollectionId: item.codCollection.id,
                   status:
                     item.collectionVariance === 0 ? 'MATCHED' : 'VARIANCE',
-                  expectedCodAmount:
-                    item.shipment.codCollection!.expectedAmount,
+                  expectedCodAmount: item.codCollection.expectedAmount,
                   collectedAmount: item.input.collectedAmount,
                   courierFee: item.input.courierFee,
                   otherDeduction: item.input.otherDeduction,
@@ -224,10 +231,9 @@ export class SettlementsService {
           });
           for (const item of calculatedItems) {
             const collectedInFull =
-              item.input.collectedAmount >=
-              item.shipment.codCollection!.expectedAmount;
+              item.input.collectedAmount >= item.codCollection.expectedAmount;
             await transaction.codCollection.update({
-              where: { id: item.shipment.codCollection!.id },
+              where: { id: item.codCollection.id },
               data: {
                 status: item.collectionVariance === 0 ? 'SETTLED' : 'VARIANCE',
                 collectedAmount: item.input.collectedAmount,
@@ -274,31 +280,27 @@ export class SettlementsService {
         error instanceof Prisma.PrismaClientKnownRequestError &&
         (error.code === 'P2002' || error.code === 'P2034')
       ) {
-        const concurrentDuplicate =
-          await db.courierSettlement.findUnique({
-            where: { idempotencyKeyHash },
-            include: settlementInclude,
-          });
+        const concurrentDuplicate = await db.courierSettlement.findUnique({
+          where: { idempotencyKeyHash },
+          include: settlementInclude,
+        });
         if (concurrentDuplicate) return concurrentDuplicate;
-        const existingReference = await db.courierSettlement.findFirst(
-          {
-            where: {
-              provider: { code: dto.provider },
-              providerSettlementReference: providerReference,
-            },
-            select: { id: true },
+        const existingReference = await db.courierSettlement.findFirst({
+          where: {
+            provider: { code: dto.provider },
+            providerSettlementReference: providerReference,
           },
-        );
+          select: { id: true },
+        });
         if (existingReference) {
           throw new ConflictException(
             'Provider settlement reference already exists',
           );
         }
-        const claimedShipment =
-          await db.courierSettlementItem.findFirst({
-            where: { shipmentId: { in: shipmentIds } },
-            select: { shipmentId: true },
-          });
+        const claimedShipment = await db.courierSettlementItem.findFirst({
+          where: { shipmentId: { in: shipmentIds } },
+          select: { shipmentId: true },
+        });
         if (claimedShipment) {
           throw new ConflictException(
             'One or more shipments are already included in a settlement',

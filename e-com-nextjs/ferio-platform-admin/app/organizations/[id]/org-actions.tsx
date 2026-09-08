@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { readJsonRecord, responseMessage } from "@/lib/client-response";
 
 export function OrgActions({ organizationId, status }: { organizationId: string; status: string }) {
   const [message, setMessage] = useState("");
@@ -13,9 +14,9 @@ export function OrgActions({ organizationId, status }: { organizationId: string;
       headers: { "Content-Type": "application/json" },
       ...(body ? { body: JSON.stringify(body) } : {}),
     });
-    const data = await res.json().catch(() => ({}));
+    const data = await readJsonRecord(res);
     setWorking(null);
-    setMessage(res.ok ? `${action} OK.` : data.message || `${action} failed.`);
+    setMessage(res.ok ? `${action} OK.` : responseMessage(data, `${action} failed.`));
     if (res.ok) window.location.reload();
   }
 

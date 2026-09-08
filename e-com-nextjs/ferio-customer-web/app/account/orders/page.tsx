@@ -7,6 +7,13 @@ import type { CommerceAccount } from "@/lib/account";
 import { formatTaka } from "@/lib/catalog";
 import CustomerLogoutButton from "@/components/CustomerLogoutButton";
 import { useCart } from "@/components/CartContext";
+import { getErrorMessage } from "@/lib/error-message";
+
+type ReorderUnavailableItem = {
+  productName: string;
+  variantName: string;
+  reason: string;
+};
 
 export default function AccountOrdersPage() {
   const router = useRouter();
@@ -19,8 +26,8 @@ export default function AccountOrdersPage() {
   const [reorderingId, setReorderingId] = useState<string | null>(null);
   const [reorderResult, setReorderResult] = useState<{
     summary: string;
-    addedItems: any[];
-    unavailableItems: any[];
+    addedItems: unknown[];
+    unavailableItems: ReorderUnavailableItem[];
   } | null>(null);
 
   async function load() {
@@ -56,8 +63,8 @@ export default function AccountOrdersPage() {
         addedItems: data.addedItems || [],
         unavailableItems: data.unavailableItems || [],
       });
-    } catch (err: any) {
-      alert(err.message || "Could not reorder items.");
+    } catch (err: unknown) {
+      alert(getErrorMessage(err, "Could not reorder items."));
     } finally {
       setReorderingId(null);
     }

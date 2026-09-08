@@ -7,10 +7,11 @@ import {
 } from '@nestjs/common';
 import type { IUserService } from '../types/user-service.interface';
 import { I_USER_SERVICE } from '../types/user-service.interface';
+import type { AuthenticatedRequest } from '../types/http-request.type';
 
 /**
  * Secondary User Guard
- * 
+ *
  * Logic from senior reference example:
  * - Business users: Always allowed
  * - Child users: Only allowed if granted "Secondary User" status by parent
@@ -22,7 +23,7 @@ export class SecondaryUserGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest();
+    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const user = request.user;
 
     if (!user) {
@@ -37,13 +38,13 @@ export class SecondaryUserGuard implements CanActivate {
     // Child users need secondary permission
     if (user.role === 'child') {
       const isSecondary = await this.userService.isSecondaryUser(user.userId);
-      
+
       if (!isSecondary) {
         throw new ForbiddenException(
           'Only Secondary Users can perform this action. Ask your parent to grant permission.',
         );
       }
-      
+
       return true;
     }
 

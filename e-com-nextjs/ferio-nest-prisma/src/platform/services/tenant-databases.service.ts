@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PlatformAuditService } from './platform-audit.service';
 import { decryptSecret, encryptSecret } from '../utils/secret-box';
 import { PlatformPrismaService } from '../platform-prisma.service';
@@ -62,7 +66,12 @@ export class TenantDatabasesService {
   async markReady(id: string, schemaVersion: string) {
     await this.platform.client.tenantDatabase.update({
       where: { id },
-      data: { status: 'READY', schemaVersion, lastHealthAt: new Date(), lastHealthy: true },
+      data: {
+        status: 'READY',
+        schemaVersion,
+        lastHealthAt: new Date(),
+        lastHealthy: true,
+      },
     });
     return this.publicView(id);
   }
@@ -78,7 +87,11 @@ export class TenantDatabasesService {
   async recordHealth(id: string, healthy: boolean) {
     await this.platform.client.tenantDatabase.update({
       where: { id },
-      data: { lastHealthAt: new Date(), lastHealthy: healthy, status: healthy ? undefined : 'UNHEALTHY' },
+      data: {
+        lastHealthAt: new Date(),
+        lastHealthy: healthy,
+        status: healthy ? undefined : 'UNHEALTHY',
+      },
     });
   }
 
@@ -87,7 +100,9 @@ export class TenantDatabasesService {
    * (schema bootstrap, health checks). Never exposed through any API surface.
    */
   async getDecryptedConnection(id: string) {
-    const record = await this.platform.client.tenantDatabase.findUnique({ where: { id } });
+    const record = await this.platform.client.tenantDatabase.findUnique({
+      where: { id },
+    });
     if (!record) throw new NotFoundException('TENANT_DATABASE_NOT_FOUND');
     const password = decryptSecret(
       record.credentialCipher,
@@ -104,7 +119,9 @@ export class TenantDatabasesService {
 
   /** Resolve full connection material for the connection manager. */
   async getConnectionMaterial(id: string) {
-    const record = await this.platform.client.tenantDatabase.findUnique({ where: { id } });
+    const record = await this.platform.client.tenantDatabase.findUnique({
+      where: { id },
+    });
     if (!record) throw new NotFoundException('TENANT_DATABASE_NOT_FOUND');
     if (record.status !== 'READY') {
       throw new ConflictException(`TENANT_DATABASE_NOT_READY:${record.status}`);
@@ -114,7 +131,9 @@ export class TenantDatabasesService {
 
   /** Credential-free view safe for APIs and logs. */
   async publicView(id: string) {
-    const record = await this.platform.client.tenantDatabase.findUnique({ where: { id } });
+    const record = await this.platform.client.tenantDatabase.findUnique({
+      where: { id },
+    });
     if (!record) throw new NotFoundException('TENANT_DATABASE_NOT_FOUND');
     return {
       id: record.id,

@@ -36,6 +36,15 @@ function buildCategoryTree(categories: CatalogCategory[]): CategoryNode[] {
   return roots;
 }
 
+function findCategoryNode(nodes: CategoryNode[], id: string): CategoryNode | null {
+  for (const node of nodes) {
+    if (node.id === id) return node;
+    const found = findCategoryNode(node.children, id);
+    if (found) return found;
+  }
+  return null;
+}
+
 // Fallback Categories (Commented out for reference)
 // const FALLBACK_CATEGORIES: CatalogCategory[] = [
 //   { id: "1", name: "Fashion & Lifestyle", slug: "fashion-lifestyle", description: null, parentId: null, sortOrder: 1, isActive: true },
@@ -87,7 +96,6 @@ export default function CategorySideNav({
   categories?: CatalogCategory[];
 }) {
   const pathname = usePathname();
-  if (pathname?.startsWith("/delivery")) return null;
   const [categoriesList, setCategoriesList] = useState<CatalogCategory[]>(categories);
   const [isOpen, setIsOpen] = useState(false);
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});
@@ -116,17 +124,8 @@ export default function CategorySideNav({
     setExpandedNodes((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const findNode = (nodes: CategoryNode[], id: string): CategoryNode | null => {
-    for (const node of nodes) {
-      if (node.id === id) return node;
-      const found = findNode(node.children, id);
-      if (found) return found;
-    }
-    return null;
-  };
-
   const activeNode = useMemo(() => {
-    return findNode(tree, selectedNodeId) || tree[0] || null;
+    return findCategoryNode(tree, selectedNodeId) || tree[0] || null;
   }, [tree, selectedNodeId]);
 
   const breadcrumbs = useMemo(() => {
@@ -134,13 +133,15 @@ export default function CategorySideNav({
     const crumbs: CategoryNode[] = [activeNode];
     let curr = activeNode;
     while (curr.parentId) {
-      const parent = findNode(tree, curr.parentId);
+      const parent = findCategoryNode(tree, curr.parentId);
       if (!parent) break;
       crumbs.unshift(parent);
       curr = parent;
     }
     return crumbs;
   }, [activeNode, tree]);
+
+  if (pathname?.startsWith("/delivery")) return null;
 
   const renderNavItems = (nodes: CategoryNode[], level = 0) => {
     return nodes.map((node) => {

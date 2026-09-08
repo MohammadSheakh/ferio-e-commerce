@@ -1,11 +1,13 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { PlatformAuditService } from './platform-audit.service';
 import { invalidateDomainCache } from '../utils/domain-cache-invalidation';
 import { PlatformPrismaService } from '../platform-prisma.service';
+import { EntitlementsService } from './entitlements.service';
 
 /** Hosts that can never be tenant subdomains. */
 export const RESERVED_SUBDOMAINS = new Set([
@@ -29,6 +31,7 @@ export class DomainsService {
   constructor(
     private readonly platform: PlatformPrismaService,
     private readonly audit: PlatformAuditService,
+    private readonly entitlements: EntitlementsService,
   ) {}
 
   /**
@@ -59,7 +62,7 @@ export class DomainsService {
         data: {
           hostname,
           type: 'PLATFORM_SUBDOMAIN',
-          status: 'ACTIVE',
+          status: 'PENDING_ACTIVATION',
           isPrimary: true,
           organizationId,
         },
@@ -85,6 +88,34 @@ export class DomainsService {
     }
   }
 
+  /** Activate a reserved platform subdomain only after tenant readiness. */
+  async activatePlatformSubdomain(domainId: string, actorId?: string) {
+    const domain = await this.platform.client.tenantDomain.findUnique({
+      where: { id: domainId },
+    });
+    if (!domain) throw new NotFoundException('DOMAIN_NOT_FOUND');
+    if (domain.type !== 'PLATFORM_SUBDOMAIN') {
+      throw new ConflictException('DOMAIN_NOT_PLATFORM_SUBDOMAIN');
+    }
+    if (domain.status === 'ACTIVE') return domain;
+    if (domain.status !== 'PENDING_ACTIVATION') {
+      throw new ConflictException('DOMAIN_NOT_READY_FOR_ACTIVATION');
+    }
+    const updated = await this.platform.client.tenantDomain.update({
+      where: { id: domainId },
+      data: { status: 'ACTIVE' },
+    });
+    invalidateDomainCache(updated.hostname);
+    await this.audit.record({
+      action: 'TENANT_DOMAIN_ACTIVATED',
+      entityType: 'TenantDomain',
+      entityId: domainId,
+      actorId,
+      newValue: { hostname: domain.hostname },
+    });
+    return updated;
+  }
+
   /**
    * Register a customer-owned custom domain. It stays PENDING_VERIFICATION
    * (and unresolvable for traffic) until verifyOwnership succeeds.
@@ -93,6 +124,13 @@ export class DomainsService {
     const hostname = this.normalizeHostname(hostnameInput);
     if (!hostname || !hostname.includes('.')) {
       throw new ConflictException('CUSTOM_DOMAIN_INVALID');
+    }
+    const decision = await this.entitlements.evaluate(
+      organizationId,
+      'custom_domain',
+    );
+    if (!decision.allowed) {
+      throw new ForbiddenException(decision.code ?? 'FEATURE_DISABLED');
     }
     try {
       const verificationToken = `ferio-verify=${crypto.randomUUID()}`;
@@ -127,11 +165,18 @@ export class DomainsService {
   }
 
   /** Ownership proof: TXT challenge match activates the domain. */
-  async verifyOwnership(domainId: string, presentedToken: string) {
+  async verifyOwnership(
+    domainId: string,
+    presentedToken: string,
+    organizationId?: string,
+  ) {
     const domain = await this.platform.client.tenantDomain.findUnique({
       where: { id: domainId },
     });
     if (!domain) throw new NotFoundException('DOMAIN_NOT_FOUND');
+    if (organizationId && domain.organizationId !== organizationId) {
+      throw new NotFoundException('DOMAIN_NOT_FOUND');
+    }
     if (domain.status === 'ACTIVE') return domain;
     if (domain.status !== 'PENDING_VERIFICATION') {
       throw new ConflictException('DOMAIN_NOT_VERIFIABLE');
@@ -183,11 +228,14 @@ export class DomainsService {
     });
   }
 
-  async disable(domainId: string, actorId?: string) {
+  async disable(domainId: string, actorId?: string, organizationId?: string) {
     const domain = await this.platform.client.tenantDomain.findUnique({
       where: { id: domainId },
     });
     if (!domain) throw new NotFoundException('DOMAIN_NOT_FOUND');
+    if (organizationId && domain.organizationId !== organizationId) {
+      throw new NotFoundException('DOMAIN_NOT_FOUND');
+    }
     invalidateDomainCache(domain.hostname);
     const updated = await this.platform.client.tenantDomain.update({
       where: { id: domainId },
@@ -202,6 +250,83 @@ export class DomainsService {
       newValue: { status: 'DISABLED' },
     });
     return updated;
+  }
+
+  /**
+   * Evict all domain-resolution entries for one organization after an
+   * operator-side repair. The control plane owns the hostname list; the
+   * tenancy module owns the cache implementation through the invalidation
+   * hook, preserving the dependency direction.
+   */
+  async invalidateOrganizationCache(organizationId: string, actorId?: string) {
+    const domains = await this.platform.client.tenantDomain.findMany({
+      where: { organizationId },
+      select: { hostname: true },
+    });
+
+    for (const domain of domains) {
+      invalidateDomainCache(domain.hostname);
+    }
+
+    await this.audit.record({
+      action: 'TENANT_DOMAIN_CACHE_INVALIDATED',
+      entityType: 'Organization',
+      entityId: organizationId,
+      actorId,
+      newValue: { hostnameCount: domains.length },
+    });
+
+    return { organizationId, hostnameCount: domains.length };
+  }
+
+  /**
+   * Credential-free operator diagnostics for every registered domain. A
+   * domain is healthy only when both its own state and its organization state
+   * are ACTIVE; verification tokens are intentionally excluded from this
+   * projection.
+   */
+  async health() {
+    const rows = await this.platform.client.tenantDomain.findMany({
+      orderBy: { hostname: 'asc' },
+      select: {
+        id: true,
+        hostname: true,
+        type: true,
+        status: true,
+        isPrimary: true,
+        organization: { select: { id: true, name: true, status: true } },
+      },
+    });
+    const byStatus = rows.reduce<Record<string, number>>((counts, row) => {
+      counts[row.status] = (counts[row.status] ?? 0) + 1;
+      return counts;
+    }, {});
+
+    const domains = rows.map((row) => ({
+      id: row.id,
+      hostname: row.hostname,
+      type: row.type,
+      status: row.status,
+      isPrimary: row.isPrimary,
+      organizationId: row.organization.id,
+      organizationName: row.organization.name,
+      organizationStatus: row.organization.status,
+      healthy: row.status === 'ACTIVE' && row.organization.status === 'ACTIVE',
+      issue:
+        row.status !== 'ACTIVE'
+          ? `DOMAIN_${row.status}`
+          : row.organization.status !== 'ACTIVE'
+            ? `ORGANIZATION_${row.organization.status}`
+            : null,
+    }));
+
+    return {
+      totalDomains: domains.length,
+      healthyCount: domains.filter((domain) => domain.healthy).length,
+      unhealthyCount: domains.filter((domain) => !domain.healthy).length,
+      byStatus,
+      domains,
+    };
   }
 
   normalizeHostname(input: string): string {

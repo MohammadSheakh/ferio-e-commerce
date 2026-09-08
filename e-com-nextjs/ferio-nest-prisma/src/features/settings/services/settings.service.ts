@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Prisma, Settings } from '@prisma/client';
 import { PrismaService } from '@app/database';
 import { RedisService } from '@app/redis';
@@ -8,7 +8,6 @@ import {
   CursorPaginateOptions,
   CursorPaginateResult,
   cleanFilters,
-  parseSort,
   buildProjection,
 } from '@app/common';
 import { SettingsType } from '../constants/settings.constants';
@@ -16,10 +15,43 @@ import { CreateOrUpdateSettingsDto } from '../dto/settings.dto';
 import { SETTINGS_CACHE_CONFIG } from '../constants/settings.cache.constants';
 import type { UserPayload } from '@app/common';
 import { AuditService } from '../../audit/services/audit.service';
-import { Optional } from '@nestjs/common';
-import { TenantDbService } from '../../../tenancy/tenant-db.service';
-import { tryGetTenantContext } from '../../../tenancy/tenant-context';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../../tenancy/services/tenant-db.service';
+import { tryGetTenantContext } from '../../../tenancy/context/tenant-context';
 import type { PrismaClient } from '@prisma/client';
+import { toTenantJsonInput } from '../../../core/database/json-input.util';
+
+type SettingsSortField = 'id' | 'type' | 'createdAt' | 'updatedAt';
+
+const SETTINGS_SORT_FIELDS: readonly SettingsSortField[] = [
+  'id',
+  'type',
+  'createdAt',
+  'updatedAt',
+];
+
+function isSettingsType(value: unknown): value is SettingsType {
+  return Object.values(SettingsType).some((type) => type === value);
+}
+
+function isSettingsSortField(value: string): value is SettingsSortField {
+  return (SETTINGS_SORT_FIELDS as readonly string[]).includes(value);
+}
+
+function isSettingsCacheItem(value: unknown): value is Settings {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  return typeof record.id === 'string' && typeof record.type === 'string';
+}
+
+function parseSettingsCache(value: unknown): Settings[] | undefined {
+  return Array.isArray(value) && value.every(isSettingsCacheItem)
+    ? value
+    : undefined;
+}
+
 @Injectable()
 export class SettingsService {
   private readonly logger = new Logger(SettingsService.name);
@@ -28,7 +60,7 @@ export class SettingsService {
     private readonly prisma: PrismaService,
     private readonly redisService: RedisService,
     private readonly audit: AuditService,
-    @Optional() private readonly tenantDb?: TenantDbService,
+    private readonly tenantDb?: TenantDbService,
   ) {
     this.logger.log('✅ Settings Service (Prisma + Cache) initialized');
   }
@@ -45,8 +77,7 @@ export class SettingsService {
 
   /** Tenant client inside resolved requests; legacy DB otherwise (MT-7). */
   private async db(): Promise<PrismaClient> {
-    const tenant = await this.tenantDb?.tryGet();
-    return tenant ?? (this.prisma as PrismaClient);
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
 
   async createOrUpdateSettings(
@@ -61,8 +92,7 @@ export class SettingsService {
       updateData.details = dto.details;
     }
     if (dto.introductionVideo !== undefined) {
-      updateData.introductionVideo =
-        dto.introductionVideo as Prisma.InputJsonValue;
+      updateData.introductionVideo = toTenantJsonInput(dto.introductionVideo);
     }
 
     const db = await this.db();
@@ -102,6 +132,7 @@ export class SettingsService {
       this.getCacheKey(type),
       () => this.fetchSettings(type),
       SETTINGS_CACHE_CONFIG.TTL,
+      parseSettingsCache,
     );
   }
 
@@ -117,6 +148,23 @@ export class SettingsService {
     return db.settings.findMany({ orderBy: { type: 'asc' } });
   }
 
+  private settingsWhere(
+    filters: Record<string, unknown>,
+  ): Prisma.SettingsWhereInput {
+    const value = cleanFilters(filters).type;
+    return isSettingsType(value) ? { type: value } : {};
+  }
+
+  private settingsOrderBy(
+    sortBy: string | undefined,
+    fallback: SettingsSortField,
+  ): Prisma.SettingsOrderByWithRelationInput {
+    const descending = sortBy?.startsWith('-') ?? false;
+    const requested = sortBy?.replace(/^-/, '') ?? fallback;
+    const field = isSettingsSortField(requested) ? requested : fallback;
+    return { [field]: descending ? 'desc' : 'asc' };
+  }
+
   async getAllWithPagination(
     filters: Record<string, unknown> = {},
     options: PaginateOptions,
@@ -126,11 +174,8 @@ export class SettingsService {
     const db = await this.db();
     const page = Number(options.page) > 0 ? Number(options.page) : 1;
     const limit = Number(options.limit) || 10;
-    const where = cleanFilters(filters) as Prisma.SettingsWhereInput;
-    const orderBy = parseSort(
-      options.sortBy,
-      'type',
-    ) as Prisma.SettingsOrderByWithRelationInput;
+    const where = this.settingsWhere(filters);
+    const orderBy = this.settingsOrderBy(options.sortBy, 'type');
 
     const [docs, total] = await Promise.all([
       db.settings.findMany({
@@ -160,14 +205,11 @@ export class SettingsService {
   ): Promise<CursorPaginateResult<Settings>> {
     const db = await this.db();
     const limit = Number(options.limit) || 10;
-    const where = cleanFilters(filters) as Prisma.SettingsWhereInput;
+    const where = this.settingsWhere(filters);
 
     // For cursor pagination, sortBy defaults to 'id' or another unique field to avoid duplicates.
     // If not specified, we sort by 'id' ascending as a reliable cursor.
-    const orderBy = parseSort(
-      options.sortBy,
-      'id',
-    ) as Prisma.SettingsOrderByWithRelationInput;
+    const orderBy = this.settingsOrderBy(options.sortBy, 'id');
 
     const take = limit + 1;
     const prismaOptions: Prisma.SettingsFindManyArgs = {

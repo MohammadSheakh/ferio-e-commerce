@@ -3,9 +3,12 @@ import {
   ProductRequestStatus,
   type PrismaClient,
 } from '@prisma/client';
-import { Injectable, NotFoundException, Optional } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@app/database';
-import { TenantDbService } from '../../tenancy/tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../tenancy/services/tenant-db.service';
 import {
   CreateProductRequestDto,
   QueryProductRequestDto,
@@ -16,7 +19,7 @@ import {
 export class ProductRequestService {
   constructor(
     private readonly prisma: PrismaService,
-    @Optional() private readonly tenantDb?: TenantDbService,
+    private readonly tenantDb?: TenantDbService,
   ) {}
 
   /**
@@ -24,8 +27,7 @@ export class ProductRequestService {
    * fallback outside resolved requests. Never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    const tenant = await this.tenantDb?.tryGet();
-    return tenant ?? (this.prisma as PrismaClient);
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
 
   async createRequest(dto: CreateProductRequestDto, userId?: string) {

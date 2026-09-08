@@ -20,7 +20,7 @@ import {
   User,
 } from '@app/common';
 import type { UserPayload } from '@app/common';
-import { TenantMembershipGuard } from '../../tenancy/tenant-membership.guard';
+import { TenantMembershipGuard } from '../../tenancy/guards/tenant-membership.guard';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CartService } from './cart.service';
 import {
@@ -110,7 +110,9 @@ export class CartController {
   }
 
   @Post('saved/share/:shareToken/import')
-  @ApiOperation({ summary: 'Import available items from a shared cart to active cart' })
+  @ApiOperation({
+    summary: 'Import available items from a shared cart to active cart',
+  })
   importSharedCart(
     @Param('shareToken') shareToken: string,
     @Headers('x-cart-token') token?: string,
@@ -137,7 +139,10 @@ export class CartController {
 
   @Post('reorder/:orderId')
   @UseGuards(AuthGuard)
-  @ApiOperation({ summary: 'Reorder available items from one of your past orders into active cart' })
+  @ApiOperation({
+    summary:
+      'Reorder available items from one of your past orders into active cart',
+  })
   reorder(
     @Param('orderId') orderId: string,
     @Body() dto: ReorderDto,

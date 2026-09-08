@@ -1,34 +1,27 @@
-import {
-  Injectable,
-  NotFoundException,
-  Optional,
-  ServiceUnavailableException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaClient, UserDevices } from '@prisma/client';
 import { PrismaService } from '@app/database';
 import { DeviceType } from './enums/TDevice.enum';
-import { TenantDbService } from '../../../tenancy/tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../../tenancy/services/tenant-db.service';
 
 /**
  * UserDevices Service
- * 
- * Manages user devices for push notifications
- * Extends GenericService for CRUD operations
+ *
+ * Manages user devices for push notifications through the tenant-aware
+ * Prisma boundary.
  */
 @Injectable()
 export class UserDevicesService {
   constructor(
     private readonly prisma: PrismaService,
-    @Optional() private readonly tenantDb?: TenantDbService,
+    private readonly tenantDb?: TenantDbService,
   ) {}
 
   private async db(): Promise<PrismaClient> {
-    const tenant = await this.tenantDb?.tryGet();
-    if (tenant) return tenant;
-    if ((process.env.TENANCY_ENABLED || 'false') === 'true') {
-      throw new ServiceUnavailableException('TENANT_IDENTITY_CONTEXT_REQUIRED');
-    }
-    return this.prisma as PrismaClient;
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
 
   /**
@@ -102,7 +95,10 @@ export class UserDevicesService {
   /**
    * Remove device (soft delete)
    */
-  async removeDevice(userId: string, deviceId: string): Promise<UserDevices | null> {
+  async removeDevice(
+    userId: string,
+    deviceId: string,
+  ): Promise<UserDevices | null> {
     const db = await this.db();
     const device = await db.userDevices.findFirst({
       where: { id: deviceId, userId, isDeleted: false },

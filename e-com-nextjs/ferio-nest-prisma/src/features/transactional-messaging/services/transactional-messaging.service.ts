@@ -3,13 +3,15 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
-  Optional,
 } from '@nestjs/common';
 import type { PrismaClient } from '@prisma/client';
-import { CommerceMessageChannel, Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { StructuredLogger, type UserPayload } from '@app/common';
 import { PrismaService } from '@app/database';
-import { TenantDbService } from '../../../tenancy/tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../../tenancy/services/tenant-db.service';
 import { AuditService } from '../../audit/services/audit.service';
 import {
   TransactionalMessageQueryDto,
@@ -47,7 +49,7 @@ export class TransactionalMessagingService {
     private readonly audit: AuditService,
     private readonly adapters: MessageAdapterRegistry,
 
-    @Optional() private readonly tenantDb?: TenantDbService,
+    private readonly tenantDb?: TenantDbService,
   ) {}
 
   /**
@@ -56,8 +58,7 @@ export class TransactionalMessagingService {
    * explicitly falls back to the legacy single-tenant DB. Never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    const tenant = await this.tenantDb?.tryGet();
-    return tenant ?? (this.prisma as PrismaClient);
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
   async enqueueAfterCommit(input: EnqueueCommerceMessageInput): Promise<void> {
     const db = await this.db();
@@ -314,7 +315,7 @@ export class TransactionalMessagingService {
         where: { id: 'transactional-default' },
         data: {
           enabled,
-          channelPriority: priority as CommerceMessageChannel[],
+          channelPriority: priority,
           fallbackOnDefinitiveFailure:
             dto.fallbackOnDefinitiveFailure ??
             current.fallbackOnDefinitiveFailure,

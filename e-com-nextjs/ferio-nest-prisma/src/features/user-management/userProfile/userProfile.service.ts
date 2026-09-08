@@ -1,28 +1,14 @@
-import {
-  Injectable,
-  Logger,
-  NotFoundException,
-  Optional,
-  ServiceUnavailableException,
-} from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma, PrismaClient, UserProfile } from '@prisma/client';
 
 import { PrismaService } from '@app/database';
-import { scopedRedisKey } from '../../../tenancy/redis-keys.util';
+import { scopedRedisKey } from '../../../tenancy/utils/redis-keys.util';
 import { RedisService } from '@app/redis';
 import { USER_CACHE_CONFIG } from '../user/user.constants';
-import { TenantDbService } from '../../../tenancy/tenant-db.service';
-
-const publicUserProfileSelect = {
-  id: true,
-  isDeleted: true,
-  createdAt: true,
-  updatedAt: true,
-} satisfies Prisma.UserProfileSelect;
-
-type UserProfileRecord = Prisma.UserProfileGetPayload<{
-  select: typeof publicUserProfileSelect;
-}>;
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../../tenancy/services/tenant-db.service';
 
 type UserProfileWithUser = Prisma.UserProfileGetPayload<{
   include: {
@@ -38,6 +24,23 @@ type UserProfileWithUser = Prisma.UserProfileGetPayload<{
   };
 }>;
 
+function isUserProfileCache(value: unknown): value is UserProfile {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return false;
+  }
+  const record = value as Record<string, unknown>;
+  return (
+    typeof record.id === 'string' &&
+    typeof record.userId === 'string' &&
+    typeof record.isDeleted === 'boolean'
+  );
+}
+
+function parseUserProfileCache(value: unknown): UserProfile | null | undefined {
+  if (value === null) return null;
+  return isUserProfileCache(value) ? value : undefined;
+}
+
 /**
  * UserProfile Service
  */
@@ -48,16 +51,11 @@ export class UserProfileService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly redisService: RedisService,
-    @Optional() private readonly tenantDb?: TenantDbService,
+    private readonly tenantDb?: TenantDbService,
   ) {}
 
   private async db(): Promise<PrismaClient> {
-    const tenant = await this.tenantDb?.tryGet();
-    if (tenant) return tenant;
-    if ((process.env.TENANCY_ENABLED || 'false') === 'true') {
-      throw new ServiceUnavailableException('TENANT_IDENTITY_CONTEXT_REQUIRED');
-    }
-    return this.prisma as PrismaClient;
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
 
   private getCacheKey(userId: string): string {
@@ -72,6 +70,7 @@ export class UserProfileService {
       this.getCacheKey(userId),
       () => this.fetchProfileByUserId(userId),
       USER_CACHE_CONFIG.PROFILE,
+      parseUserProfileCache,
     );
   }
 

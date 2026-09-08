@@ -1,6 +1,15 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsNotEmpty, IsOptional, IsString, IsArray, IsInt, Max, Min, ArrayMaxSize } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsArray,
+  IsInt,
+  Max,
+  Min,
+  ArrayMaxSize,
+} from 'class-validator';
 
 /**
  * Create Conversation DTO

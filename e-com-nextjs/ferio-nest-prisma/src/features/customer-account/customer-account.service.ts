@@ -2,13 +2,15 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
-  Optional,
 } from '@nestjs/common';
 import type { PrismaClient } from '@prisma/client';
 import { Prisma } from '@prisma/client';
 import type { UserPayload } from '@app/common';
 import { PrismaService } from '@app/database';
-import { TenantDbService } from '../../tenancy/tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../tenancy/services/tenant-db.service';
 import { timingSafeEqual } from 'crypto';
 import { normalizeBangladeshPhone } from '../checkout/utils/checkout.util';
 import {
@@ -22,7 +24,7 @@ import {
 export class CustomerAccountService {
   constructor(
     private readonly prisma: PrismaService,
-    @Optional() private readonly tenantDb?: TenantDbService,
+    private readonly tenantDb?: TenantDbService,
   ) {}
 
   /**
@@ -30,8 +32,7 @@ export class CustomerAccountService {
    * outside resolved requests. Never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    const tenant = await this.tenantDb?.tryGet();
-    return tenant ?? (this.prisma as PrismaClient);
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
   async link(dto: LinkCustomerAccountDto, actor: UserPayload) {
     const db = await this.db();
@@ -224,7 +225,9 @@ export class CustomerAccountService {
     let phoneNormalized = phone;
     try {
       phoneNormalized = normalizeBangladeshPhone(phone);
-    } catch {}
+    } catch {
+      // Keep the original phone value when normalization rejects it.
+    }
 
     const existing = await db.customer.findFirst({
       where: {
@@ -277,7 +280,9 @@ export class CustomerAccountService {
     let phoneNormalized = dto.phone ? dto.phone.trim() : '01700000000';
     try {
       phoneNormalized = normalizeBangladeshPhone(dto.phone);
-    } catch {}
+    } catch {
+      // Keep the DTO fallback when normalization rejects the supplied phone.
+    }
 
     await db.customerAddress.create({
       data: {

@@ -1,17 +1,19 @@
 import {
   ConflictException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { createHash, randomBytes } from 'crypto';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '@app/database';
-import { Optional } from '@nestjs/common';
 import type { PrismaClient } from '@prisma/client';
-import { assertTenantCommerceWritable } from '../../tenancy/commerce-write-guard.util';
-import { TenantDbService } from '../../tenancy/tenant-db.service';
+import { assertTenantCommerceWritable } from '../../tenancy/utils/commerce-write-guard.util';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../tenancy/services/tenant-db.service';
 import { ConfigService } from '@nestjs/config';
+import { errorMessage } from '@app/common';
 import { AddCartItemDto, UpdateCartItemDto } from './cart.dto';
 
 const CART_LIFETIME_DAYS = 30;
@@ -48,12 +50,63 @@ type SellableVariant = Prisma.ProductVariantGetPayload<{
   };
 }>;
 
+type SavedCartItemRecord = {
+  id: string;
+  variantId: string;
+  quantity: number;
+  variant: {
+    name: string;
+    price: number;
+    isActive: boolean;
+    inventory: Array<{
+      onHand: number;
+      reserved: number;
+      damaged: number;
+    }>;
+    product: {
+      id: string;
+      slug: string;
+      name: string;
+      status: string;
+      publishedAt: Date | null;
+      category: { isActive: boolean } | null;
+      media: Array<{ type: string; url: string }>;
+    } | null;
+  } | null;
+};
+
+type SavedCartRecord = {
+  id: string;
+  name: string;
+  shareToken: string;
+  userId: string | null;
+  user?: { name: string | null } | null;
+  items: SavedCartItemRecord[];
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+type SavedCartLineResult = {
+  variantId: string;
+  productName: string;
+  variantName: string;
+  quantity: number;
+};
+
+type UnavailableCartLine = {
+  variantId?: string;
+  productName: string;
+  variantName: string;
+  quantity?: number;
+  reason: string;
+};
+
 @Injectable()
 export class CartService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config?: ConfigService,
-    @Optional() private readonly tenantDb?: TenantDbService,
+    private readonly tenantDb?: TenantDbService,
   ) {}
 
   /**
@@ -63,8 +116,7 @@ export class CartService {
    * requests the legacy single-tenant DB applies, unchanged.
    */
   private async db(): Promise<PrismaClient> {
-    const tenant = await this.tenantDb?.tryGet();
-    return tenant ?? (this.prisma as PrismaClient);
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
 
   private tokenHash(token: string): string {
@@ -363,61 +415,59 @@ export class CartService {
       throw new ConflictException('This cart belongs to another account');
     }
 
-    const mergedCartCount = await db.$transaction(
-      async (transaction) => {
-        const sources = await transaction.cart.findMany({
-          where: {
-            userId,
-            status: 'ACTIVE',
-            expiresAt: { gt: new Date() },
-            id: { not: target.id },
-          },
-          include: cartInclude,
-        });
-        const quantities = new Map(
-          target.items.map((item) => [item.variantId, item.quantity]),
-        );
-        for (const source of sources) {
-          for (const item of source.items) {
-            const quantity = Math.min(
-              this.availableStock(item.variant),
-              (quantities.get(item.variantId) ?? 0) + item.quantity,
-            );
-            if (quantity <= 0) continue;
-            await transaction.cartItem.upsert({
-              where: {
-                cartId_variantId: {
-                  cartId: target.id,
-                  variantId: item.variantId,
-                },
-              },
-              update: { quantity, addedUnitPrice: item.variant.price },
-              create: {
+    const mergedCartCount = await db.$transaction(async (transaction) => {
+      const sources = await transaction.cart.findMany({
+        where: {
+          userId,
+          status: 'ACTIVE',
+          expiresAt: { gt: new Date() },
+          id: { not: target.id },
+        },
+        include: cartInclude,
+      });
+      const quantities = new Map(
+        target.items.map((item) => [item.variantId, item.quantity]),
+      );
+      for (const source of sources) {
+        for (const item of source.items) {
+          const quantity = Math.min(
+            this.availableStock(item.variant),
+            (quantities.get(item.variantId) ?? 0) + item.quantity,
+          );
+          if (quantity <= 0) continue;
+          await transaction.cartItem.upsert({
+            where: {
+              cartId_variantId: {
                 cartId: target.id,
                 variantId: item.variantId,
-                quantity,
-                addedUnitPrice: item.variant.price,
               },
-            });
-            quantities.set(item.variantId, quantity);
-          }
-        }
-        await transaction.checkoutDraft.deleteMany({
-          where: { cartId: target.id },
-        });
-        await transaction.cart.update({
-          where: { id: target.id },
-          data: { userId, expiresAt: this.expiresAt() },
-        });
-        if (sources.length) {
-          await transaction.cart.updateMany({
-            where: { id: { in: sources.map((source) => source.id) } },
-            data: { status: 'ABANDONED' },
+            },
+            update: { quantity, addedUnitPrice: item.variant.price },
+            create: {
+              cartId: target.id,
+              variantId: item.variantId,
+              quantity,
+              addedUnitPrice: item.variant.price,
+            },
           });
+          quantities.set(item.variantId, quantity);
         }
-        return sources.length;
-      },
-    );
+      }
+      await transaction.checkoutDraft.deleteMany({
+        where: { cartId: target.id },
+      });
+      await transaction.cart.update({
+        where: { id: target.id },
+        data: { userId, expiresAt: this.expiresAt() },
+      });
+      if (sources.length) {
+        await transaction.cart.updateMany({
+          where: { id: { in: sources.map((source) => source.id) } },
+          data: { status: 'ABANDONED' },
+        });
+      }
+      return sources.length;
+    });
 
     return {
       ...this.serializeCart(await this.loadCart(target.id)),
@@ -545,14 +595,15 @@ export class CartService {
     return this.serializeCart(cart);
   }
 
-  private serializeSavedCart(savedCart: any) {
+  private serializeSavedCart(savedCart: SavedCartRecord) {
     const now = new Date();
-    const items = (savedCart.items || []).map((item: any) => {
+    const items = savedCart.items.map((item) => {
       const product = item.variant?.product;
       const availableStock = item.variant
         ? item.variant.inventory.reduce(
-            (total: number, stock: any) =>
-              total + Math.max(0, stock.onHand - stock.reserved - stock.damaged),
+            (total, stock) =>
+              total +
+              Math.max(0, stock.onHand - stock.reserved - stock.damaged),
             0,
           )
         : 0;
@@ -567,7 +618,9 @@ export class CartService {
         new Date(product.publishedAt) <= now &&
         availableStock > 0;
 
-      const image = product?.media?.find((m: any) => m.type === 'IMAGE')?.url;
+      const image = product?.media?.find(
+        (media) => media.type === 'IMAGE',
+      )?.url;
 
       return {
         id: item.id,
@@ -585,13 +638,10 @@ export class CartService {
     });
 
     const subtotal = items.reduce(
-      (total: number, item: any) => total + item.price * item.quantity,
+      (total, item) => total + item.price * item.quantity,
       0,
     );
-    const itemCount = items.reduce(
-      (total: number, item: any) => total + item.quantity,
-      0,
-    );
+    const itemCount = items.reduce((total, item) => total + item.quantity, 0);
 
     return {
       id: savedCart.id,
@@ -611,7 +661,9 @@ export class CartService {
     const db = await this.db();
     const cart = await this.findActiveCart(token, userId);
     if (!cart || cart.items.length === 0) {
-      throw new ConflictException('Your cart is empty. Add items before saving.');
+      throw new ConflictException(
+        'Your cart is empty. Add items before saving.',
+      );
     }
 
     const defaultName = `Saved Cart (${new Date().toLocaleDateString('en-US', {
@@ -731,8 +783,8 @@ export class CartService {
 
     if (!savedCart) throw new NotFoundException('Shared cart not found');
 
-    const addedItems: any[] = [];
-    const unavailableItems: any[] = [];
+    const addedItems: SavedCartLineResult[] = [];
+    const unavailableItems: UnavailableCartLine[] = [];
     let effectiveToken = token;
 
     for (const item of savedCart.items) {
@@ -748,12 +800,12 @@ export class CartService {
           variantName: item.variant.name,
           quantity: item.quantity,
         });
-      } catch (err: any) {
+      } catch (err: unknown) {
         unavailableItems.push({
           variantId: item.variantId,
           productName: item.variant?.product?.name ?? 'Unknown Product',
           variantName: item.variant?.name ?? 'Unknown Variant',
-          reason: err.message || 'Item unavailable or out of stock',
+          reason: errorMessage(err) || 'Item unavailable or out of stock',
         });
       }
     }
@@ -872,8 +924,8 @@ export class CartService {
       ? order.items.filter((i) => orderItemIds.includes(i.id))
       : order.items;
 
-    const addedItems: any[] = [];
-    const unavailableItems: any[] = [];
+    const addedItems: SavedCartLineResult[] = [];
+    const unavailableItems: UnavailableCartLine[] = [];
     let effectiveToken = token;
 
     for (const item of targetItems) {
@@ -898,12 +950,12 @@ export class CartService {
           variantName: item.variantName,
           quantity: item.quantity,
         });
-      } catch (err: any) {
+      } catch (err: unknown) {
         unavailableItems.push({
           variantId: item.variantId,
           productName: item.productName,
           variantName: item.variantName,
-          reason: err.message || 'Item unavailable or out of stock',
+          reason: errorMessage(err) || 'Item unavailable or out of stock',
         });
       }
     }

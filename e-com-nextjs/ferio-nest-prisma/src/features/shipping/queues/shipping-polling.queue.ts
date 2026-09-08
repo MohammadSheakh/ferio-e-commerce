@@ -1,6 +1,6 @@
-import { tryGetTenantContext } from '../../../tenancy/tenant-context';
-import type { TenantFanoutService } from '../../../tenancy/tenant-fanout.service';
-import { Injectable, OnModuleInit, Optional } from '@nestjs/common';
+import { tryGetTenantContext } from '../../../tenancy/context/tenant-context';
+import { TenantFanoutService } from '../../../tenancy/services/tenant-fanout.service';
+import { Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { ConfigService } from '@nestjs/config';
 import type { Queue } from 'bullmq';
@@ -28,8 +28,8 @@ export class ShippingPollingQueue implements OnModuleInit {
     private readonly config: ConfigService,
     private readonly polling: ShippingPollingService,
     private readonly audit: AuditService,
-    @Optional() private readonly fanout?: TenantFanoutService,
-) {}
+    private readonly fanout?: TenantFanoutService,
+  ) {}
 
   async onModuleInit() {
     if (!this.scheduleEnabled()) return;
@@ -150,10 +150,24 @@ export class ShippingPollingQueue implements OnModuleInit {
 
   async enqueueShipment(shipmentId: string, actor: UserPayload) {
     const attempt = await this.polling.prepareAttempt(shipmentId, actor.userId);
+    const organizationId = tryGetTenantContext()?.organizationId;
+    if (
+      (process.env.TENANCY_ENABLED || 'false') === 'true' &&
+      !organizationId
+    ) {
+      throw new Error('TENANT_CONTEXT_REQUIRED_FOR_COURIER_POLL');
+    }
     const job = await this.queue.add(
       COURIER_POLL_JOB,
-      { pollAttemptId: attempt.id },
-      { jobId: `courier-poll-${attempt.id}` },
+      {
+        pollAttemptId: attempt.id,
+        ...(organizationId ? { organizationId } : {}),
+      },
+      {
+        jobId: organizationId
+          ? `t:${organizationId}:courier-poll-${attempt.id}`
+          : `courier-poll-${attempt.id}`,
+      },
     );
     await this.polling.attachQueueJob(attempt.id, String(job.id));
     await this.audit.record({

@@ -1819,6 +1819,16 @@ enum CommercePaymentCallbackStatus {
   FAILED
 }
 
+model CommercePaymentProviderConfig {
+  id             String                 @id @default(cuid())
+  provider       CommercePaymentProvider @unique
+  credentialCipher String
+  enabled        Boolean                @default(false)
+  credentialsRotatedAt DateTime?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+}
+
 model CommercePaymentAttempt {
   id                    String                       @id @default(cuid())
   merchantTransactionId String                       @unique
@@ -2495,8 +2505,14 @@ model CommerceSettings {
   id                      String   @id @default("default")
   storeName               String   @default("Ferio")
   legalName               String?
+  logoUrl                 String?
+  address                 String?
   supportPhone            String?
   supportEmail            String?
+  facebookUrl             String?
+  instagramUrl            String?
+  whatsappUrl             String?
+  themePreset             String   @default("default")
   currency                String   @default("BDT")
   timezone                String   @default("Asia/Dhaka")
   orderPrefix             String   @default("FER")
@@ -2756,6 +2772,16 @@ model ShipmentProvider {
   updatedAt DateTime @updatedAt
 
   @@index([isActive, name])
+}
+
+model CourierProviderConfig {
+  id             String               @id @default(cuid())
+  provider       ShipmentProviderCode @unique
+  credentialCipher String
+  enabled        Boolean              @default(false)
+  credentialsRotatedAt DateTime?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
 }
 
 model Shipment {

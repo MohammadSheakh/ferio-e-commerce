@@ -1,8 +1,10 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { AuditSource, Prisma, type PrismaClient } from '@prisma/client';
 import type { UserPayload } from '@app/common';
+import { getCorrelationId } from '@app/common';
 import { PrismaService } from '@app/database';
-import { TenantDbService } from '../../../tenancy/tenant-db.service';
+import { tryGetTenantContext } from '../../../tenancy/context/tenant-context';
+import { TenantDbService } from '../../../tenancy/services/tenant-db.service';
 import { AuditLogQueryDto } from '../dto/audit.dto';
 import { safeAuditJson } from '../utils/audit.util';
 
@@ -23,11 +25,12 @@ export type RecordAuditInput = {
 export class AuditService {
   constructor(
     private readonly prisma: PrismaService,
-    @Optional() private readonly tenantDb?: TenantDbService,
+    private readonly tenantDb?: TenantDbService,
   ) {}
 
   async record(input: RecordAuditInput, client?: AuditClient) {
     const db = client ?? (await this.databaseForRequest());
+    const tenant = tryGetTenantContext();
     return db.auditLog.create({
       data: {
         action: input.action,
@@ -38,7 +41,16 @@ export class AuditService {
         source: input.source ?? 'ADMIN_API',
         previousValue: safeAuditJson(input.previousValue),
         newValue: safeAuditJson(input.newValue),
-        metadata: safeAuditJson(input.metadata),
+        metadata: safeAuditJson({
+          ...(isRecord(input.metadata) ? input.metadata : {}),
+          context: {
+            correlationId: tenant?.correlationId ?? getCorrelationId(),
+            organizationId: tenant?.organizationId,
+            tenantDatabaseId: tenant?.tenantDatabaseId,
+            domainId: tenant?.domainId,
+            hostname: tenant?.hostname,
+          },
+        }),
       },
     });
   }
@@ -104,4 +116,8 @@ export class AuditService {
     }
     return this.prisma;
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }

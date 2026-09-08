@@ -1,5 +1,5 @@
 import { cookies, headers } from "next/headers";
-import { ApiEnvelope, getApiMessage, getBackendUrl } from "@/lib/backend";
+import { getApiMessage, getBackendUrl, parseApiEnvelope } from "@/lib/backend";
 import { withCorrelationId } from "@/lib/correlation";
 import { normalizeForwardedTenantHost } from "@/lib/tenant-host";
 
@@ -40,9 +40,9 @@ async function refreshAdminSession(): Promise<string | null> {
       }),
       cache: "no-store",
     });
-    const payload = (await response.json()) as ApiEnvelope<{
+    const payload = parseApiEnvelope<{
       accessToken?: string;
-    }>;
+    }>(await response.json().catch(() => null));
     const nextRefreshToken = extractRefreshToken(
       response.headers.get("set-cookie"),
     );
@@ -114,7 +114,7 @@ export async function adminApi<T>(
       response = await callAdminApi(path, nextAccessToken, init);
     }
   }
-  const payload = (await response.json()) as ApiEnvelope<T>;
+  const payload = parseApiEnvelope<T>(await response.json().catch(() => null));
 
   if (!response.ok || payload.data === undefined) {
     throw new AdminApiError(

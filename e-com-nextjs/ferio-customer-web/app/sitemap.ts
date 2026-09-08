@@ -1,9 +1,19 @@
 import type { MetadataRoute } from "next";
+import { headers } from "next/headers";
 import { getCategories, getProducts } from "@/lib/catalog";
 import { getStoreConfig } from "@/lib/store";
+import { getTenantStatus } from "@/lib/tenancy";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3002";
+  const tenant = await getTenantStatus();
+  if (tenant.code !== "ACTIVE" && tenant.code !== "LEGACY") return [];
+
+  const headerList = headers();
+  const host = headerList.get("x-forwarded-host") ?? headerList.get("host");
+  const protocol = headerList.get("x-forwarded-proto") ?? "http";
+  const siteUrl = host
+    ? `${protocol}://${host}`
+    : (process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3002");
   const [categories, products, store] = await Promise.all([
     getCategories().catch(() => []),
     getProducts({ limit: 100 }).then((result) => result.items).catch(() => []),

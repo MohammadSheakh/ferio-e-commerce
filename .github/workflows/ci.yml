@@ -69,6 +69,8 @@ jobs:
           DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
       - name: Strict typecheck (incl. specs)
         run: pnpm exec tsc --noEmit -p tsconfig.json
+      - name: Application lint (read-only)
+        run: pnpm lint:application
       - name: Production build
         run: pnpm build
       - name: OpenAPI contract drift check (brutal-audit #8)

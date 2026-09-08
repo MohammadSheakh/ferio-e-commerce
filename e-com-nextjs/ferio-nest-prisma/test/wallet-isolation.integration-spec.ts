@@ -15,14 +15,14 @@
 import { Pool } from 'pg';
 import { ConflictException } from '@nestjs/common';
 
-import { TenantSchemaBootstrapper } from '../src/tenancy/tenant-schema.bootstrapper';
-import { TenantDatabaseManager } from '../src/tenancy/tenant-database.manager';
-import { TenantDbService } from '../src/tenancy/tenant-db.service';
+import { TenantSchemaBootstrapper } from '../src/tenancy/services/tenant-schema.bootstrapper';
+import { TenantDatabaseManager } from '../src/tenancy/services/tenant-database.manager';
+import { TenantDbService } from '../src/tenancy/services/tenant-db.service';
 import { encryptSecret } from '../src/platform/utils/secret-box';
 import {
   runWithTenantContext,
   type TenantContext,
-} from '../src/tenancy/tenant-context';
+} from '../src/tenancy/context/tenant-context';
 
 import { WalletService } from '../src/features/wallet/wallet.service';
 import type { PrismaClient } from '@prisma/client';
@@ -78,7 +78,13 @@ conditionalDescribe('Cross-tenant wallet financial isolation', () => {
 
   interface Tenant {
     dbName: string;
-    conn: { host: string; port: number; user: string; password: string; database: string };
+    conn: {
+      host: string;
+      port: number;
+      user: string;
+      password: string;
+      database: string;
+    };
     context: TenantContext;
   }
 
@@ -134,176 +140,192 @@ conditionalDescribe('Cross-tenant wallet financial isolation', () => {
     }
   });
 
-  it(
-    'keeps top-ups, debits, refunds and idempotency keys tenant-local',
-    async () => {
-      const dbA = await createScratchDatabase('ferio_wa_a');
-      const dbB = await createScratchDatabase('ferio_wa_b');
-      created.push(dbA, dbB);
-      const tA = tenantFrom(dbA);
-      const tB = tenantFrom(dbB);
-      await bootstrapper.bootstrap(tA.conn);
-      await bootstrapper.bootstrap(tB.conn);
+  it('keeps top-ups, debits, refunds and idempotency keys tenant-local', async () => {
+    const dbA = await createScratchDatabase('ferio_wa_a');
+    const dbB = await createScratchDatabase('ferio_wa_b');
+    created.push(dbA, dbB);
+    const tA = tenantFrom(dbA);
+    const tB = tenantFrom(dbB);
+    await bootstrapper.bootstrap(tA.conn);
+    await bootstrapper.bootstrap(tB.conn);
 
-      // Identical account identifiers seeded into BOTH tenants.
-      for (const tenant of [tA, tB]) {
-        await inTenant(tenant, async (db) => {
-          const zone = await db.deliveryZone.create({
-            data: { id: 'zone-shared-1', name: 'Wallet Zone', deliveryFee: 0 },
-          });
-          const cart = await db.cart.create({
-            data: {
-              tokenHash: `hash-cart-${tenant.dbName}`,
-              expiresAt: new Date(Date.now() + 3_600_000),
-            },
-          });
-          await db.customer.create({
-            data: {
-              id: 'shared-customer-1',
-              name: 'Shared Customer',
-              phoneOriginal: '01700000000',
-              phoneNormalized: '+88017000000000',
-              email: 'shared@ferio.test',
-              orders: {
-                create: {
-                  id: 'order-shared-1',
-                  reference: 'FER-SHARED-0001',
-                  idempotencyKeyHash: `hash-order-${tenant.dbName}`,
-                  subtotal: 40_000,
-                  deliveryFee: 0,
-                  total: 40_000,
-                  checkoutDraft: {
-                    create: {
-                      name: 'Shared Customer',
-                      phoneOriginal: '01700000000',
-                      phoneNormalized: '+88017000000000',
-                      district: 'Dhaka',
-                      area: 'Gulshan',
-                      detailedAddress: 'House 1, Road 1',
-                      termsAccepted: true,
-                      subtotal: 40_000,
-                      deliveryFee: 0,
-                      total: 40_000,
-                      expiresAt: new Date(Date.now() + 3_600_000),
-                      cartId: cart.id,
-                      deliveryZoneId: zone.id,
-                    },
+    // Identical account identifiers seeded into BOTH tenants.
+    for (const tenant of [tA, tB]) {
+      await inTenant(tenant, async (db) => {
+        const zone = await db.deliveryZone.create({
+          data: { id: 'zone-shared-1', name: 'Wallet Zone', deliveryFee: 0 },
+        });
+        const cart = await db.cart.create({
+          data: {
+            tokenHash: `hash-cart-${tenant.dbName}`,
+            expiresAt: new Date(Date.now() + 3_600_000),
+          },
+        });
+        await db.customer.create({
+          data: {
+            id: 'shared-customer-1',
+            name: 'Shared Customer',
+            phoneOriginal: '01700000000',
+            phoneNormalized: '+88017000000000',
+            email: 'shared@ferio.test',
+            orders: {
+              create: {
+                id: 'order-shared-1',
+                reference: 'FER-SHARED-0001',
+                idempotencyKeyHash: `hash-order-${tenant.dbName}`,
+                subtotal: 40_000,
+                deliveryFee: 0,
+                total: 40_000,
+                checkoutDraft: {
+                  create: {
+                    name: 'Shared Customer',
+                    phoneOriginal: '01700000000',
+                    phoneNormalized: '+88017000000000',
+                    district: 'Dhaka',
+                    area: 'Gulshan',
+                    detailedAddress: 'House 1, Road 1',
+                    termsAccepted: true,
+                    subtotal: 40_000,
+                    deliveryFee: 0,
+                    total: 40_000,
+                    expiresAt: new Date(Date.now() + 3_600_000),
+                    cartId: cart.id,
+                    deliveryZoneId: zone.id,
                   },
                 },
               },
             },
-          });
-          await db.user.create({
-            data: {
-              id: 'shared-user-1',
-              name: 'Shared Customer',
-              email: 'shared@ferio.test',
-              password: 'not-a-real-hash',
-              role: 'user',
-              customerId: 'shared-customer-1',
-            },
-          });
+          },
         });
-      }
+        await db.user.create({
+          data: {
+            id: 'shared-user-1',
+            name: 'Shared Customer',
+            email: 'shared@ferio.test',
+            password: 'not-a-real-hash',
+            role: 'user',
+            customerId: 'shared-customer-1',
+          },
+        });
+      });
+    }
 
-      // ── Tenant A funds its wallet through the review workflow ──
-      const topUpA = await inTenant(tA, () =>
-        wallets.requestTopUp(
-          'shared-user-1',
-          {
-            provider: 'BKASH',
-            amount: 100_000,
-            customerReference: 'TOPUP-REF-A1',
-          } as never,
-          'wallet-topup-idempotency-key-shared-0001',
-        ),
-      );
-      expect(topUpA.status).toBe('PENDING_REVIEW');
+    // ── Tenant A funds its wallet through the review workflow ──
+    const topUpA = await inTenant(tA, () =>
+      wallets.requestTopUp(
+        'shared-user-1',
+        {
+          provider: 'BKASH',
+          amount: 100_000,
+          customerReference: 'TOPUP-REF-A1',
+        } as never,
+        'wallet-topup-idempotency-key-shared-0001',
+      ),
+    );
+    expect(topUpA.status).toBe('PENDING_REVIEW');
 
-      await inTenant(tA, () =>
-        wallets.reviewTopUp(
-          topUpA.id,
-          { status: 'COMPLETED', reviewNote: 'verified' } as never,
-          adminActor as never,
-        ),
-      );
-      const summaryA = await inTenant(tA, () => wallets.summary('shared-user-1'));
-      expect(summaryA.wallet.balance).toBe(100_000);
+    await inTenant(tA, () =>
+      wallets.reviewTopUp(
+        topUpA.id,
+        { status: 'COMPLETED', reviewNote: 'verified' } as never,
+        adminActor as never,
+      ),
+    );
+    const summaryA = await inTenant(tA, () => wallets.summary('shared-user-1'));
+    expect(summaryA.wallet.balance).toBe(100_000);
 
-      // ── Tenant B resolves the SAME identifiers to its OWN wallet ──
-      const summaryB = await inTenant(tB, () => wallets.summary('shared-user-1'));
-      expect(summaryB.wallet.balance).toBe(0);
-      expect(summaryB.wallet.id).not.toBe(summaryA.wallet.id);
+    // ── Tenant B resolves the SAME identifiers to its OWN wallet ──
+    const summaryB = await inTenant(tB, () => wallets.summary('shared-user-1'));
+    expect(summaryB.wallet.balance).toBe(0);
+    expect(summaryB.wallet.id).not.toBe(summaryA.wallet.id);
 
-      // ── Order debit in A consumes only A's balance ──
-      await inTenant(tA, (db) =>
+    // ── Order debit in A consumes only A's balance ──
+    await inTenant(tA, (db) =>
+      db.$transaction((tx) =>
+        wallets.debitOrder(tx, 'shared-user-1', 'order-shared-1', 40_000),
+      ),
+    );
+    const afterDebitA = await inTenant(tA, () =>
+      wallets.summary('shared-user-1'),
+    );
+    expect(afterDebitA.wallet.balance).toBe(60_000);
+    expect(
+      afterDebitA.transactions.filter(
+        (entry) => entry.orderId === 'order-shared-1',
+      ),
+    ).toHaveLength(1);
+
+    // B's ledger is untouched by A's debit.
+    const afterDebitB = await inTenant(tB, () =>
+      wallets.summary('shared-user-1'),
+    );
+    expect(afterDebitB.wallet.balance).toBe(0);
+    expect(afterDebitB.transactions).toHaveLength(0);
+
+    // ── Negative: replaying A's order refund against B fails closed ──
+    await expect(
+      inTenant(tB, (db) =>
         db.$transaction((tx) =>
-          wallets.debitOrder(tx, 'shared-user-1', 'order-shared-1', 40_000),
-        ),
-      );
-      const afterDebitA = await inTenant(tA, () => wallets.summary('shared-user-1'));
-      expect(afterDebitA.wallet.balance).toBe(60_000);
-      expect(
-        afterDebitA.transactions.filter((entry) => entry.orderId === 'order-shared-1'),
-      ).toHaveLength(1);
-
-      // B's ledger is untouched by A's debit.
-      const afterDebitB = await inTenant(tB, () => wallets.summary('shared-user-1'));
-      expect(afterDebitB.wallet.balance).toBe(0);
-      expect(afterDebitB.transactions).toHaveLength(0);
-
-      // ── Negative: replaying A's order refund against B fails closed ──
-      await expect(
-        inTenant(tB, (db) =>
-          db.$transaction((tx) =>
-            wallets.refundCancelledOrder(tx, 'shared-customer-1', 'order-shared-1', 40_000),
+          wallets.refundCancelledOrder(
+            tx,
+            'shared-customer-1',
+            'order-shared-1',
+            40_000,
           ),
         ),
-      ).rejects.toBeInstanceOf(ConflictException);
+      ),
+    ).rejects.toBeInstanceOf(ConflictException);
 
-      // Refund inside A credits only A.
-      await inTenant(tA, (db) =>
-        db.$transaction((tx) =>
-          wallets.refundCancelledOrder(tx, 'shared-customer-1', 'order-shared-1', 40_000),
+    // Refund inside A credits only A.
+    await inTenant(tA, (db) =>
+      db.$transaction((tx) =>
+        wallets.refundCancelledOrder(
+          tx,
+          'shared-customer-1',
+          'order-shared-1',
+          40_000,
         ),
-      );
-      const afterRefundA = await inTenant(tA, () => wallets.summary('shared-user-1'));
-      expect(afterRefundA.wallet.balance).toBe(100_000);
-      const afterRefundB = await inTenant(tB, () => wallets.summary('shared-user-1'));
-      expect(afterRefundB.wallet.balance).toBe(0);
+      ),
+    );
+    const afterRefundA = await inTenant(tA, () =>
+      wallets.summary('shared-user-1'),
+    );
+    expect(afterRefundA.wallet.balance).toBe(100_000);
+    const afterRefundB = await inTenant(tB, () =>
+      wallets.summary('shared-user-1'),
+    );
+    expect(afterRefundB.wallet.balance).toBe(0);
 
-      // ── Idempotency keys are tenant-local: same key succeeds in B ──
-      const topUpB = await inTenant(tB, () =>
-        wallets.requestTopUp(
-          'shared-user-1',
-          {
-            provider: 'BKASH',
-            amount: 55_000,
-            customerReference: 'TOPUP-REF-B1',
-          } as never,
-          'wallet-topup-idempotency-key-shared-0001',
-        ),
-      );
-      expect(topUpB.id).not.toBe(topUpA.id);
-      await inTenant(tB, () =>
-        wallets.reviewTopUp(
-          topUpB.id,
-          { status: 'COMPLETED', reviewNote: 'verified' } as never,
-          adminActor as never,
-        ),
-      );
-      const finalB = await inTenant(tB, () => wallets.summary('shared-user-1'));
-      expect(finalB.wallet.balance).toBe(55_000);
-      expect(finalB.topUps).toHaveLength(1);
+    // ── Idempotency keys are tenant-local: same key succeeds in B ──
+    const topUpB = await inTenant(tB, () =>
+      wallets.requestTopUp(
+        'shared-user-1',
+        {
+          provider: 'BKASH',
+          amount: 55_000,
+          customerReference: 'TOPUP-REF-B1',
+        } as never,
+        'wallet-topup-idempotency-key-shared-0001',
+      ),
+    );
+    expect(topUpB.id).not.toBe(topUpA.id);
+    await inTenant(tB, () =>
+      wallets.reviewTopUp(
+        topUpB.id,
+        { status: 'COMPLETED', reviewNote: 'verified' } as never,
+        adminActor as never,
+      ),
+    );
+    const finalB = await inTenant(tB, () => wallets.summary('shared-user-1'));
+    expect(finalB.wallet.balance).toBe(55_000);
+    expect(finalB.topUps).toHaveLength(1);
 
-      // Ledger visibility remains strictly per-database.
-      const finalA = await inTenant(tA, () => wallets.summary('shared-user-1'));
-      const aReferences = finalA.transactions.map((t) => t.amount);
-      expect(aReferences).toEqual([40_000, 40_000, 100_000]); // refund, debit, top-up credit
-      expect(finalB.transactions.map((t) => t.amount)).toEqual([55_000]);
-      expect(finalA.wallet.totalCredited).toBe(140_000); // top-up + refund credit
-      expect(finalB.wallet.totalCredited).toBe(55_000);
-    },
-    300_000,
-  );
+    // Ledger visibility remains strictly per-database.
+    const finalA = await inTenant(tA, () => wallets.summary('shared-user-1'));
+    const aReferences = finalA.transactions.map((t) => t.amount);
+    expect(aReferences).toEqual([40_000, 40_000, 100_000]); // refund, debit, top-up credit
+    expect(finalB.transactions.map((t) => t.amount)).toEqual([55_000]);
+    expect(finalA.wallet.totalCredited).toBe(140_000); // top-up + refund credit
+    expect(finalB.wallet.totalCredited).toBe(55_000);
+  }, 300_000);
 });

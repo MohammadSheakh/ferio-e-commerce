@@ -1,9 +1,14 @@
 import type { ConfigService } from '@nestjs/config';
 import type { Queue } from 'bullmq';
-import { ReconciliationQueue } from '../queues/reconciliation.queue';
+import {
+  ReconciliationQueue,
+  type ReconciliationJobData,
+} from '../queues/reconciliation.queue';
 import type { ReconciliationService } from '../services/reconciliation.service';
+import { runWithTenantContext } from '../../../tenancy/context/tenant-context';
 
 describe('ReconciliationQueue', () => {
+  const originalTenancy = process.env.TENANCY_ENABLED;
   const queue = {
     upsertJobScheduler: jest.fn(),
     getJobCounts: jest.fn(),
@@ -26,7 +31,7 @@ describe('ReconciliationQueue', () => {
     getRetryableRun: jest.fn(),
   };
   const service = new ReconciliationQueue(
-    queue as unknown as Queue,
+    queue as unknown as Queue<ReconciliationJobData>,
     config as unknown as ConfigService,
     reconciliation as unknown as ReconciliationService,
   );
@@ -39,6 +44,11 @@ describe('ReconciliationQueue', () => {
       completedCount: 0,
       failedCount: 0,
     });
+  });
+
+  afterEach(() => {
+    if (originalTenancy === undefined) delete process.env.TENANCY_ENABLED;
+    else process.env.TENANCY_ENABLED = originalTenancy;
   });
 
   it('registers the configured BullMQ scheduler', async () => {
@@ -99,6 +109,59 @@ describe('ReconciliationQueue', () => {
         initiatedByActorId: 'admin-1',
       },
       { jobId: 'reconciliation-retry-run-failed-1' },
+    );
+  });
+
+  it('scopes tenant retry jobs and requires tenant context', async () => {
+    process.env.TENANCY_ENABLED = 'true';
+    reconciliation.getRetryableRun.mockResolvedValue({
+      id: 'run-failed',
+      overdueHours: 72,
+      attemptCount: 2,
+    });
+    queue.add.mockResolvedValue({ id: 'tenant-job-1' });
+
+    await expect(service.enqueueRetry('run-failed', 'admin-1')).rejects.toThrow(
+      'TENANT_CONTEXT_REQUIRED_FOR_RECONCILIATION_RETRY',
+    );
+
+    await runWithTenantContext(
+      {
+        organizationId: 'org-a',
+        tenantDatabaseId: 'tdb-a',
+        database: {
+          id: 'tdb-a',
+          host: 'db.internal',
+          port: 5432,
+          databaseName: 'tenant_a',
+          username: 'tenant_a',
+          credentialCipher: 'ciphertext',
+        },
+        domainId: 'domain-a',
+        hostname: 'a.ferio.local',
+        subscriptionStatus: 'ACTIVE',
+        correlationId: 'correlation-a',
+      },
+      async () => {
+        await expect(
+          service.enqueueRetry('run-failed', 'admin-1'),
+        ).resolves.toEqual({
+          runId: 'run-failed',
+          jobId: 'tenant-job-1',
+          status: 'QUEUED',
+        });
+      },
+    );
+
+    expect(queue.add).toHaveBeenLastCalledWith(
+      'run-reconciliation-scan',
+      {
+        overdueHours: 72,
+        retryRunId: 'run-failed',
+        initiatedByActorId: 'admin-1',
+        organizationId: 'org-a',
+      },
+      { jobId: 't:org-a:reconciliation-retry-run-failed-2' },
     );
   });
 });

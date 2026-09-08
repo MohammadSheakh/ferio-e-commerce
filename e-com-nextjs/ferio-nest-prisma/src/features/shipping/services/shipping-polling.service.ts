@@ -2,13 +2,15 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
-  Optional,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
-import { Prisma } from '@prisma/client';
 import type { PrismaClient } from '@prisma/client';
 import { PrismaService } from '@app/database';
-import { TenantDbService } from '../../../tenancy/tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../../tenancy/services/tenant-db.service';
+import { toTenantJsonInput } from '../../../core/database/json-input.util';
 import { ShippingService } from './shipping.service';
 
 const TERMINAL_SHIPMENT_STATUSES = [
@@ -17,14 +19,18 @@ const TERMINAL_SHIPMENT_STATUSES = [
   'CANCELLED',
   'RTO',
 ] as const;
+const TERMINAL_SHIPMENT_STATUS_SET = new Set<string>(
+  TERMINAL_SHIPMENT_STATUSES,
+);
 
 @Injectable()
 export class ShippingPollingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly shipping: ShippingService,
-  
-    @Optional() private readonly tenantDb?: TenantDbService,) {}
+
+    private readonly tenantDb?: TenantDbService,
+  ) {}
 
   /**
    * MT-7/MT-8: inside a tenant-resolved request or worker fan-out this
@@ -32,8 +38,7 @@ export class ShippingPollingService {
    * falls back to the legacy single-tenant DB. Never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    const tenant = await this.tenantDb?.tryGet();
-    return tenant ?? (this.prisma as PrismaClient);
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
   async getAttempts() {
     const db = await this.db();
@@ -69,9 +74,15 @@ export class ShippingPollingService {
       take: limit,
       include: { provider: true },
     });
-    return shipments.filter((shipment) =>
-      this.shipping.getPollingSupport(shipment.provider.code),
+    const eligible = await Promise.all(
+      shipments.map(async (shipment) => ({
+        shipment,
+        supported: await this.shipping.getPollingSupport(shipment.provider.code),
+      })),
     );
+    return eligible
+      .filter(({ supported }) => supported)
+      .map(({ shipment }) => shipment);
   }
 
   async prepareAttempt(shipmentId: string, requestedByActorId?: string) {
@@ -81,13 +92,13 @@ export class ShippingPollingService {
       include: { provider: true },
     });
     if (!shipment) throw new NotFoundException('Shipment not found');
-    if (TERMINAL_SHIPMENT_STATUSES.includes(shipment.status as never)) {
+    if (TERMINAL_SHIPMENT_STATUS_SET.has(shipment.status)) {
       throw new ConflictException('Terminal shipments do not need polling');
     }
     if (!shipment.externalShipmentId && !shipment.trackingNumber) {
       throw new ConflictException('Shipment has no provider tracking identity');
     }
-    if (!this.shipping.getPollingSupport(shipment.provider.code)) {
+    if (!(await this.shipping.getPollingSupport(shipment.provider.code))) {
       throw new ConflictException(
         `${shipment.provider.code} polling is not configured`,
       );
@@ -154,15 +165,15 @@ export class ShippingPollingService {
         throw new ConflictException('Courier poll produced no status evidence');
       }
       const completedAt = new Date();
-      const terminal = TERMINAL_SHIPMENT_STATUSES.includes(
-        result.normalizedStatus as never,
+      const terminal = TERMINAL_SHIPMENT_STATUS_SET.has(
+        result.normalizedStatus,
       );
       await db.$transaction([
         db.shipmentPollAttempt.update({
           where: { id: attempt.id },
           data: {
             status: 'SUCCEEDED',
-            rawResponse: response as Prisma.InputJsonValue,
+            rawResponse: toTenantJsonInput(response) ?? {},
             normalizedStatus: result.normalizedStatus,
             evidenceLogId: result.evidenceLogId,
             finishedAt: completedAt,

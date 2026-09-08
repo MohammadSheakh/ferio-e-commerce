@@ -33,7 +33,7 @@ import {
   UpdateLocationDto,
 } from './delivery-personnel.dto';
 import { DeliveryPersonnelService } from './delivery-personnel.service';
-import { TenantMembershipGuard } from '../../tenancy/tenant-membership.guard';
+import { TenantMembershipGuard } from '../../tenancy/guards/tenant-membership.guard';
 
 @Controller('delivery-personnel')
 export class DeliveryPersonnelController {

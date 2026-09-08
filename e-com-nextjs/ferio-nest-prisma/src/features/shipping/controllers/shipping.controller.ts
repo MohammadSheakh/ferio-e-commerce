@@ -7,11 +7,12 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Res,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { TenantMembershipGuard } from '../../../tenancy/tenant-membership.guard';
+import { TenantMembershipGuard } from '../../../tenancy/guards/tenant-membership.guard';
 import {
   AuthGuard,
   PERMISSIONS,
@@ -27,6 +28,7 @@ import type { Response } from 'express';
 import {
   CreateShipmentDto,
   UpdateShipmentProviderDto,
+  UpdateCourierProviderConfigDto,
 } from '../dto/shipping.dto';
 import { ShippingService } from '../services/shipping.service';
 import { ShippingWebhookQueue } from '../queues/shipping-webhook.queue';
@@ -116,6 +118,16 @@ export class AdminShippingController {
     @User() actor: UserPayload,
   ) {
     return this.shippingService.updateProvider(code, dto, actor);
+  }
+
+  @Put('providers/:code/config')
+  @Permissions(PERMISSIONS.SHIPPING_PROVIDER_MANAGE)
+  updateProviderConfig(
+    @Param('code') code: ShipmentProviderCode,
+    @Body() dto: UpdateCourierProviderConfigDto,
+    @User() actor: UserPayload,
+  ) {
+    return this.shippingService.updateProviderConfig(code, dto, actor);
   }
 
   @Get('orders/:orderId')

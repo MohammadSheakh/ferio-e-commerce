@@ -15,6 +15,16 @@ interface UserAccount {
   isEmailVerified: boolean;
 }
 
+type DeliveryDistrict = {
+  id: string;
+  name: string;
+};
+
+type DeliveryZone = {
+  name: string;
+  districts?: DeliveryDistrict[];
+};
+
 export interface CustomerAddress {
   id: string;
   label?: string;
@@ -91,14 +101,15 @@ export default function AccountPage() {
         if (distRes.ok) {
           const distData = await distRes.json();
           if (Array.isArray(distData.data)) {
-            const list = distData.data
-              .flatMap((zone: any) =>
-                (zone.districts || []).map((d: any) => ({
-                  ...d,
+            const zones = distData.data as unknown as DeliveryZone[];
+            const list = zones
+              .flatMap((zone) =>
+                (zone.districts ?? []).map((district) => ({
+                  ...district,
                   zoneName: zone.name,
                 })),
               )
-              .sort((a: any, b: any) => a.name.localeCompare(b.name));
+              .sort((a, b) => a.name.localeCompare(b.name));
             setDistricts(list);
           }
         }

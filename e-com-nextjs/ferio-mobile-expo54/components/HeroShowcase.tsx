@@ -1,4 +1,4 @@
-import { Link } from 'expo-router';
+import { Link, type Href } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ImageBackground, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { apiGet } from '@/lib/api';
@@ -10,7 +10,7 @@ export interface HeroSlide {
   kicker: string;
   title: string;
   body: string;
-  href?: string | object;
+  href?: Href;
   ctaText?: string;
 }
 
@@ -46,9 +46,9 @@ export function HeroShowcase() {
         contentContainerStyle={styles.row}
       >
         {slides.map((card, index) => {
-          const hrefTarget = card.href || '/(tabs)/products';
+          const hrefTarget: Href = card.href || '/(tabs)/products';
           return (
-            <Link href={hrefTarget as any} key={card.id || index} asChild>
+            <Link href={hrefTarget} key={card.id || index} asChild>
               <Pressable style={[styles.card, { width: cardWidth }]}>
                 <ImageBackground source={{ uri: card.image }} style={styles.image} imageStyle={styles.imageRadius}>
                   <View style={styles.shade} />

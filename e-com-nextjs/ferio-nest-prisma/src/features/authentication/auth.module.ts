@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
-import { PassportModule } from '@nestjs/passport';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { RedisModule } from '@app/redis';
 import { PrismaModule } from '@app/database';
@@ -12,6 +11,8 @@ import { EmailService } from './email/email.service';
 import { OAuthVerificationService } from './oauth/oauth-verification.service';
 import { TwoFactorService } from './two-factor/two-factor.service';
 import { TenancyModule } from '../../tenancy/tenancy.module';
+import { jwtExpirySeconds } from '../../config/jwt-expiry.util';
+import { EMAIL_DELIVERY_SERVICE, EmailProcessor } from '@app/queue';
 
 /**
  * Auth Module
@@ -33,16 +34,13 @@ import { TenancyModule } from '../../tenancy/tenancy.module';
       useFactory: (configService: ConfigService) => ({
         secret: configService.getOrThrow<string>('JWT_ACCESS_SECRET'),
         signOptions: {
-          expiresIn: configService.get<string>(
-            'JWT_ACCESS_EXPIRY',
+          expiresIn: jwtExpirySeconds(
+            configService.get<string>('JWT_ACCESS_EXPIRY', '15m'),
             '15m',
-          ) as never,
+          ),
         },
       }),
     }),
-
-    // Passport Module
-    PassportModule,
 
     // Redis Module (for OTP and token blacklist)
     RedisModule,
@@ -62,9 +60,14 @@ import { TenancyModule } from '../../tenancy/tenancy.module';
     AuthService,
     OtpService,
     EmailService,
+    EmailProcessor,
+    {
+      provide: EMAIL_DELIVERY_SERVICE,
+      useExisting: EmailService,
+    },
     OAuthVerificationService,
     TwoFactorService,
   ],
-  exports: [AuthService, EmailService, JwtModule],
+  exports: [AuthService, EmailService, JwtModule, EMAIL_DELIVERY_SERVICE],
 })
 export class AuthModule {}

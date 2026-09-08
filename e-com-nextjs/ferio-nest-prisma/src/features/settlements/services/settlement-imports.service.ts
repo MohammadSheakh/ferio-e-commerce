@@ -3,14 +3,16 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
-  Optional,
 } from '@nestjs/common';
 import { createHash, randomBytes } from 'crypto';
 import { Prisma } from '@prisma/client';
 import type { PrismaClient } from '@prisma/client';
 import type { UserPayload } from '@app/common';
 import { PrismaService } from '@app/database';
-import { TenantDbService } from '../../../tenancy/tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../../tenancy/services/tenant-db.service';
 import { AuditService } from '../../audit/services/audit.service';
 import { ImportSettlementReportDto } from '../dto/settlement.dto';
 import {
@@ -18,6 +20,7 @@ import {
   SettlementReportParserService,
 } from './settlement-report-parser.service';
 import { SettlementsService } from './settlements.service';
+import { toTenantJsonInput } from '../../../core/database/json-input.util';
 
 const importInclude = {
   provider: true,
@@ -64,7 +67,7 @@ export class SettlementImportsService {
     private readonly settlements: SettlementsService,
     private readonly audit: AuditService,
     private readonly reportParser: SettlementReportParserService,
-    @Optional() private readonly tenantDb?: TenantDbService,
+    private readonly tenantDb?: TenantDbService,
   ) {}
 
   /**
@@ -72,8 +75,7 @@ export class SettlementImportsService {
    * outside resolved requests. Never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    const tenant = await this.tenantDb?.tryGet();
-    return tenant ?? (this.prisma as unknown as PrismaClient);
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
 
   async list() {
@@ -125,7 +127,7 @@ export class SettlementImportsService {
       : null;
     let correctionApplied = false;
     try {
-      let rows = await this.classifyRows(dto, correctionTarget?.id);
+      const rows = await this.classifyRows(dto, correctionTarget?.id);
       if (rows.some((row) => row.status !== 'APPLIED')) {
         return await this.persistImport({
           idempotencyKeyHash,
@@ -372,9 +374,8 @@ export class SettlementImportsService {
             rowCount: input.rows.length,
             appliedCount: input.rows.length - exceptionCount,
             exceptionCount,
-            rawPayload: this.immutableImportPayload(
-              input.dto,
-            ) as unknown as Prisma.InputJsonValue,
+            rawPayload:
+              toTenantJsonInput(this.immutableImportPayload(input.dto)) ?? {},
             recordedByActorId: input.actor.userId,
             sourceFileName: input.parserEvidence?.sourceFileName,
             sourceFileChecksum: input.parserEvidence?.sourceFileChecksum,
@@ -402,7 +403,7 @@ export class SettlementImportsService {
                 matchedShipmentId: row.matchedShipmentId,
                 matchedCollectionId: row.matchedCollectionId,
                 duplicateOfRowId: row.duplicateOfRowId,
-                rawPayload: row.input as unknown as Prisma.InputJsonValue,
+                rawPayload: toTenantJsonInput(row.input) ?? {},
               })),
             },
           },

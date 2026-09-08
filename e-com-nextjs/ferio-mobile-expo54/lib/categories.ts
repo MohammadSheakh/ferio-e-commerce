@@ -58,8 +58,7 @@ export function useCategoryTree() {
     async function load() {
       try {
         const res = await apiGet<CatalogCategory[]>('/catalog/categories');
-        const catList = Array.isArray(res) ? res : ((res as any)?.data || []);
-        setTree(buildCategoryTree(Array.isArray(catList) ? catList : []));
+        setTree(buildCategoryTree(res));
         setError(false);
       } catch {
         setTree([]);

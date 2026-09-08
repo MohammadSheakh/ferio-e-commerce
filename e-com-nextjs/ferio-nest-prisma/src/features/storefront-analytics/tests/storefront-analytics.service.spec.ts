@@ -18,7 +18,7 @@ describe('StorefrontAnalyticsService measured metrics', () => {
     get: jest.fn().mockReturnValue('analytics-test-secret'),
     getOrThrow: jest.fn().mockReturnValue('analytics-test-secret'),
   };
-  const tenantDb = { tryGet: jest.fn().mockResolvedValue(db) };
+  const tenantDb = { getOrLegacy: jest.fn().mockResolvedValue(db) };
 
   function service() {
     return new StorefrontAnalyticsService(
@@ -32,7 +32,7 @@ describe('StorefrontAnalyticsService measured metrics', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     settings.get.mockResolvedValue({ storefrontAnalyticsEnabled: true });
-    tenantDb.tryGet.mockResolvedValue(db);
+    tenantDb.getOrLegacy.mockResolvedValue(db);
   });
 
   it('stores structured search-result evidence', async () => {
@@ -47,13 +47,21 @@ describe('StorefrontAnalyticsService measured metrics', () => {
       path: '/products',
     });
 
-    expect(analyticsEvent.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        eventVersion: 2,
-        type: StorefrontAnalyticsEventType.SEARCH,
-        searchTerm: 'wireless mouse',
-        searchResultCount: 0,
-      }),
+    const createCall = (
+      analyticsEvent.create.mock.calls as unknown[][]
+    )[0]?.[0] as {
+      data: {
+        eventVersion: number;
+        type: StorefrontAnalyticsEventType;
+        searchTerm: string;
+        searchResultCount: number;
+      };
+    };
+    expect(createCall.data).toMatchObject({
+      eventVersion: 2,
+      type: StorefrontAnalyticsEventType.SEARCH,
+      searchTerm: 'wireless mouse',
+      searchResultCount: 0,
     });
   });
 
@@ -64,11 +72,12 @@ describe('StorefrontAnalyticsService measured metrics', () => {
 
     await expect(analytics.getZeroResultSearches()).resolves.toEqual([]);
     expect(topSearches).not.toHaveBeenCalled();
-    expect(analyticsEvent.groupBy).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({ searchResultCount: 0 }),
-      }),
-    );
+    const groupByCall = (
+      analyticsEvent.groupBy.mock.calls as unknown[][]
+    )[0]?.[0] as {
+      where: { searchResultCount: number };
+    };
+    expect(groupByCall.where.searchResultCount).toBe(0);
   });
 
   it('rejects search-result evidence on a different event type', async () => {

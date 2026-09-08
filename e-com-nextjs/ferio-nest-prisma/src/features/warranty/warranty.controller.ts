@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  Inject,
   Param,
   Patch,
   Post,
@@ -13,7 +14,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
-import { TenantMembershipGuard } from '../../tenancy/tenant-membership.guard';
+import { TenantMembershipGuard } from '../../tenancy/guards/tenant-membership.guard';
 import { memoryStorage } from 'multer';
 import {
   AuthGuard,
@@ -25,7 +26,7 @@ import {
   User,
 } from '@app/common';
 import type { UserPayload } from '@app/common';
-import { CloudinaryStrategy } from '../attachments/strategies/cloudinary.strategy';
+import type { StorageStrategy } from '../storage/strategies/r2.strategy';
 import { WarrantyService } from './warranty.service';
 import { CommerceSettingsService } from '../settings/services/commerce-settings.service';
 import {
@@ -40,7 +41,7 @@ import {
 export class WarrantyController {
   constructor(
     private readonly service: WarrantyService,
-    private readonly upload: CloudinaryStrategy,
+    @Inject('STORAGE_STRATEGY') private readonly upload: StorageStrategy,
     private readonly settings: CommerceSettingsService,
   ) {}
 

@@ -15,6 +15,19 @@ const existing = {
   ],
 };
 
+type ReturnStatusHistoryData = {
+  oldStatus: string;
+  newStatus: string;
+  actorId: string;
+};
+
+type ReturnMovementData = {
+  type: string;
+  quantityDelta: number;
+  referenceType?: string;
+  referenceId?: string;
+};
+
 describe('ReturnsService review', () => {
   const updated = { ...existing, status: 'APPROVED' };
   const transaction = {
@@ -31,7 +44,9 @@ describe('ReturnsService review', () => {
     inventoryMovement: { create: jest.fn() },
   };
   const prisma = {
-    $transaction: jest.fn((callback) => callback(transaction)),
+    $transaction: jest.fn((callback: (tx: typeof transaction) => unknown) =>
+      Promise.resolve(callback(transaction)),
+    ),
   };
   const audit = { record: jest.fn() };
   const service = new ReturnsService(
@@ -67,12 +82,16 @@ describe('ReturnsService review', () => {
       where: { id: 'item-1' },
       data: { approvedQuantity: 2 },
     });
-    expect(transaction.returnStatusHistory.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        oldStatus: 'REQUESTED',
-        newStatus: 'APPROVED',
-        actorId: 'admin-1',
-      }),
+    const historyCreate = transaction.returnStatusHistory.create.mock
+      .calls[0] as unknown as [
+      {
+        data: ReturnStatusHistoryData;
+      },
+    ];
+    expect(historyCreate[0].data).toMatchObject({
+      oldStatus: 'REQUESTED',
+      newStatus: 'APPROVED',
+      actorId: 'admin-1',
     });
     expect(transaction.order.update).toHaveBeenCalledWith({
       where: { id: 'order-1' },
@@ -149,13 +168,17 @@ describe('ReturnsService review', () => {
       where: { id: 'stock-1' },
       data: { onHand: { increment: 2 }, damaged: undefined },
     });
-    expect(transaction.inventoryMovement.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        type: 'RETURN',
-        quantityDelta: 2,
-        referenceType: 'ReturnCase',
-        referenceId: 'return-1',
-      }),
+    const returnMovement = transaction.inventoryMovement.create.mock
+      .calls[0] as unknown as [
+      {
+        data: ReturnMovementData;
+      },
+    ];
+    expect(returnMovement[0].data).toMatchObject({
+      type: 'RETURN',
+      quantityDelta: 2,
+      referenceType: 'ReturnCase',
+      referenceId: 'return-1',
     });
     expect(transaction.order.update).toHaveBeenCalledWith({
       where: { id: 'order-1' },
@@ -252,11 +275,15 @@ describe('ReturnsService review', () => {
         damaged: { increment: 1 },
       },
     });
-    expect(transaction.inventoryMovement.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        type: 'DAMAGE',
-        quantityDelta: 1,
-      }),
+    const damageMovement = transaction.inventoryMovement.create.mock
+      .calls[0] as unknown as [
+      {
+        data: ReturnMovementData;
+      },
+    ];
+    expect(damageMovement[0].data).toMatchObject({
+      type: 'DAMAGE',
+      quantityDelta: 1,
     });
   });
 });

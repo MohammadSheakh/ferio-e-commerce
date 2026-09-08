@@ -16,6 +16,47 @@ export default function Footer({ store }: { store: PublicStoreConfig }) {
           {store.legalName && (
             <p className="mt-3 text-[11px] text-ink2">{store.legalName}</p>
           )}
+          {store.address && (
+            <p className="mt-3 max-w-xs text-[12px] leading-relaxed text-ink2">
+              {store.address}
+            </p>
+          )}
+          {(store.facebookUrl ||
+            store.instagramUrl ||
+            store.whatsappUrl) && (
+            <div className="mt-4 flex gap-4 text-[12px] text-ink2">
+              {store.facebookUrl && (
+                <a
+                  href={store.facebookUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="hover:text-ink"
+                >
+                  Facebook
+                </a>
+              )}
+              {store.instagramUrl && (
+                <a
+                  href={store.instagramUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="hover:text-ink"
+                >
+                  Instagram
+                </a>
+              )}
+              {store.whatsappUrl && (
+                <a
+                  href={store.whatsappUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="hover:text-ink"
+                >
+                  WhatsApp
+                </a>
+              )}
+            </div>
+          )}
         </div>
         <div>
           <p className="text-[11px] uppercase tracking-eyebrow text-ink2">

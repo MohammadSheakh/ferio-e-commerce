@@ -10,7 +10,7 @@ import {
 import { ServiceBookingService } from './service-booking.service';
 
 @Module({
-  imports: [ TenancyModule,PrismaModule, AuthModule, SettingsModule],
+  imports: [TenancyModule, PrismaModule, AuthModule, SettingsModule],
   controllers: [PublicServiceController, AdminServiceController],
   providers: [ServiceBookingService],
 })

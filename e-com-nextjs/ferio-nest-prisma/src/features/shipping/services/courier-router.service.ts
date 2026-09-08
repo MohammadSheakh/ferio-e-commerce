@@ -1,10 +1,20 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ShipmentProviderCode } from '@prisma/client';
 import { PrismaService } from '@app/database';
-import { TenantDbService } from '../../../tenancy/tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../../tenancy/services/tenant-db.service';
 import type { PrismaClient } from '@prisma/client';
 import { ConfigService } from '@nestjs/config';
 import { StructuredLogger } from '@app/common';
+import {
+  decryptCourierCredentials,
+  runWithCourierCredentials,
+  tenantAwareCourierConfig,
+  type CourierCredentials,
+} from '../utils/courier-credentials.util';
+import { tryGetTenantContext } from '../../../tenancy/context/tenant-context';
 
 export type CourierRouteInput = {
   district: string;
@@ -31,19 +41,41 @@ export type CourierRouteRecommendation = {
 export class CourierRouterService {
   private readonly logger = new StructuredLogger(CourierRouterService.name);
 
+  private readonly config: ConfigService;
+
   constructor(
     private readonly prisma: PrismaService,
-    private readonly config: ConfigService,
-    @Optional() private readonly tenantDb?: TenantDbService,
-  ) {}
+    config: ConfigService,
+    private readonly tenantDb?: TenantDbService,
+  ) {
+    this.config = tenantAwareCourierConfig(config);
+  }
 
   /**
    * MT-7: tenant client inside resolved contexts; explicit legacy fallback
    * outside resolved requests. Never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    const tenant = await this.tenantDb?.tryGet();
-    return tenant ?? (this.prisma as unknown as PrismaClient);
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
+  }
+
+  private async credentials(
+    code: ShipmentProviderCode,
+  ): Promise<CourierCredentials | undefined> {
+    if (!tryGetTenantContext()) return undefined;
+    const db = await this.db();
+    const record = await db.courierProviderConfig.findUnique({
+      where: { provider: code },
+    });
+    if (!record?.enabled) return undefined;
+    try {
+      return decryptCourierCredentials(
+        record.credentialCipher,
+        this.config.get<string>('PLATFORM_DB_CREDENTIAL_KEY'),
+      );
+    } catch {
+      return undefined;
+    }
   }
 
   /**
@@ -61,22 +93,6 @@ export class CourierRouterService {
       take: 100,
       select: { code: true, isActive: true, name: true, id: true },
     });
-    const configuredStatus: Record<ShipmentProviderCode, boolean> = {
-      PATHAO: Boolean(
-        this.config.get('PATHAO_CLIENT_ID') &&
-        this.config.get('PATHAO_STORE_ID'),
-      ),
-      STEADFAST: Boolean(this.config.get('STEADFAST_API_KEY')),
-      REDX: Boolean(this.config.get('REDX_API_TOKEN')),
-      ECOURIER: Boolean(this.config.get('ECOURIER_API_KEY')),
-      PAPERFLY: Boolean(this.config.get('PAPERFLY_KEY')),
-      CARRYBEE: Boolean(
-        this.config.get('CARRYBEE_CLIENT_ID') &&
-        this.config.get('CARRYBEE_CLIENT_SECRET') &&
-        this.config.get('CARRYBEE_CLIENT_CONTEXT'),
-      ),
-    };
-
     const allCodes: ShipmentProviderCode[] = [
       'PATHAO',
       'REDX',
@@ -85,6 +101,37 @@ export class CourierRouterService {
       'ECOURIER',
       'PAPERFLY',
     ];
+    const configuredStatus = Object.fromEntries(
+      await Promise.all(
+        allCodes.map(async (code) => {
+          const credentials = await this.credentials(code);
+          const isConfigured = runWithCourierCredentials(credentials, () => {
+            switch (code) {
+              case 'PATHAO':
+                return Boolean(
+                  this.config.get('PATHAO_CLIENT_ID') &&
+                  this.config.get('PATHAO_STORE_ID'),
+                );
+              case 'STEADFAST':
+                return Boolean(this.config.get('STEADFAST_API_KEY'));
+              case 'REDX':
+                return Boolean(this.config.get('REDX_API_TOKEN'));
+              case 'ECOURIER':
+                return Boolean(this.config.get('ECOURIER_API_KEY'));
+              case 'PAPERFLY':
+                return Boolean(this.config.get('PAPERFLY_KEY'));
+              case 'CARRYBEE':
+                return Boolean(
+                  this.config.get('CARRYBEE_CLIENT_ID') &&
+                  this.config.get('CARRYBEE_CLIENT_SECRET') &&
+                  this.config.get('CARRYBEE_CLIENT_CONTEXT'),
+                );
+            }
+          });
+          return [code, isConfigured] as const;
+        }),
+      ),
+    ) as Record<ShipmentProviderCode, boolean>;
 
     const scoredProviders = allCodes.map((code) => {
       const dbRecord = dbProviders.find((p) => p.code === code);

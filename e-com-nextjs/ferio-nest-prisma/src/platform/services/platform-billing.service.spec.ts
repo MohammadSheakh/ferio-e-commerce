@@ -1,7 +1,6 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import {
-  PlatformBillingService,
-} from './platform-billing.service';
+import { TenantMetrics } from '@app/common';
+import { PlatformBillingService } from './platform-billing.service';
 
 /**
  * Platform billing service tests (PO-006): financial isolation by
@@ -19,7 +18,14 @@ describe('PlatformBillingService', () => {
     paid: false,
   };
 
-  function build(attemptRow?: Record<string, unknown>) {
+  function mockFetchResponse(body: Record<string, unknown>): typeof fetch {
+    const response = {
+      json: () => Promise.resolve(body),
+    };
+    return jest.fn().mockResolvedValue(response);
+  }
+
+  function build() {
     const platform = {
       client: {
         subscription: {
@@ -30,9 +36,11 @@ describe('PlatformBillingService', () => {
         },
         saasInvoice: {
           findFirst: jest.fn().mockResolvedValue(null),
-          create: jest.fn().mockImplementation(({ data }) =>
-            Promise.resolve({ id: 'inv-new', ...data }),
-          ),
+          create: jest
+            .fn()
+            .mockImplementation(({ data }) =>
+              Promise.resolve({ id: 'inv-new', ...data }),
+            ),
           findUnique: jest.fn().mockResolvedValue(invoice),
           update: jest.fn().mockResolvedValue({ ...invoice, paid: true }),
         },
@@ -45,51 +53,150 @@ describe('PlatformBillingService', () => {
       },
     };
     const audit = { record: jest.fn() };
-    const service = new PlatformBillingService(platform as never, audit as never);
+    const service = new PlatformBillingService(
+      platform as never,
+      audit as never,
+    );
     return { service, platform, audit };
   }
 
   beforeEach(() => {
+    TenantMetrics.reset();
     process.env.PLATFORM_SSLCOMMERZ_STORE_ID = 'store-id';
     process.env.PLATFORM_SSLCOMMERZ_STORE_PASSWORD = 'store-pass';
     delete process.env.PLATFORM_SSLCOMMERZ_IS_LIVE;
   });
 
   it('creates an open invoice from the plan amount (control plane only)', async () => {
-    const { platform } = build();
-    await service(platform).ensureInvoice({
+    const { platform, service } = build();
+    await service.ensureInvoice({
       organizationId: 'org-1',
       periodStart: new Date('2026-08-01'),
       periodEnd: new Date('2026-09-01'),
+      reason: 'Monthly platform invoice creation',
     });
-    expect(platform.client.saasInvoice.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          amountMinor: 199900,
-          currency: 'BDT',
-        }),
-      }),
+    expect(TenantMetrics.snapshot().counters).toContainEqual(
+      expect.objectContaining({ name: 'platform_billing_invoice_created' }),
     );
+    const createCall = (
+      platform.client.saasInvoice.create.mock.calls as unknown[][]
+    )[0]?.[0] as { data?: { amountMinor?: number; currency?: string } };
+    expect(createCall.data?.amountMinor).toBe(199900);
+    expect(createCall.data?.currency).toBe('BDT');
+  });
+
+  it.each([
+    [new Date('2026-09-01'), new Date('2026-09-01')],
+    [new Date('2026-10-01'), new Date('2026-09-01')],
+    [new Date('invalid'), new Date('2026-09-01')],
+  ])(
+    'rejects invalid invoice period boundaries',
+    async (periodStart, periodEnd) => {
+      const { service, platform } = build();
+
+      await expect(
+        service.ensureInvoice({
+          organizationId: 'org-1',
+          periodStart,
+          periodEnd,
+          reason: 'Monthly platform invoice creation',
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(platform.client.subscription.findUnique).not.toHaveBeenCalled();
+    },
+  );
+
+  it('requires a reason for manual invoice creation', async () => {
+    const { service, platform } = build();
+    await expect(
+      service.ensureInvoice({
+        organizationId: 'org-1',
+        periodStart: new Date('2026-08-01'),
+        periodEnd: new Date('2026-09-01'),
+        reason: 'too short',
+      }),
+    ).rejects.toThrow('BILLING_REASON_REQUIRED');
+    expect(platform.client.subscription.findUnique).not.toHaveBeenCalled();
   });
 
   it('initiates a hosted session with an unguessable reference and records INITIATED', async () => {
     const restore = global.fetch;
-    global.fetch = jest.fn().mockResolvedValue({
-      json: async () => ({
-        GatewayPageURL: 'https://sandbox.sslcommerz.com/hosted/session-1',
-      }),
-    }) as unknown as typeof fetch;
+    global.fetch = mockFetchResponse({
+      GatewayPageURL: 'https://sandbox.sslcommerz.com/hosted/session-1',
+    });
     try {
       const built = build();
-      const result = await built.service.initiatePayment('inv-1');
+      const result = await built.service.initiatePayment('inv-1', {
+        reason: 'Operator requested payment session',
+      });
       expect(result.redirectUrl).toContain('sslcommerz.com');
       expect(result.reference).toMatch(/^SAAS-SI-/);
-      const created = built.platform.client.saasPaymentAttempt.create.mock.calls[0][0];
+      const created = (
+        built.platform.client.saasPaymentAttempt.create.mock
+          .calls as unknown[][]
+      )[0]?.[0] as { data: { status: string; reference: string } };
       expect(created.data.status).toBe('INITIATED');
       expect(created.data.reference).toBe(result.reference);
+      expect(TenantMetrics.snapshot().counters).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            name: 'platform_billing_payment_initiated',
+          }),
+          expect.objectContaining({
+            name: 'platform_billing_payment_session_created',
+          }),
+        ]),
+      );
       // Success URL carries the reference for callback routing.
-      const body = String(built.platform.client.saasPaymentAttempt.create.mock.calls[0]);
+      const body = String(
+        built.platform.client.saasPaymentAttempt.create.mock.calls[0],
+      );
       void body;
+    } finally {
+      global.fetch = restore;
+    }
+  });
+
+  it('records actor and reason when a manual payment session is initiated', async () => {
+    const restore = global.fetch;
+    global.fetch = mockFetchResponse({
+      GatewayPageURL: 'https://sandbox.sslcommerz.com/hosted/session-1',
+    });
+    try {
+      const built = build();
+      await built.service.initiatePayment('inv-1', {
+        actorId: 'platform-user-1',
+        reason: 'Retry payment after owner confirmation',
+      });
+      expect(built.audit.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'SAAS_PAYMENT_MANUALLY_INITIATED',
+          actorId: 'platform-user-1',
+          metadata: { reason: 'Retry payment after owner confirmation' },
+        }),
+      );
+    } finally {
+      global.fetch = restore;
+    }
+  });
+
+  it('rejects structured gateway URLs instead of stringifying provider objects', async () => {
+    const restore = global.fetch;
+    global.fetch = mockFetchResponse({
+      GatewayPageURL: { href: 'https://attacker.invalid' },
+    });
+    try {
+      const built = build();
+      await expect(
+        built.service.initiatePayment('inv-1', {
+          reason: 'Operator requested payment session',
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      const updateCall = (
+        built.platform.client.saasPaymentAttempt.updateMany.mock
+          .calls as unknown[][]
+      )[0]?.[0] as { data?: { status?: string } };
+      expect(updateCall.data?.status).toBe('FAILED');
     } finally {
       global.fetch = restore;
     }
@@ -106,14 +213,12 @@ describe('PlatformBillingService', () => {
       invoice,
     });
     const restore = global.fetch;
-    global.fetch = jest.fn().mockResolvedValue({
-      json: async () => ({
-        status: 'VALID',
-        tran_id: 'SAAS-REF-1',
-        amount: '1999.00',
-        currency: 'BDT',
-      }),
-    }) as unknown as typeof fetch;
+    global.fetch = mockFetchResponse({
+      status: 'VALID',
+      tran_id: 'SAAS-REF-1',
+      amount: '1999.00',
+      currency: 'BDT',
+    });
     try {
       const result = await built.service.applyCallbackOutcome({
         reference: 'SAAS-REF-1',
@@ -121,7 +226,9 @@ describe('PlatformBillingService', () => {
         outcome: 'success',
       });
       expect(result).toEqual({ applied: true, paid: true });
-      expect(built.platform.client.saasPaymentAttempt.updateMany).toHaveBeenCalledWith(
+      expect(
+        built.platform.client.saasPaymentAttempt.updateMany,
+      ).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { reference: 'SAAS-REF-1', status: 'INITIATED' },
         }),
@@ -158,7 +265,9 @@ describe('PlatformBillingService', () => {
     });
     void result;
 
-    expect(built.platform.client.saasPaymentAttempt.updateMany).not.toHaveBeenCalledWith(
+    expect(
+      built.platform.client.saasPaymentAttempt.updateMany,
+    ).not.toHaveBeenCalledWith(
       expect.objectContaining({
         where: { reference: 'SAAS-REF-1', status: 'INITIATED' },
       }),
@@ -177,9 +286,11 @@ describe('PlatformBillingService', () => {
       invoice,
     });
     const restore = global.fetch;
-    global.fetch = jest.fn().mockResolvedValue({
-      json: async () => ({ status: 'EXPIRED', tran_id: 'SAAS-REF-2', amount: '1999.00' }),
-    }) as unknown as typeof fetch;
+    global.fetch = mockFetchResponse({
+      status: 'EXPIRED',
+      tran_id: 'SAAS-REF-2',
+      amount: '1999.00',
+    });
     try {
       const outcome = await built.service.applyCallbackOutcome({
         reference: 'SAAS-REF-2',
@@ -187,12 +298,18 @@ describe('PlatformBillingService', () => {
         outcome: 'success',
       });
       expect(outcome.applied).toBe(true); // recorded as failed evidence
-      expect(built.platform.client.saasPaymentAttempt.updateMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { reference: 'SAAS-REF-2', status: 'INITIATED' },
-          data: expect.objectContaining({ status: 'FAILED' }),
-        }),
-      );
+      const updateCall = (
+        built.platform.client.saasPaymentAttempt.updateMany.mock
+          .calls as unknown[][]
+      )[0]?.[0] as {
+        where?: { reference?: string; status?: string };
+        data?: { status?: string };
+      };
+      expect(updateCall.where).toEqual({
+        reference: 'SAAS-REF-2',
+        status: 'INITIATED',
+      });
+      expect(updateCall.data?.status).toBe('FAILED');
     } finally {
       global.fetch = restore;
     }
@@ -209,9 +326,11 @@ describe('PlatformBillingService', () => {
       invoice,
     });
     const restore = global.fetch;
-    global.fetch = jest.fn().mockResolvedValue({
-      json: async () => ({ status: 'VALID', tran_id: 'SAAS-REF-3', amount: '19.99' }),
-    }) as unknown as typeof fetch;
+    global.fetch = mockFetchResponse({
+      status: 'VALID',
+      tran_id: 'SAAS-REF-3',
+      amount: '19.99',
+    });
     try {
       await expect(
         built.service.applyCallbackOutcome({
@@ -220,12 +339,18 @@ describe('PlatformBillingService', () => {
           outcome: 'success',
         }),
       ).rejects.toBeInstanceOf(BadRequestException);
-      expect(built.platform.client.saasPaymentAttempt.updateMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { reference: 'SAAS-REF-3', status: 'INITIATED' },
-          data: expect.objectContaining({ status: 'FAILED' }),
-        }),
-      );
+      const updateCall = (
+        built.platform.client.saasPaymentAttempt.updateMany.mock
+          .calls as unknown[][]
+      )[0]?.[0] as {
+        where?: { reference?: string; status?: string };
+        data?: { status?: string };
+      };
+      expect(updateCall.where).toEqual({
+        reference: 'SAAS-REF-3',
+        status: 'INITIATED',
+      });
+      expect(updateCall.data?.status).toBe('FAILED');
     } finally {
       global.fetch = restore;
     }
@@ -233,7 +358,9 @@ describe('PlatformBillingService', () => {
 
   it('throws NotFound for unknown references instead of guessing', async () => {
     const built = build();
-    built.platform.client.saasPaymentAttempt.findUnique.mockResolvedValueOnce(null);
+    built.platform.client.saasPaymentAttempt.findUnique.mockResolvedValueOnce(
+      null,
+    );
     await expect(
       built.service.applyCallbackOutcome({
         reference: 'SAAS-GHOST',
@@ -242,11 +369,43 @@ describe('PlatformBillingService', () => {
       }),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
-});
 
-function service(platform: unknown): PlatformBillingService {
-  return new PlatformBillingService(
-    platform as never,
-    { record: jest.fn() } as never,
-  );
-}
+  it('returns a bounded receipt projection for a paid invoice', async () => {
+    const built = build();
+    const paidAt = new Date('2026-09-08T10:00:00.000Z');
+    built.platform.client.saasInvoice.findUnique.mockResolvedValueOnce({
+      ...invoice,
+      paid: true,
+      periodStart: new Date('2026-09-01'),
+      periodEnd: new Date('2026-10-01'),
+      paymentAttempts: [
+        {
+          provider: 'SSLCOMMERZ',
+          reference: 'SAAS-REF-PAID',
+          updatedAt: paidAt,
+        },
+      ],
+    });
+
+    await expect(built.service.receipt('inv-1')).resolves.toEqual({
+      receiptNumber: 'RC-SI-202608-ABCDE',
+      invoiceNumber: 'SI-202608-ABCDE',
+      organizationId: 'org-1',
+      amountMinor: 199900,
+      currency: 'BDT',
+      periodStart: new Date('2026-09-01'),
+      periodEnd: new Date('2026-10-01'),
+      paidAt,
+      provider: 'SSLCOMMERZ',
+      providerReference: 'SAAS-REF-PAID',
+    });
+    expect(built.platform.client.saasInvoice.findUnique).toHaveBeenCalled();
+  });
+
+  it('does not issue a receipt for an unpaid invoice', async () => {
+    const built = build();
+    await expect(built.service.receipt('inv-1')).rejects.toThrow(
+      'RECEIPT_NOT_AVAILABLE',
+    );
+  });
+});

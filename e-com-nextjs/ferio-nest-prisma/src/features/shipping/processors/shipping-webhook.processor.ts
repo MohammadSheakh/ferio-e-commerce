@@ -1,8 +1,7 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import type { Job } from 'bullmq';
 import { QUEUE_NAMES } from '@app/queue';
-import { Optional } from '@nestjs/common';
-import { TenantFanoutService } from '../../../tenancy/tenant-fanout.service';
+import { TenantFanoutService } from '../../../tenancy/services/tenant-fanout.service';
 import { runWithCorrelationId, StructuredLogger } from '@app/common';
 import { ShippingService } from '../services/shipping.service';
 import {
@@ -19,7 +18,7 @@ export class ShippingWebhookProcessor extends WorkerHost {
   constructor(
     private readonly shipping: ShippingService,
     private readonly callbackQueue: ShippingWebhookQueue,
-      @Optional() private readonly fanout?: TenantFanoutService,
+    private readonly fanout?: TenantFanoutService,
   ) {
     super();
   }
@@ -37,15 +36,18 @@ export class ShippingWebhookProcessor extends WorkerHost {
       if (job.name !== COURIER_CALLBACK_RETRY_JOB || !job.data.callbackLogId) {
         throw new Error(`Unsupported courier callback job: ${job.name}`);
       }
-      const organizationId = (job.data as { organizationId?: string })
-        .organizationId;
-      if (!organizationId && (process.env.TENANCY_ENABLED || 'false') === 'true') {
+      const organizationId = job.data.organizationId;
+      if (
+        !organizationId &&
+        (process.env.TENANCY_ENABLED || 'false') === 'true'
+      ) {
         throw new Error('TENANT_CONTEXT_REQUIRED_FOR_COURIER_CALLBACK');
       }
       if (!organizationId)
         return this.shipping.retryWebhookLog(job.data.callbackLogId);
-      const callbackLogId = job.data.callbackLogId as string;
-      return this.fanout!.forOrganization(organizationId, () =>
+      const callbackLogId = job.data.callbackLogId;
+      if (!this.fanout) throw new Error('TENANT_FANOUT_UNAVAILABLE');
+      return this.fanout.forOrganization(organizationId, () =>
         this.shipping.retryWebhookLog(callbackLogId),
       );
     });

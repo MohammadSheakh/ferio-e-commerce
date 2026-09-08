@@ -1,11 +1,11 @@
-import {
-  Injectable,
-  Optional,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import type { PrismaClient } from '@prisma/client';
 import { PrismaService } from '@app/database';
-import { TenantDbService } from '../../../tenancy/tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../../tenancy/services/tenant-db.service';
 import { PurchaseActivityQueryDto } from '../purchase-activity.dto';
 import { maskPurchaseCustomerName } from '../utils/purchase-activity.util';
 
@@ -13,7 +13,7 @@ import { maskPurchaseCustomerName } from '../utils/purchase-activity.util';
 export class PurchaseActivityService {
   constructor(
     private readonly prisma: PrismaService,
-    @Optional() private readonly tenantDb?: TenantDbService,
+    private readonly tenantDb?: TenantDbService,
   ) {}
 
   /**
@@ -21,8 +21,7 @@ export class PurchaseActivityService {
    * explicit legacy fallback otherwise. Never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    const tenant = await this.tenantDb?.tryGet();
-    return tenant ?? (this.prisma as PrismaClient);
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
   async getPublic(query: PurchaseActivityQueryDto) {
     const settings = await this.getSettings();
@@ -109,9 +108,9 @@ export class PurchaseActivityService {
             order.address?.recipientName ?? '',
           ),
           location: settings.purchaseActivityShowArea
-            ? order.address?.area ?? null
+            ? (order.address?.area ?? null)
             : settings.purchaseActivityShowDistrict
-              ? order.address?.district ?? null
+              ? (order.address?.district ?? null)
               : null,
           purchasedAt: order.createdAt,
           verifiedPurchase: true as const,

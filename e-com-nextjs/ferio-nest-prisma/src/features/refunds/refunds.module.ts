@@ -7,7 +7,7 @@ import { RefundsController } from './controllers/refunds.controller';
 import { RefundsService } from './services/refunds.service';
 
 @Module({
-  imports: [ TenancyModule,PrismaModule, AuthModule, AuditModule],
+  imports: [TenancyModule, PrismaModule, AuthModule, AuditModule],
   controllers: [RefundsController],
   providers: [RefundsService],
 })

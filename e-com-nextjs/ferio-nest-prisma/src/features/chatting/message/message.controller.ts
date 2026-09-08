@@ -8,15 +8,25 @@ import {
   Query,
   Param,
   UseGuards,
-  Request,
   HttpCode,
   HttpStatus,
   Logger,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery, ApiParam } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiQuery,
+  ApiParam,
+} from '@nestjs/swagger';
 
 import { MessageService } from './message.service';
-import { SendMessageDto, GetMessagesQueryDto, UpdateMessageDto, DeleteMessageDto } from './dto/message.dto';
+import {
+  SendMessageDto,
+  GetMessagesQueryDto,
+  UpdateMessageDto,
+} from './dto/message.dto';
 import { AuthGuard, User } from '@app/common';
 import type { UserPayload } from '@app/common';
 
@@ -74,10 +84,22 @@ export class MessageController {
   }
 
   @Get(':conversationId/messages/cursor')
-  @ApiOperation({ summary: 'Get messages with cursor pagination (more efficient)' })
+  @ApiOperation({
+    summary: 'Get messages with cursor pagination (more efficient)',
+  })
   @ApiParam({ name: 'conversationId', description: 'Conversation ID' })
-  @ApiQuery({ name: 'before', required: false, type: String, description: 'Message ID' })
-  @ApiQuery({ name: 'after', required: false, type: String, description: 'Message ID' })
+  @ApiQuery({
+    name: 'before',
+    required: false,
+    type: String,
+    description: 'Message ID',
+  })
+  @ApiQuery({
+    name: 'after',
+    required: false,
+    type: String,
+    description: 'Message ID',
+  })
   @ApiQuery({ name: 'limit', required: false, type: Number, example: 20 })
   @ApiResponse({ status: 200, description: 'Messages retrieved successfully' })
   async getMessagesWithCursor(
@@ -87,13 +109,20 @@ export class MessageController {
     @Query('after') after?: string,
     @Query('limit') limit: number = 20,
   ) {
-    this.logger.log(`📬 Getting messages with cursor for conversation ${conversationId}`);
+    this.logger.log(
+      `📬 Getting messages with cursor for conversation ${conversationId}`,
+    );
 
-    const result = await this.messageService.getMessagesWithCursor(conversationId, user.userId, {
-      before,
-      after,
-      limit,
-    }, user.role);
+    const result = await this.messageService.getMessagesWithCursor(
+      conversationId,
+      user.userId,
+      {
+        before,
+        after,
+        limit,
+      },
+      user.role,
+    );
 
     return {
       success: true,
@@ -114,7 +143,9 @@ export class MessageController {
     @Body() sendMessageDto: SendMessageDto,
     @User('userId') userId: string,
   ) {
-    this.logger.log(`📝 Sending message in conversation ${conversationId} by user ${userId}`);
+    this.logger.log(
+      `📝 Sending message in conversation ${conversationId} by user ${userId}`,
+    );
 
     const message = await this.messageService.sendMessage(
       conversationId,
@@ -177,16 +208,27 @@ export class MessageController {
 
   @Get('messages/:messageId/unread-count')
   @ApiOperation({ summary: 'Get unread message count for a conversation' })
-  @ApiParam({ name: 'messageId', description: 'Message ID (to get conversation)' })
+  @ApiParam({
+    name: 'messageId',
+    description: 'Message ID (to get conversation)',
+  })
   @ApiQuery({ name: 'conversationId', required: true, type: String })
-  @ApiResponse({ status: 200, description: 'Unread count retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Unread count retrieved successfully',
+  })
   async getUnreadCount(
     @Query('conversationId') conversationId: string,
     @User('userId') userId: string,
   ) {
-    this.logger.log(`📊 Getting unread count for conversation ${conversationId}`);
+    this.logger.log(
+      `📊 Getting unread count for conversation ${conversationId}`,
+    );
 
-    const count = await this.messageService.getUnreadCount(userId, conversationId);
+    const count = await this.messageService.getUnreadCount(
+      userId,
+      conversationId,
+    );
 
     return {
       success: true,

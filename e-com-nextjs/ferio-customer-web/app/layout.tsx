@@ -21,10 +21,19 @@ const inter = Inter({
 });
 
 export async function generateMetadata(): Promise<Metadata> {
+  const tenant = await getTenantStatus();
+  if (tenant.code !== "ACTIVE" && tenant.code !== "LEGACY") {
+    return {
+      title: "Store unavailable",
+      description: "This storefront is not currently available.",
+      robots: { index: false, follow: false },
+    };
+  }
   const store = await getStoreConfig().catch(() => fallbackStoreConfig);
   return {
     title: `${store.storeName} — Shop Online`,
     description: `Browse current products, delivery options, and order support from ${store.storeName}.`,
+    robots: { index: true, follow: true },
   };
 }
 
@@ -52,10 +61,13 @@ export default async function RootLayout({
   ]);
   return (
     <html lang="en">
-      <body className={`${inter.variable} font-sans text-ink antialiased`}>
+      <body
+        className={`${inter.variable} theme-${store.themePreset} font-sans text-ink antialiased`}
+      >
         <CartProvider>
           <Header
             storeName={store.storeName}
+            logoUrl={store.logoUrl}
             categories={categories}
             categoryTopNavEnabled={store.categoryTopNavEnabled ?? true}
             serviceBookingEnabled={store.serviceBookingEnabled ?? true}

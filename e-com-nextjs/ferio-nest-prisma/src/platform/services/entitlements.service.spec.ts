@@ -1,13 +1,21 @@
 import { EntitlementsService } from './entitlements.service';
 
+type EntitlementsPlatform = {
+  client: { subscription: { findUnique: jest.Mock } };
+};
+
 describe('EntitlementsService evaluation matrix (ADR-0006)', () => {
   let service: EntitlementsService;
-  let platform: { client: any };
+  let platform: EntitlementsPlatform;
   const usage = { getValue: jest.fn() };
 
   function mockSubscription(plan: {
     status: string;
-    entitlements: Array<{ featureKey: string; enabled: boolean; limit?: number | null }>;
+    entitlements: Array<{
+      featureKey: string;
+      enabled: boolean;
+      limit?: number | null;
+    }>;
   }) {
     platform.client.subscription.findUnique.mockResolvedValue({
       id: 'sub-1',
@@ -18,8 +26,9 @@ describe('EntitlementsService evaluation matrix (ADR-0006)', () => {
 
   beforeEach(() => {
     platform = { client: { subscription: { findUnique: jest.fn() } } };
+    usage.getValue.mockClear();
     usage.getValue.mockResolvedValue(BigInt(0));
-    service = new EntitlementsService(platform as never, usage as never);
+    service = new EntitlementsService(platform as never, usage);
   });
 
   it('denies when no subscription exists', async () => {
@@ -35,12 +44,21 @@ describe('EntitlementsService evaluation matrix (ADR-0006)', () => {
     ['PAST_DUE', 'SUBSCRIPTION_INACTIVE'],
     ['CANCELLED', 'SUBSCRIPTION_INACTIVE'],
   ])('%s subscription blocks features with %s', async (status, code) => {
-    mockSubscription({ status, entitlements: [{ featureKey: 'x', enabled: true }] });
-    expect(await service.evaluate('org', 'x')).toMatchObject({ allowed: false, code });
+    mockSubscription({
+      status,
+      entitlements: [{ featureKey: 'x', enabled: true }],
+    });
+    expect(await service.evaluate('org', 'x')).toMatchObject({
+      allowed: false,
+      code,
+    });
   });
 
   it('allows trialing subscriptions like active ones', async () => {
-    mockSubscription({ status: 'TRIALING', entitlements: [{ featureKey: 'x', enabled: true }] });
+    mockSubscription({
+      status: 'TRIALING',
+      entitlements: [{ featureKey: 'x', enabled: true }],
+    });
     expect((await service.evaluate('org', 'x')).allowed).toBe(true);
   });
 
@@ -62,9 +80,13 @@ describe('EntitlementsService evaluation matrix (ADR-0006)', () => {
   it('boolean entitlements allow without consulting usage', async () => {
     mockSubscription({
       status: 'ACTIVE',
-      entitlements: [{ featureKey: 'custom_domain', enabled: true, limit: null }],
+      entitlements: [
+        { featureKey: 'custom_domain', enabled: true, limit: null },
+      ],
     });
-    expect(await service.evaluate('org', 'custom_domain')).toEqual({ allowed: true });
+    expect(await service.evaluate('org', 'custom_domain')).toEqual({
+      allowed: true,
+    });
     expect(usage.getValue).not.toHaveBeenCalled();
   });
 
@@ -81,5 +103,47 @@ describe('EntitlementsService evaluation matrix (ADR-0006)', () => {
     expect(
       await service.evaluate('org', 'staff_seats', { requestedCount: 2 }),
     ).toMatchObject({ allowed: false, code: 'PLAN_LIMIT_REACHED' });
+  });
+
+  it('compares large limits without converting bigint usage to number', async () => {
+    mockSubscription({
+      status: 'ACTIVE',
+      entitlements: [
+        {
+          featureKey: 'orders_per_month',
+          enabled: true,
+          limit: Number.MAX_SAFE_INTEGER,
+        },
+      ],
+    });
+    usage.getValue.mockResolvedValue(BigInt(Number.MAX_SAFE_INTEGER));
+
+    await expect(
+      service.evaluate('org', 'orders_per_month', { requestedCount: 1 }),
+    ).resolves.toMatchObject({ allowed: false, code: 'PLAN_LIMIT_REACHED' });
+  });
+
+  it('rejects invalid requested counts before usage lookup', async () => {
+    mockSubscription({
+      status: 'ACTIVE',
+      entitlements: [
+        { featureKey: 'orders_per_month', enabled: true, limit: 10 },
+      ],
+    });
+
+    await expect(
+      service.evaluate('org', 'orders_per_month', { requestedCount: -1 }),
+    ).rejects.toThrow('requestedCount must be a non-negative safe integer');
+    expect(usage.getValue).not.toHaveBeenCalled();
+  });
+
+  it('propagates control-plane failures instead of allowing the feature', async () => {
+    platform.client.subscription.findUnique.mockRejectedValue(
+      new Error('control plane unavailable'),
+    );
+
+    await expect(service.evaluate('org', 'custom_domain')).rejects.toThrow(
+      'control plane unavailable',
+    );
   });
 });

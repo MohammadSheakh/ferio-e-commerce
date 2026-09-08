@@ -2,17 +2,20 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
-  Optional,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHash, randomBytes, randomInt, timingSafeEqual } from 'crypto';
 import type { PrismaClient } from '@prisma/client';
-import { CodVerificationMode, OrderStatus, Prisma } from '@prisma/client';
+import { OrderStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '@app/database';
-import { TenantDbService } from '../../tenancy/tenant-db.service';
-import { tryGetTenantContext } from '../../tenancy/tenant-context';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../tenancy/services/tenant-db.service';
+import { tryGetTenantContext } from '../../tenancy/context/tenant-context';
 import type { UserPayload } from '@app/common';
 import { CartService } from '../cart/cart.service';
 import { TransactionalMessagingService } from '../transactional-messaging/services/transactional-messaging.service';
@@ -43,6 +46,8 @@ import {
 import { buildOrderOperationalTimeline } from './utils/order-timeline.util';
 import { WalletService } from '../wallet/wallet.service';
 import { CustomerNotificationsService } from '../customer-notifications/customer-notifications.service';
+import { EntitlementsService } from '../../platform/services/entitlements.service';
+import { UsageService } from '../../platform/services/usage.service';
 
 const orderDetailInclude = {
   customer: true,
@@ -74,11 +79,10 @@ export class OrderService {
     private readonly config: ConfigService,
     private readonly wallet: WalletService,
     private readonly customerNotifications: CustomerNotificationsService,
-    @Optional() private readonly tenantDb?: TenantDbService,
-    @Optional()
-    private readonly entitlements?: import('../../platform/services/entitlements.service').EntitlementsService,
-    @Optional()
-    private readonly usage?: import('../../platform/services/usage.service').UsageService,
+    private readonly entitlements: EntitlementsService,
+    private readonly usage: UsageService,
+    @Inject(TenantDbService)
+    private readonly tenantDb: TenantDbService | undefined,
   ) {}
 
   /**
@@ -87,8 +91,7 @@ export class OrderService {
    * explicitly falls back to the legacy single-tenant DB. Never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    const tenant = await this.tenantDb?.tryGet();
-    return tenant ?? (this.prisma as PrismaClient);
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
   private hashIdempotencyKey(value: string): string {
     return createHash('sha256').update(value).digest('hex');
@@ -692,6 +695,12 @@ export class OrderService {
     if (paymentMethod === 'WALLET' && !actor) {
       throw new BadRequestException('Sign in to pay with your wallet');
     }
+    const requireActor = (): UserPayload => {
+      if (!actor) {
+        throw new BadRequestException('Sign in to pay with your wallet');
+      }
+      return actor;
+    };
     // PO-005: suspended tenants keep browsing + admin visibility but new
     // checkout is disabled. Stable code drives both UI and API behavior.
     const tenantContext = tryGetTenantContext();
@@ -699,13 +708,13 @@ export class OrderService {
       throw new ForbiddenException('CHECKOUT_DISABLED_SUSPENDED');
     }
     // MT-10 §13.2: plan limits enforced server-side at the monetizable event.
-    if (tenantContext && this.entitlements) {
-      const decision = await this.entitlements
-        .evaluate(tenantContext.organizationId, 'orders_per_month', {
-          requestedCount: 1,
-        })
-        .catch(() => null);
-      if (decision && !decision.allowed) {
+    if (tenantContext) {
+      const decision = await this.entitlements.evaluate(
+        tenantContext.organizationId,
+        'orders_per_month',
+        { requestedCount: 1 },
+      );
+      if (!decision.allowed) {
         throw new ForbiddenException(decision.code ?? 'PLAN_LIMIT_REACHED');
       }
     }
@@ -737,7 +746,7 @@ export class OrderService {
       const orderId = await db.$transaction(
         async (transaction) => {
           const cart = await transaction.cart.findUnique({
-            where: { id: validatedCart.id! },
+            where: { id: validatedCart.id },
             include: {
               checkoutDraft: { include: { deliveryZone: true } },
               items: {
@@ -803,7 +812,7 @@ export class OrderService {
             paymentMethod === 'WALLET'
               ? await this.resolveWalletCustomer(
                   transaction,
-                  actor!.userId,
+                  requireActor().userId,
                   draft,
                 )
               : await this.resolveCustomer(transaction, draft);
@@ -976,7 +985,7 @@ export class OrderService {
           if (paymentMethod === 'WALLET') {
             await this.wallet.debitOrder(
               transaction,
-              actor!.userId,
+              requireActor().userId,
               order.id,
               total,
             );

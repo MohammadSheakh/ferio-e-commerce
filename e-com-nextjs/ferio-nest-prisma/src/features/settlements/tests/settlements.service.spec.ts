@@ -60,7 +60,9 @@ describe('SettlementsService', () => {
     },
     courierSettlementItem: { findFirst: jest.fn() },
     codCollection: { findMany: jest.fn() },
-    $transaction: jest.fn((callback) => callback(transaction)),
+    $transaction: jest.fn((callback: (tx: typeof transaction) => unknown) =>
+      Promise.resolve(callback(transaction)),
+    ),
   };
   const audit = { record: jest.fn() };
   const service = new SettlementsService(
@@ -70,7 +72,10 @@ describe('SettlementsService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    prisma.$transaction.mockImplementation((callback) => callback(transaction));
+    prisma.$transaction.mockImplementation(
+      (callback: (tx: typeof transaction) => unknown) =>
+        Promise.resolve(callback(transaction)),
+    );
     prisma.courierSettlement.findUnique.mockResolvedValue(null);
     prisma.courierSettlement.findFirst.mockResolvedValue(null);
     prisma.courierSettlementItem.findFirst.mockResolvedValue(null);
@@ -92,28 +97,41 @@ describe('SettlementsService', () => {
       service.create('settlement-create-key-0001', dto, actor),
     ).resolves.toBe(created);
 
-    expect(transaction.courierSettlement.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          status: 'MATCHED',
-          grossCollected: 150000,
-          courierFees: 5000,
-          expectedRemittance: 145000,
-          remittedAmount: 145000,
-          variance: 0,
-          recordedByActorId: 'admin-1',
+    const matchedSettlement = transaction.courierSettlement.create.mock
+      .calls[0] as unknown as [
+      {
+        data: {
+          status: string;
+          grossCollected: number;
+          courierFees: number;
+          expectedRemittance: number;
+          remittedAmount: number;
+          variance: number;
+          recordedByActorId: string;
           items: {
-            create: [
-              expect.objectContaining({
-                shipmentId: 'shipment-1',
-                status: 'MATCHED',
-                collectionVariance: 0,
-              }),
-            ],
-          },
-        }),
-      }),
-    );
+            create: Array<{
+              shipmentId: string;
+              status: string;
+              collectionVariance: number;
+            }>;
+          };
+        };
+      },
+    ];
+    expect(matchedSettlement[0].data).toMatchObject({
+      status: 'MATCHED',
+      grossCollected: 150000,
+      courierFees: 5000,
+      expectedRemittance: 145000,
+      remittedAmount: 145000,
+      variance: 0,
+      recordedByActorId: 'admin-1',
+    });
+    expect(matchedSettlement[0].data.items.create[0]).toMatchObject({
+      shipmentId: 'shipment-1',
+      status: 'MATCHED',
+      collectionVariance: 0,
+    });
     expect(transaction.codCollection.update).toHaveBeenCalledWith({
       where: { id: 'collection-1' },
       data: {
@@ -153,24 +171,33 @@ describe('SettlementsService', () => {
       actor,
     );
 
-    expect(transaction.courierSettlement.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          status: 'VARIANCE',
-          grossCollected: 140000,
-          expectedRemittance: 135000,
-          variance: 0,
-        }),
-      }),
-    );
-    expect(transaction.codCollection.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          status: 'VARIANCE',
-          collectionVariance: -10000,
-        }),
-      }),
-    );
+    const varianceSettlement = transaction.courierSettlement.create.mock
+      .calls[0] as unknown as [
+      {
+        data: {
+          status: string;
+          grossCollected: number;
+          expectedRemittance: number;
+          variance: number;
+        };
+      },
+    ];
+    expect(varianceSettlement[0].data).toMatchObject({
+      status: 'VARIANCE',
+      grossCollected: 140000,
+      expectedRemittance: 135000,
+      variance: 0,
+    });
+    const collectionUpdate = transaction.codCollection.update.mock
+      .calls[0] as unknown as [
+      {
+        data: { status: string; collectionVariance: number };
+      },
+    ];
+    expect(collectionUpdate[0].data).toMatchObject({
+      status: 'VARIANCE',
+      collectionVariance: -10000,
+    });
     expect(transaction.order.update).not.toHaveBeenCalled();
   });
 

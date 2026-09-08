@@ -3,7 +3,6 @@ import {
   UnauthorizedException,
   ServiceUnavailableException,
   BadRequestException,
-  Optional,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -11,7 +10,6 @@ import {
   OAuthProvider as PrismaOAuthProvider,
   Prisma,
   PrismaClient,
-  UserAuthProvider,
   UserRole,
 } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
@@ -28,8 +26,12 @@ import { PrismaService } from '@app/database';
 import { OtpType } from '../otp/interfaces/otp-payload.interface';
 import { StructuredLogger } from '@app/common';
 import { TwoFactorService } from '../two-factor/two-factor.service';
-import { TenantDbService } from '../../../tenancy/tenant-db.service';
-import { tryGetTenantContext } from '../../../tenancy/tenant-context';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../../tenancy/services/tenant-db.service';
+import { tryGetTenantContext } from '../../../tenancy/context/tenant-context';
+import { jwtExpirySeconds } from '../../../config/jwt-expiry.util';
 
 const authUserSelect = {
   id: true,
@@ -73,16 +75,11 @@ export class AuthService {
     private readonly redisService: RedisService,
     private readonly configService: ConfigService,
     private readonly twoFactorService: TwoFactorService,
-    @Optional() private readonly tenantDb?: TenantDbService,
+    private readonly tenantDb?: TenantDbService,
   ) {}
 
   private async db(): Promise<PrismaClient> {
-    const tenant = await this.tenantDb?.tryGet();
-    if (tenant) return tenant;
-    if ((process.env.TENANCY_ENABLED || 'false') === 'true') {
-      throw new ServiceUnavailableException('TENANT_IDENTITY_CONTEXT_REQUIRED');
-    }
-    return this.prisma as PrismaClient;
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
 
   /**
@@ -600,23 +597,23 @@ export class AuthService {
       ...(organizationId ? { organizationId } : {}),
     };
 
-    const accessExpiry = this.configService.get<string>(
-      'JWT_ACCESS_EXPIRY',
+    const accessExpiry = jwtExpirySeconds(
+      this.configService.get<string>('JWT_ACCESS_EXPIRY', '15m'),
       '15m',
     );
-    const refreshExpiry = this.configService.get<string>(
-      'JWT_REFRESH_EXPIRY',
+    const refreshExpiry = jwtExpirySeconds(
+      this.configService.get<string>('JWT_REFRESH_EXPIRY', '7d'),
       '7d',
     );
 
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(payload, {
         secret: this.configService.getOrThrow<string>('JWT_ACCESS_SECRET'),
-        expiresIn: accessExpiry as never,
+        expiresIn: accessExpiry,
       }),
       this.jwtService.signAsync(payload, {
         secret: this.configService.getOrThrow<string>('JWT_REFRESH_SECRET'),
-        expiresIn: refreshExpiry as never,
+        expiresIn: refreshExpiry,
       }),
     ]);
 
@@ -736,7 +733,7 @@ export class AuthService {
               email: normalizedEmail,
               role: UserRole.user,
               isEmailVerified: true,
-              authProvider: provider as UserAuthProvider,
+              authProvider: provider,
               profileImageUrl: profileImage,
             },
             select: authUserSelect,

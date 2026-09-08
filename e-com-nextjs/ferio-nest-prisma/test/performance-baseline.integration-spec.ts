@@ -19,8 +19,9 @@
  */
 import { Pool } from 'pg';
 
-import { TenantSchemaBootstrapper } from '../src/tenancy/tenant-schema.bootstrapper';
-import { TenantDatabaseManager } from '../src/tenancy/tenant-database.manager';
+import { TenantSchemaBootstrapper } from '../src/tenancy/services/tenant-schema.bootstrapper';
+import { TenantDatabaseManager } from '../src/tenancy/services/tenant-database.manager';
+import type { ResolvedTenant } from '../src/tenancy/services/tenant-resolver.service';
 import { encryptSecret } from '../src/platform/utils/secret-box';
 
 const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL;
@@ -93,46 +94,80 @@ class MiniRedis {
 
 function resolverHarness(controlPlaneOk: boolean) {
   let controlPlaneQueries = 0;
+  type DomainWhere = { hostname: string };
+  type DatabaseWhere = { organizationId: string };
   const platform = {
     client: {
       tenantDomain: {
-        findUnique: jest.fn().mockImplementation(({ where }: any) => {
-          controlPlaneQueries += 1;
-          if (!controlPlaneOk) {
-            return Promise.reject(new Error('ECONNREFUSED control plane'));
-          }
-          const slug = String(where.hostname).split('.')[0];
-          if (slug !== 'tenant-a' && slug !== 'tenant-b') return Promise.resolve(null);
-          return Promise.resolve({
-            id: `dom-${slug}`,
-            hostname: where.hostname,
-            status: 'ACTIVE',
-            organization: {
-              id: `org-${slug}`,
+        findUnique: jest
+          .fn()
+          .mockImplementation(({ where }: { where: DomainWhere }) => {
+            controlPlaneQueries += 1;
+            if (!controlPlaneOk) {
+              return Promise.reject(new Error('ECONNREFUSED control plane'));
+            }
+            const slug = String(where.hostname).split('.')[0];
+            if (slug !== 'tenant-a' && slug !== 'tenant-b')
+              return Promise.resolve(null);
+            return Promise.resolve({
+              id: `dom-${slug}`,
+              hostname: where.hostname,
               status: 'ACTIVE',
-              subscription: { status: 'ACTIVE' },
-            },
-          });
-        }),
+              organization: {
+                id: `org-${slug}`,
+                status: 'ACTIVE',
+                subscription: { status: 'ACTIVE' },
+              },
+            });
+          }),
       },
       tenantDatabase: {
-        findUnique: jest.fn().mockImplementation(({ where }: any) =>
-          Promise.resolve({
-            id: `tdb-${where.organizationId}`,
-            organizationId: where.organizationId,
-            status: 'READY',
-            schemaVersion: 'current',
-          }),
-        ),
+        findUnique: jest
+          .fn()
+          .mockImplementation(({ where }: { where: DatabaseWhere }) =>
+            Promise.resolve({
+              id: `tdb-${where.organizationId}`,
+              organizationId: where.organizationId,
+              status: 'READY',
+              schemaVersion: 'current',
+              host: 'localhost',
+              port: 5432,
+              databaseName: `db_${where.organizationId}`,
+              username: 'tenant_user',
+              credentialCipher: 'encrypted-credential',
+            }),
+          ),
       },
     },
   };
-  const { TenantResolverService } = require('../src/tenancy/tenant-resolver.service');
-  const service = new TenantResolverService(platform as never, new MiniRedis() as never);
+  const {
+    TenantResolverService,
+  } = require('../src/tenancy/services/tenant-resolver.service');
+  const service = new TenantResolverService(
+    platform as never,
+    new MiniRedis() as never,
+  );
   return { service, queries: () => controlPlaneQueries };
 }
 
 describe('§16.3 resolver load behavior', () => {
+  it('coalesces a cold concurrent burst into one control-plane resolution', async () => {
+    const { service, queries } = resolverHarness(true);
+    const attempts = 100;
+
+    const results = await Promise.all(
+      Array.from({ length: attempts }, () =>
+        service.resolveFromHost('tenant-a.ferio.test'),
+      ),
+    );
+
+    expect(results).toHaveLength(attempts);
+    expect(
+      results.every((result) => result.organizationId === 'org-tenant-a'),
+    ).toBe(true);
+    expect(queries()).toBe(1);
+  });
+
   it('serves hot load from cache with one control-plane query per host', async () => {
     const { service, queries } = resolverHarness(true);
 
@@ -143,7 +178,7 @@ describe('§16.3 resolver load behavior', () => {
 
     const iterations = 2_000;
     const started = Date.now();
-    const round: Array<Promise<unknown>> = [];
+    const round: Array<Promise<ResolvedTenant>> = [];
     for (let i = 0; i < iterations; i += 1) {
       const host = i % 2 === 0 ? 'tenant-a.ferio.test' : 'tenant-b.ferio.test';
       round.push(service.resolveFromHost(host));
@@ -152,7 +187,7 @@ describe('§16.3 resolver load behavior', () => {
     const elapsedMs = Date.now() - started;
 
     expect(settled).toHaveLength(iterations);
-    const distinctOrgs = [...new Set(settled.map((r: any) => r.organizationId))]
+    const distinctOrgs = [...new Set(settled.map((r) => r.organizationId))]
       .sort()
       .join(',');
     expect(distinctOrgs).toBe('org-tenant-a,org-tenant-b');
@@ -174,7 +209,9 @@ describe('§16.3 resolver load behavior', () => {
 
     // First miss is allowed to reach the control plane and writes the
     // negative entry; the storm behind it must be absorbed entirely.
-    await expect(service.resolveFromHost('ghost.ferio.test')).rejects.toBeTruthy();
+    await expect(
+      service.resolveFromHost('ghost.ferio.test'),
+    ).rejects.toBeTruthy();
     const queriesAfterFirstMiss = queries();
 
     const attempts = 299;
@@ -208,107 +245,191 @@ describe('§16.3 resolver load behavior', () => {
 
 // ─────────────────── Connection manager bounds & latency ───────────────────
 
-describe('§16.3 connection manager baselines (real PostgreSQL)', () => {
-  const created: string[] = [];
+conditionalDescribe(
+  '§16.3 connection manager baselines (real PostgreSQL)',
+  () => {
+    const created: string[] = [];
 
-  afterAll(async () => {
-    for (const name of created) await dropDatabase(name).catch(() => undefined);
-  });
+    afterAll(async () => {
+      for (const name of created)
+        await dropDatabase(name).catch(() => undefined);
+    });
 
-  function materialFor(dbName: string) {
-    const cfg = serverConfig();
-    return {
-      id: `tdb-${dbName.slice(-10)}`,
-      host: cfg.host,
-      port: cfg.port,
-      databaseName: dbName,
-      username: cfg.user,
-      credentialCipher: encryptSecret(cfg.password, CREDENTIAL_KEY),
-    };
-  }
-
-  it('measures cold vs warm acquisition and collapses concurrent gets to one client', async () => {
-    const dbName = await createBareDatabase('ferio_perf_hot');
-    created.push(dbName);
-    const manager = new TenantDatabaseManager();
-    try {
-      const material = materialFor(dbName);
-
-      const coldStarted = performance.now();
-      const first = await manager.getClient(material);
-      const coldMs = Math.round(performance.now() - coldStarted);
-      await first.$queryRaw`SELECT 1`;
-
-      const warmSamples: number[] = [];
-      for (let i = 0; i < 20; i += 1) {
-        const started = performance.now();
-        await manager.getClient(material);
-        warmSamples.push(performance.now() - started);
-      }
-      warmSamples.sort((a, b) => a - b);
-      const warmMedianMs = Math.round(warmSamples[10]);
-
-      const concurrentStarted = performance.now();
-      await Promise.all(
-        Array.from({ length: 50 }, () => manager.getClient(material)),
-      );
-      const concurrentMs = Math.round(performance.now() - concurrentStarted);
-
-      expect(manager.metrics().activeClients).toBe(1);
-      evidence('perf_db_acquire', { coldMs, warmMedianMs, concurrentGets: 50, concurrentMs });
-      // Generous bounds for shared CI hardware.
-      expect(coldMs).toBeLessThan(5_000);
-      expect(warmMedianMs).toBeLessThan(100);
-    } finally {
-      await manager.onModuleDestroy();
+    function materialFor(dbName: string) {
+      const cfg = serverConfig();
+      return {
+        id: `tdb-${dbName.slice(-10)}`,
+        host: cfg.host,
+        port: cfg.port,
+        databaseName: dbName,
+        username: cfg.user,
+        credentialCipher: encryptSecret(cfg.password, CREDENTIAL_KEY),
+      };
     }
-  }, 30_000);
 
-  it('never exceeds TENANT_DB_MAX_CLIENTS under churn (LRU eviction)', async () => {
-    process.env.TENANT_DB_MAX_CLIENTS = '2';
-    const manager = new TenantDatabaseManager();
-    const dbs: string[] = [];
-    try {
-      for (let i = 0; i < 3; i += 1) {
-        const name = await createBareDatabase(`ferio_perf_lru_${i}`);
-        dbs.push(name);
-        created.push(name);
+    it('measures cold vs warm acquisition and collapses concurrent gets to one client', async () => {
+      const dbName = await createBareDatabase('ferio_perf_hot');
+      created.push(dbName);
+      const manager = new TenantDatabaseManager();
+      try {
+        const material = materialFor(dbName);
+
+        const coldStarted = performance.now();
+        const first = await manager.getClient(material);
+        const coldMs = Math.round(performance.now() - coldStarted);
+        await first.$queryRaw`SELECT 1`;
+
+        const warmSamples: number[] = [];
+        for (let i = 0; i < 20; i += 1) {
+          const started = performance.now();
+          await manager.getClient(material);
+          warmSamples.push(performance.now() - started);
+        }
+        warmSamples.sort((a, b) => a - b);
+        const warmMedianMs = Math.round(warmSamples[10]);
+
+        const concurrentStarted = performance.now();
+        await Promise.all(
+          Array.from({ length: 50 }, () => manager.getClient(material)),
+        );
+        const concurrentMs = Math.round(performance.now() - concurrentStarted);
+
+        expect(manager.metrics().activeClients).toBe(1);
+        evidence('perf_db_acquire', {
+          coldMs,
+          warmMedianMs,
+          concurrentGets: 50,
+          concurrentMs,
+        });
+        // Generous bounds for shared CI hardware.
+        expect(coldMs).toBeLessThan(5_000);
+        expect(warmMedianMs).toBeLessThan(100);
+      } finally {
+        await manager.onModuleDestroy();
       }
-      const materials = dbs.map((name) => materialFor(name));
+    }, 30_000);
 
-      // Churn four acquires across three databases; capacity is two.
-      for (const material of [...materials, materials[0]]) {
-        await manager.getClient(material);
-        expect(manager.metrics().activeClients).toBeLessThanOrEqual(2);
+    it('never exceeds TENANT_DB_MAX_CLIENTS under churn (LRU eviction)', async () => {
+      process.env.TENANT_DB_MAX_CLIENTS = '2';
+      const manager = new TenantDatabaseManager();
+      const dbs: string[] = [];
+      try {
+        for (let i = 0; i < 3; i += 1) {
+          const name = await createBareDatabase(`ferio_perf_lru_${i}`);
+          dbs.push(name);
+          created.push(name);
+        }
+        const materials = dbs.map((name) => materialFor(name));
+
+        // Churn four acquires across three databases; capacity is two.
+        for (const material of [...materials, materials[0]]) {
+          await manager.getClient(material);
+          expect(manager.metrics().activeClients).toBeLessThanOrEqual(2);
+        }
+        expect(manager.metrics().activeClients).toBe(2);
+        evidence('perf_db_lru_bound', {
+          maxClients: 2,
+          databasesTouched: materials.length,
+        });
+      } finally {
+        process.env.TENANT_DB_MAX_CLIENTS = '25';
+        await manager.onModuleDestroy();
       }
-      expect(manager.metrics().activeClients).toBe(2);
-      evidence('perf_db_lru_bound', { maxClients: 2, databasesTouched: materials.length });
-    } finally {
-      process.env.TENANT_DB_MAX_CLIENTS = '25';
-      await manager.onModuleDestroy();
-    }
-  }, 60_000);
+    }, 60_000);
 
-  it('bootstraps a fresh tenant database well inside the provisioning budget', async () => {
-    const bootstrapper = new TenantSchemaBootstrapper();
-    const dbName = await createBareDatabase('ferio_perf_boot');
-    created.push(dbName);
-    const conn = { ...serverConfig(), database: dbName };
+    it('keeps concurrent tenant database sessions inside the pool budget', async () => {
+      const previousPoolMax = process.env.TENANT_DB_POOL_MAX;
+      process.env.TENANT_DB_POOL_MAX = '2';
+      const manager = new TenantDatabaseManager();
+      const dbName = await createBareDatabase('ferio_perf_pool');
+      created.push(dbName);
+      const inspector = new Pool({
+        ...serverConfig(),
+        database: 'postgres',
+        max: 1,
+      });
 
-    const started = performance.now();
-    const result = await bootstrapper.bootstrap(conn);
-    const elapsedMs = Math.round(performance.now() - started);
+      try {
+        const material = materialFor(dbName);
+        const client = await manager.getClient(material);
+        const queryCount = 24;
+        let peakConnections = 0;
+        let polling = true;
 
-    const migrationDirs = require('node:fs')
-      .readdirSync(require('node:path').join(__dirname, '../prisma/migrations'))
-      .filter((entry: string) =>
-        require('node:fs').existsSync(
-          require('node:path').join(__dirname, '../prisma/migrations', entry, 'migration.sql'),
-        ),
-      ).length;
-    expect(result.applied).toHaveLength(migrationDirs);
-    evidence('perf_bootstrap_full_chain', { migrations: result.applied.length, elapsedMs });
-    // Whole canonical chain on modest hardware stays inside 60s.
-    expect(elapsedMs).toBeLessThan(60_000);
-  }, 90_000);
-});
+        const sampleConnections = async (): Promise<void> => {
+          while (polling) {
+            const result = await inspector.query<{ count: number }>(
+              `SELECT count(*)::int AS count
+               FROM pg_stat_activity
+               WHERE datname = $1 AND pid <> pg_backend_pid()`,
+              [dbName],
+            );
+            peakConnections = Math.max(
+              peakConnections,
+              result.rows[0]?.count ?? 0,
+            );
+            await new Promise<void>((resolve) => setTimeout(resolve, 5));
+          }
+        };
+
+        const sampler = sampleConnections();
+        await Promise.all(
+          Array.from(
+            { length: queryCount },
+            () => client.$queryRaw`SELECT pg_sleep(0.03)`,
+          ),
+        );
+        polling = false;
+        await sampler;
+
+        expect(peakConnections).toBeGreaterThan(0);
+        expect(peakConnections).toBeLessThanOrEqual(2);
+        evidence('perf_db_pool_bound', {
+          configuredPoolMax: 2,
+          queryCount,
+          peakConnections,
+        });
+      } finally {
+        polling = false;
+        await inspector.end().catch(() => undefined);
+        await manager.onModuleDestroy();
+        if (previousPoolMax === undefined)
+          delete process.env.TENANT_DB_POOL_MAX;
+        else process.env.TENANT_DB_POOL_MAX = previousPoolMax;
+      }
+    }, 60_000);
+
+    it('bootstraps a fresh tenant database well inside the provisioning budget', async () => {
+      const bootstrapper = new TenantSchemaBootstrapper();
+      const dbName = await createBareDatabase('ferio_perf_boot');
+      created.push(dbName);
+      const conn = { ...serverConfig(), database: dbName };
+
+      const started = performance.now();
+      const result = await bootstrapper.bootstrap(conn);
+      const elapsedMs = Math.round(performance.now() - started);
+
+      const migrationDirs = require('node:fs')
+        .readdirSync(
+          require('node:path').join(__dirname, '../prisma/migrations'),
+        )
+        .filter((entry: string) =>
+          require('node:fs').existsSync(
+            require('node:path').join(
+              __dirname,
+              '../prisma/migrations',
+              entry,
+              'migration.sql',
+            ),
+          ),
+        ).length;
+      expect(result.applied).toHaveLength(migrationDirs);
+      evidence('perf_bootstrap_full_chain', {
+        migrations: result.applied.length,
+        elapsedMs,
+      });
+      // Whole canonical chain on modest hardware stays inside 60s.
+      expect(elapsedMs).toBeLessThan(60_000);
+    }, 90_000);
+  },
+);

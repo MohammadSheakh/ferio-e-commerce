@@ -1,8 +1,7 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import type { Job } from 'bullmq';
 import { QUEUE_NAMES } from '@app/queue';
-import { Optional } from '@nestjs/common';
-import { TenantFanoutService } from '../../../tenancy/tenant-fanout.service';
+import { TenantFanoutService } from '../../../tenancy/services/tenant-fanout.service';
 import { runWithCorrelationId, StructuredLogger } from '@app/common';
 import {
   RECONCILIATION_SCAN_JOB,
@@ -16,7 +15,7 @@ export class ReconciliationProcessor extends WorkerHost {
 
   constructor(
     private readonly reconciliation: ReconciliationService,
-    @Optional() private readonly fanout?: TenantFanoutService,
+    private readonly fanout?: TenantFanoutService,
   ) {
     super();
   }
@@ -32,14 +31,16 @@ export class ReconciliationProcessor extends WorkerHost {
         retryRunId: job.data.retryRunId,
       });
       if (job.data.retryRunId) {
+        const retryRunId = job.data.retryRunId;
         const runRetry = () =>
           this.reconciliation.retryRun(
-            job.data.retryRunId!,
+            retryRunId,
             queueJobId,
             job.data.initiatedByActorId,
           );
         if (!job.data.organizationId) return runRetry();
-        return this.fanout!.forOrganization(job.data.organizationId, runRetry);
+        if (!this.fanout) throw new Error('TENANT_FANOUT_UNAVAILABLE');
+        return this.fanout.forOrganization(job.data.organizationId, runRetry);
       }
       if ((process.env.TENANCY_ENABLED || 'false') !== 'true') {
         return this.reconciliation.runScheduled(
@@ -50,7 +51,7 @@ export class ReconciliationProcessor extends WorkerHost {
       // MT-8 §11.2: the scheduled scan fans out per READY tenant; per-org
       // failures are isolated and logged, never starving other tenants.
       if (!this.fanout) throw new Error('TENANT_FANOUT_UNAVAILABLE');
-      const overdueHours = job.data.overdueHours as number;
+      const overdueHours = job.data.overdueHours;
       return this.fanout
         .forEachTenant(
           async () => {

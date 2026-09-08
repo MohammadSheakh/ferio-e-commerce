@@ -5,11 +5,11 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        ink: "#111114",
-        ink2: "#6e6e73",
-        line: "#e8e8ea",
-        surface: "#fafafa",
-        paper: "#ffffff",
+        ink: "rgb(var(--color-ink) / <alpha-value>)",
+        ink2: "rgb(var(--color-ink2) / <alpha-value>)",
+        line: "rgb(var(--color-line) / <alpha-value>)",
+        surface: "rgb(var(--color-surface) / <alpha-value>)",
+        paper: "rgb(var(--color-paper) / <alpha-value>)",
       },
       fontFamily: {
         sans: ["var(--font-inter)", "-apple-system", "sans-serif"],

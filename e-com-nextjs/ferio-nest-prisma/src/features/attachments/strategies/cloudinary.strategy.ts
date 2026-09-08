@@ -1,10 +1,22 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { v2 as cloudinary } from 'cloudinary';
-import {
-  IFileUploadStrategy,
-  FileUploadResult,
-} from './file-upload.strategy.interface';
+import type { UploadApiResponse } from 'cloudinary';
 import { errorMessage } from '@app/common';
+
+type CloudinaryDestroyResult = { result?: unknown };
+
+function isCloudinaryDestroyResult(
+  value: unknown,
+): value is CloudinaryDestroyResult {
+  return typeof value === 'object' && value !== null;
+}
+
+export interface FileUploadResult {
+  url: string;
+  publicId?: string;
+  size?: number;
+  mimeType?: string;
+}
 
 /**
  * Cloudinary File Upload Strategy
@@ -20,7 +32,7 @@ import { errorMessage } from '@app/common';
  * ✅ CDN delivery
  */
 @Injectable()
-export class CloudinaryStrategy implements IFileUploadStrategy {
+export class CloudinaryStrategy {
   private readonly logger = new Logger(CloudinaryStrategy.name);
 
   constructor() {
@@ -45,8 +57,8 @@ export class CloudinaryStrategy implements IFileUploadStrategy {
       const base64File = `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
 
       // Upload to Cloudinary
-      const result = await new Promise<any>((resolve, reject) => {
-        cloudinary.uploader.upload(
+      const result = await new Promise<UploadApiResponse>((resolve, reject) => {
+        void cloudinary.uploader.upload(
           base64File,
           {
             folder: `task-mgmt/${folder}`,
@@ -58,7 +70,11 @@ export class CloudinaryStrategy implements IFileUploadStrategy {
           },
           (error, result) => {
             if (error) {
-              reject(error);
+              const normalizedError = new Error(errorMessage(error));
+              if (error instanceof Error) normalizedError.cause = error;
+              reject(normalizedError);
+            } else if (!result) {
+              reject(new Error('Cloudinary returned no upload result'));
             } else {
               resolve(result);
             }
@@ -96,10 +112,15 @@ export class CloudinaryStrategy implements IFileUploadStrategy {
         }
       }
 
-      const result = await cloudinary.uploader.destroy(publicId);
+      const rawResult: unknown = await cloudinary.uploader.destroy(publicId);
+      if (!isCloudinaryDestroyResult(rawResult)) {
+        throw new Error('Cloudinary returned an invalid deletion result');
+      }
 
-      if (result.result !== 'ok') {
-        throw new Error(`Cloudinary deletion failed: ${result.result}`);
+      if (rawResult.result !== 'ok') {
+        throw new Error(
+          `Cloudinary deletion failed: ${String(rawResult.result)}`,
+        );
       }
 
       this.logger.log(`File deleted from Cloudinary: ${publicId}`);

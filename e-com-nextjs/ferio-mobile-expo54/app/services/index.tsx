@@ -1,4 +1,4 @@
-import { Link } from 'expo-router';
+import { Link, type Href } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -44,7 +44,7 @@ export default function ServicesScreen() {
         <Text style={styles.eyebrow}>BOOK A SERVICE</Text>
         <Text style={styles.title}>Services</Text>
         <Text style={styles.copy}>
-          Elevate your space with Ferio's white-glove assembly, interior design consultation, and custom crafting.
+          Elevate your space with Ferio&apos;s white-glove assembly, interior design consultation, and custom crafting.
         </Text>
 
         {loading ? (
@@ -56,7 +56,7 @@ export default function ServicesScreen() {
         ) : (
           <View style={styles.list}>
             {services.map((s) => (
-              <Link key={s.id} href={`/services/${s.slug}` as any} asChild>
+              <Link key={s.id} href={`/services/${s.slug}` as Href} asChild>
                 <Pressable style={styles.card}>
                   {s.imageUrl ? <Image source={{ uri: s.imageUrl }} style={styles.image} /> : null}
                   <View style={styles.content}>

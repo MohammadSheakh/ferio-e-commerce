@@ -1,8 +1,6 @@
 import {
   BadRequestException,
   Injectable,
-  Optional,
-  ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -17,7 +15,10 @@ import {
 } from 'node:crypto';
 import { PrismaService } from '@app/database';
 import type { PrismaClient } from '@prisma/client';
-import { TenantDbService } from '../../../tenancy/tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../../tenancy/services/tenant-db.service';
 
 const BASE32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 
@@ -26,16 +27,11 @@ export class TwoFactorService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
-    @Optional() private readonly tenantDb?: TenantDbService,
+    private readonly tenantDb?: TenantDbService,
   ) {}
 
   private async db(): Promise<PrismaClient> {
-    const tenant = await this.tenantDb?.tryGet();
-    if (tenant) return tenant;
-    if ((process.env.TENANCY_ENABLED || 'false') === 'true') {
-      throw new ServiceUnavailableException('TENANT_IDENTITY_CONTEXT_REQUIRED');
-    }
-    return this.prisma as PrismaClient;
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
 
   async status(userId: string) {

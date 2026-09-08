@@ -1,15 +1,8 @@
 import { Body, Controller, Get, Inject, Post, UseGuards } from '@nestjs/common';
-import {
-  AuthGuard,
-  PermissionsGuard,
-  Roles,
-  RolesGuard,
-  type UserPayload,
-} from '@app/common';
-import { TenantMembershipGuard } from '../../tenancy/tenant-membership.guard';
-import { tryGetTenantContext } from '../../tenancy/tenant-context';
+import { AuthGuard, PermissionsGuard, Roles, RolesGuard } from '@app/common';
+import { TenantMembershipGuard } from '../../tenancy/guards/tenant-membership.guard';
+import { assertTenantObjectKey } from '../../tenancy/utils/object-keys.util';
 import type { StorageStrategy } from './strategies/r2.strategy';
-
 
 /**
  * MT-10 storage surface (owner decision #6): presigned direct-to-bucket
@@ -24,27 +17,24 @@ import type { StorageStrategy } from './strategies/r2.strategy';
 @UseGuards(AuthGuard, RolesGuard, PermissionsGuard, TenantMembershipGuard)
 @Roles('admin')
 export class StorageController {
-  constructor(@Inject('STORAGE_STRATEGY') private readonly strategy: StorageStrategy) {}
-
-  private assertOwnNamespace(key: string): void {
-    const context = tryGetTenantContext();
-    if (!context) return; // legacy mode: no org namespaces exist
-    const required = `tenants/${context.organizationId}/`;
-    if (!key.startsWith(required)) {
-      throw new Error(`STORAGE_KEY_FORBIDDEN:key must start with ${required}`);
-    }
-  }
+  constructor(
+    @Inject('STORAGE_STRATEGY') private readonly strategy: StorageStrategy,
+  ) {}
 
   @Get('presign-get')
   async presignGet(@Body() body: { key: string }) {
-    this.assertOwnNamespace(body.key);
+    assertTenantObjectKey(body.key);
     return { url: await this.strategy.getSignedUrl(body.key), key: body.key };
   }
 
   @Post('presign-put')
   async presignPut(
     @Body()
-    body: { folder: string; filename: string; contentType: string },
+    body: {
+      folder: string;
+      filename: string;
+      contentType: string;
+    },
   ) {
     // The strategy builds the server-side tenant-scoped key; clients cannot
     // rename paths or escape their own prefix.

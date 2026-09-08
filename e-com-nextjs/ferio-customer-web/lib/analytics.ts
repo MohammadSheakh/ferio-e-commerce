@@ -7,7 +7,7 @@ declare global {
     gtag?: (
       command: string,
       targetId: string,
-      config?: Record<string, any>,
+      config?: Record<string, unknown>,
     ) => void;
   }
 }
@@ -28,7 +28,7 @@ export type AnalyticsEventParams = {
     quantity?: number;
   }>;
   transaction_id?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
 function getAnonymousId(): string {

@@ -3,14 +3,16 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
-  Optional,
 } from '@nestjs/common';
 import { createHash, randomBytes } from 'crypto';
 import { Prisma, ReconciliationFindingType } from '@prisma/client';
 import type { UserPayload } from '@app/common';
 import type { PrismaClient } from '@prisma/client';
 import { PrismaService } from '@app/database';
-import { TenantDbService } from '../../../tenancy/tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../../tenancy/services/tenant-db.service';
 import { AuditService } from '../../audit/services/audit.service';
 import {
   ReconciliationActionDto,
@@ -87,8 +89,9 @@ export class ReconciliationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
-  
-    @Optional() private readonly tenantDb?: TenantDbService,) {}
+
+    private readonly tenantDb?: TenantDbService,
+  ) {}
 
   /**
    * MT-7/MT-8: inside a tenant-resolved request or worker fan-out this
@@ -96,8 +99,7 @@ export class ReconciliationService {
    * falls back to the legacy single-tenant DB. Never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    const tenant = await this.tenantDb?.tryGet();
-    return tenant ?? (this.prisma as PrismaClient);
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
   async list(query: ReconciliationQueryDto) {
     const db = await this.db();
@@ -106,25 +108,24 @@ export class ReconciliationService {
       severity: query.severity,
       status: query.status,
     };
-    const [items, total, open, acknowledged, resolved] =
-      await db.$transaction([
-        db.reconciliationFinding.findMany({
-          where,
-          skip: (query.page - 1) * query.limit,
-          take: query.limit,
-          orderBy: [{ severity: 'desc' }, { lastSeenAt: 'desc' }],
-        }),
-        db.reconciliationFinding.count({ where }),
-        db.reconciliationFinding.count({
-          where: { ...where, status: 'OPEN' },
-        }),
-        db.reconciliationFinding.count({
-          where: { ...where, status: 'ACKNOWLEDGED' },
-        }),
-        db.reconciliationFinding.count({
-          where: { ...where, status: 'RESOLVED' },
-        }),
-      ]);
+    const [items, total, open, acknowledged, resolved] = await db.$transaction([
+      db.reconciliationFinding.findMany({
+        where,
+        skip: (query.page - 1) * query.limit,
+        take: query.limit,
+        orderBy: [{ severity: 'desc' }, { lastSeenAt: 'desc' }],
+      }),
+      db.reconciliationFinding.count({ where }),
+      db.reconciliationFinding.count({
+        where: { ...where, status: 'OPEN' },
+      }),
+      db.reconciliationFinding.count({
+        where: { ...where, status: 'ACKNOWLEDGED' },
+      }),
+      db.reconciliationFinding.count({
+        where: { ...where, status: 'RESOLVED' },
+      }),
+    ]);
     return {
       items,
       total,
@@ -461,9 +462,11 @@ export class ReconciliationService {
           select: { startedAt: true, completedAt: true },
         }),
       ]);
-    const durations = timedRuns
-      .filter((run) => run.completedAt)
-      .map((run) => run.completedAt!.getTime() - run.startedAt.getTime());
+    const durations = timedRuns.flatMap((run) =>
+      run.completedAt
+        ? [run.completedAt.getTime() - run.startedAt.getTime()]
+        : [],
+    );
     const totalCount = completedCount + failedCount;
     return {
       windowHours,

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import type { ApiEnvelope } from "@/lib/backend";
+import { parseApiEnvelope } from "@/lib/backend";
 import { withCorrelationId } from "@/lib/correlation";
 import { AdminApiError } from "@/lib/admin-api";
 import { tenantHostHeadersFromRequest } from "@/lib/tenant-host";
@@ -47,7 +47,7 @@ export async function proxyBackendResponse(
   response: Response,
   fallback: string,
 ) {
-  const payload = (await response.json().catch(() => ({}))) as ApiEnvelope<unknown>;
+  const payload = parseApiEnvelope<unknown>(await response.json().catch(() => null));
   if (!response.ok) {
     const message = Array.isArray(payload.message)
       ? payload.message.join(" ")

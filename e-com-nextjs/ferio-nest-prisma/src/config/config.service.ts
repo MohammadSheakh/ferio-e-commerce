@@ -5,12 +5,12 @@ import { ConfigService as NestConfigService } from '@nestjs/config';
 
 /**
  * Config Service
- * 
+ *
  * 📚 INDUSTRY STANDARD IMPLEMENTATION
- * 
+ *
  * Type-safe configuration service
  * Centralized access to environment variables
- * 
+ *
  * Usage:
  * constructor(private configService: ConfigService) {}
  * const databaseUrl = this.configService.getDatabaseUrl();

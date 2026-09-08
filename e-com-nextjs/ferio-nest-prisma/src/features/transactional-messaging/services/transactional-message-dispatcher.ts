@@ -1,20 +1,23 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import {
   CommerceMessageAttemptStatus,
-  CommerceMessageChannel,
   Prisma,
   PrismaClient,
 } from '@prisma/client';
 import { PrismaService } from '@app/database';
 import { MessageAdapterRegistry } from '../adapters/message-adapter.registry';
-import { TenantDbService } from '../../../tenancy/tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../../tenancy/services/tenant-db.service';
+import { toTenantJsonInput } from '../../../core/database/json-input.util';
 
 @Injectable()
 export class TransactionalMessageDispatcher {
   constructor(
     private readonly prisma: PrismaService,
     private readonly adapters: MessageAdapterRegistry,
-    @Optional() private readonly tenantDb?: TenantDbService,
+    private readonly tenantDb?: TenantDbService,
   ) {}
 
   async execute(messageId: string) {
@@ -36,7 +39,11 @@ export class TransactionalMessageDispatcher {
     ]);
 
     if (!policy?.enabled || policy.channelPriority.length === 0) {
-      return this.block(db, messageId, 'Transactional routing policy is disabled');
+      return this.block(
+        db,
+        messageId,
+        'Transactional routing policy is disabled',
+      );
     }
 
     const channelPlan =
@@ -147,12 +154,7 @@ export class TransactionalMessageDispatcher {
   }
 
   private async db(): Promise<PrismaClient> {
-    const tenant = await this.tenantDb?.tryGet();
-    if (tenant) return tenant;
-    if ((process.env.TENANCY_ENABLED || 'false') === 'true') {
-      throw new Error('TRANSACTIONAL_MESSAGE_TENANT_CONTEXT_REQUIRED');
-    }
-    return this.prisma as PrismaClient;
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
 
   private block(db: PrismaClient, messageId: string, reason: string) {
@@ -182,6 +184,6 @@ export class TransactionalMessageDispatcher {
   }
 
   private json(value: unknown): Prisma.InputJsonValue | undefined {
-    return value === undefined ? undefined : (value as Prisma.InputJsonValue);
+    return toTenantJsonInput(value);
   }
 }

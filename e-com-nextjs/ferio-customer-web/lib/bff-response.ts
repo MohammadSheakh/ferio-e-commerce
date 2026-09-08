@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { parseApiEnvelope } from "@/lib/backend";
 import { withCorrelationId } from "@/lib/correlation";
 import { hostForwardHeadersFromRequest } from "@/lib/host-forward";
 
@@ -56,7 +57,7 @@ export async function proxyBackendResponse(
   response: Response,
   fallback: string,
 ) {
-  const payload = (await response.json().catch(() => ({}))) as BackendErrorPayload;
+  const payload = parseApiEnvelope<unknown>(await response.json().catch(() => null));
   if (!response.ok) {
     return backendErrorResponse(
       {

@@ -1,5 +1,10 @@
 import { BadRequestException } from '@nestjs/common';
-import { csvCell, maskExportName, reportPeriod, sumMoney } from '../utils/report.util';
+import {
+  csvCell,
+  maskExportName,
+  reportPeriod,
+  sumMoney,
+} from '../utils/report.util';
 
 describe('report utilities', () => {
   it('creates an inclusive UTC period', () => {

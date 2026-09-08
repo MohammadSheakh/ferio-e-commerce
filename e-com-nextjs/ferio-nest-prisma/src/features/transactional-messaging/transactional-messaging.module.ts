@@ -11,7 +11,7 @@ import { TransactionalMessageQueue } from './queues/transactional-message.queue'
 import { TransactionalMessagingService } from './services/transactional-messaging.service';
 
 @Module({
-  imports: [ TenancyModule,PrismaModule, AuthModule, AuditModule],
+  imports: [TenancyModule, PrismaModule, AuthModule, AuditModule],
   controllers: [TransactionalMessagingController],
   providers: [
     TransactionalMessagingService,

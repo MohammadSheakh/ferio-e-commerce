@@ -40,8 +40,9 @@ export class StorefrontAnalyticsController {
   @Permissions(PERMISSIONS.REPORTS_READ)
   @ApiOperation({ summary: 'Get aggregated storefront and business analytics' })
   getAnalyticsDashboard(@Query('days') daysStr?: string) {
-    const days = daysStr ? Math.max(1, Math.min(365, parseInt(daysStr, 10))) : 30;
+    const days = daysStr
+      ? Math.max(1, Math.min(365, parseInt(daysStr, 10)))
+      : 30;
     return this.service.getAnalyticsOverview(days);
   }
 }
-

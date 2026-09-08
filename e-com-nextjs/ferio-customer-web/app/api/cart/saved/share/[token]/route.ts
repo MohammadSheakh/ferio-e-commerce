@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { backendApiUrl } from "@/lib/customer-session";
 import { withCorrelationId } from "@/lib/correlation";
 import { hostForwardHeadersFromRequest } from "@/lib/host-forward";
+import { getErrorMessage } from "@/lib/error-message";
 
 export async function GET(
   request: Request,
@@ -20,9 +21,9 @@ export async function GET(
     );
     const payload = await res.json();
     return NextResponse.json(payload, { status: res.status });
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
-      { message: error.message || "Failed to fetch shared cart." },
+      { message: getErrorMessage(error, "Failed to fetch shared cart.") },
       { status: 500 },
     );
   }

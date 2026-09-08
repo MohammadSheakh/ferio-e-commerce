@@ -8,14 +8,14 @@ export const IS_PUBLIC_KEY = 'isPublic';
 
 /**
  * Public Decorator
- * 
+ *
  * 📚 INDUSTRY STANDARD IMPLEMENTATION
- * 
+ *
  * Usage:
  * @Public()
  * @Post('login')
  * async login(@Body() loginDto: LoginDto) { ... }
- * 
+ *
  * This route will bypass AuthGuard authentication
  */
 export const Public = () => SetMetadata(IS_PUBLIC_KEY, true);

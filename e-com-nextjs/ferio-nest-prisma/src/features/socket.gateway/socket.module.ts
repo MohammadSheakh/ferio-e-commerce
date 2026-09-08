@@ -20,7 +20,7 @@ import { SocketAuthController } from './controllers/socket-auth.controller';
 @Module({
   imports: [
     JwtModule.register({
-      secret: process.env.JWT_ACCESS_SECRET as string,
+      secret: process.env.JWT_ACCESS_SECRET ?? '',
       signOptions: { expiresIn: '7d' },
     }),
     RedisModule,
@@ -29,16 +29,8 @@ import { SocketAuthController } from './controllers/socket-auth.controller';
     forwardRef(() => ChattingModule),
     TenancyModule,
   ],
-  providers: [
-    SocketGateway,
-    SocketAuthService,
-    SocketRoomService,
-  ],
+  providers: [SocketGateway, SocketAuthService, SocketRoomService],
   controllers: [SocketAuthController],
-  exports: [
-    SocketGateway,
-    SocketAuthService,
-    SocketRoomService,
-  ],
+  exports: [SocketGateway, SocketAuthService, SocketRoomService],
 })
 export class SocketModule {}

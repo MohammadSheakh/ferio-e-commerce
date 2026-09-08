@@ -2,34 +2,30 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
-  Optional,
-  ServiceUnavailableException,
 } from '@nestjs/common';
 import { OAuthAccount, OAuthProvider, PrismaClient } from '@prisma/client';
 
 import { PrismaService } from '@app/database';
-import { TenantDbService } from '../../../tenancy/tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../../tenancy/services/tenant-db.service';
 
 /**
  * OAuthAccount Service
- * 
- * Manages OAuth provider accounts linked to users
- * Extends GenericService for CRUD operations
+ *
+ * Manages OAuth provider accounts linked to users through the tenant-aware
+ * Prisma boundary.
  */
 @Injectable()
 export class OAuthAccountService {
   constructor(
     private readonly prisma: PrismaService,
-    @Optional() private readonly tenantDb?: TenantDbService,
+    private readonly tenantDb?: TenantDbService,
   ) {}
 
   private async db(): Promise<PrismaClient> {
-    const tenant = await this.tenantDb?.tryGet();
-    if (tenant) return tenant;
-    if ((process.env.TENANCY_ENABLED || 'false') === 'true') {
-      throw new ServiceUnavailableException('TENANT_IDENTITY_CONTEXT_REQUIRED');
-    }
-    return this.prisma as PrismaClient;
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
 
   /**
@@ -108,7 +104,9 @@ export class OAuthAccountService {
     });
 
     if (existing) {
-      throw new ConflictException('User already has this OAuth provider linked');
+      throw new ConflictException(
+        'User already has this OAuth provider linked',
+      );
     }
 
     // Create OAuth account
@@ -139,7 +137,10 @@ export class OAuthAccountService {
   /**
    * Unlink OAuth account from user
    */
-  async unlinkOAuthAccount(userId: string, authProvider: OAuthProvider): Promise<void> {
+  async unlinkOAuthAccount(
+    userId: string,
+    authProvider: OAuthProvider,
+  ): Promise<void> {
     const db = await this.db();
     const result = await db.oAuthAccount.updateMany({
       where: { userId, authProvider, isDeleted: false },
@@ -163,15 +164,18 @@ export class OAuthAccountService {
     const accounts = await this.findByUserId(userId);
 
     return {
-      google: accounts.some(acc => acc.authProvider === OAuthProvider.google),
-      apple: accounts.some(acc => acc.authProvider === OAuthProvider.apple),
+      google: accounts.some((acc) => acc.authProvider === OAuthProvider.google),
+      apple: accounts.some((acc) => acc.authProvider === OAuthProvider.apple),
     };
   }
 
   /**
    * Check if user has OAuth account
    */
-  async hasOAuthAccount(userId: string, authProvider: OAuthProvider): Promise<boolean> {
+  async hasOAuthAccount(
+    userId: string,
+    authProvider: OAuthProvider,
+  ): Promise<boolean> {
     const db = await this.db();
     const account = await db.oAuthAccount.findFirst({
       where: { userId, authProvider, isDeleted: false },

@@ -2,24 +2,36 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
-  Optional,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { CommercePaymentProvider, Prisma } from '@prisma/client';
 import { createHash, randomBytes } from 'crypto';
 import { PrismaService } from '@app/database';
 import type { PrismaClient } from '@prisma/client';
-import { TenantDbService } from '../../../tenancy/tenant-db.service';
 import {
-  buildCallbackToken,
-  verifyCallbackToken,
-} from '../../../tenancy/callback-tenant.util';
-import { tryGetTenantContext } from '../../../tenancy/tenant-context';
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../../tenancy/services/tenant-db.service';
+import { toTenantJsonInput } from '../../../core/database/json-input.util';
+import { buildCallbackToken } from '../../../tenancy/utils/callback-tenant.util';
+import { tryGetTenantContext } from '../../../tenancy/context/tenant-context';
 import { OrderService } from '../../order/order.service';
 import { normalizeBangladeshPhone } from '../../checkout/utils/checkout.util';
 import { PaymentGatewayRegistry } from '../gateways/payment-gateway.registry';
 import { AuditService } from '../../audit/services/audit.service';
 import { PaymentLedgerQueryDto } from '../dto/payment-ledger.dto';
+import type { UserPayload } from '@app/common';
+import { UpdatePaymentProviderConfigDto } from '../dto/payment-provider-config.dto';
+import {
+  decryptPaymentCredentials,
+  encryptPaymentCredentials,
+  type PaymentCredentials,
+} from '../utils/payment-credentials.util';
+
+const PAYMENT_CREDENTIAL_KEYS: Record<CommercePaymentProvider, readonly string[]> = {
+  SSLCOMMERZ: ['SSLCOMMERZ_STORE_ID', 'SSLCOMMERZ_STORE_PASSWORD', 'SSLCOMMERZ_IS_LIVE', 'SSLCOMMERZ_BASE_URL'],
+  AAMARPAY: ['AAMARPAY_STORE_ID', 'AAMARPAY_SIGNATURE_KEY', 'AAMARPAY_BASE_URL'],
+};
 
 @Injectable()
 export class CommercePaymentsService {
@@ -29,7 +41,7 @@ export class CommercePaymentsService {
     private readonly orders: OrderService,
     private readonly gateways: PaymentGatewayRegistry,
     private readonly audit: AuditService,
-    @Optional() private readonly tenantDb?: TenantDbService,
+    private readonly tenantDb?: TenantDbService,
   ) {}
 
   /**
@@ -37,12 +49,107 @@ export class CommercePaymentsService {
    * HMAC-verified callback token); legacy DB otherwise. Never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    const tenant = await this.tenantDb?.tryGet();
-    return tenant ?? (this.prisma as PrismaClient);
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
 
-  providers() {
-    return this.gateways.readiness();
+  async providers() {
+    const db = await this.db();
+    const configured = await db.commercePaymentProviderConfig.findMany();
+    const byProvider = new Map(configured.map((item) => [item.provider, item]));
+    return this.gateways.readiness().map((provider) => {
+      const config = byProvider.get(provider.code);
+      let tenantCredentials: PaymentCredentials | undefined;
+      if (config?.enabled) {
+        try {
+          tenantCredentials = decryptPaymentCredentials(
+            config.credentialCipher,
+            this.config.get<string>('PLATFORM_DB_CREDENTIAL_KEY'),
+          );
+        } catch {
+          tenantCredentials = undefined;
+        }
+      }
+      return {
+        ...provider,
+        configured: Boolean(config?.enabled && tenantCredentials && this.gateways.get(provider.code).isConfigured(tenantCredentials)),
+        source: config ? 'tenant' : 'unconfigured',
+      };
+    });
+  }
+
+  async updateProviderConfig(
+    provider: CommercePaymentProvider,
+    dto: UpdatePaymentProviderConfigDto,
+    actor: UserPayload,
+  ) {
+    const allowed = PAYMENT_CREDENTIAL_KEYS[provider];
+    const supplied = Object.keys(dto.credentials);
+    if (supplied.some((key) => !allowed.includes(key)) || supplied.length === 0) {
+      throw new ConflictException('Unsupported or empty payment credential set');
+    }
+    if (Object.values(dto.credentials).some((value) => typeof value !== 'string' || value.trim() === '')) {
+      throw new ConflictException('Payment credentials must contain non-empty strings');
+    }
+    const credentials = Object.fromEntries(
+      supplied.map((key) => [key, dto.credentials[key].trim()]),
+    ) as PaymentCredentials;
+    const gateway = this.gateways.get(provider);
+    if (dto.enabled && !gateway.isConfigured(credentials)) {
+      throw new ConflictException('Required payment credentials are missing');
+    }
+    const db = await this.db();
+    const secret = this.config.get<string>('PLATFORM_DB_CREDENTIAL_KEY');
+    const cipher = encryptPaymentCredentials(credentials, secret);
+    const credentialsRotatedAt = new Date();
+    return db.$transaction(async (transaction) => {
+      const previous = await transaction.commercePaymentProviderConfig.findUnique({ where: { provider } });
+      const updated = await transaction.commercePaymentProviderConfig.upsert({
+        where: { provider },
+        update: {
+          credentialCipher: cipher,
+          credentialsRotatedAt,
+          enabled: dto.enabled ?? false,
+        },
+        create: {
+          provider,
+          credentialCipher: cipher,
+          credentialsRotatedAt,
+          enabled: dto.enabled ?? false,
+        },
+      });
+      await this.audit.record({
+        action: 'PAYMENT_PROVIDER_CONFIG_UPDATED',
+        entityType: 'CommercePaymentProviderConfig',
+        entityId: updated.id,
+        actor,
+        previousValue: previous ? { provider, enabled: previous.enabled } : undefined,
+        newValue: {
+          provider,
+          enabled: updated.enabled,
+          credentialKeys: supplied,
+          credentialsRotatedAt: updated.credentialsRotatedAt,
+        },
+      }, transaction);
+      return {
+        provider,
+        enabled: updated.enabled,
+        configured: gateway.isConfigured(credentials),
+        credentialsRotatedAt: updated.credentialsRotatedAt,
+      };
+    });
+  }
+
+  private async tenantCredentials(provider: CommercePaymentProvider): Promise<PaymentCredentials | undefined> {
+    const context = tryGetTenantContext();
+    if (!context) return undefined;
+    const db = await this.db();
+    const config = await db.commercePaymentProviderConfig.findUnique({ where: { provider } });
+    if (!config?.enabled) return undefined;
+    try {
+      return decryptPaymentCredentials(config.credentialCipher, this.config.get<string>('PLATFORM_DB_CREDENTIAL_KEY'));
+    } catch {
+      return undefined;
+    }
   }
 
   async retry(
@@ -81,7 +188,8 @@ export class CommercePaymentsService {
   ) {
     const db = await this.db();
     const adapter = this.gateways.get(provider);
-    if (!adapter.isConfigured())
+    const credentials = await this.tenantCredentials(provider);
+    if ((tryGetTenantContext() && !credentials) || !adapter.isConfigured(credentials))
       throw new ConflictException(`${provider} is not configured`);
     const order = await db.order.findUnique({
       where: { id: orderId },
@@ -188,7 +296,7 @@ export class CommercePaymentsService {
         failUrl: `${callbackBase}/payments/callback/${provider}/fail?merchantTransactionId=${merchantTransactionId}${callbackTenantQuery.value}`,
         cancelUrl: `${callbackBase}/payments/callback/${provider}/cancel?merchantTransactionId=${merchantTransactionId}${callbackTenantQuery.value}`,
         ipnUrl: `${callbackBase}/payments/callback/${provider}/ipn?merchantTransactionId=${merchantTransactionId}${callbackTenantQuery.value}`,
-      });
+      }, credentials);
       return this.publicAttempt(
         await db.commercePaymentAttempt.update({
           where: { id: attempt.id },
@@ -196,7 +304,7 @@ export class CommercePaymentsService {
             status: 'PENDING',
             redirectUrl: result.redirectUrl,
             providerSessionId: result.providerSessionId,
-            initiationResponse: result.raw as Prisma.InputJsonValue,
+            initiationResponse: toTenantJsonInput(result.raw) ?? {},
           },
         }),
       );
@@ -234,6 +342,10 @@ export class CommercePaymentsService {
   ) {
     const db = await this.db();
     const adapter = this.gateways.get(provider);
+    const credentials = await this.tenantCredentials(provider);
+    if (tryGetTenantContext() && !credentials) {
+      throw new ConflictException(`${provider} is not configured`);
+    }
 
     // Step 1: Generate unique deduplication key for callback logging
     const key = createHash('sha256')
@@ -257,13 +369,13 @@ export class CommercePaymentsService {
           deduplicationKey: key,
           provider,
           eventType,
-          payload: payload as Prisma.InputJsonValue,
+          payload: toTenantJsonInput(payload) ?? {},
         },
       }));
 
     try {
       // Step 2: Validate transaction with Gateway (e.g. SSLCommerz server-to-server API)
-      const validation = await adapter.validate(payload);
+      const validation = await adapter.validate(payload, credentials);
       const attempt = await db.commercePaymentAttempt.findUnique({
         where: { merchantTransactionId: validation.merchantTransactionId },
         include: { order: { select: { paymentStatus: true } } },
@@ -315,7 +427,7 @@ export class CommercePaymentsService {
                 status: 'SUCCEEDED',
                 providerTransactionId: validation.providerTransactionId,
                 providerValidationId: validation.validationId,
-                validatedResponse: validation.raw as Prisma.InputJsonValue,
+                validatedResponse: toTenantJsonInput(validation.raw) ?? {},
                 completedAt: new Date(),
               },
             });
@@ -384,7 +496,7 @@ export class CommercePaymentsService {
           where: { id: attempt.id },
           data: {
             status,
-            validatedResponse: validation.raw as Prisma.InputJsonValue,
+            validatedResponse: toTenantJsonInput(validation.raw) ?? {},
             completedAt: ['FAILED', 'CANCELLED'].includes(status)
               ? new Date()
               : undefined,

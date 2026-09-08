@@ -20,7 +20,9 @@ describe('explicit permission authorization', () => {
     };
   }
 
-  function guardFor(requiredPermissions: string[] = [PERMISSIONS.REFUNDS_MANAGE]) {
+  function guardFor(
+    requiredPermissions: string[] = [PERMISSIONS.REFUNDS_MANAGE],
+  ) {
     const reflector = {
       getAllAndOverride: jest.fn().mockReturnValue(requiredPermissions),
     };

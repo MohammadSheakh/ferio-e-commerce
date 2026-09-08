@@ -10,6 +10,39 @@ interface ChatMessage {
   time: string;
 }
 
+type ChatSocketMessage = {
+  conversationId?: string;
+  targetUserId?: string;
+  senderId?: string;
+  guestId?: string;
+  senderName?: string;
+  text?: string;
+  _messageId?: string;
+  createdAt?: string;
+  isAdmin?: boolean;
+};
+
+type ChatHistoryMessage = {
+  id?: string;
+  text?: string;
+  createdAt?: string;
+  sender?: { role?: string };
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function isChatMessage(value: unknown): value is ChatMessage {
+  if (!isRecord(value)) return false;
+  return (
+    typeof value.id === "string" &&
+    (value.sender === "agent" || value.sender === "user") &&
+    typeof value.text === "string" &&
+    typeof value.time === "string"
+  );
+}
+
 const DEFAULT_MESSAGES: ChatMessage[] = [
   {
     id: "1",
@@ -76,8 +109,11 @@ export default function LiveChatWidget() {
 
             const savedMsgs = localStorage.getItem(`ferio_chat_history_${userObj.id}`);
             if (savedMsgs) {
-              const parsed = JSON.parse(savedMsgs);
-              if (Array.isArray(parsed) && parsed.length > 0) setMessages(parsed);
+              const parsed: unknown = JSON.parse(savedMsgs);
+              if (Array.isArray(parsed)) {
+                const validMessages = parsed.filter(isChatMessage);
+                if (validMessages.length > 0) setMessages(validMessages);
+              }
             }
             return;
           }
@@ -90,8 +126,11 @@ export default function LiveChatWidget() {
       setIsLoggedIn(false);
       const savedMsgs = localStorage.getItem(`ferio_chat_history_${savedGuestId}`);
       if (savedMsgs) {
-        const parsed = JSON.parse(savedMsgs);
-        if (Array.isArray(parsed) && parsed.length > 0) setMessages(parsed);
+        const parsed: unknown = JSON.parse(savedMsgs);
+        if (Array.isArray(parsed)) {
+          const validMessages = parsed.filter(isChatMessage);
+          if (validMessages.length > 0) setMessages(validMessages);
+        }
       }
     }
 
@@ -168,7 +207,9 @@ export default function LiveChatWidget() {
       setIsConnected(false);
     });
 
-    socket.on("new-message-received", (data: any) => {
+    socket.on("new-message-received", (rawData: unknown) => {
+      if (!isRecord(rawData)) return;
+      const data: ChatSocketMessage = rawData;
       const targetConv = data.conversationId;
       const currentCust = customerUserRef.current;
       const currentGuest = guestIdRef.current;
@@ -199,7 +240,7 @@ export default function LiveChatWidget() {
         const newMsg: ChatMessage = {
           id: data._messageId || Date.now().toString(),
           sender: isAgent ? "agent" : "user",
-          text: data.text,
+          text: data.text ?? "",
           time: new Date(data.createdAt || Date.now()).toLocaleTimeString([], {
             hour: "2-digit",
             minute: "2-digit",
@@ -256,16 +297,40 @@ export default function LiveChatWidget() {
           headers: { "x-chat-guest-id": guestId },
         });
         if (res.ok) {
-          const json = await res.json();
-          const rawMsgs = json.data?.results || [];
+          const json: unknown = await res.json();
+          const data = isRecord(json) && isRecord(json.data) ? json.data : {};
+          const rawMsgs: ChatHistoryMessage[] = Array.isArray(data.results)
+            ? data.results.filter(isRecord).map((message) => ({
+                id: typeof message.id === "string" ? message.id : undefined,
+                text: typeof message.text === "string" ? message.text : undefined,
+                createdAt:
+                  typeof message.createdAt === "string"
+                    ? message.createdAt
+                    : undefined,
+                sender: isRecord(message.sender)
+                  ? {
+                      role:
+                        typeof message.sender.role === "string"
+                          ? message.sender.role
+                          : undefined,
+                    }
+                  : undefined,
+              }))
+            : [];
 
           if (rawMsgs.length > 0) {
-            const formatted: ChatMessage[] = rawMsgs.map((m: any) => ({
-              id: m.id,
-              sender: m.sender?.role === "admin" ? "agent" : "user",
-              text: m.text,
-              time: new Date(m.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-            }));
+            const formatted: ChatMessage[] = rawMsgs.flatMap((message) => {
+              if (!message.id || !message.text || !message.createdAt) return [];
+              return [{
+                id: message.id,
+                sender: message.sender?.role === "admin" ? "agent" : "user",
+                text: message.text,
+                time: new Date(message.createdAt).toLocaleTimeString([], {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                }),
+              }];
+            });
 
             setMessages((prev) => {
               const existingIds = new Set(prev.map((item) => item.id));

@@ -61,10 +61,8 @@ export default function HomeScreen() {
   const loadData = useCallback(() => {
     return Promise.all([getCategories(), getProducts({ limit: 6 })])
       .then(([c, p]) => {
-        const catList = Array.isArray(c) ? c : (c as any)?.data || [];
-        const prodList = Array.isArray(p?.items) ? p.items : (p as any)?.data?.items || (Array.isArray(p) ? p : []);
-        setCategories(catList);
-        setProducts(prodList);
+        setCategories(c);
+        setProducts(p.items);
       })
       .catch(() => {
         setCategories([]);
