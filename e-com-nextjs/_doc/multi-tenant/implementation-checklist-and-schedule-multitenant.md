@@ -654,7 +654,7 @@ This is the largest migration slice. Existing feature behavior should remain sta
 - [x] Tenant-scope every return/refund/RTO/settlement record. (`ReturnsService`, `RefundsService`, `RtoService`, `SettlementsService`, and reconciliation resolve through the tenant client; two-tenant read-isolation suites cover return, refund, RTO, and settlement identifiers)
 - [x] Tenant-scope scheduled reconciliation runs.
 - [x] Tenant-scope settlement imports and evidence. (`SettlementImportsService` resolves every import/classify/persist/claim path through the tenant client)
-- [ ] Tenant-scope BullMQ job IDs.
+- [x] Tenant-scope BullMQ job IDs. (tenant-bearing queue producers prefix IDs with `t:{organizationId}:`; reconciliation, courier, transactional-message, and payment-recovery tests cover collision-free IDs while platform-wide sweep jobs remain intentionally global)
 - [x] Tenant-scope manual retry actions. (Reconciliation, courier callback, and transactional-message retries require resolved tenant context, stamp the trusted organization in job data, and use tenant-scoped job IDs)
 - [x] Prove failure in tenant A reconciliation does not block tenant B jobs. (reconciliation scans fan out per tenant with isolated failure evidence)
 
@@ -696,7 +696,7 @@ This is the largest migration slice. Existing feature behavior should remain sta
 - [x] Clarify that "Global Order History" means tenant-global only. (The customer history view is global within one tenant database, never across organizations)
 - [ ] **PARTIAL:** Tenant-scope feature flags/settings. (`SettingsService` — all settings CRUD/pagination/delete paths now resolve through the tenant client; platform-vs-tenant feature-flag separation still open)
 - [ ] Separate platform feature flags from tenant feature flags.
-- [ ] Tenant-scope operations health while keeping platform health separate.
+- [x] Tenant-scope operations health while keeping platform health separate. (tenant `/health` remains in `OperationsHealthModule`; control-plane `/platform/system-health` is independently permission-protected and never uses tenant DB health as platform authorization)
 - [x] Ensure Platform Admin aggregate metrics use approved metadata/aggregation and do not expose tenant PII by default. (`GET /platform/dashboard` reads control-plane group counts only; regression coverage rejects organization IDs, customer/order fields, and contact data)
 - [x] Tenant-scope audit logs. (Audit writes automatically include trusted organization, tenant database, domain, hostname, and correlation context)
 - [x] Add support-access audit linking when Platform Support views tenant data. (`SupportAccessService.assertActive` requires the exact organization/operator grant and records `SUPPORT_ACCESS_USED`; audit failure blocks the access request.)
@@ -835,7 +835,7 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 
 - [x] Provisioning retry. (console "Run provisioning" action replays the resumable orchestrator; per-step timeline evidences recovery)
 
-- [ ] Tenant migration canary/batch control.
+- [x] Tenant migration canary/batch control. (migration console and orchestrator accept a requested canary organization and bounded concurrency, then persist ordered per-tenant results before fleet rollout)
 - [x] Persist and honor the requested migration canary organization. (`TenantMigrationRun.canaryOrganizationId` is stored in the platform plane and the orchestrator migrates that organization before the remaining ordered fleet)
 - [x] Pause rollout. (Queued workers re-check the durable run status before touching any tenant database, so an operator pause wins races with already-enqueued jobs.)
 - [x] Retry failed tenant. (failed result rows remain retryable; queued resume retries them while skipping successful tenants)
@@ -853,9 +853,9 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 - [ ] Require tenant authorization where policy demands it.
 - [x] Set expiry. (5min–8h TTL clamp)
 - [ ] Restrict scope/permissions.
-- [ ] Record every support action.
+- [x] Record every support action. (`SUPPORT_ACCESS_GRANTED`, `SUPPORT_ACCESS_USED`, and `SUPPORT_ACCESS_REVOKED` are append-only audit events; data access fails closed if the usage audit cannot be written)
 - [x] Revoke immediately. (console revoke button + `revoke()` audit)
-- [ ] Display active support sessions prominently.
+- [x] Display active support sessions prominently. (Platform Dashboard shows the active-grant count and the Support Access console lists active grants with organization/operator, scope, expiry, and immediate revoke action)
 
 ### MT-9 gate
 
