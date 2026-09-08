@@ -229,7 +229,7 @@ Create a separate control-plane schema/database for platform metadata.
 - [x] Define platform permissions for organization, subscription, billing, domain, provisioning, migration, support access, and platform health. (`PLATFORM_PERMISSION` is the typed canonical catalog; health diagnostics require `platform_health:read`.)
 - [x] Ensure tenant staff roles cannot invoke Platform Admin APIs. (realm mismatch rejected)
 - [x] Ensure Platform Admin identity alone does not grant direct tenant commerce access. (`TenantMembershipGuard` rejects platform-realm principals before roster lookup; tenant data access requires an explicit support-access workflow.)
-- [ ] Require explicit support-access workflow for tenant-data access.
+- [x] Require explicit support-access workflow for tenant-data access. (`TenantMembershipGuard` rejects platform-realm principals; tenant-data access requires an active reason-bound support grant and `SUPPORT_ACCESS_USED` audit evidence.)
 - [x] Make support access reason-bound, time-bound, auditable, and revocable. (min reason length, 5min–8h TTL clamp)
 
 ## 4.4 Validation
@@ -328,20 +328,20 @@ Create a separate control-plane schema/database for platform metadata.
 
 ## 6.3 Database isolation tests
 
-- [ ] Provision tenant A database.
-- [ ] Provision tenant B database.
-- [ ] Seed deliberately similar IDs into both.
-- [ ] Prove tenant A reads only A.
-- [ ] Prove tenant B reads only B.
-- [ ] Prove writes remain isolated.
-- [ ] Prove transaction rollback remains isolated.
+- [x] Provision tenant A database. (CI-gated `test/tenant-bootstrap.integration-spec.ts` creates an independent disposable PostgreSQL database.)
+- [x] Provision tenant B database. (CI-gated `test/tenant-bootstrap.integration-spec.ts` creates a second independent disposable PostgreSQL database.)
+- [x] Seed deliberately similar IDs into both. (The integration suite writes identical brand/category/product identifiers to both databases.)
+- [x] Prove tenant A reads only A. (The real PostgreSQL isolation suite verifies A sees its own row.)
+- [x] Prove tenant B reads only B. (The real PostgreSQL isolation suite verifies B cannot read A's row and can own the same identifier independently.)
+- [x] Prove writes remain isolated. (Identical identifiers can be written independently without cross-database visibility.)
+- [x] Prove transaction rollback remains isolated. (A forced rollback removes A's uncommitted row while leaving B's data untouched.)
 - [ ] Prove one tenant DB outage does not route to another.
 - [ ] Prove one tenant DB outage does not crash healthy tenant traffic unnecessarily.
 - [ ] Load-test connection manager with many simulated tenants.
 
 ### MT-3 gate
 
-- [ ] Database-per-tenant isolation is demonstrated automatically.
+- [x] Database-per-tenant isolation is demonstrated automatically. (The disposable PostgreSQL tenant-bootstrap integration suite is mandatory in the backend CI integration job.)
 - [ ] No tenant-scoped HTTP path uses a global/default Prisma client.
 - [x] Pool/client count remains bounded under load. (50 concurrent acquisitions collapse to 1 active client; LRU churn never exceeds TENANT_DB_MAX_CLIENTS — performance-baseline suite)
 
@@ -529,7 +529,7 @@ All surfaces live in the ferio-platform-admin console:
 
 - [x] Plan A cannot use Plan B-only feature. (entitlement matrix suite)
 - [x] Upgrade unlocks capability without tenant DB migration where possible. (changePlan swaps planId only — covered)
-- [ ] Downgrade does not destroy historical data.
+- [x] Downgrade does not destroy historical data. (The CI-gated `test/plan-limit-lifecycle.integration-spec.ts` upgrades and downgrades the plan, rechecks limits, and verifies historical orders survive byte-for-byte.)
 - [x] Limit exceeded is enforced concurrently. (evaluate() limit+usage semantics unit-tested; atomic counters in UsageService)
 - [x] Suspended subscription blocks only approved capabilities.
 - [x] Internal/free entitlement is explicit and audited. (`SubscriptionsService.startInternal()` requires the seeded `internal` plan, creates an ACTIVE subscription, and records `SUBSCRIPTION_INTERNAL_STARTED` with actor and plan evidence.)
