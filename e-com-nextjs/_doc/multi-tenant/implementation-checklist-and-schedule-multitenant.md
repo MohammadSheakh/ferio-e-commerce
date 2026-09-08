@@ -377,7 +377,7 @@ Provisioning should behave as an idempotent state machine, not a controller scri
 
 - [x] Refactor existing Ferio seed into tenant-safe seed logic. (`TenantSchemaBootstrapper.seedBaseline` is the provisioning seed boundary and is idempotent under PostgreSQL conflict handling)
 - [x] Remove global hard-coded Ferio business assumptions. (The organization name is the tenant seed input; the `Ferio` factory value is used only to avoid overwriting a prior migration default)
-- [ ] Seed tenant owner separately from platform super-admin.
+- [x] Seed tenant owner separately from platform super-admin. (The approved shared-identity design does not create a tenant-local super-admin: organization creation atomically creates the tenant's control-plane `OWNER` membership, while Platform Admin users remain a separate realm.)
 - [x] Seed tenant-local settings. (`CommerceSettings` is created in the tenant database with the requested organization name)
 - [x] Seed tenant-local feature defaults. (Commerce settings defaults are stored in each tenant database; commerce-affecting options remain configuration-owned)
 - [x] Seed tenant-local notification templates. (`TenantSchemaBootstrapper.seedBaseline` inserts the approved transactional order/shipment templates idempotently while messaging remains disabled until a provider is configured.)
@@ -944,7 +944,7 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 - [x] Define canonical migration artifact/version. (`prisma/migrations` is validated and `TenantSchemaBootstrapper` reports the completed migration head as the tenant schema version)
 - [x] Record expected schema version in control plane. (`TenantDatabase.schemaVersion` is stamped during provisioning and migration, and platform migration results retain from/to versions)
 - [x] Make migration artifact immutable once released. (`prisma/migration-checksums.json` records SHA-256 digests for all 48 tenant and platform migration artifacts; `pnpm check:migrations` fails on changed, missing, or unlisted SQL.)
-- [ ] Add compatibility metadata if application version requires minimum schema version.
+- [x] Add compatibility metadata if application version requires minimum schema version. (`TenantDatabase.schemaVersion` and migration result from/to versions are stamped and surfaced; the resolver fails closed with `TENANT_MIGRATION_REQUIRED` when a registry is incompatible.)
 - [x] Separate control-plane migrations from tenant-plane migrations. (`prisma/platform-migrations` and `prisma/migrations` have independent PostgreSQL locks, validation, and deployment commands)
 
 ## 14.2 Migration orchestrator
