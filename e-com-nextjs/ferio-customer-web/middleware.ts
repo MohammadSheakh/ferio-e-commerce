@@ -27,7 +27,27 @@ function requestOrigin(request: NextRequest) {
   }
 }
 
+function redirectToHttps(request: NextRequest): NextResponse | null {
+  if (process.env.NODE_ENV !== "production") return null;
+  if (!safeMethods.has(request.method)) return null;
+  const forwardedProtocol = firstHeaderValue(
+    request.headers.get("x-forwarded-proto"),
+  );
+  if (forwardedProtocol !== "http") return null;
+
+  const url = request.nextUrl.clone();
+  url.protocol = "https:";
+  return NextResponse.redirect(url, 308);
+}
+
 export function middleware(request: NextRequest) {
+  const httpsRedirect = redirectToHttps(request);
+  if (httpsRedirect) return httpsRedirect;
+
+  if (!request.nextUrl.pathname.startsWith("/api/")) {
+    return NextResponse.next();
+  }
+
   if (safeMethods.has(request.method)) return NextResponse.next();
 
   const origin = request.headers.get("origin");
@@ -51,5 +71,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: "/api/:path*",
+  matcher: "/:path*",
 };

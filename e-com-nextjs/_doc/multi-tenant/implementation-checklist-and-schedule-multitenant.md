@@ -428,7 +428,7 @@ All surfaces live in the ferio-platform-admin console:
 - [ ] **PARTIAL:** Configure wildcard DNS. (Decision made: *.ferio.com → storefront infrastructure, PO-007/008; DNS record creation itself is an ops task on the production domain)
 - [ ] Configure wildcard TLS/certificate strategy.
 - [x] Configure local-development tenant-domain strategy. (`TENANT_DEV_HOST_MAP` maps browser hosts such as `localhost:3000` to registered tenant domains without changing production routing.)
-- [ ] Add canonical redirect rules.
+- [x] Add canonical redirect rules. (Customer Web permanently redirects trusted-proxy HTTP `GET`/`HEAD`/`OPTIONS` storefront requests to HTTPS in production; unsafe API mutations retain same-origin protections rather than following unsafe redirects. Certificate issuance and managed TLS automation remain infrastructure work.)
 - [x] Add reserved subdomain list (`www`, `admin`, `api`, `app`, etc.). (`RESERVED_SUBDOMAINS`)
 - [x] Prevent organization slugs from colliding with reserved/system routes. (`OrganizationsService` rejects the canonical reserved subdomain set before opening the control-plane transaction.)
 - [x] Ensure storefront SSR/server requests resolve tenant before fetching tenant data. (Customer Web root layout gates rendering on backend `/tenancy/status`; all server-side BFF fetches forward `x-forwarded-host` via the instrumentation-registered provider)

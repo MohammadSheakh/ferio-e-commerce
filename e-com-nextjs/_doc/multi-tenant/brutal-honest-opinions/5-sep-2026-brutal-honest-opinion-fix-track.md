@@ -28,6 +28,10 @@ and must not be modified to make the project look better.
 
 - Added an architecture check for tenant feature transaction entry points. Feature services must resolve the local `db` client through `this.db()` before calling `db.$transaction`; direct singleton transaction calls are rejected by CI. Nested-service client reuse remains a separate open review item.
 
+## 2026-09-08 canonical storefront redirect
+
+- Added a production Customer Web middleware redirect for trusted-proxy HTTP safe requests, preserving the original host/path/query while returning a permanent HTTPS redirect. Unsafe API mutations are not redirected; same-origin enforcement remains authoritative. Certificate issuance and managed TLS automation remain infrastructure-owned.
+
 ## Status Legend
 
 - `TODO`: identified, not yet implemented
