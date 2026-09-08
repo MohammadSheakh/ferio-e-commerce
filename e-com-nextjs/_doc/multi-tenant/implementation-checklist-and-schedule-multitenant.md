@@ -887,7 +887,7 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 
 ## 13.2 Tenant Admin entitlement UX
 
-- [ ] **PARTIAL:** Navigation hides or labels unavailable plan features. (Plan & Usage card on the admin dashboard surfaces plan, usage vs limits and limit-reached labels; full nav gating pending)
+- [x] Navigation hides or labels unavailable plan features. (Tenant Admin Sidebar consumes the tenant-scoped boolean entitlement map for presentation filtering while backend route/limit enforcement remains authoritative.)
 - [x] Backend remains authoritative.
 - [x] Upgrade CTA for plan-gated features. (Plan & Usage card links to the subscription settings surface with an explicit “Review plan or upgrade” action.)
 - [x] Limit warnings before hard limits. (Plan & Usage card marks usage at or above 80% as `near limit` before server-side denial.)

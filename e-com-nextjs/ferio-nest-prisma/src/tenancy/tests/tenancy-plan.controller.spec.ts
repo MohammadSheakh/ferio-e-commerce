@@ -17,8 +17,8 @@ describe('TenancyPlanController overdue subscription behavior', () => {
                 key: 'business',
                 displayName: 'Business',
                 entitlements: [
-                  { featureKey: 'staff_seats', limit: 10 },
-                  { featureKey: 'custom_domain', limit: null },
+                  { featureKey: 'staff_seats', enabled: true, limit: 10 },
+                  { featureKey: 'custom_domain', enabled: false, limit: null },
                 ],
               },
             }),
@@ -73,6 +73,7 @@ describe('TenancyPlanController overdue subscription behavior', () => {
       },
       usage: { orders_per_month: '12' },
       limits: { staff_seats: 10 },
+      features: { staff_seats: true, custom_domain: false },
     });
   });
 });

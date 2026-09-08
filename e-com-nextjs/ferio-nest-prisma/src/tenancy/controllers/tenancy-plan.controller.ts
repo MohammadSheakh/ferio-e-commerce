@@ -12,6 +12,7 @@ export interface TenantPlanStatusPayload {
   code: 'LEGACY' | 'ACTIVE' | 'TENANT_MEMBERSHIP_REQUIRED';
   plan?: { key: string; displayName: string };
   subscription?: { status: string; currentPeriodEnd?: string };
+  features?: Record<string, boolean>;
   usage?: Record<string, string>;
   limits?: Record<string, number>;
   domains?: Array<{ hostname: string; status: string; isPrimary: boolean }>;
@@ -70,7 +71,9 @@ export class TenancyPlanController {
     if (!subscription) return { code: 'LEGACY' };
 
     const limits: Record<string, number> = {};
+    const features: Record<string, boolean> = {};
     for (const entitlement of subscription.plan.entitlements) {
+      features[entitlement.featureKey] = entitlement.enabled;
       if (entitlement.limit != null)
         limits[entitlement.featureKey] = entitlement.limit;
     }
@@ -87,6 +90,7 @@ export class TenancyPlanController {
           ? { currentPeriodEnd: subscription.currentPeriodEnd.toISOString() }
           : {}),
       },
+      features,
       usage,
       limits,
       domains,
