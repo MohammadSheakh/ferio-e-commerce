@@ -997,14 +997,14 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 ## 15.1 Backup
 
 - [ ] Select managed PostgreSQL backup/PITR strategy.
-- [ ] Define RPO.
-- [ ] Define RTO.
+- [x] Define RPO. (PO-012: recovery point objective is at most 1 hour.)
+- [x] Define RTO. (PO-012: recovery time objective is at most 4 hours.)
 - [ ] Back up control plane.
 - [ ] Back up every tenant DB.
 - [ ] Track backup evidence/status centrally.
 - [ ] Alert on stale/failed backup.
 - [ ] Protect backup credentials.
-- [ ] Define retention by plan/legal requirement.
+- [x] Define retention by plan/legal requirement. (PO-012 sets the initial backup retention to 30 days; legal/plan-specific extensions remain an operations policy follow-up.)
 
 ## 15.2 Restore
 
