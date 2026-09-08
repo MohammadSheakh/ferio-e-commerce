@@ -646,7 +646,7 @@ This is the largest migration slice. Existing feature behavior should remain sta
 - [x] Tenant-scope location-history clearing.
 - [x] Prevent rider session from tenant A acting on tenant B order. (`DeliveryPersonnelService` resolves through the tenant client; assigned-order lookup is scoped to the same database — cross-tenant action has no resolution path)
 - [x] Preserve COD staff-confirmation rule per tenant. (COD policy is read from the resolved tenant database, confirmation transitions are explicit, and the two-tenant vertical suite proves identical COD orders and confirmation stock reservations remain isolated.)
-- [ ] Add location retention policy.
+- [x] Add location retention policy. (`RetentionSweepService` prunes tenant-local `DeliveryLocationHistory` after the configurable `RETENTION_GPS_DAYS` window, defaulting to the approved 90-day policy; retention tests cover the rule and tenant context.)
 
 ## 10.9 Returns, refunds, RTO, settlement, reconciliation
 
