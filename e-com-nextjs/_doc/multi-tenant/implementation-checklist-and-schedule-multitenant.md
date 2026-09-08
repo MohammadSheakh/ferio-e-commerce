@@ -510,7 +510,7 @@ All surfaces live in the ferio-platform-admin console:
 - [x] Add webhook verification/idempotency. (server-side val_id validation; single-transition INITIATED→SUCCEEDED/FAILED; duplicates absorbed)
 - [ ] **PARTIAL:** Add retry/recovery. (failed sessions recorded with reasons and can be re-initiated as fresh attempts; automated recovery sweep pending)
 - [x] Add billing history.
-- [ ] Add manual/admin adjustment workflow with audit if required.
+- [x] Add manual/admin adjustment workflow with audit if required. (Platform Admin invoice creation and hosted payment initiation require `saas_billing:write` plus a bounded operator reason, persist only in the control plane, and emit actor/reason audit events.)
 - [x] Never write SaaS subscription payments into tenant `Payment`, `Wallet`, COD, refund, or settlement records. (`PlatformBillingService` depends only on the control-plane client/audit boundary; `architecture:check` now rejects tenant-plane imports or tenant database access in this service.)
 
 ## 9.4 Usage metering
