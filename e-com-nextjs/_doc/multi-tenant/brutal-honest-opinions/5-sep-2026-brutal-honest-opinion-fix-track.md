@@ -12,6 +12,10 @@ and must not be modified to make the project look better.
 
 - Completed the schema ownership freeze for new control-plane tables. `architecture:check` now verifies every model in `prisma/platform.prisma` is explicitly listed in the `CONTROL_PLANE` section of `data-classification.md`, so adding a global table requires a reviewed classification update in the same change.
 
+## 2026-09-08 tenant identity binding reconciliation
+
+- Reconciled the previously partial account-membership control. Admin sessions are bound by `TenantMembershipGuard`; customer accounts and rider actions resolve identity against the current tenant database and approved tenant-local records, with focused isolation tests. Full multi-client E2E coverage remains open and is not counted as complete here.
+
 ## Status Legend
 
 - `TODO`: identified, not yet implemented

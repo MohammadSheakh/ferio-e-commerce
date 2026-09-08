@@ -281,7 +281,7 @@ Create a separate control-plane schema/database for platform metadata.
 ## 5.3 Identity + tenant membership
 
 - [x] Define global identity vs tenant membership behavior. (Global authentication identity is checked against tenant-local membership/customer records; PO-014)
-- [ ] **PARTIAL:** Verify an authenticated account is a member/customer/rider of the resolved tenant before protected tenant actions. (staff membership gate live behind flag; rider binding remains enforced tenant-locally via approved personnel records; customer accounts tenant-local by database separation)
+- [x] Verify an authenticated account is a member/customer/rider of the resolved tenant before protected tenant actions. (`TenantMembershipGuard` binds tenant-admin sessions to the control-plane organization roster; customer-account services resolve the authenticated user and customer only from the current tenant database; delivery-personnel operations bind rider identity to tenant-local approved personnel records. Focused membership, customer-isolation, and rider-isolation tests cover the boundaries; full multi-client E2E remains tracked under MT-14.)
 - [x] Define same-email behavior across independent tenant businesses. (The same email may exist in independent tenant-local records; organization membership remains the authorization boundary)
 - [x] Define whether customer identity is tenant-local initially. (Customer profiles and user-to-customer links are resolved from the trusted tenant database; PO-015)
 - [x] Prevent a valid session from tenant A being replayed against tenant B. (Tenant membership and tenant-local identity lookups reject replay; focused auth/session coverage)
