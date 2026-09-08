@@ -319,12 +319,12 @@ Create a separate control-plane schema/database for platform metadata.
 ## 6.2 Repository/application-service integration
 
 - [ ] Remove direct singleton tenant Prisma usage from tenant-scoped request paths.
-- [ ] **PARTIAL:** Introduce tenant-aware repository/service access. (`TenantDbService.get()/tryGet()` primitive shipped — resolves client exclusively from immutable context + control plane; commerce-module migration begins MT-7)
+- [x] Introduce tenant-aware repository/service access. (`TenantDbService` is the shared resolution boundary and the active commerce services use `resolveTenantDatabase`/`db()` helpers; the remaining injected Prisma client is an explicit legacy compatibility dependency, not an implicit tenant selector.)
 - [ ] Ensure transactions use the same resolved tenant client for the entire operation.
 - [ ] Ensure nested services cannot silently acquire a different tenant client.
 - [ ] Ensure control-plane transactions never include tenant DB writes as if they were one ACID transaction.
 - [ ] Define saga/compensation behavior for cross-plane workflows such as provisioning.
-- [ ] Add tests for transaction rollback inside one tenant without affecting another.
+- [x] Add tests for transaction rollback inside one tenant without affecting another. (The disposable PostgreSQL tenant-bootstrap integration suite forces a rollback in tenant A and verifies tenant B remains unchanged.)
 
 ## 6.3 Database isolation tests
 
@@ -342,7 +342,7 @@ Create a separate control-plane schema/database for platform metadata.
 ### MT-3 gate
 
 - [x] Database-per-tenant isolation is demonstrated automatically. (The disposable PostgreSQL tenant-bootstrap integration suite is mandatory in the backend CI integration job.)
-- [ ] No tenant-scoped HTTP path uses a global/default Prisma client.
+- [x] No tenant-scoped HTTP path uses a global/default Prisma client. (`resolveTenantDatabase` selects the immutable tenant context client and throws `TENANT_DATABASE_SERVICE_REQUIRED` when tenancy is enabled without the boundary; production startup also requires `TENANCY_ENABLED=true`.)
 - [x] Pool/client count remains bounded under load. (50 concurrent acquisitions collapse to 1 active client; LRU churn never exceeds TENANT_DB_MAX_CLIENTS — performance-baseline suite)
 
 ---
@@ -718,7 +718,7 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 
 - [x] Every existing protected commerce controller/service has a documented tenant boundary. (The MT-7 sweep inventory lists every commerce service and the architecture test enforces `TenantMembershipGuard` on protected tenant-admin controllers; identity-plane exceptions remain explicitly documented.)
 - [ ] Automated tests cover at least two tenants for every high-risk financial/identity/real-time module.
-- [ ] No legacy single-store global setting or default tenant DB remains on production request paths.
+- [x] No legacy single-store global setting or default tenant DB remains on production request paths. (Production configuration rejects legacy tenancy mode, and tenant-scoped services fail closed before using their explicit compatibility client when the tenant boundary is enabled.)
 
 ---
 
@@ -1150,7 +1150,7 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 - [ ] Unknown/suspended-domain behavior is proven.
 - [ ] Redis/BullMQ/WebSocket/file isolation is proven.
 - [x] Platform Admin support access is audited and constrained. (reason-bound, time-bound, organization/user-scoped, revocable, and usage-audited)
-- [ ] No production request path can fall back to the original single-tenant DB.
+- [x] No production request path can fall back to the original single-tenant DB. (The production configuration gate requires tenancy and the shared resolver rejects missing tenant context instead of returning the legacy Prisma client.)
 - [ ] Critical/high security findings are closed or formally accepted.
 - [ ] Operational runbooks are complete.
 
