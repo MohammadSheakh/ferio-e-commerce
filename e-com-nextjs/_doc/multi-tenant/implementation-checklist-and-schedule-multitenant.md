@@ -850,9 +850,9 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 
 - [x] Request support access. (API landed MT-1)
 - [x] Require reason. (≥10 chars enforced server-side)
-- [ ] Require tenant authorization where policy demands it.
+- [x] Require tenant authorization where policy demands it. (`SupportAccessService.assertActive` requires the exact organization and platform-user pairing; tenant data callers must provide the organization selected by the trusted support workflow.)
 - [x] Set expiry. (5min–8h TTL clamp)
-- [ ] Restrict scope/permissions.
+- [x] Restrict scope/permissions. (Support grants accept only bounded resource/action pairs, reject unknown or wildcard scopes, and fail closed when a required resource action is absent; write grants may satisfy read operations.)
 - [x] Record every support action. (`SUPPORT_ACCESS_GRANTED`, `SUPPORT_ACCESS_USED`, and `SUPPORT_ACCESS_REVOKED` are append-only audit events; data access fails closed if the usage audit cannot be written)
 - [x] Revoke immediately. (console revoke button + `revoke()` audit)
 - [x] Display active support sessions prominently. (Platform Dashboard shows the active-grant count and the Support Access console lists active grants with organization/operator, scope, expiry, and immediate revoke action)

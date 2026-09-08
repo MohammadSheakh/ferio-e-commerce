@@ -1,4 +1,9 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { SupportAccessService } from './support-access.service';
 
 type Grant = {
@@ -70,6 +75,20 @@ describe('SupportAccessService (explicit, scoped, time-bound access)', () => {
     expect(platform.supportAccessGrant.create).not.toHaveBeenCalled();
   });
 
+  it('rejects an unrecognized or overbroad scope before creating a grant', async () => {
+    const { service, platform } = build();
+
+    await expect(
+      service.grant({
+        organizationId: 'org-a',
+        platformUserId: 'platform-1',
+        reason: 'Investigate a reported tenant incident',
+        scope: { arbitrary: 'write' },
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(platform.supportAccessGrant.create).not.toHaveBeenCalled();
+  });
+
   it('creates an auditable grant with a clamped TTL and requested scope', async () => {
     const { service, platform, audit } = build();
     const created = grant();
@@ -128,6 +147,26 @@ describe('SupportAccessService (explicit, scoped, time-bound access)', () => {
       actorId: 'platform-1',
       metadata: { organizationId: 'org-a' },
     });
+  });
+
+  it('fails closed when a grant does not include the required resource action', async () => {
+    const { service, platform } = build();
+    platform.supportAccessGrant.findFirst.mockResolvedValue(
+      grant({ scope: { orders: 'read' } }),
+    );
+
+    await expect(
+      service.assertActive('org-a', 'platform-1', {
+        resource: 'payments',
+        action: 'read',
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(
+      service.assertActive('org-a', 'platform-1', {
+        resource: 'orders',
+        action: 'read',
+      }),
+    ).resolves.toBeDefined();
   });
 
   it('fails closed when support-access usage cannot be audited', async () => {
