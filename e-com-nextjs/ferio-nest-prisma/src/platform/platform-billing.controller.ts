@@ -18,6 +18,7 @@ import {
   CreatePlatformInvoiceDto,
   ManualBillingActionDto,
   PlatformBillingCallbackQueryDto,
+  RecoverPlatformPaymentAttemptsDto,
 } from './dto/billing.dto';
 import type { PlatformRequest } from './platform-request.type';
 
@@ -58,6 +59,12 @@ export class PlatformBillingController {
       actorId: request.platformPrincipal?.platformUserId,
       reason: body.reason,
     });
+  }
+
+  @Post('payment-attempts/recover')
+  @PlatformPermissions('saas_billing:write')
+  recoverPaymentAttempts(@Body() body: RecoverPlatformPaymentAttemptsDto) {
+    return this.billing.recoverStalePaymentAttempts(body.staleAfterMinutes);
   }
 
   @Get('invoices/:id/receipt')

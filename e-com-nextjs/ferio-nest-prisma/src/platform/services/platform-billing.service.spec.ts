@@ -47,6 +47,7 @@ describe('PlatformBillingService', () => {
         saasPaymentAttempt: {
           create: jest.fn().mockResolvedValue({ id: 'att-1' }),
           findUnique: jest.fn(),
+          findMany: jest.fn().mockResolvedValue([]),
           updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         },
         platformAuditLog: { create: jest.fn() },
@@ -407,5 +408,49 @@ describe('PlatformBillingService', () => {
     await expect(built.service.receipt('inv-1')).rejects.toThrow(
       'RECEIPT_NOT_AVAILABLE',
     );
+  });
+
+  it('recovers stale initiated attempts without charging their invoices', async () => {
+    const built = build();
+    const now = new Date('2026-09-08T12:00:00.000Z');
+    built.platform.client.saasPaymentAttempt.findMany.mockResolvedValueOnce([
+      {
+        id: 'att-stale',
+        reference: 'SAAS-STALE',
+        invoiceId: 'inv-1',
+        amountMinor: 199900,
+      },
+    ]);
+
+    await expect(
+      built.service.recoverStalePaymentAttempts(30, now),
+    ).resolves.toEqual({
+      examined: 1,
+      recovered: 1,
+      staleBefore: new Date('2026-09-08T11:30:00.000Z'),
+    });
+    expect(
+      built.platform.client.saasPaymentAttempt.updateMany,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'att-stale', status: 'INITIATED' },
+        data: expect.objectContaining({ status: 'FAILED' }),
+      }),
+    );
+    expect(built.platform.client.saasInvoice.update).not.toHaveBeenCalled();
+    expect(built.audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'SAAS_PAYMENT_ATTEMPT_RECOVERED',
+        entityId: 'att-stale',
+      }),
+    );
+  });
+
+  it('bounds the stale-attempt recovery window', async () => {
+    const { service, platform } = build();
+    await expect(service.recoverStalePaymentAttempts(2)).rejects.toThrow(
+      'PAYMENT_RECOVERY_WINDOW_INVALID',
+    );
+    expect(platform.client.saasPaymentAttempt.findMany).not.toHaveBeenCalled();
   });
 });

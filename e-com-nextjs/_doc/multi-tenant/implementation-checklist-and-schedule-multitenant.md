@@ -508,7 +508,7 @@ All surfaces live in the ferio-platform-admin console:
 - [x] Store platform payment attempts in control plane.
 - [x] Add invoices/receipts. (control-plane invoice history is available to Platform Admin and `GET /platform/billing/invoices/:id/receipt` returns a bounded receipt projection only after payment succeeds; raw provider payloads and tenant commerce ledgers remain excluded)
 - [x] Add webhook verification/idempotency. (server-side val_id validation; single-transition INITIATED→SUCCEEDED/FAILED; duplicates absorbed)
-- [ ] **PARTIAL:** Add retry/recovery. (failed sessions recorded with reasons and can be re-initiated as fresh attempts; automated recovery sweep pending)
+- [x] Add retry/recovery. (failed sessions remain re-initiable through the existing payment route; bounded `POST /platform/billing/payment-attempts/recover` closes stale INITIATED attempts with audit evidence without charging or mutating invoices)
 - [x] Add billing history.
 - [x] Add manual/admin adjustment workflow with audit if required. (Platform Admin invoice creation and hosted payment initiation require `saas_billing:write` plus a bounded operator reason, persist only in the control plane, and emit actor/reason audit events.)
 - [x] Never write SaaS subscription payments into tenant `Payment`, `Wallet`, COD, refund, or settlement records. (`PlatformBillingService` depends only on the control-plane client/audit boundary; `architecture:check` now rejects tenant-plane imports or tenant database access in this service.)
@@ -987,7 +987,7 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 
 ### MT-11 gate
 
-- [ ] Canary → batch → fleet migration works with one intentionally failing database.
+- [x] Canary → batch → fleet migration works with one intentionally failing database. (`migration-orchestrator.service.spec.ts` proves canary/batch progression, isolated failure evidence, threshold pause behavior, and resume without re-running successful tenants)
 - [x] Production deployment does not depend on manually migrating tenant DBs one by one. (operator start enqueues one bounded canary/batch fleet job; workers record per-tenant results and support queued resume)
 
 ---

@@ -4,13 +4,19 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
-import { correlationHeaders, StructuredLogger, TenantMetrics } from '@app/common';
+import {
+  correlationHeaders,
+  StructuredLogger,
+  TenantMetrics,
+} from '@app/common';
 import { PlatformPrismaService } from '../platform-prisma.service';
 import { PlatformAuditService } from './platform-audit.service';
 import { toPlatformJsonInput } from '../utils/json-input.util';
 
 const SSLC_SANDBOX = 'https://sandbox.sslcommerz.com';
 const SSLC_LIVE = 'https://securepay.sslcommerz.com';
+const DEFAULT_STALE_ATTEMPT_MINUTES = 30;
+const MAX_RECOVERY_BATCH = 100;
 
 function providerText(value: unknown, fallback = ''): string {
   return typeof value === 'string' ||
@@ -446,6 +452,77 @@ export class PlatformBillingService {
         createdAt: true,
       },
     });
+  }
+
+  /**
+   * Close abandoned hosted sessions without charging or mutating invoices.
+   * Operators can then start a fresh idempotent attempt for the invoice.
+   */
+  async recoverStalePaymentAttempts(
+    staleAfterMinutes = DEFAULT_STALE_ATTEMPT_MINUTES,
+    now = new Date(),
+  ): Promise<{ examined: number; recovered: number; staleBefore: Date }> {
+    if (
+      !Number.isInteger(staleAfterMinutes) ||
+      staleAfterMinutes < 5 ||
+      staleAfterMinutes > 1440
+    ) {
+      throw new BadRequestException('PAYMENT_RECOVERY_WINDOW_INVALID');
+    }
+    if (Number.isNaN(now.getTime())) {
+      throw new BadRequestException('PAYMENT_RECOVERY_TIME_INVALID');
+    }
+
+    const staleBefore = new Date(now.getTime() - staleAfterMinutes * 60_000);
+    const attempts = await this.platform.client.saasPaymentAttempt.findMany({
+      where: { status: 'INITIATED', createdAt: { lt: staleBefore } },
+      orderBy: { createdAt: 'asc' },
+      take: MAX_RECOVERY_BATCH,
+      select: {
+        id: true,
+        reference: true,
+        invoiceId: true,
+        amountMinor: true,
+      },
+    });
+    let recovered = 0;
+    for (const attempt of attempts) {
+      const result = await this.platform.client.saasPaymentAttempt.updateMany({
+        where: { id: attempt.id, status: 'INITIATED' },
+        data: {
+          status: 'FAILED',
+          raw: toPlatformJsonInput({
+            recoveryReason: 'STALE_INITIATED_PAYMENT_ATTEMPT',
+            recoveredAt: now,
+          }),
+        },
+      });
+      if (result.count !== 1) continue;
+      recovered += 1;
+      await this.audit.record({
+        action: 'SAAS_PAYMENT_ATTEMPT_RECOVERED',
+        entityType: 'SaasPaymentAttempt',
+        entityId: attempt.id,
+        newValue: {
+          reference: attempt.reference,
+          invoiceId: attempt.invoiceId,
+          amountMinor: attempt.amountMinor,
+          status: 'FAILED',
+        },
+        metadata: {
+          staleAfterMinutes,
+          recoveredAt: now,
+        },
+      });
+    }
+    if (recovered > 0) {
+      TenantMetrics.increment(
+        'platform_billing_payment_recovered',
+        {},
+        recovered,
+      );
+    }
+    return { examined: attempts.length, recovered, staleBefore };
   }
 
   /** Return a bounded receipt projection only after control-plane payment. */
