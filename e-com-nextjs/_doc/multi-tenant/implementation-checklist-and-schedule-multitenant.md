@@ -876,10 +876,10 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 - [x] Currency/timezone. (CommerceSettings validation and the Store Setup checklist)
 - [x] Order prefix. (CommerceSettings validation and the Store Setup checklist)
 - [x] Delivery zones.
-- [ ] COD policy.
+- [x] COD policy. (Tenant Admin orders exposes the tenant-local COD verification policy read/update flow; checkout and order confirmation consume the same tenant database policy, while the two-tenant vertical suite proves confirmation state remains isolated.)
 - [ ] Payment configuration.
 - [ ] Courier configuration.
-- [ ] Notification configuration.
+- [x] Notification configuration. (Tenant Admin transactional-message templates are listed and edited through guarded tenant routes and the template service resolves through the tenant client; provider activation and credential tenancy remain separate open controls.)
 - [x] Initial catalog/import guidance. (Store Setup checklist detects whether the tenant has a catalog product and links directly to the product creation flow.)
 - [x] Subscription/plan summary. (tenant-scoped `GET /tenancy/my-plan` and the dashboard Plan & Usage card)
 - [x] Usage/limit summary. (Tenant Admin Plan & Usage card renders tenant-scoped usage and limits, with unavailable-state handling and near-limit warnings.)
