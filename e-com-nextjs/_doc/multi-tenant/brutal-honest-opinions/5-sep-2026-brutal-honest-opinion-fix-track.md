@@ -4,6 +4,10 @@ This tracker records remediation work for
 `5-sep-2026-brutal-honest-opinion.md`. The opinion document is an audit record
 and must not be modified to make the project look better.
 
+## 2026-09-08 tenant service database boundary
+
+- Removed the final feature-service-specific environment check from `AuditService`; it now uses the shared `resolveTenantDatabase` policy like the other tenant services. Extended `architecture:check` to reject feature services that inject `PrismaService` without the shared resolver or issue direct singleton queries. The direct singleton tenant request-path checklist item is now complete; nested-service client reuse remains open.
+
 ## 2026-09-08 provider entitlement enforcement
 
 - Completed the previously open integration/provider entitlement control. Tenant-scoped payment-provider enablement now requires the `online_payments` entitlement, and courier activation requires `couriers_basic`, both through the shared `PlanGateService` evaluator. Legacy single-tenant mode remains unchanged because it has no tenant context. Added denial-code regression coverage; transactional messaging provider tenancy remains a separate open control.

@@ -4,7 +4,10 @@ import type { UserPayload } from '@app/common';
 import { getCorrelationId } from '@app/common';
 import { PrismaService } from '@app/database';
 import { tryGetTenantContext } from '../../../tenancy/context/tenant-context';
-import { TenantDbService } from '../../../tenancy/services/tenant-db.service';
+import {
+  resolveTenantDatabase,
+  TenantDbService,
+} from '../../../tenancy/services/tenant-db.service';
 import { AuditLogQueryDto } from '../dto/audit.dto';
 import { safeAuditJson } from '../utils/audit.util';
 
@@ -109,12 +112,7 @@ export class AuditService {
   }
 
   private async databaseForRequest(): Promise<PrismaClient> {
-    if ((process.env.TENANCY_ENABLED || 'false') === 'true') {
-      if (!this.tenantDb)
-        throw new Error('TENANT_DATABASE_SERVICE_UNAVAILABLE');
-      return this.tenantDb.get();
-    }
-    return this.prisma;
+    return resolveTenantDatabase(this.tenantDb, this.prisma);
   }
 }
 

@@ -318,7 +318,7 @@ Create a separate control-plane schema/database for platform metadata.
 
 ## 6.2 Repository/application-service integration
 
-- [ ] Remove direct singleton tenant Prisma usage from tenant-scoped request paths.
+- [x] Remove direct singleton tenant Prisma usage from tenant-scoped request paths. (All feature services that inject `PrismaService` now resolve request database access through `resolveTenantDatabase`; `architecture:check` rejects missing resolver imports and direct singleton queries. The legacy client remains an explicit migration fallback only outside production tenancy mode.)
 - [x] Introduce tenant-aware repository/service access. (`TenantDbService` is the shared resolution boundary and the active commerce services use `resolveTenantDatabase`/`db()` helpers; the remaining injected Prisma client is an explicit legacy compatibility dependency, not an implicit tenant selector.)
 - [x] Ensure transactions use the same resolved tenant client for the entire operation. (Tenant feature transactions enter through a local `db` resolved by `this.db()`/`resolveTenantDatabase`; `architecture:check` rejects direct singleton transaction entry points. Nested-service client reuse remains tracked separately below.)
 - [ ] Ensure nested services cannot silently acquire a different tenant client.

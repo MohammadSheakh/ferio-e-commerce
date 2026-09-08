@@ -89,6 +89,45 @@ async function checkTenantTransactionEntryPoints() {
   }
 }
 
+async function checkTenantServiceDatabaseBoundaries() {
+  const featureRoot = resolve(root, 'src/features');
+  const files = [];
+
+  async function walk(directory) {
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      const path = resolve(directory, entry.name);
+      if (entry.isDirectory()) {
+        await walk(path);
+      } else if (
+        entry.isFile() &&
+        entry.name.endsWith('.service.ts') &&
+        !entry.name.endsWith('.spec.ts')
+      ) {
+        files.push(path);
+      }
+    }
+  }
+
+  await walk(featureRoot);
+  for (const file of files) {
+    const source = withoutComments(await readFile(file, 'utf8'));
+    if (!source.includes('PrismaService')) continue;
+
+    const relative = file.replace(`${root}/`, '');
+    if (!source.includes('resolveTenantDatabase')) {
+      violations.push(
+        `${relative} injects PrismaService without the shared tenant database resolver`,
+      );
+    }
+
+    if (/this\.prisma\.(?!poolMetrics\b)[A-Za-z_$][\w$]*/.test(source)) {
+      violations.push(
+        `${relative} performs a direct PrismaService query instead of using its resolved db client`,
+      );
+    }
+  }
+}
+
 async function checkTenantAdminControllerGuards() {
   const featureRoot = resolve(root, 'src/features');
   const controllerFiles = await listControllerFiles(featureRoot);
@@ -158,6 +197,7 @@ if (
 
 checkPlatformModelClassification();
 await checkTenantTransactionEntryPoints();
+await checkTenantServiceDatabaseBoundaries();
 await checkTenantAdminControllerGuards();
 
 try {
