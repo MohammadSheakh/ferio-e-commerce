@@ -33,6 +33,8 @@ export const PLATFORM_PERMISSION = {
   TENANT_DATABASE_READ: 'tenant_db:read',
   USAGE_READ: 'usage:read',
   AUDIT_READ: 'audit:read',
+  FEATURE_FLAG_READ: 'feature_flag:read',
+  FEATURE_FLAG_WRITE: 'feature_flag:write',
 } as const;
 
 export type PlatformPermission =

@@ -694,8 +694,8 @@ This is the largest migration slice. Existing feature behavior should remain sta
 - [x] Tenant-scope exports. (The available orders export is tenant-routed, bounded, permission-masked, and covered by two-tenant evidence)
 - [x] Tenant-scope purchase activity/social proof.
 - [x] Clarify that "Global Order History" means tenant-global only. (The customer history view is global within one tenant database, never across organizations)
-- [ ] **PARTIAL:** Tenant-scope feature flags/settings. (`SettingsService` — all settings CRUD/pagination/delete paths now resolve through the tenant client; platform-vs-tenant feature-flag separation still open)
-- [ ] Separate platform feature flags from tenant feature flags.
+- [x] Tenant-scope feature flags/settings. (`SettingsService` — all settings CRUD/pagination/delete paths resolve through the tenant client; tenant commerce flags remain tenant-local.)
+- [x] Separate platform feature flags from tenant feature flags. (`PlatformFeatureFlagsService` persists only through the control-plane `PlatformPrismaService`; `GET /platform/feature-flags` and `PUT /platform/feature-flags/:key` use dedicated SUPERADMIN permissions and append platform audit records.)
 - [x] Tenant-scope operations health while keeping platform health separate. (tenant `/health` remains in `OperationsHealthModule`; control-plane `/platform/system-health` is independently permission-protected and never uses tenant DB health as platform authorization)
 - [x] Ensure Platform Admin aggregate metrics use approved metadata/aggregation and do not expose tenant PII by default. (`GET /platform/dashboard` reads control-plane group counts only; regression coverage rejects organization IDs, customer/order fields, and contact data)
 - [x] Tenant-scope audit logs. (Audit writes automatically include trusted organization, tenant database, domain, hostname, and correlation context)

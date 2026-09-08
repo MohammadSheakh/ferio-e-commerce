@@ -27,6 +27,10 @@ and must not be modified to make the project look better.
 
 ## Change Log
 
+### 2026-09-08
+
+- BO-01/BO-04/BO-09: completed platform-vs-tenant feature-flag separation. Added a typed `PlatformFeatureFlagsService` backed exclusively by the control-plane Prisma client, guarded list/upsert routes under dedicated `feature_flag:read` and `feature_flag:write` permissions, strict key/note validation, and append-only platform audit records. Added focused creation, update, and invalid-key tests; application typecheck, architecture validation, migration validation/integrity, and focused platform tests pass.
+
 ### 2026-09-05
 
 - Created this tracker; the audit document remains unchanged.
