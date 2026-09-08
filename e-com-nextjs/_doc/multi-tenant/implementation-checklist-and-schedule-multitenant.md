@@ -783,7 +783,7 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 - [ ] Tenant-scope transactional messaging providers/templates.
 - [ ] Tenant-scope Google/Meta integrations where later enabled.
 - [ ] Add credential rotation workflow.
-- [ ] Add readiness/health without leaking secrets.
+- [x] Add readiness/health without leaking secrets. (`OperationsHealthService` exposes bounded payment/courier readiness and launch blockers, while database/queue/provider failures are reduced to safe diagnostics; regression coverage rejects secret-bearing error output.)
 
 ### MT-8 gate
 
