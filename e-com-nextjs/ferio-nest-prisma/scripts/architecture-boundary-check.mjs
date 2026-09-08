@@ -51,6 +51,44 @@ async function listControllerFiles(directory) {
   return files;
 }
 
+async function checkTenantTransactionEntryPoints() {
+  const featureRoot = resolve(root, 'src/features');
+  const files = [];
+
+  async function walk(directory) {
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      const path = resolve(directory, entry.name);
+      if (entry.isDirectory()) {
+        await walk(path);
+      } else if (
+        entry.isFile() &&
+        entry.name.endsWith('.service.ts') &&
+        !entry.name.endsWith('.spec.ts')
+      ) {
+        files.push(path);
+      }
+    }
+  }
+
+  await walk(featureRoot);
+  for (const file of files) {
+    const source = withoutComments(await readFile(file, 'utf8'));
+    if (/\$transaction\s*\(/.test(source) && !/\bdb\s*=\s*await\s+this\.db\(\)/.test(source)) {
+      violations.push(
+        `${file.replace(`${root}/`, '')} uses a transaction without resolving the tenant db client first`,
+      );
+    }
+    for (const line of source.split('\n')) {
+      if (line.includes('$transaction(') && !line.includes('db.$transaction(')) {
+        violations.push(
+          `${file.replace(`${root}/`, '')} must enter tenant transactions through db.$transaction`,
+        );
+        break;
+      }
+    }
+  }
+}
+
 async function checkTenantAdminControllerGuards() {
   const featureRoot = resolve(root, 'src/features');
   const controllerFiles = await listControllerFiles(featureRoot);
@@ -119,6 +157,7 @@ if (
 }
 
 checkPlatformModelClassification();
+await checkTenantTransactionEntryPoints();
 await checkTenantAdminControllerGuards();
 
 try {

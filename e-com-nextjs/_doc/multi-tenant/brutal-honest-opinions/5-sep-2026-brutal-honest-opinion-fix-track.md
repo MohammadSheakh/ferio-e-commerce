@@ -24,6 +24,10 @@ and must not be modified to make the project look better.
 
 - Added a backend cache boundary after successful tenant resolution: tenant responses are `private, no-store` and vary by `x-forwarded-host`, while existing `Vary` values are preserved. Added middleware regression coverage to prevent shared proxy/CDN responses from crossing storefront hosts without changing Redis behavior.
 
+## 2026-09-08 tenant transaction entry boundary
+
+- Added an architecture check for tenant feature transaction entry points. Feature services must resolve the local `db` client through `this.db()` before calling `db.$transaction`; direct singleton transaction calls are rejected by CI. Nested-service client reuse remains a separate open review item.
+
 ## Status Legend
 
 - `TODO`: identified, not yet implemented
