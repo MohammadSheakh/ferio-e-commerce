@@ -16,6 +16,10 @@ and must not be modified to make the project look better.
 
 - Reconciled the previously partial account-membership control. Admin sessions are bound by `TenantMembershipGuard`; customer accounts and rider actions resolve identity against the current tenant database and approved tenant-local records, with focused isolation tests. Full multi-client E2E coverage remains open and is not counted as complete here.
 
+## 2026-09-08 automated organization provisioning reconciliation
+
+- Reconciled the organization provisioning gate as complete for the implemented automated path. Platform Admin triggers the resumable provisioning state machine, which creates/registers the tenant database through the provisioner abstraction, applies migrations, seeds the baseline, checks readiness, and activates the domain without manual SQL. Managed production provider selection remains an infrastructure decision and is not represented as completed.
+
 ## Status Legend
 
 - `TODO`: identified, not yet implemented

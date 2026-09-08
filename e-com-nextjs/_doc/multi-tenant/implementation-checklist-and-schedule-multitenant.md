@@ -414,7 +414,7 @@ All surfaces live in the ferio-platform-admin console:
 
 ### MT-4 gate
 
-- [ ] A new organization can be created from Platform Admin and reach a working isolated storefront/admin environment without manual SQL.
+- [x] A new organization can be created from Platform Admin and reach a working isolated storefront/admin environment without manual SQL. (`OrganizationsService` creates the control-plane owner membership, while the resumable `ProvisioningService` reserves the domain, invokes the `TENANT_DB_PROVISIONER`, registers the database, applies canonical migrations, seeds the tenant baseline, verifies readiness, and activates the organization. The default local executor is automated; production managed-provider selection remains an infrastructure decision.)
 - [x] Replaying provisioning is idempotent. (active subdomain, registered tenant database, and already-active organization state are safely reused on step replay)
 - [x] Failed provisioning is diagnosable and recoverable. (Provisioning timeline, durable step/error records, idempotent replay, and the partial-failure runbook are available.)
 
