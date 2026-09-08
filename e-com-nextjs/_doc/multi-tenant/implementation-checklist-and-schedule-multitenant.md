@@ -555,7 +555,7 @@ This is the largest migration slice. Existing feature behavior should remain sta
 - [x] Make brand slug uniqueness tenant-local. (automatic under database-per-tenant; identical slugs proven coexisting across two bootstrapped databases)
 - [x] Make Hero content tenant-local. (Public settings/hero reads forward the resolved storefront host and the backend settings service reads the tenant client.)
 - [x] Make catalog search/filter cache tenant-aware. (catalog reads resolve per tenant; no shared cache layer exists to leak across)
-- [ ] Tenant-scope product media object keys/metadata.
+- [x] Tenant-scope product media object keys/metadata. (`R2Strategy` derives every product/media key from the trusted organization prefix; storage controller tests reject foreign prefixes before presigning.)
 - [x] Prove tenant A unpublished/product IDs cannot be queried from tenant B. (`tenant-bootstrap.integration-spec.ts`: identical product IDs/slugs seeded into two real PostgreSQL databases; A publishes, B stays draft; publish-filtered read returns 1 in A, 0 in B)
 - [x] Prove storefront SEO/catalog caches cannot cross tenants. (Customer Web forwards the original host on server fetches, derives sitemap URLs from that host, and emits no inactive/unknown tenant URLs; catalog/settings reads remain tenant-routed.)
 
@@ -563,7 +563,7 @@ This is the largest migration slice. Existing feature behavior should remain sta
 
 - [x] Stock movements/reservations/concurrency foundations exist.
 - [x] Move inventory transactions behind tenant client. (adjustment/movement flows inside `CatalogService` swept; reservation consumption inside `OrderService` transactions)
-- [ ] Tenant-scope reconciliation jobs and idempotency keys.
+- [x] Tenant-scope reconciliation jobs and idempotency keys. (scheduled reconciliation fans out with organization context; manual runs require tenant context and organization-prefixed job IDs, while the reconciliation integration suite proves duplicate idempotency keys are absorbed.)
 - [x] Tenant-scope low-stock alerts. (`getInventory` low-stock computation resolves through the tenant client)
 - [ ] **PARTIAL:** Tenant-scope exports. (orders export routed through tenant client; remaining export surfaces pending)
 - [x] Preserve finite-stock concurrency guarantees independently per tenant. (serializable confirmation transactions execute on the resolved tenant client — same mechanism proven under concurrency)
@@ -645,7 +645,7 @@ This is the largest migration slice. Existing feature behavior should remain sta
 - [ ] **PARTIAL:** Tenant-scope WebSocket/live-map rooms. (all existing socket room families — conversations, tasks, admin, notifications — are org-scoped; a dedicated rider live-map emitter does not exist server-side yet)
 - [x] Tenant-scope location-history clearing.
 - [x] Prevent rider session from tenant A acting on tenant B order. (`DeliveryPersonnelService` resolves through the tenant client; assigned-order lookup is scoped to the same database — cross-tenant action has no resolution path)
-- [ ] Preserve COD staff-confirmation rule per tenant.
+- [x] Preserve COD staff-confirmation rule per tenant. (COD policy is read from the resolved tenant database, confirmation transitions are explicit, and the two-tenant vertical suite proves identical COD orders and confirmation stock reservations remain isolated.)
 - [ ] Add location retention policy.
 
 ## 10.9 Returns, refunds, RTO, settlement, reconciliation
