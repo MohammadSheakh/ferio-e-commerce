@@ -1,4 +1,5 @@
 import type { CommerceMessageChannel } from '@prisma/client';
+import type { MessagingCredentials } from '../utils/messaging-credentials.util';
 
 export type MessageDispatchInput = {
   recipient: string;
@@ -8,6 +9,7 @@ export type MessageDispatchInput = {
   body: string;
   payload: unknown;
   idempotencyKey: string;
+  credentials?: MessagingCredentials;
 };
 
 export type MessageDispatchResult = {
@@ -21,6 +23,6 @@ export type MessageDispatchResult = {
 export interface MessageChannelAdapter {
   readonly channel: CommerceMessageChannel;
   readonly provider: string;
-  isConfigured(): boolean;
+  isConfigured(credentials?: MessagingCredentials): boolean;
   dispatch(input: MessageDispatchInput): Promise<MessageDispatchResult>;
 }

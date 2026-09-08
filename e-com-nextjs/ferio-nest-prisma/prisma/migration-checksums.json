@@ -48,6 +48,7 @@
   "migrations/20260908170000_provider_credential_rotation/migration.sql": "7934ca0157ad3819b638cbb98c6ff6a1aec70e61ffadbb066e15acf95f841b78",
   "migrations/20260908173000_tenant_payment_provider_configs/migration.sql": "3792dab196b1fc4672a091e67de33adf3e210e7750e5543e0e7f1f6821be624f",
   "migrations/20260908180000_tenant_courier_provider_configs/migration.sql": "53be0282af50d64a25d88ff37ee1ea46856418669cb83a5764fe29a05835fa27",
+  "migrations/20260908193000_tenant_messaging_provider_configs/migration.sql": "521a33a1178bdcc37ffed013dc0a9e5f413faf76cb2ac9b779c6699dcf2c5944",
   "platform-migrations/20260826000000_platform_init/migration.sql": "e2fdcadb83549604fbdaab00d1bc1bdcdf60bd6cc9b21ff8b6d91468322b982c",
   "platform-migrations/20260907000000_add_migration_canary_organization/migration.sql": "a4893595691fe7fb17622f42ea06dcaff57f264f618628bd9026feb4b10bed83",
   "platform-migrations/20260907210000_pending_tenant_domain_activation/migration.sql": "5b51d0ec32b5202e4c567c47a292b82dcb7e5e812556e9569ea68f684fdf9396",

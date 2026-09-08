@@ -3,7 +3,9 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import type { PrismaClient } from '@prisma/client';
 import { Prisma } from '@prisma/client';
 import { StructuredLogger, type UserPayload } from '@app/common';
@@ -16,9 +18,15 @@ import { AuditService } from '../../audit/services/audit.service';
 import {
   TransactionalMessageQueryDto,
   UpdateMessageTemplateDto,
+  UpdateMessagingProviderConfigDto,
   UpdateMessagingPolicyDto,
 } from '../dto/transactional-message.dto';
 import { MessageAdapterRegistry } from '../adapters/message-adapter.registry';
+import {
+  decryptMessagingCredentials,
+  encryptMessagingCredentials,
+  type MessagingCredentials,
+} from '../utils/messaging-credentials.util';
 import {
   buildMessageDeduplicationKey,
   commerceTemplateDefinitions,
@@ -48,7 +56,7 @@ export class TransactionalMessagingService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly adapters: MessageAdapterRegistry,
-
+    @Optional() private readonly config?: ConfigService,
     private readonly tenantDb?: TenantDbService,
   ) {}
 
@@ -283,7 +291,7 @@ export class TransactionalMessagingService {
       update: {},
       create: { id: 'transactional-default' },
     });
-    const channels = this.adapters.readiness();
+    const channels = this.adapters.readiness(await this.providerConfigs(db));
     return {
       ...policy,
       channels,
@@ -303,7 +311,11 @@ export class TransactionalMessagingService {
     }
     if (
       enabled &&
-      !priority.some((channel) => this.adapters.isConfigured(channel))
+      !priority.some((channel) =>
+        current.channels.some(
+          (available) => available.channel === channel && available.configured,
+        ),
+      )
     ) {
       throw new ConflictException(
         'Configure an approved provider adapter before activating transactional dispatch',
@@ -334,7 +346,96 @@ export class TransactionalMessagingService {
         },
         transaction,
       );
-      return { ...updated, channels: this.adapters.readiness() };
+      return {
+        ...updated,
+        channels: this.adapters.readiness(await this.providerConfigs(db)),
+      };
+    });
+  }
+
+  async getProviderConfigs() {
+    const db = await this.db();
+    const configs = await db.commerceMessagingProviderConfig.findMany({
+      orderBy: { channel: 'asc' },
+    });
+    return configs.map((config) => ({
+      channel: config.channel,
+      provider: config.provider,
+      enabled: config.enabled,
+      credentialsRotatedAt: config.credentialsRotatedAt,
+      credentialKeys: this.credentialKeys(config.credentialCipher),
+    }));
+  }
+
+  async updateProviderConfig(
+    channel: 'WHATSAPP' | 'SMS' | 'EMAIL',
+    dto: UpdateMessagingProviderConfigDto,
+    actor: UserPayload,
+  ) {
+    const provider = dto.provider.normalize('NFKC').trim();
+    const credentials = this.normalizeCredentials(dto.credentials);
+    if (!provider || Object.keys(credentials).length === 0) {
+      throw new ConflictException(
+        'Provider and non-empty credentials are required',
+      );
+    }
+    const db = await this.db();
+    const cipher = encryptMessagingCredentials(
+      credentials,
+      this.config?.get<string>('PLATFORM_DB_CREDENTIAL_KEY'),
+    );
+    const credentialsRotatedAt = new Date();
+    return db.$transaction(async (transaction) => {
+      const previous =
+        await transaction.commerceMessagingProviderConfig.findUnique({
+          where: { channel },
+        });
+      const updated = await transaction.commerceMessagingProviderConfig.upsert({
+        where: { channel },
+        update: {
+          provider,
+          credentialCipher: cipher,
+          enabled: dto.enabled ?? false,
+          credentialsRotatedAt,
+        },
+        create: {
+          channel,
+          provider,
+          credentialCipher: cipher,
+          enabled: dto.enabled ?? false,
+          credentialsRotatedAt,
+        },
+      });
+      await this.audit.record(
+        {
+          action: 'TRANSACTIONAL_MESSAGING_PROVIDER_CONFIG_UPDATED',
+          entityType: 'CommerceMessagingProviderConfig',
+          entityId: updated.id,
+          actor,
+          previousValue: previous
+            ? {
+                channel,
+                provider: previous.provider,
+                enabled: previous.enabled,
+              }
+            : undefined,
+          newValue: {
+            channel,
+            provider: updated.provider,
+            enabled: updated.enabled,
+            credentialKeys: Object.keys(credentials),
+            credentialsRotatedAt: updated.credentialsRotatedAt,
+          },
+        },
+        transaction,
+      );
+      return {
+        channel,
+        provider: updated.provider,
+        enabled: updated.enabled,
+        credentialKeys: Object.keys(credentials),
+        credentialsRotatedAt: updated.credentialsRotatedAt,
+      };
     });
   }
 
@@ -422,6 +523,54 @@ export class TransactionalMessagingService {
   private templatePayload(value?: Prisma.InputJsonValue) {
     if (!value || Array.isArray(value) || typeof value !== 'object') return {};
     return value as Record<string, unknown>;
+  }
+
+  private async providerConfigs(db: PrismaClient) {
+    if (!db.commerceMessagingProviderConfig) return [];
+    const configs = await db.commerceMessagingProviderConfig.findMany();
+    return configs.map((config) => ({
+      channel: config.channel,
+      provider: config.provider,
+      enabled: config.enabled,
+      credentials: this.decryptCredentials(config.credentialCipher),
+    }));
+  }
+
+  private decryptCredentials(cipher: string): MessagingCredentials | undefined {
+    try {
+      return decryptMessagingCredentials(
+        cipher,
+        this.config?.get<string>('PLATFORM_DB_CREDENTIAL_KEY'),
+      );
+    } catch {
+      return undefined;
+    }
+  }
+
+  private credentialKeys(cipher: string): string[] {
+    return Object.keys(this.decryptCredentials(cipher) ?? {});
+  }
+
+  private normalizeCredentials(
+    value: Record<string, string>,
+  ): MessagingCredentials {
+    const entries = Object.entries(value).filter(
+      ([key, item]) =>
+        key.normalize('NFKC').trim().length > 0 &&
+        typeof item === 'string' &&
+        item.normalize('NFKC').trim().length > 0,
+    );
+    if (entries.length !== Object.keys(value).length) {
+      throw new ConflictException(
+        'Messaging credentials must be non-empty strings',
+      );
+    }
+    return Object.fromEntries(
+      entries.map(([key, item]) => [
+        key.normalize('NFKC').trim(),
+        item.normalize('NFKC').trim(),
+      ]),
+    );
   }
 }
 

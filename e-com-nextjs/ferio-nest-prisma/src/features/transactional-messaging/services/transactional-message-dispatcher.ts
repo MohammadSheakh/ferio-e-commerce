@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   CommerceMessageAttemptStatus,
   Prisma,
@@ -11,12 +12,18 @@ import {
   TenantDbService,
 } from '../../../tenancy/services/tenant-db.service';
 import { toTenantJsonInput } from '../../../core/database/json-input.util';
+import {
+  decryptMessagingCredentials,
+  type MessagingCredentials,
+} from '../utils/messaging-credentials.util';
 
 @Injectable()
 export class TransactionalMessageDispatcher {
   constructor(
     private readonly prisma: PrismaService,
     private readonly adapters: MessageAdapterRegistry,
+    @Optional()
+    private readonly config?: ConfigService,
     private readonly tenantDb?: TenantDbService,
   ) {}
 
@@ -57,6 +64,8 @@ export class TransactionalMessageDispatcher {
       });
     }
 
+    const providerConfigs = await this.providerConfigs(db);
+    const readiness = this.adapters.readiness(providerConfigs);
     let fallbackReason: string | null = message.fallbackReason;
     for (let index = 0; index < channelPlan.length; index += 1) {
       const channel = channelPlan[index];
@@ -67,8 +76,8 @@ export class TransactionalMessageDispatcher {
           attemptNumber,
           channel,
           provider:
-            this.adapters.readiness().find((item) => item.channel === channel)
-              ?.provider ?? 'UNCONFIGURED',
+            readiness.find((item) => item.channel === channel)?.provider ??
+            'UNCONFIGURED',
           requestPayload: {
             templateKey: message.templateKey,
             templateVersion: message.templateVersion,
@@ -87,6 +96,8 @@ export class TransactionalMessageDispatcher {
           body: message.renderedBody,
           payload: message.payload,
           idempotencyKey: `${message.deduplicationKey}:${channel}`,
+          credentials: providerConfigs.find((item) => item.channel === channel)
+            ?.credentials,
         });
       } catch (error) {
         result = {
@@ -155,6 +166,28 @@ export class TransactionalMessageDispatcher {
 
   private async db(): Promise<PrismaClient> {
     return resolveTenantDatabase(this.tenantDb, this.prisma);
+  }
+
+  private async providerConfigs(db: PrismaClient) {
+    if (!db.commerceMessagingProviderConfig) return [];
+    const configs = await db.commerceMessagingProviderConfig.findMany();
+    return configs.map((config) => ({
+      channel: config.channel,
+      provider: config.provider,
+      enabled: config.enabled,
+      credentials: this.decryptCredentials(config.credentialCipher),
+    }));
+  }
+
+  private decryptCredentials(cipher: string): MessagingCredentials | undefined {
+    try {
+      return decryptMessagingCredentials(
+        cipher,
+        this.config?.get<string>('PLATFORM_DB_CREDENTIAL_KEY'),
+      );
+    } catch {
+      return undefined;
+    }
   }
 
   private block(db: PrismaClient, messageId: string, reason: string) {
