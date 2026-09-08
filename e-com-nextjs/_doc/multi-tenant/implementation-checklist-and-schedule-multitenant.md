@@ -426,7 +426,7 @@ All surfaces live in the ferio-platform-admin console:
 
 - [x] Define canonical hostname format, e.g. `{tenant}.ferio...`. (`PLATFORM_PUBLIC_DOMAIN` + slug; enforced in DomainsService)
 - [ ] **PARTIAL:** Configure wildcard DNS. (Decision made: *.ferio.com → storefront infrastructure, PO-007/008; DNS record creation itself is an ops task on the production domain)
-- [ ] Configure wildcard TLS/certificate strategy.
+- [x] Configure wildcard TLS/certificate strategy. (PO-008 selects automated wildcard TLS for the Cloudflare-backed storefront ingress; certificate issuance, renewal monitoring, and production readiness verification remain operational tasks.)
 - [x] Configure local-development tenant-domain strategy. (`TENANT_DEV_HOST_MAP` maps browser hosts such as `localhost:3000` to registered tenant domains without changing production routing.)
 - [x] Add canonical redirect rules. (Customer Web permanently redirects trusted-proxy HTTP `GET`/`HEAD`/`OPTIONS` storefront requests to HTTPS in production; unsafe API mutations retain same-origin protections rather than following unsafe redirects. Certificate issuance and managed TLS automation remain infrastructure work.)
 - [x] Add reserved subdomain list (`www`, `admin`, `api`, `app`, etc.). (`RESERVED_SUBDOMAINS`)
