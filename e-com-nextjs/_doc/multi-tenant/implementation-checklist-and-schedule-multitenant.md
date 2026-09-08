@@ -605,7 +605,7 @@ This is the largest migration slice. Existing feature behavior should remain sta
 - [x] Tenant-scope COD policy.
 - [x] Tenant-scope confirmation queues.
 - [x] Tenant-scope public/signed tracking.
-- [ ] **PARTIAL:** Prove same human-readable reference/prefix cannot cause cross-tenant lookup. (references unique per database by construction; product-level cross-read proof landed — order-reference cross-read case rides the two-tenant vertical spec in CI)
+- [x] Prove same human-readable reference/prefix cannot cause cross-tenant lookup. (`order-reference.tenant-isolation.spec.ts` runs the same reference and phone through two trusted tenant contexts and proves each lookup uses only its resolved tenant database.)
 
 ## 10.6 Commerce payments
 
