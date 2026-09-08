@@ -31,7 +31,11 @@ type RetentionPlatformDouble = {
 };
 
 function harness(options: {
-  registries: Array<{ organizationId: string; status: string }>;
+  registries: Array<{
+    organizationId: string;
+    status: string;
+    organizationStatus?: string;
+  }>;
   counts?: Record<string, number>;
 }) {
   const deleteCalls: Array<{ model: string; where: unknown }> = [];
@@ -52,8 +56,16 @@ function harness(options: {
           ),
         findMany: jest
           .fn()
-          .mockResolvedValue(
-            options.registries.filter((r) => r.status === 'READY'),
+          .mockImplementation(
+            (args: { where: { organization: { status: string } } }) =>
+              Promise.resolve(
+                options.registries.filter(
+                  (r) =>
+                    r.status === 'READY' &&
+                    (r.organizationStatus ?? 'ACTIVE') ===
+                      args.where.organization.status,
+                ),
+              ),
           ),
       },
       organizationMember: { count: jest.fn() },
@@ -200,10 +212,17 @@ describe('RetentionSweepService (brutal-audit #7 — unbounded growth)', () => {
             ),
           findMany: jest
             .fn()
-            .mockResolvedValue([
-              { organizationId: 'org-bad' },
-              { organizationId: 'org-good' },
-            ]),
+            .mockImplementation(
+              (args: { where: { organization: { status: string } } }) =>
+                Promise.resolve(
+                  args.where.organization.status === 'ACTIVE'
+                    ? [
+                        { organizationId: 'org-bad' },
+                        { organizationId: 'org-good' },
+                      ]
+                    : [],
+                ),
+            ),
         },
         organizationMember: { count: jest.fn() },
       },
@@ -252,6 +271,28 @@ describe('RetentionSweepService (brutal-audit #7 — unbounded growth)', () => {
       { organizationId: 'org-bad', error: 'TENANT_DATABASE_NOT_READY:org-bad' },
     ]);
     expect(result.totalDeleted).toBeGreaterThanOrEqual(0);
+  });
+
+  it('does not sweep READY databases for inactive organizations', async () => {
+    const h = harness({
+      registries: [
+        { organizationId: 'org-active', status: 'READY' },
+        {
+          organizationId: 'org-closed',
+          status: 'READY',
+          organizationStatus: 'CLOSED',
+        },
+      ],
+    });
+
+    await h.service.sweepAllReady();
+
+    expect(h.platform.client.tenantDatabase.findMany).toHaveBeenCalledWith({
+      where: { status: 'READY', organization: { status: 'ACTIVE' } },
+      select: { organizationId: true },
+      orderBy: { organizationId: 'asc' },
+    });
+    expect(new Set(h.contextOrganizations)).toEqual(new Set(['org-active']));
   });
 
   it('refuses a sweep against a non-READY registry', async () => {

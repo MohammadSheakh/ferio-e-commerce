@@ -278,7 +278,10 @@ export class RetentionSweepService {
     totalDeleted: number;
   }> {
     const registries = await this.platform.client.tenantDatabase.findMany({
-      where: { status: 'READY' },
+      where: {
+        status: 'READY',
+        organization: { status: 'ACTIVE' },
+      },
       select: { organizationId: true },
       orderBy: { organizationId: 'asc' },
     });

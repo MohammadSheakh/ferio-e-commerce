@@ -1026,7 +1026,7 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 - [ ] Export media where required.
 - [x] Revoke domains safely. (`TenantClosureService.initiateClosure` disables every domain at CLOSURE_PENDING — takeover/reassignment designed out)
 - [ ] Revoke integration credentials.
-- [ ] **PARTIAL:** Stop scheduled jobs. (fan-out skips non-ACTIVE orgs by query shape; explicit job-revocation sweep pending)
+- [ ] **PARTIAL:** Stop scheduled jobs. (tenant fan-out and retention sweeps select only READY databases owned by ACTIVE organizations; explicit queued-job revocation sweep remains pending)
 - [x] Close DB connections. (registry RETIRED → connection manager refuses; graceful disconnect path exists)
 - [ ] **PARTIAL:** Archive/delete DB according to policy. (90-day recoverable window implemented per PO-013 — finalize refuses inside the window without operator override; registry retirement + CLOSED transition landed; physical destruction awaits hosting decision)
 - [x] Prevent domain takeover after closure. (closure disables all organization domains before the retention window; domain service tests preserve the disabled state and resolver fail-closed behavior)
