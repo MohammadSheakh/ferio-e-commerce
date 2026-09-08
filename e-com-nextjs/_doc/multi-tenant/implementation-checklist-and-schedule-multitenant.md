@@ -869,21 +869,21 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 ## 13.1 Tenant owner onboarding
 
 - [x] Invitation/first-login flow.
-- [ ] Organization/store setup wizard.
-- [ ] **PARTIAL:** Store identity. (tenant-scoped via CommerceSettings; surfaced in the Store Setup checklist card — full consolidated wizard remains polish)
+- [x] Organization/store setup wizard. (Tenant Admin dashboard Store Setup checklist combines validated settings, delivery-zone, payment, subscription, and domain readiness with deep links to the owning screens.)
+- [x] Store identity. (tenant-scoped via CommerceSettings and surfaced in the Store Setup checklist card)
 - [ ] Logo/branding.
 - [x] Support contacts.
-- [ ] Currency/timezone.
-- [ ] Order prefix.
+- [x] Currency/timezone. (CommerceSettings validation and the Store Setup checklist)
+- [x] Order prefix. (CommerceSettings validation and the Store Setup checklist)
 - [x] Delivery zones.
 - [ ] COD policy.
 - [ ] Payment configuration.
 - [ ] Courier configuration.
 - [ ] Notification configuration.
 - [ ] Initial catalog/import guidance.
-- [ ] Subscription/plan summary.
+- [x] Subscription/plan summary. (tenant-scoped `GET /tenancy/my-plan` and the dashboard Plan & Usage card)
 - [ ] Usage/limit summary.
-- [ ] Domain status.
+- [x] Domain status. (tenant-scoped `GET /tenancy/my-plan` returns active domains and the Store Setup checklist verifies an active primary domain)
 
 ## 13.2 Tenant Admin entitlement UX
 
