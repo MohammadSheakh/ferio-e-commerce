@@ -163,6 +163,32 @@ conditionalDescribe('TenantSchemaBootstrapper (real PostgreSQL)', () => {
     await Promise.all([poolA.end(), poolB.end()]);
   }, 240_000);
 
+  it('creates and migrates ten disposable tenant databases', async () => {
+    const names = await Promise.all(
+      Array.from({ length: 10 }, (_, index) =>
+        createScratchDatabase(`ferio_test_fleet_${index}`),
+      ),
+    );
+    created.push(...names);
+    const config = serverConfig();
+
+    const results = await Promise.all(
+      names.map((database) =>
+        bootstrapper.bootstrap({ ...config, database }),
+      ),
+    );
+
+    expect(results).toHaveLength(10);
+    expect(results.every((result) => result.applied.length > 0)).toBe(true);
+    expect(new Set(results.map((result) => result.schemaVersion)).size).toBe(1);
+    await Promise.all(
+      names.map((database) =>
+        expect(bootstrapper.verifyReady({ ...config, database })).resolves
+          .toBeUndefined(),
+      ),
+    );
+  }, 240_000);
+
   it('proves tenant B cannot query tenant A products by ID even with identical identifiers (MT-7 §10.1)', async () => {
     const [dbA, dbB] = await Promise.all([
       createScratchDatabase('ferio_test_prod_a'),

@@ -324,6 +324,29 @@ describe('MigrationOrchestratorService (MT-11 / ADR-0005)', () => {
     ).toHaveLength(0);
   });
 
+  it('continues healthy tenants after one isolated fleet failure', async () => {
+    const registries = [
+      { id: 'tdb-1', organizationId: 'org-1', status: 'READY' },
+      { id: 'tdb-2', organizationId: 'org-2', status: 'READY' },
+      { id: 'tdb-3', organizationId: 'org-3', status: 'READY' },
+      { id: 'tdb-4', organizationId: 'org-4', status: 'READY' },
+    ];
+    const built = build(registries);
+    built.bootstrapper.bootstrap
+      .mockResolvedValueOnce({ applied: [], schemaVersion: 'v' })
+      .mockRejectedValueOnce(new Error('tenant-2 migration failed'))
+      .mockResolvedValue({ applied: [], schemaVersion: 'v' });
+
+    const outcome = await built.service.processRun('run-1');
+
+    expect(outcome.status).toBe('COMPLETED');
+    expect(outcome.migrated).toEqual(['org-1', 'org-3', 'org-4']);
+    expect(outcome.failures).toEqual([
+      { organizationId: 'org-2', error: 'tenant-2 migration failed' },
+    ]);
+    expect(built.bootstrapper.bootstrap).toHaveBeenCalledTimes(4);
+  });
+
   it('queues a paused-run resume instead of running the fleet in the HTTP request', async () => {
     const built = build([
       { id: 'tdb-1', organizationId: 'org-1', status: 'READY' },

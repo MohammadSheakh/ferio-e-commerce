@@ -977,10 +977,10 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 
 ## 14.4 Validation
 
-- [ ] Create at least 10 disposable tenant DBs.
-- [ ] Migrate all successfully.
-- [ ] Inject one failing tenant.
-- [ ] Prove remaining tenants are handled according to rollout policy.
+- [x] Create at least 10 disposable tenant DBs. (CI integration suite creates ten independent scratch PostgreSQL databases in parallel and cleans them up after the run.)
+- [x] Migrate all successfully. (The same suite applies the canonical tenant migration set to all ten databases and verifies one common schema version plus readiness.)
+- [x] Inject one failing tenant. (Migration orchestrator regression injects a middle-tenant failure after a successful canary.)
+- [x] Prove remaining tenants are handled according to rollout policy. (The orchestrator continues healthy tenants after the isolated failure while preserving the failure result; threshold pause behavior remains separately tested.)
 - [x] Prove retry after repair. (`migration-orchestrator.service.spec.ts` retries transient failures and resumes failed results without re-running successful tenants)
 - [x] Prove schema-version reporting. (migration result rows, tenant registry views, provisioning evidence, and restore verification expose schema versions)
 - [x] Prove app rejects/isolates incompatible tenant safely. (resolver tests reject `MIGRATION_REQUIRED` before tenant request routing)

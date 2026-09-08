@@ -12,6 +12,10 @@ and must not be modified to make the project look better.
 
 - Added required dependency installation/audit gates for every backend and web lockfile, added tenant and control-plane migration deployment against disposable PostgreSQL, and added OpenAPI client drift checks to each web build job. This makes the CI evidence match the Release 1 checklist; rollback testing, full frontend E2E coverage, and production infrastructure drills remain open.
 
+## 2026-09-08 tenant migration fleet evidence
+
+- Added a CI integration case that creates ten disposable tenant databases, migrates them in parallel, verifies a shared schema head, and checks readiness for every database. Added migration-orchestrator coverage proving a failed middle tenant does not prevent later healthy tenants from completing. Full canary-to-fleet production drills and old/new schema compatibility tests remain open.
+
 ## 2026-09-08 provider entitlement enforcement
 
 - Completed the previously open integration/provider entitlement control. Tenant-scoped payment-provider enablement now requires the `online_payments` entitlement, and courier activation requires `couriers_basic`, both through the shared `PlanGateService` evaluator. Legacy single-tenant mode remains unchanged because it has no tenant context. Added denial-code regression coverage; transactional messaging provider tenancy remains a separate open control.
