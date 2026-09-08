@@ -438,7 +438,7 @@ All surfaces live in the ferio-platform-admin console:
 
 ## 8.2 Custom domains — P1 / plan-gated
 
-- [ ] **BLOCKED:** Select DNS/TLS automation strategy/provider.
+- [x] Select DNS/TLS automation strategy/provider. (Product-owner decisions PO-007/PO-008 select Cloudflare DNS with wildcard subdomains and automated wildcard TLS as the preferred production strategy; record creation, certificate issuance, and custom-domain verification remain operational follow-up controls.)
 - [x] Add custom-domain request. (`POST /platform/organizations/:organizationId/domains/custom` is permission-protected, plan-gated, normalized, and audited.)
 - [x] Generate ownership verification challenge. (The same route returns an ownership token while keeping the domain `PENDING_VERIFICATION`.)
 - [ ] Verify DNS.
@@ -1019,7 +1019,7 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 
 ## 15.3 Tenant export/closure
 
-- [ ] **BLOCKED:** Approve retention/deletion policy.
+- [x] Approve retention/deletion policy. (PO-013 approves a 90-day recoverable closure window, followed by deletion only when legal/financial retention permits; the closure service enforces the window and requires explicit acknowledgement.)
 - [ ] Define export package.
 - [ ] Export tenant business data.
 - [ ] Export audit/financial data according to policy.
