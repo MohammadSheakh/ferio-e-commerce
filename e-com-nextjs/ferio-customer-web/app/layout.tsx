@@ -61,10 +61,13 @@ export default async function RootLayout({
   ]);
   return (
     <html lang="en">
-      <body className={`${inter.variable} font-sans text-ink antialiased`}>
+      <body
+        className={`${inter.variable} theme-${store.themePreset} font-sans text-ink antialiased`}
+      >
         <CartProvider>
           <Header
             storeName={store.storeName}
+            logoUrl={store.logoUrl}
             categories={categories}
             categoryTopNavEnabled={store.categoryTopNavEnabled ?? true}
             serviceBookingEnabled={store.serviceBookingEnabled ?? true}

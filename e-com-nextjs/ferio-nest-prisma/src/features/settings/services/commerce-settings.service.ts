@@ -22,6 +22,7 @@ const defaultCommerceSettings = {
   currency: 'BDT',
   timezone: 'Asia/Dhaka',
   orderPrefix: 'FER',
+  themePreset: 'default',
 } satisfies Prisma.CommerceSettingsCreateInput;
 
 @Injectable()
@@ -52,8 +53,14 @@ export class CommerceSettingsService {
     return {
       storeName: settings.storeName,
       legalName: settings.legalName,
+      logoUrl: settings.logoUrl,
+      address: settings.address,
       supportPhone: settings.supportPhone,
       supportEmail: settings.supportEmail,
+      facebookUrl: settings.facebookUrl,
+      instagramUrl: settings.instagramUrl,
+      whatsappUrl: settings.whatsappUrl,
+      themePreset: settings.themePreset,
       currency: settings.currency,
       timezone: settings.timezone,
       defaultReturnWindowDays: settings.defaultReturnWindowDays,
@@ -83,8 +90,14 @@ export class CommerceSettingsService {
     const data: Prisma.CommerceSettingsUpdateInput = {
       storeName: this.clean(dto.storeName),
       legalName: this.cleanNullable(dto.legalName),
+      logoUrl: this.cleanNullable(dto.logoUrl),
+      address: this.cleanNullable(dto.address),
       supportPhone: this.normalizePhone(dto.supportPhone),
       supportEmail: this.cleanNullable(dto.supportEmail)?.toLowerCase(),
+      facebookUrl: this.cleanNullable(dto.facebookUrl),
+      instagramUrl: this.cleanNullable(dto.instagramUrl),
+      whatsappUrl: this.cleanNullable(dto.whatsappUrl),
+      themePreset: dto.themePreset,
       currency: dto.currency,
       timezone: this.clean(dto.timezone),
       orderPrefix: this.clean(dto.orderPrefix)?.toUpperCase(),

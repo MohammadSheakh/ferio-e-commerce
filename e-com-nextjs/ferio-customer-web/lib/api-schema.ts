@@ -4531,10 +4531,21 @@ export interface components {
             /** @example Ferio */
             storeName?: string;
             legalName?: string | null;
+            /** Format: uri */
+            logoUrl?: string | null;
+            address?: string | null;
             /** @example +8801712345678 */
             supportPhone?: string | null;
             /** Format: email */
             supportEmail?: string | null;
+            /** Format: uri */
+            facebookUrl?: string | null;
+            /** Format: uri */
+            instagramUrl?: string | null;
+            /** Format: uri */
+            whatsappUrl?: string | null;
+            /** @enum {string} */
+            themePreset?: "default" | "warm" | "cool";
             /** @enum {string} */
             currency?: "BDT";
             /** @example Asia/Dhaka */

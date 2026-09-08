@@ -30,6 +30,7 @@ and must not be modified to make the project look better.
 ### 2026-09-08
 
 - BO-01/BO-04/BO-09: completed platform-vs-tenant feature-flag separation. Added a typed `PlatformFeatureFlagsService` backed exclusively by the control-plane Prisma client, guarded list/upsert routes under dedicated `feature_flag:read` and `feature_flag:write` permissions, strict key/note validation, and append-only platform audit records. Added focused creation, update, and invalid-key tests; application typecheck, architecture validation, migration validation/integrity, and focused platform tests pass.
+- BO-04/BO-05/BO-08: implemented tenant-local storefront branding. Added a forward-only `CommerceSettings` migration for HTTPS-only logo/social URLs, address, and an allowlisted theme preset; extended the guarded tenant admin settings API and public storefront contract; rendered the logo in the header and social/contact identity in the footer. Backend settings/catalog tests, application typecheck, customer-web TypeScript check, architecture validation, and migration integrity pass. Arbitrary theme tokens, provider credentials, and full tenant-admin UI coverage remain open.
 
 ### 2026-09-05
 

@@ -2495,8 +2495,14 @@ model CommerceSettings {
   id                      String   @id @default("default")
   storeName               String   @default("Ferio")
   legalName               String?
+  logoUrl                 String?
+  address                 String?
   supportPhone            String?
   supportEmail            String?
+  facebookUrl             String?
+  instagramUrl            String?
+  whatsappUrl             String?
+  themePreset             String   @default("default")
   currency                String   @default("BDT")
   timezone                String   @default("Asia/Dhaka")
   orderPrefix             String   @default("FER")

@@ -871,7 +871,7 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 - [x] Invitation/first-login flow.
 - [x] Organization/store setup wizard. (Tenant Admin dashboard Store Setup checklist combines validated settings, delivery-zone, payment, subscription, and domain readiness with deep links to the owning screens.)
 - [x] Store identity. (tenant-scoped via CommerceSettings and surfaced in the Store Setup checklist card)
-- [ ] Logo/branding.
+- [x] Logo/branding. (Tenant admins can update the tenant-local logo, address, social links, and approved theme preset through guarded CommerceSettings; the customer storefront renders the logo and public identity.)
 - [x] Support contacts.
 - [x] Currency/timezone. (CommerceSettings validation and the Store Setup checklist)
 - [x] Order prefix. (CommerceSettings validation and the Store Setup checklist)
@@ -897,15 +897,15 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 
 ## 13.3 Tenant branding
 
-- [ ] Tenant storefront logo.
+- [x] Tenant storefront logo. (The public tenant CommerceSettings contract exposes an HTTPS-only logo URL and the storefront header renders it with the tenant store name as alt text.)
 - [x] Tenant name. (Customer Web reads the tenant-local commerce settings store name and uses it in the storefront shell and metadata.)
 - [x] Hero Showcase. (Customer Web requests the tenant-scoped public Hero Showcase settings through the host-forwarding BFF path.)
 - [x] Contact information. (Customer Web renders tenant-local support phone/email on checkout and the support page.)
 - [x] Policies. (Customer Web renders tenant-local terms, privacy, and return-policy URLs from public commerce settings.)
-- [ ] Social links.
+- [x] Social links. (Tenant-local HTTPS-only Facebook, Instagram, and WhatsApp links are validated in the admin DTO and rendered in the storefront footer.)
 - [ ] Theme tokens only within approved customization boundary.
 - [x] No tenant-supplied unsafe arbitrary script/CSS by default. (Commerce settings and public storefront contracts expose no arbitrary script or CSS injection fields; the current customization surface is limited to typed settings and static content routes.)
-- [ ] Cache invalidation after branding update.
+- [x] Cache invalidation after branding update. (Public commerce settings use `no-store`, and the server-side storefront request forwards the resolved host; branding updates therefore cannot remain in or reuse a shared tenant cache entry.)
 
 ## 13.4 Storefront tenant behavior
 

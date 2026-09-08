@@ -9807,6 +9807,17 @@
             "nullable": true,
             "maxLength": 160
           },
+          "logoUrl": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500,
+            "format": "uri"
+          },
+          "address": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 300
+          },
           "supportPhone": {
             "type": "string",
             "nullable": true,
@@ -9818,6 +9829,32 @@
             "nullable": true,
             "maxLength": 160,
             "format": "email"
+          },
+          "facebookUrl": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500,
+            "format": "uri"
+          },
+          "instagramUrl": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500,
+            "format": "uri"
+          },
+          "whatsappUrl": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500,
+            "format": "uri"
+          },
+          "themePreset": {
+            "type": "string",
+            "enum": [
+              "default",
+              "warm",
+              "cool"
+            ]
           },
           "currency": {
             "type": "string",

@@ -8,12 +8,14 @@ import type { CatalogCategory } from "@/lib/catalog";
 
 export default function Header({
   storeName,
+  logoUrl,
   categories = [],
   categoryTopNavEnabled = true,
   serviceBookingEnabled = true,
   warrantyClaimsEnabled = true,
 }: {
   storeName: string;
+  logoUrl?: string | null;
   categories?: CatalogCategory[];
   categoryTopNavEnabled?: boolean;
   serviceBookingEnabled?: boolean;
@@ -28,7 +30,15 @@ export default function Header({
             href="/"
             className="text-[19px] font-semibold tracking-tight text-ink"
           >
-            {storeName}
+            {logoUrl ? (
+              <img
+                src={logoUrl}
+                alt={storeName}
+                className="h-8 w-auto object-contain"
+              />
+            ) : (
+              storeName
+            )}
           </Link>
           <nav className="hidden gap-9 text-[13px] text-ink2 md:flex items-center">
             <Link href="/products" className="transition hover:text-ink">
