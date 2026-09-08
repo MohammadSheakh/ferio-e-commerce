@@ -2,12 +2,14 @@ import type { ConfigService } from '@nestjs/config';
 import type { Queue } from 'bullmq';
 import type { PrismaService } from '@app/database';
 import type { RedisService } from '@app/redis';
-import { RequestMetrics } from '@app/common';
+import { RequestMetrics, TenantMetrics } from '@app/common';
 import type { PaymentGatewayRegistry } from '../../commerce-payments/gateways/payment-gateway.registry';
 import type { ShippingService } from '../../shipping/services/shipping.service';
 import { OperationsHealthService } from '../operations-health.service';
 
 describe('OperationsHealthService', () => {
+  beforeEach(() => TenantMetrics.reset());
+
   beforeEach(() => RequestMetrics.resetForTests());
 
   it('combines runtime, queue, commerce, provider, and backup evidence', async () => {
@@ -91,6 +93,11 @@ describe('OperationsHealthService', () => {
     expect(health.backup).toMatchObject({
       status: 'CURRENT',
       restoreStatus: 'VERIFIED',
+    });
+    expect(TenantMetrics.snapshot().counters).toContainEqual({
+      name: 'backup_freshness_observed',
+      labels: { restoreStatus: 'VERIFIED', status: 'CURRENT' },
+      value: 1,
     });
     expect(health.queues).toHaveLength(6);
   });

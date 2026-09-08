@@ -35,7 +35,8 @@ export type TenantMetricName =
   | 'platform_billing_payment_succeeded'
   | 'platform_billing_payment_failed'
   | 'usage_threshold_crossed'
-  | 'usage_reconciliation_drift';
+  | 'usage_reconciliation_drift'
+  | 'backup_freshness_observed';
 
 const MAX_LABEL_KEYS = 4;
 const MAX_LABEL_VALUE = 128;

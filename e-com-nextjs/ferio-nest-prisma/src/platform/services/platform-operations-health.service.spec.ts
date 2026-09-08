@@ -48,6 +48,11 @@ describe('PlatformOperationsHealthService', () => {
     expect(result.tenantDatabases).toEqual({ READY: 2 });
     expect(result.backup.status).toBe('CURRENT');
     expect(result.backup.restoreStatus).toBe('VERIFIED');
+    expect(TenantMetrics.snapshot().counters).toContainEqual({
+      name: 'backup_freshness_observed',
+      labels: { restoreStatus: 'VERIFIED', status: 'CURRENT' },
+      value: 1,
+    });
     expect(result.support.activeGrants).toBe(1);
     expect(result.alerts).toContain(
       '1 support access grant(s) currently active.',

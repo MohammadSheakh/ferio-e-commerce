@@ -5,7 +5,7 @@ import type { Queue } from 'bullmq';
 import { PrismaService } from '@app/database';
 import { RedisService } from '@app/redis';
 import { QUEUE_NAMES } from '@app/queue';
-import { RequestMetrics } from '@app/common';
+import { RequestMetrics, TenantMetrics } from '@app/common';
 import { PaymentGatewayRegistry } from '../commerce-payments/gateways/payment-gateway.registry';
 import { ShippingService } from '../shipping/services/shipping.service';
 import {
@@ -275,17 +275,23 @@ export class OperationsHealthService {
     const restoreVerified =
       lastRestoreAt !== null &&
       Date.now() - lastRestoreAt.getTime() <= 180 * DAY_MS;
+    const status = current
+      ? 'CURRENT'
+      : enabled
+        ? 'STALE_OR_UNPROTECTED'
+        : 'MISSING';
+    const restoreStatus = restoreVerified ? 'VERIFIED' : 'MISSING_OR_STALE';
+    TenantMetrics.increment('backup_freshness_observed', {
+      status,
+      restoreStatus,
+    });
     return {
       source: 'DEPLOYMENT_ENVIRONMENT',
-      status: current
-        ? 'CURRENT'
-        : enabled
-          ? 'STALE_OR_UNPROTECTED'
-          : 'MISSING',
+      status,
       enabled,
       protectedStorage,
       lastSuccessAt: lastSuccessAt?.toISOString() ?? null,
-      restoreStatus: restoreVerified ? 'VERIFIED' : 'MISSING_OR_STALE',
+      restoreStatus,
       lastRestoreVerifiedAt: lastRestoreAt?.toISOString() ?? null,
     };
   }

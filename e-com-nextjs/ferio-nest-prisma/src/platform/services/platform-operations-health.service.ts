@@ -143,10 +143,16 @@ export class PlatformOperationsHealthService {
     const restoreVerified =
       lastRestoreAt !== null &&
       Date.now() - lastRestoreAt.getTime() <= 180 * 24 * 60 * 60 * 1000;
+    const status = current ? 'CURRENT' : enabled ? 'STALE_OR_UNPROTECTED' : 'MISSING';
+    const restoreStatus = restoreVerified ? 'VERIFIED' : 'MISSING_OR_STALE';
+    TenantMetrics.increment('backup_freshness_observed', {
+      status,
+      restoreStatus,
+    });
     return {
       source: 'DEPLOYMENT_ENVIRONMENT',
-      status: current ? 'CURRENT' : enabled ? 'STALE_OR_UNPROTECTED' : 'MISSING',
-      restoreStatus: restoreVerified ? 'VERIFIED' : 'MISSING_OR_STALE',
+      status,
+      restoreStatus,
       protectedStorage,
       lastSuccessAt: lastSuccessAt?.toISOString() ?? null,
       lastRestoreVerifiedAt: lastRestoreAt?.toISOString() ?? null,
