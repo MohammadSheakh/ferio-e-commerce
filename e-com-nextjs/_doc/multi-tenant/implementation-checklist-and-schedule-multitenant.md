@@ -716,7 +716,7 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 
 ### MT-7 gate
 
-- [ ] Every existing protected commerce controller/service has a documented tenant boundary.
+- [x] Every existing protected commerce controller/service has a documented tenant boundary. (The MT-7 sweep inventory lists every commerce service and the architecture test enforces `TenantMembershipGuard` on protected tenant-admin controllers; identity-plane exceptions remain explicitly documented.)
 - [ ] Automated tests cover at least two tenants for every high-risk financial/identity/real-time module.
 - [ ] No legacy single-store global setting or default tenant DB remains on production request paths.
 
@@ -734,7 +734,7 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
       in the legacy identity realm until the auth migration decision lands.
 - [ ] Tenant-scope session adjunct data where applicable.
 - [x] Tenant-scope OTP/rate-limit keys where business semantics require it. (OTP scoped; rate limits intentionally IP-global as abuse control, not business data)
-- [ ] Tenant-scope catalog/settings caches.
+- [x] Tenant-scope catalog/settings caches. (Settings cache keys include the resolved organization; catalog reads have no shared cache layer and remain tenant-routed, so neither path can reuse another tenant's catalog/settings entry.)
 - [x] Tenant-scope idempotency keys.
 - [ ] Tenant-scope distributed locks.
 - [x] Add collision tests using identical record IDs in two tenants. (`src/tenancy/redis-collision.spec.ts`: scopedRedisKey, OTP keys, and settings cache keys all diverge per organization for identical identifiers; legacy key shape preserved outside contexts)
@@ -910,12 +910,12 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 ## 13.4 Storefront tenant behavior
 
 - [x] Tenant-aware catalog. (Server-side catalog reads forward the trusted storefront host and the backend routing tests prove tenant reads never fall back to the legacy database.)
-- [ ] Tenant-aware cart cookies/session.
+- [x] Tenant-aware cart cookies/session. (Host-only storefront cookies plus tenant-local CartService/saved-cart/reorder routing prevent cart state and share tokens crossing hosts or databases.)
 - [ ] Tenant-aware auth/customer account.
-- [ ] Tenant-aware checkout/payment.
-- [ ] Tenant-aware tracking.
-- [ ] Tenant-aware wallet.
-- [ ] Tenant-aware warranty/services/chat.
+- [x] Tenant-aware checkout/payment. (Checkout and payment attempts/callbacks resolve through the tenant database and callback organization binding; provider account configuration remains a separate open control.)
+- [x] Tenant-aware tracking. (Tracking and storefront analytics read/write through the resolved tenant context; two-tenant analytics isolation coverage is present.)
+- [x] Tenant-aware wallet. (Wallet balances, ledgers, top-ups, checkout debits, and refunds use the resolved tenant database with real two-database isolation evidence.)
+- [x] Tenant-aware warranty/services/chat. (Warranty, service-booking, product-content, and chatting services are included in the tenant-service sweep; socket tickets and rooms carry trusted organization scope.)
 - [x] Tenant-aware support information. (Support and checkout surfaces use tenant-local public commerce settings, with a safe empty-contact state.)
 - [x] Tenant-aware SEO. (Metadata, sitemap, and robots use the resolved storefront host and disable indexing for non-active tenant states.)
 - [x] Unknown/suspended domain states. (Customer Web replaces the storefront shell with explicit unknown, suspended, or unavailable states returned by the backend resolver.)
