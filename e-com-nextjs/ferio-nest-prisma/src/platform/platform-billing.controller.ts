@@ -60,6 +60,12 @@ export class PlatformBillingController {
     });
   }
 
+  @Get('invoices/:id/receipt')
+  @PlatformPermissions('saas_billing:read')
+  receipt(@Param('id') id: string) {
+    return this.billing.receipt(id);
+  }
+
   @Get('billing-configured')
   @PlatformPermissions('saas_billing:read', 'saas_billing:write')
   configured() {

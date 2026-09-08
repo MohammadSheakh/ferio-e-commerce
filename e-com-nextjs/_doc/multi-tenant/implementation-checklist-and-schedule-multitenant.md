@@ -506,7 +506,7 @@ All surfaces live in the ferio-platform-admin console:
 - [x] Build platform billing adapter interface.
 - [x] Approve SaaS subscription payment provider(s). (PO-006: SSLCOMMERZ first, abstraction preserved)
 - [x] Store platform payment attempts in control plane.
-- [ ] Add invoices/receipts.
+- [x] Add invoices/receipts. (control-plane invoice history is available to Platform Admin and `GET /platform/billing/invoices/:id/receipt` returns a bounded receipt projection only after payment succeeds; raw provider payloads and tenant commerce ledgers remain excluded)
 - [x] Add webhook verification/idempotency. (server-side val_id validation; single-transition INITIATED→SUCCEEDED/FAILED; duplicates absorbed)
 - [ ] **PARTIAL:** Add retry/recovery. (failed sessions recorded with reasons and can be re-initiated as fresh attempts; automated recovery sweep pending)
 - [x] Add billing history.

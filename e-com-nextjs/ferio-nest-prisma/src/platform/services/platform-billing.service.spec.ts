@@ -369,4 +369,43 @@ describe('PlatformBillingService', () => {
       }),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
+
+  it('returns a bounded receipt projection for a paid invoice', async () => {
+    const built = build();
+    const paidAt = new Date('2026-09-08T10:00:00.000Z');
+    built.platform.client.saasInvoice.findUnique.mockResolvedValueOnce({
+      ...invoice,
+      paid: true,
+      periodStart: new Date('2026-09-01'),
+      periodEnd: new Date('2026-10-01'),
+      paymentAttempts: [
+        {
+          provider: 'SSLCOMMERZ',
+          reference: 'SAAS-REF-PAID',
+          updatedAt: paidAt,
+        },
+      ],
+    });
+
+    await expect(built.service.receipt('inv-1')).resolves.toEqual({
+      receiptNumber: 'RC-SI-202608-ABCDE',
+      invoiceNumber: 'SI-202608-ABCDE',
+      organizationId: 'org-1',
+      amountMinor: 199900,
+      currency: 'BDT',
+      periodStart: new Date('2026-09-01'),
+      periodEnd: new Date('2026-10-01'),
+      paidAt,
+      provider: 'SSLCOMMERZ',
+      providerReference: 'SAAS-REF-PAID',
+    });
+    expect(built.platform.client.saasInvoice.findUnique).toHaveBeenCalled();
+  });
+
+  it('does not issue a receipt for an unpaid invoice', async () => {
+    const built = build();
+    await expect(built.service.receipt('inv-1')).rejects.toThrow(
+      'RECEIPT_NOT_AVAILABLE',
+    );
+  });
 });

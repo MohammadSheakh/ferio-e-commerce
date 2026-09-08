@@ -29,6 +29,19 @@ export interface InvoiceWithAttempts {
   organizationId: string;
 }
 
+export interface PlatformReceipt {
+  receiptNumber: string;
+  invoiceNumber: string;
+  organizationId: string;
+  amountMinor: number;
+  currency: string;
+  periodStart: Date;
+  periodEnd: Date;
+  paidAt: Date | null;
+  provider: string | null;
+  providerReference: string | null;
+}
+
 interface ManualBillingAction {
   actorId?: string;
   reason: string;
@@ -433,5 +446,36 @@ export class PlatformBillingService {
         createdAt: true,
       },
     });
+  }
+
+  /** Return a bounded receipt projection only after control-plane payment. */
+  async receipt(invoiceId: string): Promise<PlatformReceipt> {
+    const invoice = await this.platform.client.saasInvoice.findUnique({
+      where: { id: invoiceId },
+      include: {
+        paymentAttempts: {
+          where: { status: 'SUCCEEDED' },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: { provider: true, reference: true, updatedAt: true },
+        },
+      },
+    });
+    if (!invoice) throw new NotFoundException('INVOICE_NOT_FOUND');
+    if (!invoice.paid) throw new BadRequestException('RECEIPT_NOT_AVAILABLE');
+
+    const successfulAttempt = invoice.paymentAttempts[0] ?? null;
+    return {
+      receiptNumber: `RC-${invoice.number}`,
+      invoiceNumber: invoice.number,
+      organizationId: invoice.organizationId,
+      amountMinor: invoice.amountMinor,
+      currency: invoice.currency,
+      periodStart: invoice.periodStart,
+      periodEnd: invoice.periodEnd,
+      paidAt: successfulAttempt?.updatedAt ?? null,
+      provider: successfulAttempt?.provider ?? null,
+      providerReference: successfulAttempt?.reference ?? null,
+    };
   }
 }
