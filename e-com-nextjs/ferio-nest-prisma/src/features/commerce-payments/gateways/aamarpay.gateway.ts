@@ -7,6 +7,7 @@ import {
   PaymentGateway,
   ValidatePaymentResult,
 } from './payment.gateway';
+import type { PaymentCredentials } from '../utils/payment-credentials.util';
 
 @Injectable()
 export class AamarpayGateway extends PaymentGateway {
@@ -16,10 +17,10 @@ export class AamarpayGateway extends PaymentGateway {
     super(config);
   }
 
-  async initiate(input: InitiatePaymentInput): Promise<InitiatePaymentResult> {
+  async initiate(input: InitiatePaymentInput, credentials?: PaymentCredentials): Promise<InitiatePaymentResult> {
     const request = {
-      store_id: this.storeId(),
-      signature_key: this.signatureKey(),
+      store_id: this.storeId(credentials),
+      signature_key: this.signatureKey(credentials),
       cus_name: input.customer.name,
       cus_email: input.customer.email,
       cus_phone: input.customer.phone,
@@ -38,7 +39,7 @@ export class AamarpayGateway extends PaymentGateway {
       type: 'json',
     };
     const raw = await this.json(
-      await fetch(`${this.baseUrl()}/jsonpost.php`, {
+      await fetch(`${this.baseUrl(credentials)}/jsonpost.php`, {
         method: 'POST',
         headers: correlationHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(request),
@@ -52,6 +53,7 @@ export class AamarpayGateway extends PaymentGateway {
 
   async validate(
     payload: Record<string, unknown>,
+    credentials?: PaymentCredentials,
   ): Promise<ValidatePaymentResult> {
     const merchantTransactionId = this.text(
       payload.mer_txnid ??
@@ -61,12 +63,12 @@ export class AamarpayGateway extends PaymentGateway {
     );
     const query = new URLSearchParams({
       request_id: merchantTransactionId,
-      signature_key: this.signatureKey(),
-      store_id: this.storeId(),
+      signature_key: this.signatureKey(credentials),
+      store_id: this.storeId(credentials),
       type: 'json',
     });
     const raw = await this.json(
-      await fetch(`${this.baseUrl()}/api/v1/trxcheck/request.php?${query}`, {
+      await fetch(`${this.baseUrl(credentials)}/api/v1/trxcheck/request.php?${query}`, {
         headers: correlationHeaders(),
       }),
     );
@@ -97,13 +99,13 @@ export class AamarpayGateway extends PaymentGateway {
   protected credentialKeys() {
     return ['AAMARPAY_STORE_ID', 'AAMARPAY_SIGNATURE_KEY'];
   }
-  private storeId() {
-    return this.value('AAMARPAY_STORE_ID');
+  private storeId(credentials?: PaymentCredentials) {
+    return this.value('AAMARPAY_STORE_ID', '', credentials);
   }
-  private signatureKey() {
-    return this.value('AAMARPAY_SIGNATURE_KEY');
+  private signatureKey(credentials?: PaymentCredentials) {
+    return this.value('AAMARPAY_SIGNATURE_KEY', '', credentials);
   }
-  private baseUrl() {
-    return this.value('AAMARPAY_BASE_URL', 'https://sandbox.aamarpay.com');
+  private baseUrl(credentials?: PaymentCredentials) {
+    return this.value('AAMARPAY_BASE_URL', 'https://sandbox.aamarpay.com', credentials);
   }
 }

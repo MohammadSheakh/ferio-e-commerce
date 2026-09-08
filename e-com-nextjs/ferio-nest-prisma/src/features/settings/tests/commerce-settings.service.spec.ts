@@ -54,6 +54,7 @@ describe('CommerceSettingsService', () => {
   };
   const prisma = {
     commerceSettings: { upsert: jest.fn() },
+    commercePaymentProviderConfig: { findFirst: jest.fn() },
     $transaction: jest.fn((callback: (value: typeof transaction) => unknown) =>
       callback(transaction),
     ),

@@ -111,6 +111,7 @@ describe('CommercePaymentsService', () => {
         'providers',
         'recoveryHealth',
         'recoverySweep',
+        'updateProvider',
       ].sort(),
     );
   });
@@ -321,10 +322,13 @@ describe('CommercePaymentsService', () => {
         tran_id: 'FERPAY123',
       });
 
-      expect(mockGateway.validate).toHaveBeenCalledWith({
-        val_id: 'VAL-999',
-        tran_id: 'FERPAY123',
-      });
+      expect(mockGateway.validate).toHaveBeenCalledWith(
+        {
+          val_id: 'VAL-999',
+          tran_id: 'FERPAY123',
+        },
+        undefined,
+      );
       expect(orders.confirmVerifiedPrepaidOrder).toHaveBeenCalledWith(
         transaction,
         'order-1',

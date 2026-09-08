@@ -8,6 +8,7 @@ import {
   Post,
   Query,
   Res,
+  Put,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
@@ -39,6 +40,7 @@ import { verifyCallbackToken } from '../../../tenancy/utils/callback-tenant.util
 import { TenantCallbackRunner } from '../../../tenancy/services/tenant-callback.runner';
 import { PaymentLedgerQueryDto } from '../dto/payment-ledger.dto';
 import { TenantReturnOriginService } from '../../../tenancy/services/tenant-return-origin.service';
+import { UpdatePaymentProviderConfigDto } from '../dto/payment-provider-config.dto';
 
 @ApiTags('Payments')
 @Controller('payments')
@@ -216,6 +218,19 @@ export class AdminCommercePaymentsController {
   @Get('providers')
   providers() {
     return this.payments.providers();
+  }
+
+  @Put('providers/:provider')
+  @Permissions(PERMISSIONS.PAYMENTS_MANAGE)
+  updateProvider(
+    @Param('provider') provider: CommercePaymentProvider,
+    @Body() dto: UpdatePaymentProviderConfigDto,
+    @User() actor: UserPayload,
+  ) {
+    if (!Object.values(CommercePaymentProvider).includes(provider)) {
+      throw new BadRequestException('Unknown payment provider');
+    }
+    return this.payments.updateProviderConfig(provider, dto, actor);
   }
 
   @Get('recovery/queue-health')

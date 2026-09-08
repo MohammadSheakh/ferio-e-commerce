@@ -610,11 +610,11 @@ This is the largest migration slice. Existing feature behavior should remain sta
 ## 10.6 Commerce payments
 
 - [x] Provider-neutral prepaid architecture exists.
-- [ ] Move payment provider configuration to tenant-secure integration configuration.
-- [ ] Tenant-scope provider credentials/secrets.
+- [x] Move payment provider configuration to tenant-secure integration configuration. (`CommercePaymentProviderConfig` is tenant-local and managed through the permission-protected Tenant Admin payment route; responses expose only bounded readiness.)
+- [x] Tenant-scope provider credentials/secrets. (Payment credentials are AES-256-GCM encrypted in the tenant database, injected only inside trusted tenant context, and never returned or written to audit values.)
 - [x] Tenant-scope merchant references/idempotency. (attempts/callbacks resolve per tenant database; unique references scoped by construction)
 - [x] Resolve webhook/callback tenant without trusting customer browser input. (HMAC-signed `cbt` token minted at initiation and embedded in gateway callback URLs; verified timing-safe server-side before any mutation — forgery fails closed with PAYMENT_CALLBACK_TENANT_INVALID)
-- [ ] Define provider account mapping to tenant.
+- [x] Define provider account mapping to tenant. (`CommercePaymentProviderConfig.provider` is unique within each tenant database; enabled runtime calls resolve that tenant-local record before gateway invocation.)
 - [x] Verify callback cannot mutate another tenant's payment. (token binds organization; processing runs inside that tenant's context/database — cross-tenant mutation has no resolution path)
 - [x] Tenant-scope payment recovery/sweeps. (`enqueueDue` fans out per READY tenant; expiry processor resolves envelopes via forOrganization)
 - [x] Tenant-scope reconciliation. (scheduled scans fan out per READY tenant with isolated failure evidence)
@@ -877,7 +877,7 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 - [x] Order prefix. (CommerceSettings validation and the Store Setup checklist)
 - [x] Delivery zones.
 - [x] COD policy. (Tenant Admin orders exposes the tenant-local COD verification policy read/update flow; checkout and order confirmation consume the same tenant database policy, while the two-tenant vertical suite proves confirmation state remains isolated.)
-- [ ] Payment configuration.
+- [x] Payment configuration. (Tenant Admin can replace encrypted SSLCommerz/aamarPay credentials, enable a provider only after required fields validate, and receive masked readiness.)
 - [ ] Courier configuration.
 - [x] Notification configuration. (Tenant Admin transactional-message templates are listed and edited through guarded tenant routes and the template service resolves through the tenant client; provider activation and credential tenancy remain separate open controls.)
 - [x] Initial catalog/import guidance. (Store Setup checklist detects whether the tenant has a catalog product and links directly to the product creation flow.)

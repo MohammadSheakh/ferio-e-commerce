@@ -15,6 +15,7 @@ import {
 import { AuditService } from '../../audit/services/audit.service';
 import { normalizeBangladeshPhone } from '../../checkout/utils/checkout.util';
 import { UpdateCommerceSettingsDto } from '../dto/commerce-settings.dto';
+import { tryGetTenantContext } from '../../../tenancy/context/tenant-context';
 
 const defaultCommerceSettings = {
   id: 'default',
@@ -80,7 +81,7 @@ export class CommerceSettingsService {
   }
 
   async update(dto: UpdateCommerceSettingsDto, actor: UserPayload) {
-    if (dto.prepaidEnabled && !this.hasConfiguredPaymentProvider()) {
+    if (dto.prepaidEnabled && !(await this.hasConfiguredPaymentProvider())) {
       throw new ConflictException(
         'Configure SSLCommerz or aamarPay credentials before enabling prepaid checkout',
       );
@@ -157,7 +158,15 @@ export class CommerceSettingsService {
     });
   }
 
-  private hasConfiguredPaymentProvider() {
+  private async hasConfiguredPaymentProvider() {
+    if (tryGetTenantContext()) {
+      const db = await this.db();
+      const configured = await db.commercePaymentProviderConfig.findFirst({
+        where: { enabled: true },
+        select: { id: true },
+      });
+      return Boolean(configured);
+    }
     return Boolean(
       ((this.config.get('SSLCOMMERZ_STORE_ID') ||
         this.config.get('SSL_STORE_ID')) &&
