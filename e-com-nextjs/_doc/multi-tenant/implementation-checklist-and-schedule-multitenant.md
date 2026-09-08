@@ -782,7 +782,7 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 - [x] Tenant-scope courier providers. (`CourierProviderConfig` is tenant-local; all six courier adapters and readiness/recommendation/polling paths use tenant-scoped credentials with no cross-tenant process fallback.)
 - [ ] Tenant-scope transactional messaging providers/templates.
 - [ ] Tenant-scope Google/Meta integrations where later enabled.
-- [ ] Add credential rotation workflow.
+- [x] Add credential rotation workflow. (Tenant payment and courier configuration replacement is an authenticated, permission-protected transaction: the new credential envelope is validated before activation, the previous ciphertext is atomically replaced, `credentialsRotatedAt` is recorded, and audit/API output contains only provider, enabled, key-name, readiness, and rotation-time metadata. External KMS/Secret Manager rotation remains production-infrastructure work.)
 - [x] Add readiness/health without leaking secrets. (`OperationsHealthService` exposes bounded payment/courier readiness and launch blockers, while database/queue/provider failures are reduced to safe diagnostics; regression coverage rejects secret-bearing error output.)
 
 ### MT-8 gate
@@ -966,7 +966,7 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 
 ## 14.3 Migration safety
 
-- [ ] Back up before high-risk migrations.
+- [x] Back up before high-risk migrations. (`runbooks/migration-rollback-forward-fix.md` requires verified control-plane and tenant backup evidence for every target batch and aborts the batch when evidence is missing or stale; provider scheduling and live backup execution remain MT-12 operations work.)
 - [x] Define expand/migrate/contract pattern for breaking changes. (`runbooks/migration-rollback-forward-fix.md` defines additive expand, bounded backfill, and separate contract phases.)
 - [x] Avoid destructive schema changes in one step. (ADR-0005 and the migration runbook require a separate contract phase and reject ad-hoc reverse SQL against live tenants.)
 - [ ] Test old app/new schema and new app/transition schema compatibility where rollout requires it.

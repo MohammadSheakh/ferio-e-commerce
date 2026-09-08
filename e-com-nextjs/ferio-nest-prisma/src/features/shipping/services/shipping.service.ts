@@ -292,12 +292,22 @@ export class ShippingService {
       credentials,
       this.config.get<string>('PLATFORM_DB_CREDENTIAL_KEY'),
     );
+    const credentialsRotatedAt = new Date();
     return db.$transaction(async (transaction) => {
       const previous = await transaction.courierProviderConfig.findUnique({ where: { provider } });
       const updated = await transaction.courierProviderConfig.upsert({
         where: { provider },
-        update: { credentialCipher: cipher, enabled: dto.enabled ?? false },
-        create: { provider, credentialCipher: cipher, enabled: dto.enabled ?? false },
+        update: {
+          credentialCipher: cipher,
+          credentialsRotatedAt,
+          enabled: dto.enabled ?? false,
+        },
+        create: {
+          provider,
+          credentialCipher: cipher,
+          credentialsRotatedAt,
+          enabled: dto.enabled ?? false,
+        },
       });
       await this.audit.record({
         action: 'COURIER_PROVIDER_CONFIG_UPDATED',
@@ -305,9 +315,19 @@ export class ShippingService {
         entityId: updated.id,
         actor,
         previousValue: previous ? { provider, enabled: previous.enabled } : undefined,
-        newValue: { provider, enabled: updated.enabled, credentialKeys: supplied },
+        newValue: {
+          provider,
+          enabled: updated.enabled,
+          credentialKeys: supplied,
+          credentialsRotatedAt: updated.credentialsRotatedAt,
+        },
       }, transaction);
-      return { provider, enabled: updated.enabled, configured };
+      return {
+        provider,
+        enabled: updated.enabled,
+        configured,
+        credentialsRotatedAt: updated.credentialsRotatedAt,
+      };
     });
   }
 

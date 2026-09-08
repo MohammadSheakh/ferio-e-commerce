@@ -45,6 +45,7 @@
   "migrations/20260826120000_search_trgm_indexes/migration.sql": "ef4d91d7f99c5ce8a42530d6691f352acf9077e5908068d91c4434f251e4e082",
   "migrations/20260826150000_measured_storefront_analytics/migration.sql": "51693146744964e54ce11d5b6f6953d8ee78ef4450d8e50096ca99dcc2a20f0e",
   "migrations/20260908160000_tenant_commerce_branding/migration.sql": "0b429b933db91475d41ab37e9385c22a4f75fe13d9dc3d4acaad247071d1b9d2",
+  "migrations/20260908170000_provider_credential_rotation/migration.sql": "7934ca0157ad3819b638cbb98c6ff6a1aec70e61ffadbb066e15acf95f841b78",
   "migrations/20260908173000_tenant_payment_provider_configs/migration.sql": "3792dab196b1fc4672a091e67de33adf3e210e7750e5543e0e7f1f6821be624f",
   "migrations/20260908180000_tenant_courier_provider_configs/migration.sql": "53be0282af50d64a25d88ff37ee1ea46856418669cb83a5764fe29a05835fa27",
   "platform-migrations/20260826000000_platform_init/migration.sql": "e2fdcadb83549604fbdaab00d1bc1bdcdf60bd6cc9b21ff8b6d91468322b982c",

@@ -97,6 +97,7 @@ model CommercePaymentProviderConfig {
   provider       CommercePaymentProvider @unique
   credentialCipher String
   enabled        Boolean                @default(false)
+  credentialsRotatedAt DateTime?
   createdAt      DateTime               @default(now())
   updatedAt      DateTime               @updatedAt
 }

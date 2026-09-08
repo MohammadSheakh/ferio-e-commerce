@@ -100,12 +100,22 @@ export class CommercePaymentsService {
     const db = await this.db();
     const secret = this.config.get<string>('PLATFORM_DB_CREDENTIAL_KEY');
     const cipher = encryptPaymentCredentials(credentials, secret);
+    const credentialsRotatedAt = new Date();
     return db.$transaction(async (transaction) => {
       const previous = await transaction.commercePaymentProviderConfig.findUnique({ where: { provider } });
       const updated = await transaction.commercePaymentProviderConfig.upsert({
         where: { provider },
-        update: { credentialCipher: cipher, enabled: dto.enabled ?? false },
-        create: { provider, credentialCipher: cipher, enabled: dto.enabled ?? false },
+        update: {
+          credentialCipher: cipher,
+          credentialsRotatedAt,
+          enabled: dto.enabled ?? false,
+        },
+        create: {
+          provider,
+          credentialCipher: cipher,
+          credentialsRotatedAt,
+          enabled: dto.enabled ?? false,
+        },
       });
       await this.audit.record({
         action: 'PAYMENT_PROVIDER_CONFIG_UPDATED',
@@ -113,9 +123,19 @@ export class CommercePaymentsService {
         entityId: updated.id,
         actor,
         previousValue: previous ? { provider, enabled: previous.enabled } : undefined,
-        newValue: { provider, enabled: updated.enabled, credentialKeys: supplied },
+        newValue: {
+          provider,
+          enabled: updated.enabled,
+          credentialKeys: supplied,
+          credentialsRotatedAt: updated.credentialsRotatedAt,
+        },
       }, transaction);
-      return { provider, enabled: updated.enabled, configured: gateway.isConfigured(credentials) };
+      return {
+        provider,
+        enabled: updated.enabled,
+        configured: gateway.isConfigured(credentials),
+        credentialsRotatedAt: updated.credentialsRotatedAt,
+      };
     });
   }
 
