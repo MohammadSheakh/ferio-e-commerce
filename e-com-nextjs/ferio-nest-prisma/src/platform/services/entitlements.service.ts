@@ -48,7 +48,10 @@ export class EntitlementsService {
   ): Promise<EntitlementDecision> {
     const subscription = await this.platform.client.subscription.findUnique({
       where: { organizationId },
-      include: { plan: { include: { entitlements: true } } },
+      include: {
+        plan: { include: { entitlements: true } },
+        entitlementOverrides: true,
+      },
     });
     if (!subscription) {
       TenantMetrics.increment('entitlement_denied', {
@@ -65,9 +68,15 @@ export class EntitlementsService {
       return { allowed: false, code: 'SUBSCRIPTION_INACTIVE' };
     }
 
-    const entitlement = subscription.plan.entitlements.find(
-      (e) => e.featureKey === featureKey,
+    const override = subscription.entitlementOverrides.find(
+      (candidate) =>
+        candidate.featureKey === featureKey &&
+        candidate.revokedAt === null &&
+        candidate.expiresAt > new Date(),
     );
+    const entitlement =
+      override ??
+      subscription.plan.entitlements.find((e) => e.featureKey === featureKey);
     if (!entitlement) {
       TenantMetrics.increment('entitlement_denied', {
         code: 'FEATURE_DISABLED',

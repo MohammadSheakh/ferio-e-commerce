@@ -35,7 +35,7 @@ Cross-plane references use opaque IDs only — a tenant database must never hold
 These belong to the deleted Mongoose-era payment/subscription/notification/user-role modules. They must be dropped during the canonical tenant-schema extraction (MT-11 packaging step), which also resolves every "unique constraint that becomes tenant-local" concern by construction.
 
 ### New CONTROL_PLANE models (introduced in MT-1)
-`Organization`, `OrganizationLifecycleEvent`, `TenantDomain`, `TenantDatabase`, `ProvisioningRun`, `ProvisioningStep`, `TenantMigrationRun`, `TenantMigrationResult`, `Plan`, `PlanEntitlement`, `Subscription`, `SubscriptionEvent`, `SaasInvoice`, `SaasPaymentAttempt`, `UsageCounter`, `PlatformUser`, `PlatformRole`, `OrganizationMember`, `SupportAccessGrant`, `PlatformFeatureFlag`, `PlatformAuditLog`.
+`Organization`, `OrganizationLifecycleEvent`, `TenantDomain`, `TenantDatabase`, `ProvisioningRun`, `ProvisioningStep`, `TenantMigrationRun`, `TenantMigrationResult`, `Plan`, `PlanEntitlement`, `Subscription`, `SubscriptionEntitlementOverride`, `SubscriptionEvent`, `SaasInvoice`, `SaasPaymentAttempt`, `UsageCounter`, `PlatformUser`, `PlatformRole`, `OrganizationMember`, `SupportAccessGrant`, `PlatformFeatureFlag`, `PlatformAuditLog`.
 
 ### PLATFORM_SHARED (requires explicit design before enabling)
 `Attachment` / media objects: metadata rows are TENANT; object-storage keys must be tenant-prefixed (`{organizationId}/...`) with signed access for private evidence. Blocked on object-storage strategy decision (owner-blocked). Until then uploads remain tenant-local metadata with tenant-scoped keys enforced at the storage boundary.

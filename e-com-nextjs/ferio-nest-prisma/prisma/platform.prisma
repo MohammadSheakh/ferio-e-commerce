@@ -289,6 +289,7 @@ model Subscription {
   cancelledAt       DateTime?
 
   events SubscriptionEvent[]
+  entitlementOverrides SubscriptionEntitlementOverride[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -297,6 +298,25 @@ model Subscription {
   plan         Plan         @relation(fields: [planId], references: [id])
 
   @@index([status])
+}
+
+model SubscriptionEntitlementOverride {
+  id             String   @id @default(cuid())
+  subscriptionId String
+  featureKey     String
+  enabled        Boolean  @default(true)
+  limit          Int?
+  reason         String
+  actorId        String?
+  expiresAt      DateTime
+  revokedAt      DateTime?
+  createdAt      DateTime @default(now())
+
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@unique([subscriptionId, featureKey])
+  @@index([subscriptionId, expiresAt])
+  @@index([expiresAt])
 }
 
 model SubscriptionEvent {

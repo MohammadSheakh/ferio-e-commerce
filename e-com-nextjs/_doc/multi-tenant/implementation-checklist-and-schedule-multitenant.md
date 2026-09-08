@@ -829,7 +829,7 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 - [x] View platform invoices/payment attempts. (Billing console page backed by the two billing endpoints)
 - [x] Manual billing operations require explicit permission/reason/audit. (`saas_billing:write` plus 10–500 character reason DTOs; invoice creation and payment initiation record actor/reason audit events.)
 - [x] Add internal/free entitlement state if approved. (approved PO-002 policy is implemented by the seeded `internal` plan and audited `SubscriptionsService.startInternal()` flow)
-- [ ] Add tenant-specific override with expiry/reason if approved.
+- [x] Add tenant-specific override with expiry/reason if approved. (`PUT/DELETE /platform/organizations/:id/entitlement-overrides/:featureKey` stores audited control-plane overrides with expiry, reason, actor, and revocation; `EntitlementsService` applies only active, unrevoked overrides before plan entitlements.)
 
 ## 12.4 Tenant operations
 
