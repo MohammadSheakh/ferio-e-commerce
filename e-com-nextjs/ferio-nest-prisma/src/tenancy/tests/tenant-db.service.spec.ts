@@ -63,6 +63,54 @@ describe('TenantDbService database selection', () => {
     });
   });
 
+  it('keeps nested service lookups on the immutable tenant database boundary', async () => {
+    process.env.TENANCY_ENABLED = 'true';
+    const clientA = {} as PrismaClient;
+    const clientB = {} as PrismaClient;
+    const manager = {
+      getClient: jest.fn().mockImplementation((database: { id: string }) =>
+        Promise.resolve(database.id === 'tdb-a' ? clientA : clientB),
+      ),
+    };
+    const nestedServiceA = new TenantDbService(manager as never);
+    const nestedServiceB = new TenantDbService(manager as never);
+    const context = (organizationId: string, databaseId: string) => ({
+      correlationId: `correlation-${organizationId}`,
+      organizationId,
+      tenantDatabaseId: databaseId,
+      database: {
+        id: databaseId,
+        host: 'localhost',
+        port: 5432,
+        databaseName: `tenant_${organizationId}`,
+        username: 'tenant',
+        credentialCipher: 'encrypted',
+      },
+      domainId: `domain-${organizationId}`,
+      hostname: `${organizationId}.example.com`,
+      subscriptionStatus: 'ACTIVE' as const,
+    });
+
+    const [tenantA, tenantB] = await Promise.all([
+      runWithTenantContext(context('a', 'tdb-a'), async () =>
+        Promise.all([nestedServiceA.get(), nestedServiceB.get()]),
+      ),
+      runWithTenantContext(context('b', 'tdb-b'), async () =>
+        Promise.all([nestedServiceA.get(), nestedServiceB.get()]),
+      ),
+    ]);
+
+    expect(tenantA).toEqual([clientA, clientA]);
+    expect(tenantB).toEqual([clientB, clientB]);
+    expect(manager.getClient).toHaveBeenCalledTimes(4);
+    expect(manager.getClient).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'tdb-a' }),
+    );
+    expect(manager.getClient).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'tdb-b' }),
+    );
+  });
+
   it('fails closed when the optional provider is missing in tenancy mode', async () => {
     process.env.TENANCY_ENABLED = 'true';
 
