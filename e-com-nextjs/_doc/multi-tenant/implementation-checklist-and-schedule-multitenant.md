@@ -732,7 +732,7 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
       user profile/stats caches (this pass). Auth refresh-token blacklist is
       INTENTIONALLY platform-scoped — tokens hash-opaque and sessions remain
       in the legacy identity realm until the auth migration decision lands.
-- [ ] Tenant-scope session adjunct data where applicable.
+- [x] Tenant-scope session adjunct data where applicable. (Cart, customer, and rider session cookies are host-only; BFF calls forward the resolved host; tenant-local commerce/session records resolve through the tenant database. The refresh-token blacklist remains intentionally platform-global under PO-014/PO-015 because token hashes are opaque and the identity plane is shared.)
 - [x] Tenant-scope OTP/rate-limit keys where business semantics require it. (OTP scoped; rate limits intentionally IP-global as abuse control, not business data)
 - [x] Tenant-scope catalog/settings caches. (Settings cache keys include the resolved organization; catalog reads have no shared cache layer and remain tenant-routed, so neither path can reuse another tenant's catalog/settings entry.)
 - [x] Tenant-scope idempotency keys.
