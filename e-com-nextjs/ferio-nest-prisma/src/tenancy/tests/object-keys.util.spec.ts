@@ -58,6 +58,37 @@ describe('tenantObjectKey', () => {
     ).toBe('tenants/org-1/products/image.png');
   });
 
+  it('prevents identical logical object identifiers from colliding across tenants', () => {
+    process.env.TENANCY_ENABLED = 'true';
+    const context = (organizationId: string) => ({
+      correlationId: `correlation-${organizationId}`,
+      organizationId,
+      tenantDatabaseId: `tdb-${organizationId}`,
+      database: {
+        id: `tdb-${organizationId}`,
+        host: 'localhost',
+        port: 5432,
+        databaseName: `tenant_${organizationId}`,
+        username: 'tenant',
+        credentialCipher: 'encrypted',
+      },
+      domainId: `domain-${organizationId}`,
+      hostname: `${organizationId}.example.com`,
+      subscriptionStatus: 'ACTIVE' as const,
+    });
+
+    const keyA = runWithTenantContext(context('org-a'), () =>
+      tenantObjectKey('products', 'image.png'),
+    );
+    const keyB = runWithTenantContext(context('org-b'), () =>
+      tenantObjectKey('products', 'image.png'),
+    );
+
+    expect(keyA).toBe('tenants/org-a/products/image.png');
+    expect(keyB).toBe('tenants/org-b/products/image.png');
+    expect(keyA).not.toBe(keyB);
+  });
+
   it('rejects another organization key in the current tenant context', () => {
     process.env.TENANCY_ENABLED = 'true';
     const context = {
