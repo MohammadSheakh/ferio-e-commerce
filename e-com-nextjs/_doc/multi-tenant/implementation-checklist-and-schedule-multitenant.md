@@ -238,7 +238,7 @@ Create a separate control-plane schema/database for platform metadata.
 - [x] Unit-test subscription state transitions.
 - [x] Unit-test entitlement evaluation. (full matrix incl. concurrent-limit semantics)
 - [x] Unit-test domain lifecycle. (reserved names, verification mismatch → FAILED, activation)
-- [ ] Integration-test control-plane migrations on disposable PostgreSQL.
+- [x] Integration-test control-plane migrations on disposable PostgreSQL. (Required CI backend job applies the control-plane migration history to the disposable PostgreSQL service before typechecks, build, and integration tests.)
 - [x] Prove platform billing tables cannot be confused with tenant payment/wallet ledgers. (Platform billing tests and the platform/tenant architecture checks keep SaaS invoices and payment attempts in the control plane; tenant payment, wallet, COD, refund, and settlement records remain outside the platform billing service.)
 
 ### MT-1 gate

@@ -8,6 +8,10 @@ and must not be modified to make the project look better.
 
 - Removed the final feature-service-specific environment check from `AuditService`; it now uses the shared `resolveTenantDatabase` policy like the other tenant services. Extended `architecture:check` to reject feature services that inject `PrismaService` without the shared resolver or issue direct singleton queries. The direct singleton tenant request-path checklist item is now complete; nested-service client reuse remains open.
 
+## 2026-09-08 CI release evidence alignment
+
+- Added required dependency installation/audit gates for every backend and web lockfile, added tenant and control-plane migration deployment against disposable PostgreSQL, and added OpenAPI client drift checks to each web build job. This makes the CI evidence match the Release 1 checklist; rollback testing, full frontend E2E coverage, and production infrastructure drills remain open.
+
 ## 2026-09-08 provider entitlement enforcement
 
 - Completed the previously open integration/provider entitlement control. Tenant-scoped payment-provider enablement now requires the `online_payments` entitlement, and courier activation requires `couriers_basic`, both through the shared `PlanGateService` evaluator. Legacy single-tenant mode remains unchanged because it has no tenant context. Added denial-code regression coverage; transactional messaging provider tenancy remains a separate open control.
