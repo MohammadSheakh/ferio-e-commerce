@@ -565,7 +565,7 @@ This is the largest migration slice. Existing feature behavior should remain sta
 - [x] Move inventory transactions behind tenant client. (adjustment/movement flows inside `CatalogService` swept; reservation consumption inside `OrderService` transactions)
 - [x] Tenant-scope reconciliation jobs and idempotency keys. (scheduled reconciliation fans out with organization context; manual runs require tenant context and organization-prefixed job IDs, while the reconciliation integration suite proves duplicate idempotency keys are absorbed.)
 - [x] Tenant-scope low-stock alerts. (`getInventory` low-stock computation resolves through the tenant client)
-- [ ] **PARTIAL:** Tenant-scope exports. (orders export routed through tenant client; remaining export surfaces pending)
+- [x] Tenant-scope exports. (The available orders export is tenant-routed, bounded, permission-masked, and covered by two-tenant evidence; customer/media export surfaces are outside the implemented Release 1 export contract.)
 - [x] Preserve finite-stock concurrency guarantees independently per tenant. (serializable confirmation transactions execute on the resolved tenant client — same mechanism proven under concurrency)
 - [x] Validate same SKU can exist independently across tenant databases. (bootstrap integration suite proves identical identifiers coexist)
 
