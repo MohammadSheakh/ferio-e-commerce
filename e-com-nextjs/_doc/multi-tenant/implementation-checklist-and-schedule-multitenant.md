@@ -776,7 +776,7 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 ## 11.5 Tenant integrations
 
 - [x] Credential vault boundary: **env-files approach accepted** (owner confirmed). AES-256-GCM encryption at rest + env-var master key satisfies PO-010 for current stage. KMS/Secret Manager migration deferred to production infrastructure.
-- [ ] Encrypt provider secrets.
+- [x] Encrypt provider secrets. (Payment and courier credentials use AES-256-GCM envelopes before tenant-local persistence; the master key is required and length-validated, plaintext is never returned or logged, and readiness/audit output is bounded to non-secret metadata. KMS/Secret Manager ownership remains production-infrastructure work.)
 - [x] Redact secrets from Admin/API/logs. (Tenant registry views omit credential ciphers, provider APIs expose bounded readiness rather than credentials, webhook headers are redacted, and platform/tenant health tests reject secret-bearing errors and payloads.)
 - [x] Tenant-scope payment providers. (`CommercePaymentProviderConfig` is tenant-local, encrypted, and injected only inside the resolved tenant context.)
 - [x] Tenant-scope courier providers. (`CourierProviderConfig` is tenant-local; all six courier adapters and readiness/recommendation/polling paths use tenant-scoped credentials with no cross-tenant process fallback.)
