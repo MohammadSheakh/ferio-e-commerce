@@ -30,16 +30,18 @@ describe('TenantSchemaBootstrapper baseline seed', () => {
       organizationName: 'Acme Store',
     });
 
-    expect(poolQuery).toHaveBeenCalledTimes(2);
+    expect(poolQuery).toHaveBeenCalledTimes(3);
     const statements = poolQuery.mock.calls.map(([sql]) => String(sql));
     expect(statements[0]).toContain('"CommerceSettings"');
     expect(statements[1]).toContain('"CodVerificationPolicy"');
+    expect(statements[2]).toContain('"CommerceMessageTemplate"');
     expect(statements.join('\n')).not.toMatch(
       /INSERT INTO .*"(Customer|Order|PaymentTransaction)"/s,
     );
     const calls = poolQuery.mock.calls as unknown[][];
     expect(calls[0]?.[1]).toEqual(['default', 'Acme Store', 'Ferio']);
     expect(calls[1]?.[1]).toEqual(['default', 'ALWAYS']);
+    expect(calls[2]?.[1]).toHaveLength(48);
     expect(poolEnd).toHaveBeenCalledTimes(1);
   });
 });

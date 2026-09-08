@@ -380,7 +380,7 @@ Provisioning should behave as an idempotent state machine, not a controller scri
 - [ ] Seed tenant owner separately from platform super-admin.
 - [x] Seed tenant-local settings. (`CommerceSettings` is created in the tenant database with the requested organization name)
 - [x] Seed tenant-local feature defaults. (Commerce settings defaults are stored in each tenant database; commerce-affecting options remain configuration-owned)
-- [ ] Seed tenant-local notification templates.
+- [x] Seed tenant-local notification templates. (`TenantSchemaBootstrapper.seedBaseline` inserts the approved transactional order/shipment templates idempotently while messaging remains disabled until a provider is configured.)
 - [ ] Seed delivery/payment defaults as disabled/configuration-required where appropriate.
 - [x] Seed no fake customer/order/payment data in production provisioning. (The baseline seed writes only `CommerceSettings` and `CodVerificationPolicy`; regression coverage rejects customer/order/payment inserts)
 - [x] Make seed idempotent.

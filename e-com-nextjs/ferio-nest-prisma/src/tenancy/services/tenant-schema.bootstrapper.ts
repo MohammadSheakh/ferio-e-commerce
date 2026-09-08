@@ -20,6 +20,81 @@ export interface TenantDatabaseConnection {
 /** Factory store name installed by migration 20260811103000_commerce_settings_foundation. */
 const FACTORY_STORE_NAME = 'Ferio';
 
+const DEFAULT_MESSAGE_TEMPLATES = [
+  [
+    'order-placed',
+    'ORDER_PLACED',
+    'Order {{reference}} received',
+    'We received order {{reference}}. Total: {{currency}} {{total}}.',
+  ],
+  [
+    'order-confirmed',
+    'ORDER_CONFIRMED',
+    'Order {{reference}} confirmed',
+    'Order {{reference}} is confirmed and is being prepared.',
+  ],
+  [
+    'order-cancelled',
+    'ORDER_CANCELLED',
+    'Order {{reference}} cancelled',
+    'Order {{reference}} has been cancelled.',
+  ],
+  [
+    'shipment-created',
+    'SHIPMENT_CREATED',
+    'Shipment created for {{orderReference}}',
+    'Shipment {{trackingNumber}} for order {{orderReference}} was created with {{provider}}.',
+  ],
+  [
+    'shipment-picked-up',
+    'SHIPMENT_PICKED_UP',
+    'Order {{orderReference}} picked up',
+    'Shipment {{trackingNumber}} for order {{orderReference}} has been picked up.',
+  ],
+  [
+    'shipment-in-transit',
+    'SHIPMENT_IN_TRANSIT',
+    'Order {{orderReference}} is in transit',
+    'Shipment {{trackingNumber}} for order {{orderReference}} is in transit.',
+  ],
+  [
+    'shipment-out-for-delivery',
+    'SHIPMENT_OUT_FOR_DELIVERY',
+    'Order {{orderReference}} is out for delivery',
+    'Shipment {{trackingNumber}} for order {{orderReference}} is out for delivery.',
+  ],
+  [
+    'shipment-delivered',
+    'SHIPMENT_DELIVERED',
+    'Order {{orderReference}} delivered',
+    'Shipment {{trackingNumber}} for order {{orderReference}} has been delivered.',
+  ],
+  [
+    'shipment-delivery-failed',
+    'SHIPMENT_DELIVERY_FAILED',
+    'Delivery update for {{orderReference}}',
+    'Delivery of shipment {{trackingNumber}} for order {{orderReference}} was unsuccessful.',
+  ],
+  [
+    'shipment-return-in-progress',
+    'SHIPMENT_RETURN_IN_PROGRESS',
+    'Return started for {{orderReference}}',
+    'Shipment {{trackingNumber}} for order {{orderReference}} is returning to the store.',
+  ],
+  [
+    'shipment-returned',
+    'SHIPMENT_RETURNED',
+    'Order {{orderReference}} returned',
+    'Shipment {{trackingNumber}} for order {{orderReference}} has returned to the store.',
+  ],
+  [
+    'shipment-cancelled',
+    'SHIPMENT_CANCELLED',
+    'Shipment cancelled for {{orderReference}}',
+    'Shipment {{trackingNumber}} for order {{orderReference}} has been cancelled.',
+  ],
+] as const;
+
 /**
  * Applies the canonical tenant migration set to a freshly created tenant
  * database (ADR-0005 §14.1 packaging; MT-4 provisioning step).
@@ -207,6 +282,14 @@ export class TenantSchemaBootstrapper {
       await pool.query(
         'INSERT INTO "CodVerificationPolicy" ("id", "mode", "createdAt", "updatedAt") VALUES ($1, $2, now(), now()) ON CONFLICT ("id") DO NOTHING',
         ['default', 'ALWAYS'],
+      );
+      const placeholders = DEFAULT_MESSAGE_TEMPLATES.map((_, index) => {
+        const offset = index * 4;
+        return `($${offset + 1}, $${offset + 2}, true, $${offset + 3}, $${offset + 4}, 1, now(), now())`;
+      }).join(', ');
+      await pool.query(
+        `INSERT INTO "CommerceMessageTemplate" ("key", "eventType", "enabled", "subjectTemplate", "bodyTemplate", "version", "createdAt", "updatedAt") VALUES ${placeholders} ON CONFLICT ("key") DO NOTHING`,
+        DEFAULT_MESSAGE_TEMPLATES.flatMap((template) => [...template]),
       );
     } finally {
       await pool.end().catch(() => undefined);
