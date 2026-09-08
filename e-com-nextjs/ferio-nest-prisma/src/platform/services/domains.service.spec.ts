@@ -139,6 +139,34 @@ describe('DomainsService lifecycle (MT-1)', () => {
     expect(platform.client.tenantDomain.create).not.toHaveBeenCalled();
   });
 
+  it('fails closed when verification is requested through another organization', async () => {
+    platform.client.tenantDomain.findUnique.mockResolvedValue({
+      id: 'dom-2',
+      organizationId: 'org-a',
+      status: 'PENDING_VERIFICATION',
+      verificationToken: 'ferio-verify=token123',
+    });
+
+    await expect(
+      service.verifyOwnership('dom-2', 'ferio-verify=token123', 'org-b'),
+    ).rejects.toThrow('DOMAIN_NOT_FOUND');
+    expect(platform.client.tenantDomain.update).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when disabling a domain through another organization', async () => {
+    platform.client.tenantDomain.findUnique.mockResolvedValue({
+      id: 'dom-2',
+      organizationId: 'org-a',
+      hostname: 'shop.example.com',
+      status: 'ACTIVE',
+    });
+
+    await expect(service.disable('dom-2', undefined, 'org-b')).rejects.toThrow(
+      'DOMAIN_NOT_FOUND',
+    );
+    expect(platform.client.tenantDomain.update).not.toHaveBeenCalled();
+  });
+
   it('returns credential-free health diagnostics for every domain', async () => {
     platform.client.tenantDomain.findMany.mockResolvedValue([
       {

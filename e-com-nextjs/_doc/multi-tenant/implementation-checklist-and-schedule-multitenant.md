@@ -439,15 +439,15 @@ All surfaces live in the ferio-platform-admin console:
 ## 8.2 Custom domains — P1 / plan-gated
 
 - [ ] **BLOCKED:** Select DNS/TLS automation strategy/provider.
-- [ ] Add custom-domain request.
-- [ ] Generate ownership verification challenge.
+- [x] Add custom-domain request. (`POST /platform/organizations/:organizationId/domains/custom` is permission-protected, plan-gated, normalized, and audited.)
+- [x] Generate ownership verification challenge. (The same route returns an ownership token while keeping the domain `PENDING_VERIFICATION`.)
 - [ ] Verify DNS.
 - [ ] Verify TLS readiness.
-- [ ] Activate only after verification.
-- [ ] Support primary/canonical domain.
-- [ ] Support domain removal.
-- [ ] Prevent stale domain takeover/reassignment.
-- [ ] Audit domain changes.
+- [x] Activate only after verification. (`POST /platform/organizations/:organizationId/domains/:domainId/verify` requires the organization-scoped challenge before activation.)
+- [x] Support primary/canonical domain. (The organization-scoped primary route rejects inactive domains and atomically clears the previous primary.)
+- [x] Support domain removal. (The organization-scoped disable route revokes routing and invalidates the hostname cache.)
+- [x] Prevent stale domain takeover/reassignment. (Unique hostname ownership, disabled-domain invalidation, and organization-scoped mutation routes prevent reuse through stale state.)
+- [x] Audit domain changes. (Reservation, request, verification, activation, disable, and cache invalidation emit bounded platform audit events.)
 - [x] Entitlement-gate custom domains by plan. (`DomainsService.addCustomDomain` evaluates the organization subscription before creating a pending verification record and returns stable denial codes.)
 
 ## 8.3 Tenant-aware frontend state

@@ -19,6 +19,7 @@ import { ProvisioningService } from './services/provisioning.service';
 import { PlatformAdminController } from './platform.controller';
 import { PlatformAuthController } from './platform-auth.controller';
 import { PlatformCatalogController } from './platform-catalog.controller';
+import { PlatformDomainsController } from './platform-domains.controller';
 import { PlatformMigrationsController } from './platform-migrations.controller';
 import { PlatformSupportAccessController } from './platform-support-access.controller';
 import { PlatformAuthService } from './services/platform-auth.service';
@@ -67,6 +68,7 @@ import {
     PlatformAdminController,
     PlatformAuthController,
     PlatformCatalogController,
+    PlatformDomainsController,
     PlatformMigrationsController,
     PlatformSupportAccessController,
     PlatformBillingController,

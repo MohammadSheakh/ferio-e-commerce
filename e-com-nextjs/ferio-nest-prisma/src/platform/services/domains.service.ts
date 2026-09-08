@@ -165,11 +165,18 @@ export class DomainsService {
   }
 
   /** Ownership proof: TXT challenge match activates the domain. */
-  async verifyOwnership(domainId: string, presentedToken: string) {
+  async verifyOwnership(
+    domainId: string,
+    presentedToken: string,
+    organizationId?: string,
+  ) {
     const domain = await this.platform.client.tenantDomain.findUnique({
       where: { id: domainId },
     });
     if (!domain) throw new NotFoundException('DOMAIN_NOT_FOUND');
+    if (organizationId && domain.organizationId !== organizationId) {
+      throw new NotFoundException('DOMAIN_NOT_FOUND');
+    }
     if (domain.status === 'ACTIVE') return domain;
     if (domain.status !== 'PENDING_VERIFICATION') {
       throw new ConflictException('DOMAIN_NOT_VERIFIABLE');
@@ -221,11 +228,14 @@ export class DomainsService {
     });
   }
 
-  async disable(domainId: string, actorId?: string) {
+  async disable(domainId: string, actorId?: string, organizationId?: string) {
     const domain = await this.platform.client.tenantDomain.findUnique({
       where: { id: domainId },
     });
     if (!domain) throw new NotFoundException('DOMAIN_NOT_FOUND');
+    if (organizationId && domain.organizationId !== organizationId) {
+      throw new NotFoundException('DOMAIN_NOT_FOUND');
+    }
     invalidateDomainCache(domain.hostname);
     const updated = await this.platform.client.tenantDomain.update({
       where: { id: domainId },
