@@ -158,6 +158,7 @@ export class SocketGateway
           await client.join(orgRoom('role::admin'));
           await client.join(orgRoom('role::super-admin'));
           await client.join(orgRoom('admin-room'));
+          await client.join(orgRoom('delivery-live-map'));
           if (!user.organizationId) {
             await client.join(`role::${user.role}`);
             await client.join(`role::${lowerRole}`);
@@ -1051,6 +1052,26 @@ export class SocketGateway
       this.logger.error(
         `❌ Failed to emit unread count: ${errorMessage(error)}`,
       );
+    }
+  }
+
+  /** Broadcast rider location only to admins in the current tenant. */
+  emitRiderLocation(payload: {
+    riderId: string;
+    latitude: number;
+    longitude: number;
+    occurredAt: string;
+  }): boolean {
+    try {
+      for (const room of this.ambientRooms('delivery-live-map')) {
+        this.server.to(room).emit('rider-location-updated', payload);
+      }
+      return true;
+    } catch (error) {
+      this.logger.error(
+        `Failed to emit rider location: ${errorMessage(error)}`,
+      );
+      return false;
     }
   }
 

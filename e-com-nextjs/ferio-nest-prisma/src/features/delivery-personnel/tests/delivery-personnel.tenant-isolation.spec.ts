@@ -67,6 +67,7 @@ describe('DeliveryPersonnelService tenant GPS isolation', () => {
       {} as never,
       { record: jest.fn() } as never,
       tenantDb as never,
+      { emitRiderLocation: jest.fn() } as never,
     );
 
     await runWithTenantContext(context('org-a', 'tenant_a'), () =>
@@ -107,6 +108,34 @@ describe('DeliveryPersonnelService tenant GPS isolation', () => {
     );
     expect(tenantB.deliveryPersonnel.update).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: 'rider-b' } }),
+    );
+  });
+
+  it('emits each location through the ambient tenant boundary', async () => {
+    process.env.TENANCY_ENABLED = 'true';
+    const tenant = riderClient('rider-a');
+    const emitRiderLocation = jest.fn();
+    const tenantDb = { getOrLegacy: jest.fn().mockResolvedValue(tenant) };
+    const service = new DeliveryPersonnelService(
+      {} as never,
+      { record: jest.fn() } as never,
+      tenantDb as never,
+      { emitRiderLocation } as never,
+    );
+
+    await runWithTenantContext(context('org-a', 'tenant_a'), () =>
+      service.updateLocation('same-rider-user-id', {
+        latitude: 23.7,
+        longitude: 90.4,
+      }),
+    );
+
+    expect(emitRiderLocation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        riderId: 'rider-a',
+        latitude: 23.7,
+        longitude: 90.4,
+      }),
     );
   });
 });

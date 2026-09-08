@@ -642,7 +642,7 @@ This is the largest migration slice. Existing feature behavior should remain sta
 - [x] Tenant-scope assignment.
 - [x] Tenant-scope duty state.
 - [x] Tenant-scope GPS history.
-- [ ] **PARTIAL:** Tenant-scope WebSocket/live-map rooms. (all existing socket room families — conversations, tasks, admin, notifications — are org-scoped; a dedicated rider live-map emitter does not exist server-side yet)
+- [x] Tenant-scope WebSocket/live-map rooms. (SocketGateway joins tenant-bound admins to `delivery-live-map` and emits rider locations only through the ambient organization room; existing conversations, tasks, admin, and notification rooms remain org-scoped.)
 - [x] Tenant-scope location-history clearing.
 - [x] Prevent rider session from tenant A acting on tenant B order. (`DeliveryPersonnelService` resolves through the tenant client; assigned-order lookup is scoped to the same database — cross-tenant action has no resolution path)
 - [x] Preserve COD staff-confirmation rule per tenant. (COD policy is read from the resolved tenant database, confirmation transitions are explicit, and the two-tenant vertical suite proves identical COD orders and confirmation stock reservations remain isolated.)
@@ -758,7 +758,7 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 - [x] Bind socket ticket/session to tenant. (tickets minted inside tenant-resolved requests embed `organizationId`; `SocketUser` propagates it)
 - [x] Prefix rooms with tenant identity. (`scopedSocketRoom` applied to personal/conversation/role/admin joins and message emissions; identical room IDs across tenants can never share a channel)
 - [x] Tenant-scope Admin chat. (org-bound admin sockets join ONLY org-prefixed role/admin rooms at connection; the message relay broadcasts to sender-scoped admin rooms so one tenant's chats can never reach another's console; REST-initiated chat mutations via `emitToRoom` resolve the ambient tenant)
-- [ ] Tenant-scope rider live map. (no server-side WebSocket live-map emitter exists yet — location surfaces are poll-based; scope the room when realtime lands)
+- [x] Tenant-scope rider live map. (rider location updates emit `rider-location-updated` to the tenant-scoped admin live-map room after the tenant-local persistence succeeds; the existing bounded map-read endpoint remains available as the recovery/read model.)
 - [x] Tenant-scope customer notifications if realtime. (`emitNotificationToUser` / `emitUnreadCountUpdate` / `emitToUser` target ONLY the org-prefixed personal room inside a resolved context; raw rooms remain legacy-only since unbound sockets no longer coexist in them)
 - [x] Reject room joins across tenant boundaries. (cross-tenant rooms are unreachable by construction — clients cannot learn another org's prefixed name from their own ticket)
 

@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import {
@@ -29,6 +30,7 @@ import {
   UpdateDeliveryPersonnelDto,
   UpdateLocationDto,
 } from './delivery-personnel.dto';
+import { SocketGateway } from '../socket.gateway/gateway/socket.gateway';
 
 function normalizePhone(phone: string): string {
   const digits = phone.replace(/\D/g, '');
@@ -62,6 +64,7 @@ export class DeliveryPersonnelService {
     private readonly audit: AuditService,
 
     private readonly tenantDb?: TenantDbService,
+    @Optional() private readonly socket?: SocketGateway,
   ) {}
 
   /**
@@ -821,7 +824,7 @@ export class DeliveryPersonnelService {
       },
     });
 
-    return db.deliveryPersonnel.update({
+    const updated = await db.deliveryPersonnel.update({
       where: { id: personnel.id },
       data: {
         currentLat: dto.latitude,
@@ -829,6 +832,14 @@ export class DeliveryPersonnelService {
         lastLocationAt: new Date(),
       },
     });
+    this.socket?.emitRiderLocation({
+      riderId: personnel.id,
+      latitude: dto.latitude,
+      longitude: dto.longitude,
+      occurredAt:
+        updated.lastLocationAt?.toISOString() ?? new Date().toISOString(),
+    });
+    return updated;
   }
 
   /**
