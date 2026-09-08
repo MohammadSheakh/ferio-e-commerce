@@ -239,13 +239,13 @@ Create a separate control-plane schema/database for platform metadata.
 - [x] Unit-test entitlement evaluation. (full matrix incl. concurrent-limit semantics)
 - [x] Unit-test domain lifecycle. (reserved names, verification mismatch → FAILED, activation)
 - [ ] Integration-test control-plane migrations on disposable PostgreSQL.
-- [ ] Prove platform billing tables cannot be confused with tenant payment/wallet ledgers.
+- [x] Prove platform billing tables cannot be confused with tenant payment/wallet ledgers. (Platform billing tests and the platform/tenant architecture checks keep SaaS invoices and payment attempts in the control plane; tenant payment, wallet, COD, refund, and settlement records remain outside the platform billing service.)
 
 ### MT-1 gate
 
-- [ ] Control-plane database can operate without connecting to a tenant DB.
-- [ ] Platform Admin authorization is independent.
-- [ ] Organization/domain/plan/subscription/database registry foundations are production-build clean.
+- [x] Control-plane database can operate without connecting to a tenant DB. (Platform Prisma bootstrap requires its own `PLATFORM_DATABASE_URL` and the platform health/billing/catalog services use control-plane clients without tenant database injection.)
+- [x] Platform Admin authorization is independent. (Platform routes use the separate `PlatformAuthGuard` realm and typed platform permissions; regression tests reject tenant-realm tokens and missing permissions.)
+- [x] Organization/domain/plan/subscription/database registry foundations are production-build clean. (Backend application typecheck and production build pass across the platform foundation services and generated clients.)
 
 ---
 
