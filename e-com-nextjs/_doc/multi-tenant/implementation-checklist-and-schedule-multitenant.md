@@ -1142,13 +1142,13 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 - [ ] Every PRD Release 1 SaaS exit criterion passes.
 - [ ] At least two independent organizations have isolated DBs and domains.
 - [ ] Cross-tenant negative test suite passes.
-- [ ] Provisioning is idempotent.
-- [ ] Migration orchestration is proven.
-- [ ] Subscription/entitlement enforcement is proven.
-- [ ] Platform billing is separated from tenant commerce billing.
+- [x] Provisioning is idempotent. (`organizations.service.spec.ts` and `provisioning.service.spec.ts` cover concurrent replay, completed replay, and cross-organization idempotency-key conflict.)
+- [x] Migration orchestration is proven. (`migration-orchestrator.service.spec.ts` covers canary/batch progression, isolated tenant failure, threshold pause, and queued resume without re-running successful tenants.)
+- [x] Subscription/entitlement enforcement is proven. (`plan-limit-lifecycle.integration-spec.ts` covers plan limits, activation, usage enforcement, and lifecycle transitions; focused entitlement service tests cover overrides.)
+- [x] Platform billing is separated from tenant commerce billing. (Platform invoices/payment attempts use the platform Prisma client and platform migrations; tenant payment attempts, ledgers, and provider configuration remain in tenant Prisma migrations.)
 - [ ] Backup and restore are proven.
-- [ ] Unknown/suspended-domain behavior is proven.
-- [ ] Redis/BullMQ/WebSocket/file isolation is proven.
+- [x] Unknown/suspended-domain behavior is proven. (`tenant-resolver.service.spec.ts`, tenant middleware tests, and Customer Web metadata/robots/sitemap paths fail closed or emit unavailable/noindex behavior for unknown, suspended, and closed domains.)
+- [x] Redis/BullMQ/WebSocket/file isolation is proven. (Tenant-prefixed job/socket/object keys and two-tenant isolation suites cover collision resistance; external Redis deployment and capacity evidence remain separate operational work.)
 - [x] Platform Admin support access is audited and constrained. (reason-bound, time-bound, organization/user-scoped, revocable, and usage-audited)
 - [x] No production request path can fall back to the original single-tenant DB. (The production configuration gate requires tenancy and the shared resolver rejects missing tenant context instead of returning the legacy Prisma client.)
 - [ ] Critical/high security findings are closed or formally accepted.
