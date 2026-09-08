@@ -699,7 +699,7 @@ This is the largest migration slice. Existing feature behavior should remain sta
 - [ ] Tenant-scope operations health while keeping platform health separate.
 - [x] Ensure Platform Admin aggregate metrics use approved metadata/aggregation and do not expose tenant PII by default. (`GET /platform/dashboard` reads control-plane group counts only; regression coverage rejects organization IDs, customer/order fields, and contact data)
 - [x] Tenant-scope audit logs. (Audit writes automatically include trusted organization, tenant database, domain, hostname, and correlation context)
-- [ ] Add support-access audit linking when Platform Support views tenant data.
+- [x] Add support-access audit linking when Platform Support views tenant data. (`SupportAccessService.assertActive` requires the exact organization/operator grant and records `SUPPORT_ACCESS_USED`; audit failure blocks the access request.)
 
 ### 10.4A Transactional messaging outbox (pulled forward)
 
@@ -971,9 +971,9 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 - [ ] Avoid destructive schema changes in one step.
 - [ ] Test old app/new schema and new app/transition schema compatibility where rollout requires it.
 - [x] Add migration timeout. (per-tenant bootstrap is bounded by `TENANT_MIGRATION_TIMEOUT_MS`, default 120 seconds)
-- [ ] Add lock/contention strategy.
+- [x] Add lock/contention strategy. (tenant bootstrap applies per-migration `lock_timeout` and `statement_timeout`; the orchestrator classifies PostgreSQL lock/deadlock/serialization failures as bounded transient retries.)
 - [ ] Add rollback/forward-fix runbook.
-- [ ] Never run uncontrolled `prisma migrate deploy` against every tenant simultaneously from application startup.
+- [x] Never run uncontrolled `prisma migrate deploy` against every tenant simultaneously from application startup. (tenant migrations are launched only through the bounded, canary-aware BullMQ orchestrator; application startup has no tenant-fleet migration path.)
 
 ## 14.4 Validation
 
