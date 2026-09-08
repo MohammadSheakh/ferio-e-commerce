@@ -100,15 +100,26 @@ export class ReconciliationQueue implements OnModuleInit {
 
   async enqueueRetry(runId: string, initiatedByActorId: string) {
     const run = await this.reconciliation.getRetryableRun(runId);
+    const organizationId = tryGetTenantContext()?.organizationId;
+    if (
+      (process.env.TENANCY_ENABLED || 'false') === 'true' &&
+      !organizationId
+    ) {
+      throw new Error('TENANT_CONTEXT_REQUIRED_FOR_RECONCILIATION_RETRY');
+    }
     const job = await this.queue.add(
       RECONCILIATION_SCAN_JOB,
       {
         overdueHours: run.overdueHours,
         retryRunId: run.id,
         initiatedByActorId,
-        organizationId: tryGetTenantContext()?.organizationId,
+        ...(organizationId ? { organizationId } : {}),
       },
-      { jobId: `reconciliation-retry-${run.id}-${run.attemptCount}` },
+      {
+        jobId: organizationId
+          ? `t:${organizationId}:reconciliation-retry-${run.id}-${run.attemptCount}`
+          : `reconciliation-retry-${run.id}-${run.attemptCount}`,
+      },
     );
     return { runId: run.id, jobId: String(job.id), status: 'QUEUED' as const };
   }

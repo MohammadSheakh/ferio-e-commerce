@@ -655,7 +655,7 @@ This is the largest migration slice. Existing feature behavior should remain sta
 - [x] Tenant-scope scheduled reconciliation runs.
 - [x] Tenant-scope settlement imports and evidence. (`SettlementImportsService` resolves every import/classify/persist/claim path through the tenant client)
 - [ ] Tenant-scope BullMQ job IDs.
-- [ ] Tenant-scope manual retry actions.
+- [x] Tenant-scope manual retry actions. (Reconciliation, courier callback, and transactional-message retries require resolved tenant context, stamp the trusted organization in job data, and use tenant-scoped job IDs)
 - [x] Prove failure in tenant A reconciliation does not block tenant B jobs. (reconciliation scans fan out per tenant with isolated failure evidence)
 
 ### 10.1A Settings and storefront branding (pulled forward from §10.12 scope)
