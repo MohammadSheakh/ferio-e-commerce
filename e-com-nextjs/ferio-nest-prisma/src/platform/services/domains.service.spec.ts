@@ -194,4 +194,24 @@ describe('DomainsService lifecycle (MT-1)', () => {
       'verificationToken',
     );
   });
+
+  it('invalidates every hostname for one organization and records bounded evidence', async () => {
+    platform.client.tenantDomain.findMany.mockResolvedValue([
+      { hostname: 'acme.ferio.test' },
+      { hostname: 'shop.acme.test' },
+    ]);
+
+    await expect(
+      service.invalidateOrganizationCache('org-1', 'platform-1'),
+    ).resolves.toEqual({ organizationId: 'org-1', hostnameCount: 2 });
+
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'TENANT_DOMAIN_CACHE_INVALIDATED',
+        entityId: 'org-1',
+        actorId: 'platform-1',
+        newValue: { hostnameCount: 2 },
+      }),
+    );
+  });
 });

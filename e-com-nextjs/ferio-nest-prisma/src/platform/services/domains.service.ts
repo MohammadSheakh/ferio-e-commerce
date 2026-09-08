@@ -243,6 +243,33 @@ export class DomainsService {
   }
 
   /**
+   * Evict all domain-resolution entries for one organization after an
+   * operator-side repair. The control plane owns the hostname list; the
+   * tenancy module owns the cache implementation through the invalidation
+   * hook, preserving the dependency direction.
+   */
+  async invalidateOrganizationCache(organizationId: string, actorId?: string) {
+    const domains = await this.platform.client.tenantDomain.findMany({
+      where: { organizationId },
+      select: { hostname: true },
+    });
+
+    for (const domain of domains) {
+      invalidateDomainCache(domain.hostname);
+    }
+
+    await this.audit.record({
+      action: 'TENANT_DOMAIN_CACHE_INVALIDATED',
+      entityType: 'Organization',
+      entityId: organizationId,
+      actorId,
+      newValue: { hostnameCount: domains.length },
+    });
+
+    return { organizationId, hostnameCount: domains.length };
+  }
+
+  /**
    * Credential-free operator diagnostics for every registered domain. A
    * domain is healthy only when both its own state and its organization state
    * are ACTIVE; verification tokens are intentionally excluded from this

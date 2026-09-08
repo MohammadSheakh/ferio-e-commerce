@@ -208,6 +208,18 @@ export class PlatformAdminController {
     return this.organizations.getById(id);
   }
 
+  @Post('organizations/:id/domain-cache/invalidate')
+  @PlatformPermissions('organization:write')
+  invalidateOrganizationDomainCache(
+    @Param('id') id: string,
+    @Req() request: PlatformRequest,
+  ) {
+    return this.domains.invalidateOrganizationCache(
+      id,
+      request.platformPrincipal?.platformUserId,
+    );
+  }
+
   /**
    * MT-9 §9.4 — Platform Admin usage view: recorded counters for every
    * authoritative metric against the current plan's limits, with warning

@@ -828,7 +828,7 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 - [x] View subscriptions. (`GET /platform/subscriptions` directory + Subscriptions console page)
 - [x] View platform invoices/payment attempts. (Billing console page backed by the two billing endpoints)
 - [x] Manual billing operations require explicit permission/reason/audit. (`saas_billing:write` plus 10–500 character reason DTOs; invoice creation and payment initiation record actor/reason audit events.)
-- [ ] Add internal/free entitlement state if approved.
+- [x] Add internal/free entitlement state if approved. (approved PO-002 policy is implemented by the seeded `internal` plan and audited `SubscriptionsService.startInternal()` flow)
 - [ ] Add tenant-specific override with expiry/reason if approved.
 
 ## 12.4 Tenant operations
@@ -843,8 +843,8 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 - [x] Schema version drift view. (Database Health page highlights any tenant database behind the canonical head)
 - [x] Backup evidence. (Platform system health exposes current/stale/missing backup and restore evidence from deployment metadata; it does not claim a backup provider integration.)
 - [ ] Restore workflow status.
-- [ ] Domain verification diagnostics.
-- [ ] Tenant cache invalidation where safe.
+- [x] Domain verification diagnostics. (`GET /platform/domain-health` exposes credential-free domain status, organization status, verification failures, and actionable routing issues without returning verification tokens.)
+- [x] Tenant cache invalidation where safe. (`POST /platform/organizations/:id/domain-cache/invalidate` enumerates control-plane hostnames, invokes the tenancy invalidation hook, and records bounded audit evidence; it never accepts cache keys or database URLs from the caller.)
 
 ## 12.5 Support access
 
