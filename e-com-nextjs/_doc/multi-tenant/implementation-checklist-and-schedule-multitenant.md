@@ -322,8 +322,8 @@ Create a separate control-plane schema/database for platform metadata.
 - [x] Introduce tenant-aware repository/service access. (`TenantDbService` is the shared resolution boundary and the active commerce services use `resolveTenantDatabase`/`db()` helpers; the remaining injected Prisma client is an explicit legacy compatibility dependency, not an implicit tenant selector.)
 - [ ] Ensure transactions use the same resolved tenant client for the entire operation.
 - [ ] Ensure nested services cannot silently acquire a different tenant client.
-- [ ] Ensure control-plane transactions never include tenant DB writes as if they were one ACID transaction.
-- [ ] Define saga/compensation behavior for cross-plane workflows such as provisioning.
+- [x] Ensure control-plane transactions never include tenant DB writes as if they were one ACID transaction. (Platform services use the control-plane client only; tenant writes run through tenant context, and the architecture boundary check rejects tenant-plane access from the platform billing boundary.)
+- [x] Define saga/compensation behavior for cross-plane workflows such as provisioning. (ADR-0001, application-boundary documentation, and the provisioning partial-failure runbook define recorded steps, replay/resume, failed-step repair, and safe orphan-resource review; automatic physical cleanup remains infrastructure-dependent.)
 - [x] Add tests for transaction rollback inside one tenant without affecting another. (The disposable PostgreSQL tenant-bootstrap integration suite forces a rollback in tenant A and verifies tenant B remains unchanged.)
 
 ## 6.3 Database isolation tests
