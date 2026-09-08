@@ -683,7 +683,7 @@ This is the largest migration slice. Existing feature behavior should remain sta
 - [x] Tenant-scope socket tickets. (Authenticated ticket issuance now requires `TenantMembershipGuard`; the signed ticket carries only the resolved organization context.)
 - [x] Tenant-scope rooms/channels. (conversations, tasks, admin role rooms, and every server-side emission path are org-prefixed; task-room Redis presence lists are scoped by the same names)
 - [x] Tenant-scope conversation lookup/history. (chat REST swept; realtime rooms namespaced in MT-8)
-- [ ] Tenant-scope quick replies/folders if configurable.
+- [x] Tenant-scope quick replies/folders if configurable. (Not a configurable or persisted Release 1 capability in the PRD/schema; no tenant data path exists. Reopen this control when quick replies or folders receive a persistence contract.)
 - [x] Reject cross-tenant socket subscriptions. (org-scoped rooms unreachable from foreign tickets)
 - [x] Add multi-client E2E with two tenants active simultaneously. (`test/socket-isolation.integration-spec.ts`: four live WebSocket clients — same-userId admins of org-a/org-b plus org-bound guests — over a real socket.io server; connection rooms, tenant-scoped notifications and chat relay proven isolated on the wire; foreign guest join denied)
 
