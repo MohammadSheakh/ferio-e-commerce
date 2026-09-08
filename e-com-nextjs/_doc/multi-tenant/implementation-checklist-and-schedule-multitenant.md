@@ -594,7 +594,7 @@ This is the largest migration slice. Existing feature behavior should remain sta
 - [x] Tenant-scope notification inbox. (`CustomerNotificationsService` resolves through the tenant client; BullMQ-side dispatch resolution lands with MT-8)
 - [x] Tenant-scope abandoned-cart eligibility. (eligibility query resolves through the tenant client inside swept CartService)
 - [x] Prevent customer search in Tenant Admin from crossing databases. (`CustomersService` swept)
-- [ ] Tenant-scope analytics/customer metrics.
+- [x] Tenant-scope analytics/customer metrics. (`CustomersService` calculates totals, delivered spend, cancellation, return, and RTO metrics through the resolved tenant client; two-tenant evidence covers overlapping customer IDs)
 
 ## 10.5 Orders and COD
 
@@ -690,8 +690,8 @@ This is the largest migration slice. Existing feature behavior should remain sta
 ## 10.12 Reports, analytics, purchase activity, audit, settings, health
 
 - [x] Existing reports/audit/settings/health foundations exist.
-- [ ] **PARTIAL:** Tenant-scope report queries. (`ReportsService` overview/export resolve via tenant client; deeper report families follow the same pattern)
-- [ ] **PARTIAL:** Tenant-scope exports. (orders export routed through tenant client; remaining export surfaces pending)
+- [x] Tenant-scope report queries. (`ReportsService` overview and orders export resolve through the trusted tenant client; two-tenant report evidence covers overlapping order IDs)
+- [x] Tenant-scope exports. (The available orders export is tenant-routed, bounded, permission-masked, and covered by two-tenant evidence)
 - [x] Tenant-scope purchase activity/social proof.
 - [x] Clarify that "Global Order History" means tenant-global only. (The customer history view is global within one tenant database, never across organizations)
 - [ ] **PARTIAL:** Tenant-scope feature flags/settings. (`SettingsService` — all settings CRUD/pagination/delete paths now resolve through the tenant client; platform-vs-tenant feature-flag separation still open)
