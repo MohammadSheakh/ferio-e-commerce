@@ -49,9 +49,19 @@ function harness(options: {
           .mockImplementation(
             ({ where }: { where: { organizationId: string } }) =>
               Promise.resolve(
-                options.registries.find(
-                  (r) => r.organizationId === where.organizationId,
-                ) ?? null,
+                (() => {
+                  const registry = options.registries.find(
+                    (r) => r.organizationId === where.organizationId,
+                  );
+                  return registry
+                    ? {
+                        ...registry,
+                        organization: {
+                          status: registry.organizationStatus ?? 'ACTIVE',
+                        },
+                      }
+                    : null;
+                })(),
               ),
           ),
         findMany: jest
@@ -123,6 +133,7 @@ function harness(options: {
   return {
     service,
     platform,
+    manager,
     deleteCalls,
     selectionCalls,
     contextOrganizations,
@@ -207,6 +218,7 @@ describe('RetentionSweepService (brutal-audit #7 — unbounded growth)', () => {
                         id: `tdb-${where.organizationId}`,
                         status: 'READY',
                         organizationId: where.organizationId,
+                        organization: { status: 'ACTIVE' },
                       },
                 ),
             ),
@@ -293,6 +305,23 @@ describe('RetentionSweepService (brutal-audit #7 — unbounded growth)', () => {
       orderBy: { organizationId: 'asc' },
     });
     expect(new Set(h.contextOrganizations)).toEqual(new Set(['org-active']));
+  });
+
+  it('does not run a targeted sweep for an inactive organization', async () => {
+    const h = harness({
+      registries: [
+        {
+          organizationId: 'org-closed',
+          status: 'READY',
+          organizationStatus: 'CLOSED',
+        },
+      ],
+    });
+
+    await expect(h.service.sweepTenant('org-closed')).rejects.toThrow(
+      'TENANT_DATABASE_NOT_READY:org-closed',
+    );
+    expect(h.manager.getClient).not.toHaveBeenCalled();
   });
 
   it('refuses a sweep against a non-READY registry', async () => {
