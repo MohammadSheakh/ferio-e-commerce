@@ -13,6 +13,24 @@ jest.mock('bcrypt', () => ({
 import { UnauthorizedException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { AuthService } from '../auth.service';
+import { runWithTenantContext } from '../../../../tenancy/context/tenant-context';
+
+const tenantContext = {
+  correlationId: 'correlation-auth',
+  organizationId: 'org-a',
+  tenantDatabaseId: 'tenant-db-a',
+  database: {
+    id: 'tenant-db-a',
+    host: 'localhost',
+    port: 5432,
+    databaseName: 'tenant_a',
+    username: 'tenant_a',
+    credentialCipher: 'ciphertext',
+  },
+  domainId: 'domain-a',
+  hostname: 'a.example.test',
+  subscriptionStatus: 'ACTIVE' as const,
+};
 
 describe('AuthService token lifecycle', () => {
   const signAsync = jest.fn().mockResolvedValue('signed-token');
@@ -27,6 +45,7 @@ describe('AuthService token lifecycle', () => {
     update?: jest.Mock;
     redisClient?: { get: jest.Mock; set?: jest.Mock } | null;
     verifyAsync?: jest.Mock;
+    tenantDb?: { getOrLegacy: jest.Mock };
   }) {
     const prisma = {
       user: {
@@ -58,6 +77,7 @@ describe('AuthService token lifecycle', () => {
       redisService as never,
       configService as never,
       twoFactorService as never,
+      options?.tenantDb as never,
     );
     const logger = { log: jest.fn(), warn: jest.fn(), error: jest.fn() };
     (service as unknown as { logger: typeof logger }).logger = logger;
@@ -105,6 +125,61 @@ describe('AuthService token lifecycle', () => {
       expect.objectContaining({ sub: 'user-1' }),
       expect.objectContaining({ expiresIn: 7 * 24 * 60 * 60 }),
     );
+  });
+
+  it('binds customer tokens to the resolved tenant organization', async () => {
+    const service = createService().service;
+    process.env.TENANCY_ENABLED = 'true';
+
+    try {
+      await runWithTenantContext(tenantContext, () =>
+        (
+          service as unknown as {
+            generateTokens(user: {
+              id: string;
+              email: string;
+              role: string;
+            }): Promise<unknown>;
+          }
+        ).generateTokens({
+          id: 'user-a',
+          email: 'customer-a@example.com',
+          role: 'user',
+        }),
+      );
+    } finally {
+      delete process.env.TENANCY_ENABLED;
+    }
+
+    expect(signAsync).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ organizationId: 'org-a' }),
+      expect.any(Object),
+    );
+  });
+
+  it('rejects a refresh token issued for another tenant', async () => {
+    const service = createService({
+      redisClient: { get: jest.fn().mockResolvedValue(null) },
+      verifyAsync: jest.fn().mockResolvedValue({
+        userId: 'user-b',
+        organizationId: 'org-b',
+      }),
+      tenantDb: {
+        getOrLegacy: jest.fn((legacyClient: unknown) => legacyClient),
+      },
+    }).service;
+    process.env.TENANCY_ENABLED = 'true';
+
+    try {
+      await expect(
+        runWithTenantContext(tenantContext, () =>
+          service.refreshToken('refresh-token-from-org-b'),
+        ),
+      ).rejects.toThrow(new UnauthorizedException('Invalid refresh token'));
+    } finally {
+      delete process.env.TENANCY_ENABLED;
+    }
   });
 
   it('logs an identifier-free event for an unknown password account', async () => {

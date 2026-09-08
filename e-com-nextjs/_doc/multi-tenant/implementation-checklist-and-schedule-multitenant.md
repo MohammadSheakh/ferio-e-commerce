@@ -911,7 +911,7 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 
 - [x] Tenant-aware catalog. (Server-side catalog reads forward the trusted storefront host and the backend routing tests prove tenant reads never fall back to the legacy database.)
 - [x] Tenant-aware cart cookies/session. (Host-only storefront cookies plus tenant-local CartService/saved-cart/reorder routing prevent cart state and share tokens crossing hosts or databases.)
-- [ ] Tenant-aware auth/customer account.
+- [x] Tenant-aware auth/customer account. (Customer session cookies are host-only, BFF calls forward the resolved storefront host, tenant login tokens carry the resolved organization, and refresh rejects tokens whose organization differs from the current tenant context; auth regression coverage proves both invariants.)
 - [x] Tenant-aware checkout/payment. (Checkout and payment attempts/callbacks resolve through the tenant database and callback organization binding; provider account configuration remains a separate open control.)
 - [x] Tenant-aware tracking. (Tracking and storefront analytics read/write through the resolved tenant context; two-tenant analytics isolation coverage is present.)
 - [x] Tenant-aware wallet. (Wallet balances, ledgers, top-ups, checkout debits, and refunds use the resolved tenant database with real two-database isolation evidence.)
