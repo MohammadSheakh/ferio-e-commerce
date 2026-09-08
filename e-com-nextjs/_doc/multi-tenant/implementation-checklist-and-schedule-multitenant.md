@@ -674,7 +674,7 @@ This is the largest migration slice. Existing feature behavior should remain sta
 - [x] Tenant-scope all records and settings. (`ServiceBookingService`, `WarrantyService`, `ProductContentService` (reviews/banners), `ProductRequestService`, `StoreLocationsService` all resolve through the tenant client with explicit legacy fallback)
 - [x] Tenant-scope media/evidence. (Warranty evidence now uses the shared R2 `STORAGE_STRATEGY`; `R2Strategy` derives private `tenants/{organizationId}/...` keys from trusted tenant context.)
 - [x] Tenant-scope outlet inventory/pickup configuration. (`StoreLocationsService` resolves public stores and availability checks through the tenant client; identical store identifiers are read from separate tenant databases in isolation coverage)
-- [ ] Tenant-scope moderation and Admin queues.
+- [x] Tenant-scope moderation and Admin queues. (`product-content.controller.ts` applies tenant membership and permission guards to review/banner moderation routes, while `ProductContentService` resolves all moderation records through the tenant database.)
 - [x] Add cross-tenant ownership tests. (two-tenant suites cover returns, refunds, RTO, settlements, store pickup locations, and storefront analytics with overlapping lookup identifiers)
 
 ## 10.11 Chat and real-time communication
