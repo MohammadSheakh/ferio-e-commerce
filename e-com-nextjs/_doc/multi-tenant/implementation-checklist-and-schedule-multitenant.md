@@ -73,7 +73,7 @@ Verification: backend production build clean; **67 suites / 264 unit tests passi
 
 ## 3.1 Repository and application boundaries
 
-- [ ] Confirm the canonical SaaS application map:
+- [x] Confirm the canonical SaaS application map. (`_doc/multi-tenant/application-boundaries.md`)
   - `ferio-nest-prisma` — shared NestJS backend;
   - Tenant Storefront Web;
   - Tenant Admin Web;
@@ -81,7 +81,7 @@ Verification: backend production build clean; **67 suites / 264 unit tests passi
   - Customer Mobile App;
   - Ferio Platform Admin.
 - [x] Decide whether Platform Admin is a separate Next.js application or an explicitly isolated application boundary inside an existing admin repository. (`ferio-platform-admin` — ADR-0008)
-- [ ] Document which modules are **control-plane**, **tenant-plane**, or **shared infrastructure**.
+- [x] Document which modules are **control-plane**, **tenant-plane**, or **shared infrastructure**. (`_doc/multi-tenant/application-boundaries.md`)
 - [x] Add an architecture decision record for database-per-tenant. (`_doc/multi-tenant/adr/ADR-0001`)
 - [x] Add an architecture decision record for tenant resolution. (`ADR-0002`)
 - [x] Add an architecture decision record for connection-pool management. (`ADR-0003`)
@@ -90,7 +90,7 @@ Verification: backend production build clean; **67 suites / 264 unit tests passi
 - [x] Add an architecture decision record for subscription/entitlement enforcement. (`ADR-0006`)
 - [x] Add an architecture decision record for tenant deletion/export/retention. (`ADR-0007`, policy owner-blocked)
 - [ ] Freeze accidental new global tables in the existing tenant schema until ownership is classified.
-- [ ] Create a tenant-boundary review checklist for every future module/PR.
+- [x] Create a tenant-boundary review checklist for every future module/PR. (`_doc/multi-tenant/tenant-boundary-review-checklist.md`)
 
 ## 3.1.1 Backend feature structure convention
 
@@ -147,10 +147,10 @@ Implementation tracking: `_doc/multi-tenant/skill-related-discussion/file-folder
 - [x] Classify all existing tables for catalog, inventory, cart, checkout, orders, payments, wallet, returns, riders, chat, services, warranty, reviews, settings, analytics, audit, reconciliation, and notifications.
 - [x] Identify every current singleton/global setting that must become tenant-local.
 - [x] Identify every current unique constraint that becomes tenant-local after DB separation.
-- [ ] Identify every cross-domain reference that cannot cross database boundaries.
+- [x] Identify every cross-domain reference that cannot cross database boundaries. (`data-classification.md`, `application-boundaries.md`, and `project-flow/03-multi-tenant-resolution-and-database-routing.md` define opaque-ID-only cross-plane references.)
 - [x] Prohibit tenant DB foreign keys to control-plane tables. (enforced by ADR-0001; canonical schema extraction will make it physical)
 - [x] Define opaque identifiers required in cross-plane messages/events instead of database foreign keys. (TenantContext carries registry IDs only)
-- [ ] Document ownership and retention of uploaded product, warranty, review, return, and other media.
+- [x] Document ownership and retention of uploaded product, warranty, review, return, and other media. (`_doc/multi-tenant/media-ownership-and-retention.md`; provider lifecycle and malware controls remain operational work.)
 
 ## 3.3 Security baseline before tenancy
 
@@ -158,7 +158,7 @@ Implementation tracking: `_doc/multi-tenant/skill-related-discussion/file-folder
 - [x] Verify JWT/session secrets have no development fallback in production. (Aug 2026 remediation + template-secret startup rejection)
 - [x] Verify refresh revocation fails closed. (Aug 2026 remediation)
 - [x] Verify OTP/TOTP hardening remains active. (Aug 2026 remediation)
-- [ ] Verify Platform Admin cannot reuse Tenant Admin authorization implicitly.
+- [x] Verify Platform Admin cannot reuse Tenant Admin authorization implicitly. (separate platform realm/permission guard plus platform-principal rejection in `TenantMembershipGuard`; regression-tested)
 - [x] Add stable error codes for tenant resolution, tenant unavailable, subscription denial, provisioning failure, and tenant migration failure. (`src/tenancy/tenant-errors.ts`; entitlement/provisioning codes in services)
 - [x] Add a rule: **no tenant lookup failure may fall back to the original Ferio database**. (resolver fails closed; enforced by tests)
 - [x] Add a rule: **no request body/query/header may select a tenant database directly**. (resolver reads host only; manager keys on registry ID)
@@ -168,7 +168,7 @@ Implementation tracking: `_doc/multi-tenant/skill-related-discussion/file-folder
 - [ ] Architecture decisions approved.
 - [ ] Existing Prisma models classified.
 - [ ] No ambiguous global-vs-tenant business data remains undocumented.
-- [ ] Threat model reviewed before implementing database routing.
+- [x] Threat model reviewed before implementing database routing. (`_doc/multi-tenant/threat-model.md`; residual production/provider risks are explicitly listed)
 
 ---
 
@@ -335,8 +335,8 @@ Create a separate control-plane schema/database for platform metadata.
 - [x] Prove tenant B reads only B. (The real PostgreSQL isolation suite verifies B cannot read A's row and can own the same identifier independently.)
 - [x] Prove writes remain isolated. (Identical identifiers can be written independently without cross-database visibility.)
 - [x] Prove transaction rollback remains isolated. (A forced rollback removes A's uncommitted row while leaving B's data untouched.)
-- [ ] Prove one tenant DB outage does not route to another.
-- [ ] Prove one tenant DB outage does not crash healthy tenant traffic unnecessarily.
+- [x] Prove one tenant DB outage does not route to another. (`tenant-fanout.service.spec.ts` records the failed organization and resolves healthy work through its own trusted registry material.)
+- [x] Prove one tenant DB outage does not crash healthy tenant traffic unnecessarily. (`tenant-fanout.service.spec.ts` continues healthy work after a connection failure.)
 - [ ] Load-test connection manager with many simulated tenants.
 
 ### MT-3 gate
@@ -1084,7 +1084,7 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 - [x] Measure cached tenant resolution. (same suite; positive/negative cache effectiveness asserted by query counts, not wall-clock alone)
 - [x] Test pool exhaustion behavior. (`tenant-database.manager.spec.ts` proves active-client capacity fails closed with `TENANT_DATABASE_CAPACITY_EXHAUSTED`; the integration baseline proves configured pool bounds)
 - [ ] Test noisy-neighbor queue behavior.
-- [ ] Test one slow tenant DB.
+- [x] Test one slow tenant DB. (`tenant-fanout.service.spec.ts` proves two healthy tenants progress while one bounded slow tenant is still running.)
 - [x] Test control-plane outage behavior. (`performance-baseline.integration-spec.ts` proves tenant resolution fails closed within a bounded latency without legacy fallback)
 - [x] Define safe degraded behavior; never bypass tenant authorization. (resolver, database manager, membership guard, and fan-out tests assert fail-closed errors, per-tenant breakers, and isolated worker failures)
 - [x] Establish capacity thresholds for when database connection strategy must change. (`scripts/connection-budget-check.mjs` computes replica, platform, legacy, tenant-client, pool, reserved, and usable connection totals and exits non-zero on budget overflow)

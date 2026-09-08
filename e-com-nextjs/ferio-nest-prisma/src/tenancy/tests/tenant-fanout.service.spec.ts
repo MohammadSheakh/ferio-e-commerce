@@ -191,4 +191,29 @@ describe('TenantFanoutService (MT-8 §11.2)', () => {
       { organizationId: 'org-bad', error: 'connection refused' },
     ]);
   });
+
+  it('keeps healthy tenants progressing while one tenant is slow', async () => {
+    process.env.TENANCY_ENABLED = 'true';
+    process.env.TENANT_FANOUT_CONCURRENCY = '2';
+    const built = build([
+      registry('org-slow'),
+      registry('org-fast-1'),
+      registry('org-fast-2'),
+    ]);
+    const completed: string[] = [];
+
+    const outcome = await built.service.forEachTenant(async () => {
+      const organizationId = getTenantContext().organizationId;
+      if (organizationId === 'org-slow') {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      completed.push(organizationId);
+    }, { label: 'slow-tenant-test' });
+
+    expect(outcome.processed).toBe(3);
+    expect(outcome.failures).toEqual([]);
+    expect(completed.slice(0, 2)).toEqual(
+      expect.arrayContaining(['org-fast-1', 'org-fast-2']),
+    );
+  });
 });
