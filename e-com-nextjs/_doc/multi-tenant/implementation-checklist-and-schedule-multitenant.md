@@ -497,8 +497,8 @@ All surfaces live in the ferio-platform-admin console:
 - [x] Implement cancelled/non-renewing.
 - [x] Implement reactivation. (PAST_DUE/SUSPENDED/CANCELLED → ACTIVE)
 - [x] Preserve tenant data across non-destructive subscription state changes. (plan-limit lifecycle integration spec: every historical order survives an upgrade AND a downgrade byte-for-byte)
-- [ ] Define storefront behavior when subscription is overdue.
-- [ ] Define Tenant Admin behavior when subscription is overdue.
+- [x] Define storefront behavior when subscription is overdue. (during `PAST_DUE` grace, trusted tenant resolution keeps the storefront browsable; suspension remains the explicit commerce-mutation restriction)
+- [x] Define Tenant Admin behavior when subscription is overdue. (`GET /tenancy/my-plan` remains reachable to an active tenant member and returns `PAST_DUE`, current-period recovery metadata, usage, limits, and active domains)
 - [x] Keep billing lifecycle separate from organization/database lifecycle.
 
 ## 9.3 SaaS billing

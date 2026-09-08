@@ -233,6 +233,34 @@ describe('TenantResolverService fail-closed resolution (MT-2 gate)', () => {
     });
   });
 
+  it('keeps a PAST_DUE store browsable during the grace period', async () => {
+    platform.client.tenantDomain.findUnique.mockResolvedValue({
+      id: 'dom-overdue',
+      status: 'ACTIVE',
+      organization: {
+        id: 'org-overdue',
+        status: 'ACTIVE',
+        subscription: { status: 'PAST_DUE' },
+      },
+    });
+    platform.client.tenantDatabase.findUnique.mockResolvedValue({
+      id: 'tdb-overdue',
+      status: 'READY',
+      host: 'h',
+      port: 5432,
+      databaseName: 'd',
+      username: 'u',
+      credentialCipher: 'c',
+    });
+
+    await expect(
+      service.resolveFromHost('overdue.example.com'),
+    ).resolves.toMatchObject({
+      organizationId: 'org-overdue',
+      subscriptionStatus: 'PAST_DUE',
+    });
+  });
+
   it('still takes closure-pending and closed stores fully offline', async () => {
     platform.client.tenantDomain.findUnique.mockResolvedValue({
       id: 'dom-1',
