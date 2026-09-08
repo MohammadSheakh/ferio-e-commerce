@@ -55,12 +55,15 @@ export default function PlanUsageCard() {
               {limit != null && used >= limit && (
                 <em className="ml-1 not-italic text-[12px] text-rose-700">limit reached</em>
               )}
+              {limit != null && used < limit && used / limit >= 0.8 && (
+                <em className="ml-1 not-italic text-[12px] text-amber-700">near limit</em>
+              )}
             </span>
           </li>
         ))}
       </ul>
       <a href="/dashboard/settings" style={{ fontSize: 12 }} className="mt-3 inline-block underline">
-        Manage subscription
+        Review plan or upgrade
       </a>
     </div>
   );

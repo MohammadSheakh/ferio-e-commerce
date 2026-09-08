@@ -30,9 +30,11 @@ export default function StoreSetupChecklist() {
       fetch("/api/admin/delivery-zones").then((r) => r.json()).catch(() => null),
       fetch("/api/payments/providers").then((r) => r.json()).catch(() => null),
       fetch("/api/admin/plan-status").then((r) => r.json()).catch(() => null),
-    ]).then(([settingsRes, zonesRes, providersRes, planRes]) => {
+      fetch("/api/catalog/products?limit=1").then((r) => r.json()).catch(() => null),
+    ]).then(([settingsRes, zonesRes, providersRes, planRes, productsRes]) => {
       const settings = settingsRes?.data ?? settingsRes ?? {};
       const zones = zonesRes?.data?.items ?? zonesRes?.items ?? [];
+      const products = productsRes?.data?.items ?? productsRes?.items ?? [];
       const providers = Array.isArray(providersRes?.data)
         ? providersRes.data
         : (providersRes?.data?.providers ?? providersRes?.providers ?? []);
@@ -59,6 +61,7 @@ export default function StoreSetupChecklist() {
         { key: "zones", label: "Delivery zones and fees", done: hasZones, href: "/dashboard/delivery" },
         { key: "payments", label: "A payment method enabled (COD counts)", done: paymentConfigured, href: "/dashboard/payments" },
         { key: "cod", label: "Cash-on-delivery policy chosen", done: codPolicyChosen, href: "/dashboard/settings" },
+        { key: "catalog", label: "Add the first catalog product", done: Array.isArray(products) && products.length > 0, href: "/dashboard/products/new" },
         { key: "subscription", label: "Subscription and plan active", done: subscriptionActive, href: "/dashboard/settings" },
         { key: "domain", label: "Primary storefront domain active", done: primaryDomainActive, href: "/dashboard/settings" },
       ]);

@@ -880,7 +880,7 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 - [ ] Payment configuration.
 - [ ] Courier configuration.
 - [ ] Notification configuration.
-- [ ] Initial catalog/import guidance.
+- [x] Initial catalog/import guidance. (Store Setup checklist detects whether the tenant has a catalog product and links directly to the product creation flow.)
 - [x] Subscription/plan summary. (tenant-scoped `GET /tenancy/my-plan` and the dashboard Plan & Usage card)
 - [ ] Usage/limit summary.
 - [x] Domain status. (tenant-scoped `GET /tenancy/my-plan` returns active domains and the Store Setup checklist verifies an active primary domain)
@@ -889,8 +889,8 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 
 - [ ] **PARTIAL:** Navigation hides or labels unavailable plan features. (Plan & Usage card on the admin dashboard surfaces plan, usage vs limits and limit-reached labels; full nav gating pending)
 - [x] Backend remains authoritative.
-- [ ] Upgrade CTA for plan-gated features.
-- [ ] Limit warnings before hard limits.
+- [x] Upgrade CTA for plan-gated features. (Plan & Usage card links to the subscription settings surface with an explicit “Review plan or upgrade” action.)
+- [x] Limit warnings before hard limits. (Plan & Usage card marks usage at or above 80% as `near limit` before server-side denial.)
 - [x] Stable errors when limit reached. (`PLAN_LIMIT_REACHED` / `FEATURE_DISABLED` / `SUBSCRIPTION_INACTIVE` from EntitlementsService)
 - [ ] Downgraded tenant can still access historical records appropriately.
 - [x] Suspended tenant gets approved read/write restrictions. (Global tenancy guard permits reads and authentication, and blocks non-read tenant mutations with `COMMERCE_MUTATION_DISABLED_SUSPENDED`; service-level guard remains available for defense in depth.)
