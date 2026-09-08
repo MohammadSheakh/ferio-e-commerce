@@ -5,6 +5,7 @@ import { CommercePaymentsService } from '../services/commerce-payments.service';
 import type { PaymentGatewayRegistry } from '../gateways/payment-gateway.registry';
 import type { OrderService } from '../../order/order.service';
 import type { AuditService } from '../../audit/services/audit.service';
+import type { PlanGateService } from '../../../platform/services/plan-gate.service';
 import { AdminCommercePaymentsController } from '../controllers/commerce-payments.controller';
 
 type PaymentAuditRecord = {
@@ -86,6 +87,7 @@ describe('CommercePaymentsService', () => {
     readiness: jest.fn(),
   };
   const audit = { record: jest.fn().mockResolvedValue({ id: 'audit-1' }) };
+  const planGate = { assertFeatureEnabled: jest.fn().mockResolvedValue(undefined) };
 
   const service = new CommercePaymentsService(
     prisma as unknown as PrismaService,
@@ -93,6 +95,7 @@ describe('CommercePaymentsService', () => {
     orders as unknown as OrderService,
     gateways as unknown as PaymentGatewayRegistry,
     audit as unknown as AuditService,
+    planGate as unknown as PlanGateService,
   );
 
   beforeEach(() => {

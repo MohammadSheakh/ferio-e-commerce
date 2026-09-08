@@ -40,6 +40,7 @@ import {
   type CourierCredentials,
 } from '../utils/courier-credentials.util';
 import { UpdateCourierProviderConfigDto } from '../dto/shipping.dto';
+import { PlanGateService } from '../../../platform/services/plan-gate.service';
 
 const shipmentInclude = {
   provider: true,
@@ -70,6 +71,7 @@ export class ShippingService {
     private readonly messages: TransactionalMessagingService,
     private readonly audit: AuditService,
     private readonly config: ConfigService,
+    private readonly planGate: PlanGateService,
 
     private readonly tenantDb?: TenantDbService,
   ) {}
@@ -242,6 +244,13 @@ export class ShippingService {
     if (dto.isActive && !(await this.withProvider(code, async () => this.adapter(code).isConfigured()))) {
       throw new ConflictException(
         `${code} credentials must be configured before activation`,
+      );
+    }
+    const tenantContext = tryGetTenantContext();
+    if (dto.isActive && tenantContext) {
+      await this.planGate.assertFeatureEnabled(
+        tenantContext.organizationId,
+        'couriers_basic',
       );
     }
     return db.$transaction(async (transaction) => {

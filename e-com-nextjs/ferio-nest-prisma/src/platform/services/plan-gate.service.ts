@@ -10,6 +10,16 @@ import { EntitlementsService } from './entitlements.service';
 export class PlanGateService {
   constructor(private readonly entitlements: EntitlementsService) {}
 
+  async assertFeatureEnabled(
+    organizationId: string,
+    featureKey: string,
+  ): Promise<void> {
+    const decision = await this.entitlements.evaluate(organizationId, featureKey);
+    if (!decision.allowed) {
+      throw new ForbiddenException(decision.code ?? 'FEATURE_DISABLED');
+    }
+  }
+
   async assertStaffSeat(
     organizationId: string,
     currentMemberCount: number,

@@ -22,6 +22,7 @@ import { AuditService } from '../../audit/services/audit.service';
 import { PaymentLedgerQueryDto } from '../dto/payment-ledger.dto';
 import type { UserPayload } from '@app/common';
 import { UpdatePaymentProviderConfigDto } from '../dto/payment-provider-config.dto';
+import { PlanGateService } from '../../../platform/services/plan-gate.service';
 import {
   decryptPaymentCredentials,
   encryptPaymentCredentials,
@@ -41,6 +42,7 @@ export class CommercePaymentsService {
     private readonly orders: OrderService,
     private readonly gateways: PaymentGatewayRegistry,
     private readonly audit: AuditService,
+    private readonly planGate: PlanGateService,
     private readonly tenantDb?: TenantDbService,
   ) {}
 
@@ -96,6 +98,13 @@ export class CommercePaymentsService {
     const gateway = this.gateways.get(provider);
     if (dto.enabled && !gateway.isConfigured(credentials)) {
       throw new ConflictException('Required payment credentials are missing');
+    }
+    const tenantContext = tryGetTenantContext();
+    if (dto.enabled && tenantContext) {
+      await this.planGate.assertFeatureEnabled(
+        tenantContext.organizationId,
+        'online_payments',
+      );
     }
     const db = await this.db();
     const secret = this.config.get<string>('PLATFORM_DB_CREDENTIAL_KEY');
