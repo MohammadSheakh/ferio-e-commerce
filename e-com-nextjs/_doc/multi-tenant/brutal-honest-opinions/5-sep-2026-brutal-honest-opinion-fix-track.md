@@ -8,6 +8,10 @@ and must not be modified to make the project look better.
 
 - Completed the previously open integration/provider entitlement control. Tenant-scoped payment-provider enablement now requires the `online_payments` entitlement, and courier activation requires `couriers_basic`, both through the shared `PlanGateService` evaluator. Legacy single-tenant mode remains unchanged because it has no tenant context. Added denial-code regression coverage; transactional messaging provider tenancy remains a separate open control.
 
+## 2026-09-08 schema ownership freeze
+
+- Completed the schema ownership freeze for new control-plane tables. `architecture:check` now verifies every model in `prisma/platform.prisma` is explicitly listed in the `CONTROL_PLANE` section of `data-classification.md`, so adding a global table requires a reviewed classification update in the same change.
+
 ## Status Legend
 
 - `TODO`: identified, not yet implemented

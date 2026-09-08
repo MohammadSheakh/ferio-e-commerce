@@ -3,8 +3,16 @@ import { resolve } from 'node:path';
 
 const root = resolve(import.meta.dirname, '..');
 const appModule = await readFile(resolve(root, 'src/app.module.ts'), 'utf8');
+const platformPrisma = await readFile(
+  resolve(root, 'prisma/platform.prisma'),
+  'utf8',
+);
 const platformBilling = await readFile(
   resolve(root, 'src/platform/services/platform-billing.service.ts'),
+  'utf8',
+);
+const dataClassification = await readFile(
+  resolve(root, '../_doc/multi-tenant/data-classification.md'),
   'utf8',
 );
 let mongoModule = '';
@@ -69,6 +77,23 @@ async function checkTenantAdminControllerGuards() {
   }
 }
 
+function checkPlatformModelClassification() {
+  const platformModels = [...platformPrisma.matchAll(/\bmodel\s+([A-Za-z0-9_]+)/g)].map(
+    (match) => match[1],
+  );
+  const controlPlaneSection = dataClassification.match(
+    /### New CONTROL_PLANE models[\s\S]*?(?=###|$)/,
+  )?.[0] ?? '';
+
+  for (const model of platformModels) {
+    if (!controlPlaneSection.includes(`\`${model}\``)) {
+      violations.push(
+        `platform Prisma model ${model} is missing from the CONTROL_PLANE classification`,
+      );
+    }
+  }
+}
+
 if (/MongooseModule\s*\.\s*forRoot(?:Async)?\s*\(/.test(activeAppSource)) {
   violations.push('AppModule must not register a legacy Mongoose root connection');
 }
@@ -93,6 +118,7 @@ if (
   );
 }
 
+checkPlatformModelClassification();
 await checkTenantAdminControllerGuards();
 
 try {

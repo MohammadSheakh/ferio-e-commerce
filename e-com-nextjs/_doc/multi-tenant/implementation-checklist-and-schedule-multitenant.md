@@ -89,7 +89,7 @@ Verification: backend production build clean; **67 suites / 264 unit tests passi
 - [x] Add an architecture decision record for tenant migration orchestration. (`ADR-0005`)
 - [x] Add an architecture decision record for subscription/entitlement enforcement. (`ADR-0006`)
 - [x] Add an architecture decision record for tenant deletion/export/retention. (`ADR-0007`, policy owner-blocked)
-- [ ] Freeze accidental new global tables in the existing tenant schema until ownership is classified.
+- [x] Freeze accidental new global tables in the existing tenant schema until ownership is classified. (`architecture:check` parses `prisma/platform.prisma` and fails when any control-plane model is absent from the `CONTROL_PLANE` section of `data-classification.md`; new platform tables therefore require an explicit ownership-classification change.)
 - [x] Create a tenant-boundary review checklist for every future module/PR. (`_doc/multi-tenant/tenant-boundary-review-checklist.md`)
 
 ## 3.1.1 Backend feature structure convention
