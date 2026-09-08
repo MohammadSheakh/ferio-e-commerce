@@ -139,7 +139,7 @@ Implementation tracking: `_doc/multi-tenant/skill-related-discussion/file-folder
 - [x] Apply the convention to complex existing backend modules.
 - [x] Move nested feature tests into dedicated `tests/` folders.
 - [ ] Complete the controlled kebab-case naming migration for legacy folders.
-- [ ] Replace or isolate legacy Mongoose-shaped feature boundaries.
+- [x] Replace or isolate legacy Mongoose-shaped feature boundaries. (No active Mongoose imports, package dependencies, or root registration remain; the architecture check rejects reintroduction and the empty legacy database directory is outside the application graph.)
 
 ## 3.2 Data classification
 
@@ -154,7 +154,7 @@ Implementation tracking: `_doc/multi-tenant/skill-related-discussion/file-folder
 
 ## 3.3 Security baseline before tenancy
 
-- [ ] Re-run secret scanning and rotate any remaining exposed credentials.
+- [x] Re-run secret scanning and rotate any remaining exposed credentials. (Required full-history gitleaks CI scan is clean; no exposed credential was identified for rotation.)
 - [x] Verify JWT/session secrets have no development fallback in production. (Aug 2026 remediation + template-secret startup rejection)
 - [x] Verify refresh revocation fails closed. (Aug 2026 remediation)
 - [x] Verify OTP/TOTP hardening remains active. (Aug 2026 remediation)
@@ -165,9 +165,9 @@ Implementation tracking: `_doc/multi-tenant/skill-related-discussion/file-folder
 
 ### MT-0 gate
 
-- [ ] Architecture decisions approved.
-- [ ] Existing Prisma models classified.
-- [ ] No ambiguous global-vs-tenant business data remains undocumented.
+- [x] Architecture decisions approved. (ADR-0001 through ADR-0008 and the product-owner decision log record the accepted database, identity, migration, entitlement, closure, and platform-boundary decisions.)
+- [x] Existing Prisma models classified. (`data-classification.md` covers control-plane, tenant, platform-shared, and legacy model ownership.)
+- [x] No ambiguous global-vs-tenant business data remains undocumented. (`data-classification.md` documents singleton settings, cross-plane opaque IDs, tenant-local identity, audit placement, and the remaining explicitly owner-blocked storage decision.)
 - [x] Threat model reviewed before implementing database routing. (`_doc/multi-tenant/threat-model.md`; residual production/provider risks are explicitly listed)
 
 ---
@@ -582,7 +582,7 @@ This is the largest migration slice. Existing feature behavior should remain sta
 - [x] Tenant-scope coupon validation. (deterministic coupon evaluation executes within the swept checkout flow)
 - [x] Tenant-scope delivery zones/fees. (`getDeliveryZones`/zone CRUD resolve through the tenant client)
 - [x] Tenant-scope checkout settings/support contacts. (`getPaymentOptions`/`getSettings` resolve per tenant via CommerceSettingsService)
-- [ ] **PARTIAL:** Prove order history reorder ownership + tenant checks. (ownership enforced against the caller's linked customer profile; reorder resolves through the tenant client — cross-database integration case lands with the orders-module slice)
+- [x] Prove order history reorder ownership + tenant checks. (`cart.reorder-ownership.spec.ts` exercises the same order ID under two trusted tenant contexts and proves each tenant queries only its own database; the service also requires the caller's linked customer profile.)
 
 ## 10.4 Customers, addresses, identity, notifications
 
