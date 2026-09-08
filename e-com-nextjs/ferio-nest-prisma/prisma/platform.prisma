@@ -244,6 +244,7 @@ model Plan {
   amountMinor    Int     @default(0) // poisha; 0 = free/internal tier
   currency       String  @default("BDT")
   isActive       Boolean @default(true)
+  version        Int     @default(1)
 
   entitlements PlanEntitlement[]
   subscriptions Subscription[]

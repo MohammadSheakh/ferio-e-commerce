@@ -96,7 +96,12 @@ export class PlansService {
         entityType: 'Plan',
         entityId: plan.id,
         actorId: input.actorId,
-        newValue: { key, amountMinor: plan.amountMinor },
+        newValue: {
+          key,
+          amountMinor: plan.amountMinor,
+          version: plan.version,
+          entitlements: plan.entitlements,
+        },
       });
       return plan;
     } catch (error: unknown) {
@@ -140,6 +145,7 @@ export class PlansService {
           billingInterval: input.billingInterval,
           amountMinor: input.amountMinor,
           isActive: input.isActive,
+          version: { increment: 1 },
           ...(entitlements ? { entitlements: { create: entitlements } } : {}),
         },
         include: { entitlements: true },
@@ -156,6 +162,7 @@ export class PlansService {
         billingInterval: existing.billingInterval,
         amountMinor: existing.amountMinor,
         isActive: existing.isActive,
+        version: existing.version,
         entitlements: existing.entitlements,
       },
       newValue: {
@@ -163,6 +170,7 @@ export class PlansService {
         billingInterval: plan.billingInterval,
         amountMinor: plan.amountMinor,
         isActive: plan.isActive,
+        version: plan.version,
         entitlements: plan.entitlements,
       },
     });

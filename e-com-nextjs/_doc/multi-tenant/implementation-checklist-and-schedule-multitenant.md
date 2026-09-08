@@ -186,7 +186,7 @@ Create a separate control-plane schema/database for platform metadata.
 - [x] Model provisioning operations/runs. (`ProvisioningRun`/`Step`)
 - [x] Model tenant migration runs and per-tenant migration results. (`TenantMigrationRun`/`Result`)
 - [x] Model `Plan`.
-- [ ] Model plan versions if plan behavior must remain historically explainable.
+- [x] Model plan versions if plan behavior must remain historically explainable. (`Plan.version` starts at 1 and increments atomically on every Platform Admin edit; creation/update audit snapshots include the version and normalized entitlements, while existing subscriptions retain their plan reference and billing history remains control-plane-only.)
 - [x] Model plan entitlements/limits. (`PlanEntitlement` featureKey/enabled/limit)
 - [x] Model `Subscription`.
 - [x] Model subscription lifecycle history. (`SubscriptionEvent`)

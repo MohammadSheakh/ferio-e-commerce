@@ -29,6 +29,7 @@ and must not be modified to make the project look better.
 
 ### 2026-09-08
 
+- BO-01/BO-04/BO-06: made platform plan edits historically explainable. Plans now carry an additive revision counter that increments atomically on operator updates, and create/update audit snapshots include the revision and normalized entitlement set; seeded plans remain at revision 1. Added a platform migration and checksum; full billing-provider version history remains outside this slice.
 - BO-04/BO-06/BO-07: made tenant provider credential rotation explicit. Payment and courier configuration replacement now records `credentialsRotatedAt` in tenant-local Prisma records, atomically replaces the encrypted envelope, and returns/audits only bounded rotation metadata. Added the migration checksum and regenerated the Prisma client; application typecheck and migration integrity remain required. External KMS/Secret Manager rotation, provider scheduling, and live provider verification remain open.
 - BO-03/BO-06/BO-07: reconciled the backup-before-high-risk-migration control with the migration rollback/forward-fix runbook. The runbook now serves as the repository evidence for verified backup gates and stale/missing-evidence abort behavior; provider-backed scheduling, restore execution, and live drills remain open.
 
