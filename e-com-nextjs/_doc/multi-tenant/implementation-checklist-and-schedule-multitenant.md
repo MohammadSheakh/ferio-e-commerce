@@ -1083,7 +1083,7 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 - [x] Measure cold tenant DB connection latency. (~105ms cold vs <1ms warm median against local PostgreSQL — recorded per run as structured evidence)
 - [x] Measure cached tenant resolution. (same suite; positive/negative cache effectiveness asserted by query counts, not wall-clock alone)
 - [x] Test pool exhaustion behavior. (`tenant-database.manager.spec.ts` proves active-client capacity fails closed with `TENANT_DATABASE_CAPACITY_EXHAUSTED`; the integration baseline proves configured pool bounds)
-- [ ] Test noisy-neighbor queue behavior.
+- [x] Test noisy-neighbor queue behavior. (`tenant-fanout.service.spec.ts` proves a slow tenant cannot occupy all bounded fan-out slots: healthy tenants begin before the slow tenant completes.)
 - [x] Test one slow tenant DB. (`tenant-fanout.service.spec.ts` proves two healthy tenants progress while one bounded slow tenant is still running.)
 - [x] Test control-plane outage behavior. (`performance-baseline.integration-spec.ts` proves tenant resolution fails closed within a bounded latency without legacy fallback)
 - [x] Define safe degraded behavior; never bypass tenant authorization. (resolver, database manager, membership guard, and fan-out tests assert fail-closed errors, per-tenant breakers, and isolated worker failures)

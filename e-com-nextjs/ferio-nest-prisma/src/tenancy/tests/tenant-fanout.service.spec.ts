@@ -192,7 +192,7 @@ describe('TenantFanoutService (MT-8 §11.2)', () => {
     ]);
   });
 
-  it('keeps healthy tenants progressing while one tenant is slow', async () => {
+  it('prevents one noisy tenant from starving healthy background work', async () => {
     process.env.TENANCY_ENABLED = 'true';
     process.env.TENANT_FANOUT_CONCURRENCY = '2';
     const built = build([
@@ -208,7 +208,7 @@ describe('TenantFanoutService (MT-8 §11.2)', () => {
         await new Promise((resolve) => setTimeout(resolve, 20));
       }
       completed.push(organizationId);
-    }, { label: 'slow-tenant-test' });
+    }, { label: 'noisy-neighbor-test' });
 
     expect(outcome.processed).toBe(3);
     expect(outcome.failures).toEqual([]);
