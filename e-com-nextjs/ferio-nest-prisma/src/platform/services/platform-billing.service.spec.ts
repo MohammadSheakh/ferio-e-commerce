@@ -1,4 +1,5 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { TenantMetrics } from '@app/common';
 import { PlatformBillingService } from './platform-billing.service';
 
 /**
@@ -60,6 +61,7 @@ describe('PlatformBillingService', () => {
   }
 
   beforeEach(() => {
+    TenantMetrics.reset();
     process.env.PLATFORM_SSLCOMMERZ_STORE_ID = 'store-id';
     process.env.PLATFORM_SSLCOMMERZ_STORE_PASSWORD = 'store-pass';
     delete process.env.PLATFORM_SSLCOMMERZ_IS_LIVE;
@@ -73,6 +75,9 @@ describe('PlatformBillingService', () => {
       periodEnd: new Date('2026-09-01'),
       reason: 'Monthly platform invoice creation',
     });
+    expect(TenantMetrics.snapshot().counters).toContainEqual(
+      expect.objectContaining({ name: 'platform_billing_invoice_created' }),
+    );
     const createCall = (
       platform.client.saasInvoice.create.mock.calls as unknown[][]
     )[0]?.[0] as { data?: { amountMinor?: number; currency?: string } };
@@ -132,6 +137,16 @@ describe('PlatformBillingService', () => {
       )[0]?.[0] as { data: { status: string; reference: string } };
       expect(created.data.status).toBe('INITIATED');
       expect(created.data.reference).toBe(result.reference);
+      expect(TenantMetrics.snapshot().counters).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            name: 'platform_billing_payment_initiated',
+          }),
+          expect.objectContaining({
+            name: 'platform_billing_payment_session_created',
+          }),
+        ]),
+      );
       // Success URL carries the reference for callback routing.
       const body = String(
         built.platform.client.saasPaymentAttempt.create.mock.calls[0],

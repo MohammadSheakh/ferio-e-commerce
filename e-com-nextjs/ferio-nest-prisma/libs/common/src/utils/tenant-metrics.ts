@@ -26,6 +26,14 @@ export type TenantMetricName =
   | 'migration_tenant_failed'
   | 'migration_run_paused'
   | 'migration_run_completed'
+  | 'provisioning_run_started'
+  | 'provisioning_run_completed'
+  | 'provisioning_run_failed'
+  | 'platform_billing_invoice_created'
+  | 'platform_billing_payment_initiated'
+  | 'platform_billing_payment_session_created'
+  | 'platform_billing_payment_succeeded'
+  | 'platform_billing_payment_failed'
   | 'usage_threshold_crossed'
   | 'usage_reconciliation_drift';
 

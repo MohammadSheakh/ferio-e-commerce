@@ -1,4 +1,5 @@
 import { ConflictException } from '@nestjs/common';
+import { TenantMetrics } from '@app/common';
 import { ProvisioningService } from './provisioning.service';
 
 type ProvisioningRun = {
@@ -9,6 +10,8 @@ type ProvisioningRun = {
 };
 
 describe('ProvisioningService idempotency boundary', () => {
+  beforeEach(() => TenantMetrics.reset());
+
   function build() {
     const organization = {
       id: 'org-a',
@@ -82,6 +85,9 @@ describe('ProvisioningService idempotency boundary', () => {
     await expect(
       built.service.start('org-a', { idempotencyKey: 'prov-key-1' }),
     ).resolves.toBe(built.completedRun);
+    expect(TenantMetrics.snapshot().counters).toContainEqual(
+      expect.objectContaining({ name: 'provisioning_run_started' }),
+    );
   });
 
   it('rejects an idempotency key already owned by another organization', async () => {

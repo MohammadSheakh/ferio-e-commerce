@@ -12,6 +12,7 @@ import { DomainsService } from './domains.service';
 import { TenantDatabasesService } from './tenant-databases.service';
 import { TenantSchemaBootstrapper } from '../../tenancy/services/tenant-schema.bootstrapper';
 import type { TenantDatabaseProvisioner } from './tenant-database-provisioner.interface';
+import { TenantMetrics } from '@app/common';
 import { toPlatformJsonInput } from '../utils/json-input.util';
 
 /**
@@ -69,6 +70,7 @@ export class ProvisioningService {
     organizationId: string,
     options: { actorId?: string; idempotencyKey?: string } = {},
   ) {
+    TenantMetrics.increment('provisioning_run_started');
     const organization = await this.platform.client.organization.findUnique({
       where: { id: organizationId },
     });
@@ -160,6 +162,7 @@ export class ProvisioningService {
         actorId,
         metadata: { runId: run.id },
       });
+      TenantMetrics.increment('provisioning_run_completed');
       return completed;
     } catch (error) {
       await this.platform.client.provisioningRun.update({
@@ -176,6 +179,7 @@ export class ProvisioningService {
           reason: error instanceof Error ? error.message : undefined,
         })
         .catch(() => undefined);
+      TenantMetrics.increment('provisioning_run_failed');
       throw error;
     }
   }

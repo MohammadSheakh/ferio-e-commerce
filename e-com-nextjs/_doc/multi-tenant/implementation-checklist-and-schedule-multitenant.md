@@ -1046,12 +1046,12 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 - [x] Add organization/tenant ID to safe structured logs. (`StructuredLogger` stamps `organizationId`/`hostname` on every JSON entry via a bootstrap-registered context accessor — registry IDs only, never credentials)
 - [x] Add resolved domain where safe. (hostname rides the same envelope from the trusted `TenantContext`)
 - [x] Add tenant DB connection metrics. (`db_acquire_failure` / `db_breaker_opened` counters emitted per tenant database)
-- [ ] Add provisioning metrics.
+- [x] Add provisioning metrics. (`provisioning_run_started`, `provisioning_run_completed`, and `provisioning_run_failed` are bounded control-plane counters emitted through the shared structured metrics snapshot.)
 - [x] Add migration fleet metrics. (`migration_run_started`, `migration_tenant_succeeded`, `migration_tenant_failed`, `migration_run_paused`, and `migration_run_completed`; tenant labels remain bounded by `TenantMetrics` cardinality limits)
 - [x] Add subscription/entitlement denial metrics. (`entitlement_denied{code,featureKey}` counted at every server-side denial in `EntitlementsService.evaluate`)
 - [x] Add unknown-domain metrics. (`resolver_unknown_domain` / `resolver_suspended` / `resolver_tenant_unavailable` / `resolver_migration_required` counted at each fail-closed branch)
 - [x] Add per-tenant queue failure visibility. (`queue_tenant_failure{label,organizationId}` counted per isolated fan-out failure; snapshots carry org labels)
-- [ ] Add platform billing metrics.
+- [x] Add platform billing metrics. (invoice creation, payment initiation, hosted-session creation, payment success, and payment failure emit bounded control-plane counters without organization or payment identifiers.)
 - [ ] Add backup freshness metrics.
 - [x] Add support-access security events. (`SUPPORT_ACCESS_GRANTED`, `SUPPORT_ACCESS_USED`, and `SUPPORT_ACCESS_REVOKED` are append-only platform audit events; usage fails closed if the audit write fails)
 - [x] Validate support-access control-plane requests with dedicated DTOs. (organization/reason/scope fields are bounded; TTL is transformed and constrained to 5 minutes through 8 hours; active-grant query filters are explicit)

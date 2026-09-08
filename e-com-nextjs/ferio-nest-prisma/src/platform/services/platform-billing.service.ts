@@ -4,8 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
-import { correlationHeaders } from '@app/common';
-import { StructuredLogger } from '@app/common';
+import { correlationHeaders, StructuredLogger, TenantMetrics } from '@app/common';
 import { PlatformPrismaService } from '../platform-prisma.service';
 import { PlatformAuditService } from './platform-audit.service';
 import { toPlatformJsonInput } from '../utils/json-input.util';
@@ -145,6 +144,7 @@ export class PlatformBillingService {
       },
       metadata: { reason: input.reason.trim() },
     });
+    TenantMetrics.increment('platform_billing_invoice_created');
     return created;
   }
 
@@ -194,6 +194,7 @@ export class PlatformBillingService {
       newValue: { invoiceId: invoice.id, amountMinor: invoice.amountMinor },
       metadata: { reason: action.reason.trim() },
     });
+    TenantMetrics.increment('platform_billing_payment_initiated');
 
     const publicBase = (
       process.env.PUBLIC_API_URL || 'http://localhost:6733'
@@ -241,6 +242,7 @@ export class PlatformBillingService {
         where: { reference, status: 'INITIATED' },
         data: { raw: toPlatformJsonInput(raw) },
       });
+      TenantMetrics.increment('platform_billing_payment_session_created');
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       await this.platform.client.saasPaymentAttempt.updateMany({
@@ -250,6 +252,7 @@ export class PlatformBillingService {
           raw: toPlatformJsonInput({ initiationError: message }),
         },
       });
+      TenantMetrics.increment('platform_billing_payment_failed');
       throw new BadRequestException('PAYMENT_SESSION_FAILED');
     }
     return { redirectUrl, reference };
@@ -344,6 +347,7 @@ export class PlatformBillingService {
           valId: input.valId,
         },
       });
+      TenantMetrics.increment('platform_billing_payment_succeeded');
       return { applied: true, paid: true };
     }
 
@@ -365,6 +369,7 @@ export class PlatformBillingService {
         raw: toPlatformJsonInput({ failureReason: reason }),
       },
     });
+    TenantMetrics.increment('platform_billing_payment_failed');
     this.logger.warn('platform_payment_failed', { reference });
   }
 
