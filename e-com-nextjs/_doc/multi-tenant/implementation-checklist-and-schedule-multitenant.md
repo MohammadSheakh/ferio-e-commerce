@@ -562,12 +562,12 @@ This is the largest migration slice. Existing feature behavior should remain sta
 ## 10.2 Inventory
 
 - [x] Stock movements/reservations/concurrency foundations exist.
--[x] Move inventory transactions behind tenant client. (adjustment/movement flows inside `CatalogService` swept; reservation consumption inside `OrderService` transactions)
+- [x] Move inventory transactions behind tenant client. (adjustment/movement flows inside `CatalogService` swept; reservation consumption inside `OrderService` transactions)
 - [ ] Tenant-scope reconciliation jobs and idempotency keys.
--[x] Tenant-scope low-stock alerts. (`getInventory` low-stock computation resolves through the tenant client)
+- [x] Tenant-scope low-stock alerts. (`getInventory` low-stock computation resolves through the tenant client)
 - [ ] **PARTIAL:** Tenant-scope exports. (orders export routed through tenant client; remaining export surfaces pending)
--[x] Preserve finite-stock concurrency guarantees independently per tenant. (serializable confirmation transactions execute on the resolved tenant client — same mechanism proven under concurrency)
--[x] Validate same SKU can exist independently across tenant databases. (bootstrap integration suite proves identical identifiers coexist)
+- [x] Preserve finite-stock concurrency guarantees independently per tenant. (serializable confirmation transactions execute on the resolved tenant client — same mechanism proven under concurrency)
+- [x] Validate same SKU can exist independently across tenant databases. (bootstrap integration suite proves identical identifiers coexist)
 
 ## 10.3 Cart, saved carts, sharing, reorder, checkout
 
@@ -616,9 +616,9 @@ This is the largest migration slice. Existing feature behavior should remain sta
 - [x] Resolve webhook/callback tenant without trusting customer browser input. (HMAC-signed `cbt` token minted at initiation and embedded in gateway callback URLs; verified timing-safe server-side before any mutation — forgery fails closed with PAYMENT_CALLBACK_TENANT_INVALID)
 - [ ] Define provider account mapping to tenant.
 - [x] Verify callback cannot mutate another tenant's payment. (token binds organization; processing runs inside that tenant's context/database — cross-tenant mutation has no resolution path)
--[x] Tenant-scope payment recovery/sweeps. (`enqueueDue` fans out per READY tenant; expiry processor resolves envelopes via forOrganization)
--[x] Tenant-scope reconciliation. (scheduled scans fan out per READY tenant with isolated failure evidence)
--[x] Preserve platform SaaS billing separation. (SaasInvoice/SaasPaymentAttempt live exclusively in the control plane; no code path bridges them into tenant commerce records)
+- [x] Tenant-scope payment recovery/sweeps. (`enqueueDue` fans out per READY tenant; expiry processor resolves envelopes via forOrganization)
+- [x] Tenant-scope reconciliation. (scheduled scans fan out per READY tenant with isolated failure evidence)
+- [x] Preserve platform SaaS billing separation. (SaasInvoice/SaasPaymentAttempt live exclusively in the control plane; no code path bridges them into tenant commerce records)
 
 ## 10.7 Wallet
 
@@ -636,7 +636,7 @@ This is the largest migration slice. Existing feature behavior should remain sta
 - [x] Rider application/assignment/location/live map exists.
 - [x] Tenant-scope fulfillment queues.
 - [ ] Tenant-scope courier integrations and credentials.
--[x] Tenant-scope shipment callbacks/polls. (`ShippingService` resolves through the tenant client; callback tenant binding rides the HMAC cbt token)
+- [x] Tenant-scope shipment callbacks/polls. (`ShippingService` resolves through the tenant client; callback tenant binding rides the HMAC cbt token)
 - [x] Tenant-scope rider application.
 - [x] Tenant-scope rider personnel approval.
 - [x] Tenant-scope assignment.
@@ -644,7 +644,7 @@ This is the largest migration slice. Existing feature behavior should remain sta
 - [x] Tenant-scope GPS history.
 - [ ] **PARTIAL:** Tenant-scope WebSocket/live-map rooms. (all existing socket room families — conversations, tasks, admin, notifications — are org-scoped; a dedicated rider live-map emitter does not exist server-side yet)
 - [x] Tenant-scope location-history clearing.
--[x] Prevent rider session from tenant A acting on tenant B order. (`DeliveryPersonnelService` resolves through the tenant client; assigned-order lookup is scoped to the same database — cross-tenant action has no resolution path)
+- [x] Prevent rider session from tenant A acting on tenant B order. (`DeliveryPersonnelService` resolves through the tenant client; assigned-order lookup is scoped to the same database — cross-tenant action has no resolution path)
 - [ ] Preserve COD staff-confirmation rule per tenant.
 - [ ] Add location retention policy.
 
