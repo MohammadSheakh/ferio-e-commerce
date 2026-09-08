@@ -313,7 +313,7 @@ Create a separate control-plane schema/database for platform metadata.
 - [x] Prevent unbounded `new PrismaClient()` per request. (one cached client per registry ID with concurrent cold-start single-flight)
 - [x] Add graceful application shutdown/disconnect. (`OnModuleDestroy` drains creations and disconnects all pools)
 - [x] Add metrics for active clients, evictions, acquisition failures, and pool exhaustion. (`metrics()` plus bounded `TenantMetrics` events)
-- [ ] Design for PgBouncer/managed pooling if tenant count requires it.
+- [x] Design for PgBouncer/managed pooling if tenant count requires it. (ADR-0003 defines the escalation trigger, transaction-pooling constraints, direct-session exceptions for migrations/operations, bounded failure behavior, connection-budget inputs, and rollout evidence; the bounded LRU manager remains the default until the trigger is reached.)
 - [x] Add a circuit-breaker/backoff strategy for repeatedly unhealthy tenant DBs. (`TenantDatabaseManager` opens a per-registry circuit after bounded acquisition failures, applies cooldown/backoff, and fails fast until recovery; manager tests cover the breaker boundary.)
 
 ## 6.2 Repository/application-service integration
@@ -1247,7 +1247,7 @@ The following decisions should be recorded in a dedicated ADR/product decision l
 - [x] RESOLVED-DIRECTION (automated wildcard TLS preferred; custom domains post-alpha per PO-008).
 - [ ] **RESOLVED-DIRECTION** (Resolved: shared managed cluster initially (PO-009).) — was: PostgreSQL hosting model for database-per-tenant.
 - [ ] **RESOLVED-DIRECTION** (Resolved: AES-256-GCM + external master key (PO-010).) — was: Tenant DB credential storage/KMS strategy.
-- [ ] **RESOLVED-DIRECTION** (Resolved sequencing: bounded LRU now, PgBouncer at scale (PO-011).) — was: PgBouncer/connection-pooling infrastructure.
+- [x] **RESOLVED-DIRECTION** (Resolved sequencing: bounded LRU now, PgBouncer at scale (PO-011); ADR-0003 now records the concrete rollout and verification contract.) — was: PgBouncer/connection-pooling infrastructure.
 - [ ] **RESOLVED-DIRECTION** (Resolved: RPO ≤1h, RTO ≤4h (PO-012).) — was: RPO/RTO.
 - [ ] **RESOLVED-DIRECTION** (Resolved: 30 days (PO-012).) — was: Backup retention.
 - [ ] **RESOLVED-DIRECTION** (Resolved: 90-day recoverable window (PO-013), implemented in TenantClosureService.) — was: Tenant closure/export/deletion retention.
