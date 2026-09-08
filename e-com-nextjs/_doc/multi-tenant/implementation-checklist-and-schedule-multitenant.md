@@ -943,7 +943,7 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 - [x] Define canonical tenant Prisma schema. (`prisma/schema.prisma` is built from the canonical tenant model sources and is distinct from `prisma/platform.prisma`)
 - [x] Define canonical migration artifact/version. (`prisma/migrations` is validated and `TenantSchemaBootstrapper` reports the completed migration head as the tenant schema version)
 - [x] Record expected schema version in control plane. (`TenantDatabase.schemaVersion` is stamped during provisioning and migration, and platform migration results retain from/to versions)
-- [ ] Make migration artifact immutable once released.
+- [x] Make migration artifact immutable once released. (`prisma/migration-checksums.json` records SHA-256 digests for all 48 tenant and platform migration artifacts; `pnpm check:migrations` fails on changed, missing, or unlisted SQL.)
 - [ ] Add compatibility metadata if application version requires minimum schema version.
 - [x] Separate control-plane migrations from tenant-plane migrations. (`prisma/platform-migrations` and `prisma/migrations` have independent PostgreSQL locks, validation, and deployment commands)
 
