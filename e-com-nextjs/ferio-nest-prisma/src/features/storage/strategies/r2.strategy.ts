@@ -30,6 +30,7 @@ export interface StorageStrategy {
     folder: string,
     filename: string,
     contentType: string,
+    sizeBytes: number,
   ): Promise<{ key: string; url: string }>;
 }
 
@@ -182,6 +183,7 @@ export class R2Strategy implements StorageStrategy {
     folder: string,
     filename: string,
     contentType: string,
+    sizeBytes: number,
   ): Promise<{ key: string; url: string }> {
     const safeFolder = sanitizeStoragePath(folder);
     const safeName =
@@ -193,6 +195,7 @@ export class R2Strategy implements StorageStrategy {
         Bucket: this.bucket,
         Key: key,
         ContentType: contentType,
+        ContentLength: sizeBytes,
       }),
       { expiresIn: this.presignExpiresSeconds },
     );

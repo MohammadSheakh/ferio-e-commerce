@@ -31,6 +31,7 @@ describe('WarrantyController', () => {
         {
           originalname: 'item.webp',
           mimetype: 'image/webp',
+          buffer: Buffer.from('RIFF0000WEBP'),
         } as Express.Multer.File,
       ]),
     ).resolves.toEqual([

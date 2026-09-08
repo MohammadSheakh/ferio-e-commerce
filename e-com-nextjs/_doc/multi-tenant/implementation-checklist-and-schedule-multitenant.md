@@ -771,7 +771,7 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 - [x] Prevent guessed tenant paths from returning objects. (org prefix derives from ambient TenantContext; a guessed path cannot name another tenant's namespace and objects are private regardless)
 - [ ] Add lifecycle/retention rules. (bucket-level lifecycle config is an ops task on the R2 account)
 - [ ] Add tenant export/deletion support. (wired to MT-12 closure/export flow)
-- [ ] Add malware/content validation where required by upload type.
+- [ ] **PARTIAL:** Add malware/content validation where required by upload type. (Buffered warranty uploads enforce size, allowlisted MIME types, and JPEG/PNG/WebP signature validation; direct presigned uploads enforce allowlisted MIME and signed size but still require post-upload inspection and malware scanning before this control is complete.)
 
 ## 11.5 Tenant integrations
 
