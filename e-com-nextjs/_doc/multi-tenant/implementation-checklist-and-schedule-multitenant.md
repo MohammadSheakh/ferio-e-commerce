@@ -462,7 +462,7 @@ All surfaces live in the ferio-platform-admin console:
 ### MT-5 gate
 
 - [ ] Tenant A and tenant B render different storefronts/data/settings on distinct hosts.
-- [ ] Cache/CDN behavior cannot leak branding/catalog/settings between hosts.
+- [x] Cache/CDN behavior cannot leak branding/catalog/settings between hosts. (Resolved tenant responses emit `Cache-Control: private, no-store` and preserve/add `Vary: x-forwarded-host` at the tenant middleware boundary; Customer Web tenant-local SSR fetches use host forwarding and sensitive reads use `no-store`, with middleware regression coverage.)
 - [x] Unknown and removed domains are safe. (Customer Web renders a dedicated unavailable state and disables indexing; the tenant resolver fails closed for unknown, disabled, closure-pending, closed, archived, and non-active domains.)
 
 ---

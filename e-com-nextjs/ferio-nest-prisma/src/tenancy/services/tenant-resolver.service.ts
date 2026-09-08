@@ -423,6 +423,18 @@ export class TenantContextMiddleware implements NestMiddleware {
     this.resolver
       .resolveFromHost(effectiveHost)
       .then((resolved) => {
+        response.setHeader('Cache-Control', 'private, no-store');
+        const existingVary = response.getHeader('Vary');
+        const varyValues = existingVary
+          ? String(existingVary)
+              .split(',')
+              .map((value) => value.trim())
+              .filter(Boolean)
+          : [];
+        if (!varyValues.some((value) => value.toLowerCase() === 'x-forwarded-host')) {
+          varyValues.push('x-forwarded-host');
+        }
+        response.setHeader('Vary', varyValues.join(', '));
         (
           request as Request & { tenantOrganizationId?: string }
         ).tenantOrganizationId = resolved.organizationId;

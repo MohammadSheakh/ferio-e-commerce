@@ -20,6 +20,10 @@ and must not be modified to make the project look better.
 
 - Reconciled the organization provisioning gate as complete for the implemented automated path. Platform Admin triggers the resumable provisioning state machine, which creates/registers the tenant database through the provisioner abstraction, applies migrations, seeds the baseline, checks readiness, and activates the domain without manual SQL. Managed production provider selection remains an infrastructure decision and is not represented as completed.
 
+## 2026-09-08 tenant response cache boundary
+
+- Added a backend cache boundary after successful tenant resolution: tenant responses are `private, no-store` and vary by `x-forwarded-host`, while existing `Vary` values are preserved. Added middleware regression coverage to prevent shared proxy/CDN responses from crossing storefront hosts without changing Redis behavior.
+
 ## Status Legend
 
 - `TODO`: identified, not yet implemented
