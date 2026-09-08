@@ -362,7 +362,7 @@ Provisioning should behave as an idempotent state machine, not a controller scri
 - [x] Apply current approved tenant migration set. (ordered artifact execution tracked in `_ferio_tenant_migrations`; idempotent re-runs proven)
 - [x] Run tenant seed.
 - [x] Seed default tenant settings. (CommerceSettings store identity + COD verification ALWAYS baseline, ON CONFLICT-safe)
-- [ ] Seed default permissions/owner role.
+- [x] Seed default permissions/owner role. (The control-plane organization transaction creates the initial `OWNER` membership; tenant authentication remains a shared global identity with tenant membership checked by `TenantMembershipGuard`, so no duplicate tenant-local super-admin is seeded)
 - [x] Create/attach initial owner membership. (created atomically with the organization; owner-membership conflicts cannot leave an orphan organization)
 - [x] Run DB health check. (read-only `SELECT 1` plus required migration-ledger and baseline-table verification before registry READY stamping)
 - [x] Run minimal tenant smoke test. (provisioning records a separate `SMOKE_TEST` step and verifies the migration ledger, `CommerceSettings`, and `CodVerificationPolicy` tables against the new database)
@@ -375,14 +375,14 @@ Provisioning should behave as an idempotent state machine, not a controller scri
 
 ## 7.2 Tenant seed
 
-- [ ] Refactor existing Ferio seed into tenant-safe seed logic.
-- [ ] Remove global hard-coded Ferio business assumptions.
+- [x] Refactor existing Ferio seed into tenant-safe seed logic. (`TenantSchemaBootstrapper.seedBaseline` is the provisioning seed boundary and is idempotent under PostgreSQL conflict handling)
+- [x] Remove global hard-coded Ferio business assumptions. (The organization name is the tenant seed input; the `Ferio` factory value is used only to avoid overwriting a prior migration default)
 - [ ] Seed tenant owner separately from platform super-admin.
-- [ ] Seed tenant-local settings.
-- [ ] Seed tenant-local feature defaults.
+- [x] Seed tenant-local settings. (`CommerceSettings` is created in the tenant database with the requested organization name)
+- [x] Seed tenant-local feature defaults. (Commerce settings defaults are stored in each tenant database; commerce-affecting options remain configuration-owned)
 - [ ] Seed tenant-local notification templates.
 - [ ] Seed delivery/payment defaults as disabled/configuration-required where appropriate.
-- [ ] Seed no fake customer/order/payment data in production provisioning.
+- [x] Seed no fake customer/order/payment data in production provisioning. (The baseline seed writes only `CommerceSettings` and `CodVerificationPolicy`; regression coverage rejects customer/order/payment inserts)
 - [x] Make seed idempotent.
 
 ## 7.3 Organization lifecycle
