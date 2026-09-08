@@ -191,6 +191,33 @@ describe('TenantDatabaseManager (ADR-0003)', () => {
     await manager.onModuleDestroy();
   });
 
+  it('keeps a simulated tenant fleet bounded during sequential acquisition', async () => {
+    const manager = newManager();
+    let peakActiveClients = 0;
+
+    for (let index = 0; index < 100; index += 1) {
+      await manager.getClient(material(`tdb-fleet-${index}`));
+      peakActiveClients = Math.max(
+        peakActiveClients,
+        manager.metrics().activeClients,
+      );
+    }
+
+    expect(peakActiveClients).toBe(3);
+    expect(manager.metrics()).toMatchObject({
+      activeClients: 3,
+      pendingClients: 0,
+    });
+    expect(PrismaClient).toHaveBeenCalledTimes(100);
+    expect(
+      TenantMetrics.snapshot().counters.filter(
+        (counter) => counter.name === 'db_client_evicted',
+      ),
+    ).toHaveLength(97);
+
+    await manager.onModuleDestroy();
+  });
+
   it('records capacity exhaustion when every cached client is still active', async () => {
     process.env.TENANT_DB_EVICTION_GRACE_MS = '60000';
     const manager = newManager();

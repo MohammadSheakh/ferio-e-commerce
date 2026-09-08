@@ -337,7 +337,7 @@ Create a separate control-plane schema/database for platform metadata.
 - [x] Prove transaction rollback remains isolated. (A forced rollback removes A's uncommitted row while leaving B's data untouched.)
 - [x] Prove one tenant DB outage does not route to another. (`tenant-fanout.service.spec.ts` records the failed organization and resolves healthy work through its own trusted registry material.)
 - [x] Prove one tenant DB outage does not crash healthy tenant traffic unnecessarily. (`tenant-fanout.service.spec.ts` continues healthy work after a connection failure.)
-- [ ] Load-test connection manager with many simulated tenants.
+- [x] Load-test connection manager with many simulated tenants. (`tenant-database.manager.spec.ts` acquires 100 distinct tenant identities and proves the active client cache remains bounded at `TENANT_DB_MAX_CLIENTS` with deterministic LRU eviction.)
 
 ### MT-3 gate
 
