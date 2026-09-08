@@ -1055,7 +1055,7 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 - [x] Add backup freshness metrics. (Platform and tenant operations-health projections emit bounded `backup_freshness_observed` observations with backup and restore states; no credentials, storage keys, or tenant identifiers are included.)
 - [x] Add support-access security events. (`SUPPORT_ACCESS_GRANTED`, `SUPPORT_ACCESS_USED`, and `SUPPORT_ACCESS_REVOKED` are append-only platform audit events; usage fails closed if the audit write fails)
 - [x] Validate support-access control-plane requests with dedicated DTOs. (organization/reason/scope fields are bounded; TTL is transformed and constrained to 5 minutes through 8 hours; active-grant query filters are explicit)
-- [ ] **PARTIAL:** Add alerting for isolation-critical failures. (counters surface as periodic structured `tenant_metrics_snapshot` events any log pipeline can alert on; dedicated alert routing awaits metrics-stack decision)
+- [x] Add alerting for isolation-critical failures. (periodic snapshots now emit thresholded structured `tenant_isolation_alert` events for resolver, database, queue, provisioning, and migration failures; external routing remains deployment-owned)
 
 ## 16.2 Security tests
 
