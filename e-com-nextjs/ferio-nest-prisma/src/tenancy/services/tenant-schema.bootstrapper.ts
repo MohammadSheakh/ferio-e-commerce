@@ -234,13 +234,14 @@ export class TenantSchemaBootstrapper {
         `SELECT table_name AS "tableName"
          FROM information_schema.tables
          WHERE table_schema = 'public'
-           AND table_name IN ('_ferio_tenant_migrations', 'CommerceSettings', 'CodVerificationPolicy')`,
+           AND table_name IN ('_ferio_tenant_migrations', 'CommerceSettings', 'CodVerificationPolicy', 'ShipmentProvider')`,
       );
       const found = new Set(result.rows.map((row) => row.tableName));
       const required = [
         '_ferio_tenant_migrations',
         'CommerceSettings',
         'CodVerificationPolicy',
+        'ShipmentProvider',
       ];
       const missing = required.filter((tableName) => !found.has(tableName));
       if (missing.length > 0) {
@@ -282,6 +283,30 @@ export class TenantSchemaBootstrapper {
       await pool.query(
         'INSERT INTO "CodVerificationPolicy" ("id", "mode", "createdAt", "updatedAt") VALUES ($1, $2, now(), now()) ON CONFLICT ("id") DO NOTHING',
         ['default', 'ALWAYS'],
+      );
+      const courierProviders = [
+        ['PATHAO', 'Pathao Courier', 'https://api-hermes.pathao.com'],
+        ['STEADFAST', 'Steadfast Courier', 'https://portal.steadfast.com.bd/api/v1'],
+        ['REDX', 'REDX Logistics', 'https://openapi.redx.com.bd'],
+        ['ECOURIER', 'eCourier', 'https://backoffice.ecourier.com.bd/api'],
+        ['PAPERFLY', 'Paperfly Courier', 'https://paperfly.com.bd/api'],
+        ['CARRYBEE', 'CarryBee Courier', 'https://developers.carrybee.com'],
+      ] as const;
+      const providerPlaceholders = courierProviders
+        .map((_, index) => {
+          const offset = index * 4;
+          return `($${offset + 1}, $${offset + 2}, $${offset + 3}, false, now(), now())`;
+        })
+        .join(', ');
+      await pool.query(
+        `INSERT INTO "ShipmentProvider" ("id", "code", "name", "baseUrl", "isActive", "createdAt", "updatedAt") VALUES ${providerPlaceholders}
+         ON CONFLICT ("code") DO UPDATE SET "name" = EXCLUDED."name", "baseUrl" = EXCLUDED."baseUrl"`,
+        courierProviders.flatMap(([code, name, baseUrl]) => [
+          `provider-${code.toLowerCase()}`,
+          code,
+          name,
+          baseUrl,
+        ]),
       );
       const placeholders = DEFAULT_MESSAGE_TEMPLATES.map((_, index) => {
         const offset = index * 4;
