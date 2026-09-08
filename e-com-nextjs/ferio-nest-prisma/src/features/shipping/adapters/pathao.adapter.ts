@@ -16,12 +16,17 @@ import {
   secureWebhookCredentialEquals,
   shippingText,
 } from '../utils/shipping.util';
+import { tenantAwareCourierConfig } from '../utils/courier-credentials.util';
 
 @Injectable()
 export class PathaoAdapter implements CourierAdapter {
   readonly code = 'PATHAO' as const;
 
-  constructor(private readonly config: ConfigService) {}
+  private readonly config: ConfigService;
+
+  constructor(config: ConfigService) {
+    this.config = tenantAwareCourierConfig(config);
+  }
 
   private get baseUrl() {
     return this.config.get<string>(

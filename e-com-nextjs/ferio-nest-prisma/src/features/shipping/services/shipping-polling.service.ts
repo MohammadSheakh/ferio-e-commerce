@@ -74,9 +74,15 @@ export class ShippingPollingService {
       take: limit,
       include: { provider: true },
     });
-    return shipments.filter((shipment) =>
-      this.shipping.getPollingSupport(shipment.provider.code),
+    const eligible = await Promise.all(
+      shipments.map(async (shipment) => ({
+        shipment,
+        supported: await this.shipping.getPollingSupport(shipment.provider.code),
+      })),
     );
+    return eligible
+      .filter(({ supported }) => supported)
+      .map(({ shipment }) => shipment);
   }
 
   async prepareAttempt(shipmentId: string, requestedByActorId?: string) {
@@ -92,7 +98,7 @@ export class ShippingPollingService {
     if (!shipment.externalShipmentId && !shipment.trackingNumber) {
       throw new ConflictException('Shipment has no provider tracking identity');
     }
-    if (!this.shipping.getPollingSupport(shipment.provider.code)) {
+    if (!(await this.shipping.getPollingSupport(shipment.provider.code))) {
       throw new ConflictException(
         `${shipment.provider.code} polling is not configured`,
       );

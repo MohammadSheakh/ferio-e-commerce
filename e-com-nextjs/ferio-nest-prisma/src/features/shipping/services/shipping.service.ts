@@ -31,6 +31,15 @@ import type { PollCourierShipmentInput } from '../adapters/courier-adapter.inter
 import { canApplyShipmentStatus } from '../utils/shipping.util';
 import { TransactionalMessagingService } from '../../transactional-messaging/services/transactional-messaging.service';
 import { AuditService } from '../../audit/services/audit.service';
+import { tryGetTenantContext } from '../../../tenancy/context/tenant-context';
+import { ConfigService } from '@nestjs/config';
+import {
+  decryptCourierCredentials,
+  encryptCourierCredentials,
+  runWithCourierCredentials,
+  type CourierCredentials,
+} from '../utils/courier-credentials.util';
+import { UpdateCourierProviderConfigDto } from '../dto/shipping.dto';
 
 const shipmentInclude = {
   provider: true,
@@ -38,6 +47,14 @@ const shipmentInclude = {
 } satisfies Prisma.ShipmentInclude;
 
 const WEBHOOK_PROCESSING_LEASE_MS = 5 * 60 * 1000;
+const COURIER_CREDENTIAL_KEYS: Record<ShipmentProviderCode, readonly string[]> = {
+  PATHAO: ['PATHAO_CLIENT_ID', 'PATHAO_CLIENT_SECRET', 'PATHAO_USERNAME', 'PATHAO_PASSWORD', 'PATHAO_STORE_ID', 'PATHAO_WEBHOOK_SECRET'],
+  STEADFAST: ['STEADFAST_API_KEY', 'STEADFAST_SECRET_KEY', 'STEADFAST_WEBHOOK_TOKEN'],
+  REDX: ['REDX_API_TOKEN', 'REDX_WEBHOOK_SECRET'],
+  ECOURIER: ['ECOURIER_API_KEY', 'ECOURIER_API_SECRET', 'ECOURIER_USER_ID', 'ECOURIER_WEBHOOK_SECRET'],
+  PAPERFLY: ['PAPERFLY_USERNAME', 'PAPERFLY_PASSWORD', 'PAPERFLY_KEY', 'PAPERFLY_WEBHOOK_SECRET'],
+  CARRYBEE: ['CARRYBEE_CLIENT_ID', 'CARRYBEE_CLIENT_SECRET', 'CARRYBEE_CLIENT_CONTEXT', 'CARRYBEE_WEBHOOK_SECRET'],
+};
 
 @Injectable()
 export class ShippingService {
@@ -52,6 +69,7 @@ export class ShippingService {
     public readonly courierRouter: CourierRouterService,
     private readonly messages: TransactionalMessagingService,
     private readonly audit: AuditService,
+    private readonly config: ConfigService,
 
     private readonly tenantDb?: TenantDbService,
   ) {}
@@ -63,6 +81,25 @@ export class ShippingService {
    */
   private async db(): Promise<PrismaClient> {
     return resolveTenantDatabase(this.tenantDb, this.prisma);
+  }
+
+  private async tenantCredentials(code: ShipmentProviderCode): Promise<CourierCredentials | undefined> {
+    const db = await this.db();
+    const config = await db.courierProviderConfig.findUnique({ where: { provider: code } });
+    if (!config?.enabled) return undefined;
+    try {
+      return decryptCourierCredentials(config.credentialCipher, this.config.get<string>('PLATFORM_DB_CREDENTIAL_KEY'));
+    } catch {
+      return undefined;
+    }
+  }
+
+  private async withProvider<T>(code: ShipmentProviderCode, callback: () => Promise<T>): Promise<T> {
+    const credentials = await this.tenantCredentials(code);
+    if (tryGetTenantContext() && !credentials) {
+      throw new ConflictException(`${code} credentials are not configured`);
+    }
+    return runWithCourierCredentials(credentials, callback);
   }
   private adapter(code: ShipmentProviderCode): CourierAdapter {
     switch (code) {
@@ -118,10 +155,14 @@ export class ShippingService {
     const providers = await db.shipmentProvider.findMany({
       orderBy: { name: 'asc' },
     });
-    return providers.map((provider) => ({
-      ...provider,
-      configured: this.adapter(provider.code).isConfigured(),
-      pollingConfigured: this.adapter(provider.code).isPollingConfigured(),
+    return Promise.all(providers.map(async (provider) => {
+      const credentials = await this.tenantCredentials(provider.code);
+      return runWithCourierCredentials(credentials, () => ({
+        ...provider,
+        configured: this.adapter(provider.code).isConfigured(),
+        pollingConfigured: this.adapter(provider.code).isPollingConfigured(),
+        source: credentials ? 'tenant' : 'unconfigured',
+      }));
     }));
   }
 
@@ -155,31 +196,37 @@ export class ShippingService {
     });
   }
 
-  getPollingSupport(code: ShipmentProviderCode) {
-    return this.adapter(code).isPollingConfigured();
+  async getPollingSupport(code: ShipmentProviderCode) {
+    return this.withProvider(code, async () =>
+      this.adapter(code).isPollingConfigured(),
+    );
   }
 
   async pollProviderShipment(
     code: ShipmentProviderCode,
     input: PollCourierShipmentInput,
   ) {
-    const adapter = this.adapter(code);
-    if (!adapter.isPollingConfigured() || !adapter.pollShipment) {
-      throw new ConflictException(`${code} polling is not configured`);
-    }
-    return adapter.pollShipment(input);
+    return this.withProvider(code, async () => {
+      const adapter = this.adapter(code);
+      if (!adapter.isPollingConfigured() || !adapter.pollShipment) {
+        throw new ConflictException(`${code} polling is not configured`);
+      }
+      return adapter.pollShipment(input);
+    });
   }
 
   processPolledPayload(
     provider: ShipmentProviderCode,
     body: Record<string, unknown>,
   ) {
-    return this.processAuthenticatedWebhook(
-      provider,
-      body,
-      undefined,
-      undefined,
-      'POLL',
+    return this.withProvider(provider, () =>
+      this.processAuthenticatedWebhook(
+        provider,
+        body,
+        undefined,
+        undefined,
+        'POLL',
+      ),
     );
   }
 
@@ -192,7 +239,7 @@ export class ShippingService {
     if (!Object.values(ShipmentProviderCode).includes(code)) {
       throw new BadRequestException('Unsupported shipment provider');
     }
-    if (dto.isActive && !this.adapter(code).isConfigured()) {
+    if (dto.isActive && !(await this.withProvider(code, async () => this.adapter(code).isConfigured()))) {
       throw new ConflictException(
         `${code} credentials must be configured before activation`,
       );
@@ -217,6 +264,50 @@ export class ShippingService {
         transaction,
       );
       return updated;
+    });
+  }
+
+  async updateProviderConfig(
+    provider: ShipmentProviderCode,
+    dto: UpdateCourierProviderConfigDto,
+    actor: UserPayload,
+  ) {
+    const allowed = COURIER_CREDENTIAL_KEYS[provider];
+    const supplied = Object.keys(dto.credentials);
+    if (supplied.length === 0 || supplied.some((key) => !allowed.includes(key))) {
+      throw new ConflictException('Unsupported or empty courier credential set');
+    }
+    if (Object.values(dto.credentials).some((value) => typeof value !== 'string' || value.trim() === '')) {
+      throw new ConflictException('Courier credentials must contain non-empty strings');
+    }
+    const credentials = Object.fromEntries(
+      supplied.map((key) => [key, dto.credentials[key].trim()]),
+    ) as CourierCredentials;
+    const configured = runWithCourierCredentials(credentials, () => this.adapter(provider).isConfigured());
+    if (dto.enabled && !configured) {
+      throw new ConflictException('Required courier credentials are missing');
+    }
+    const db = await this.db();
+    const cipher = encryptCourierCredentials(
+      credentials,
+      this.config.get<string>('PLATFORM_DB_CREDENTIAL_KEY'),
+    );
+    return db.$transaction(async (transaction) => {
+      const previous = await transaction.courierProviderConfig.findUnique({ where: { provider } });
+      const updated = await transaction.courierProviderConfig.upsert({
+        where: { provider },
+        update: { credentialCipher: cipher, enabled: dto.enabled ?? false },
+        create: { provider, credentialCipher: cipher, enabled: dto.enabled ?? false },
+      });
+      await this.audit.record({
+        action: 'COURIER_PROVIDER_CONFIG_UPDATED',
+        entityType: 'CourierProviderConfig',
+        entityId: updated.id,
+        actor,
+        previousValue: previous ? { provider, enabled: previous.enabled } : undefined,
+        newValue: { provider, enabled: updated.enabled, credentialKeys: supplied },
+      }, transaction);
+      return { provider, enabled: updated.enabled, configured };
     });
   }
 
@@ -284,7 +375,7 @@ export class ShippingService {
       throw new ConflictException(`${dto.provider} is not active`);
     }
     const adapter = this.adapter(provider.code);
-    if (!adapter.isConfigured()) {
+    if (!(await this.withProvider(provider.code, async () => adapter.isConfigured()))) {
       throw new ConflictException(
         `${dto.provider} credentials are not configured`,
       );
@@ -332,7 +423,7 @@ export class ShippingService {
       },
     });
     try {
-      const result = await adapter.createShipment(request);
+      const result = await this.withProvider(provider.code, () => adapter.createShipment(request));
       const createdShipment = await db.$transaction(async (transaction) => {
         await transaction.shipmentEvent.create({
           data: {
@@ -479,7 +570,7 @@ export class ShippingService {
       throw new NotFoundException('Courier provider not found');
     }
     const adapter = this.adapter(provider);
-    const authValid = adapter.verifyWebhook(headers);
+    const authValid = await this.withProvider(provider, async () => adapter.verifyWebhook(headers));
     if (!authValid) {
       const attemptedAt = new Date();
       await db.shipmentWebhookLog.create({
@@ -498,7 +589,9 @@ export class ShippingService {
       });
       throw new UnauthorizedException('Invalid courier webhook credentials');
     }
-    return this.processAuthenticatedWebhook(provider, body, undefined, headers);
+    return this.withProvider(provider, () =>
+      this.processAuthenticatedWebhook(provider, body, undefined, headers),
+    );
   }
 
   async retryWebhookLog(callbackLogId: string) {
@@ -511,10 +604,12 @@ export class ShippingService {
       throw new ConflictException('Rejected callbacks cannot be retried');
     }
     if (log.processed) return { accepted: true, duplicate: true };
-    return this.processAuthenticatedWebhook(
-      log.providerCode,
-      log.body as Record<string, unknown>,
-      log.id,
+    return this.withProvider(log.providerCode, () =>
+      this.processAuthenticatedWebhook(
+        log.providerCode,
+        log.body as Record<string, unknown>,
+        log.id,
+      ),
     );
   }
 

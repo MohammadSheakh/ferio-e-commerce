@@ -5263,6 +5263,44 @@
         ]
       }
     },
+    "/api/v1/admin/shipping/providers/{code}/config": {
+      "put": {
+        "operationId": "AdminShippingController_updateProviderConfig",
+        "parameters": [
+          {
+            "name": "code",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCourierProviderConfigDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Admin Shipping"
+        ]
+      }
+    },
     "/api/v1/admin/shipping/orders/{orderId}": {
       "get": {
         "operationId": "AdminShippingController_getOrderShipment",
@@ -8879,6 +8917,10 @@
         "properties": {}
       },
       "UpdateShipmentProviderDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "UpdateCourierProviderConfigDto": {
         "type": "object",
         "properties": {}
       },

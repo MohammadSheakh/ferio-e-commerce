@@ -2964,6 +2964,22 @@ export interface paths {
         patch: operations["AdminShippingController_updateProvider"];
         trace?: never;
     };
+    "/api/v1/admin/shipping/providers/{code}/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["AdminShippingController_updateProviderConfig"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/shipping/orders/{orderId}": {
         parameters: {
             query?: never;
@@ -4801,6 +4817,7 @@ export interface components {
         CreateWalletTopUpDto: Record<string, never>;
         ReviewWalletTopUpDto: Record<string, never>;
         UpdateShipmentProviderDto: Record<string, never>;
+        UpdateCourierProviderConfigDto: Record<string, never>;
         CreateShipmentDto: Record<string, never>;
         CheckStoreAvailabilityDto: {
             /** @example clx...storeId */
@@ -8947,6 +8964,29 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["UpdateShipmentProviderDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminShippingController_updateProviderConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCourierProviderConfigDto"];
             };
         };
         responses: {

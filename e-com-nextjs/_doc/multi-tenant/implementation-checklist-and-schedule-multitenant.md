@@ -635,7 +635,7 @@ This is the largest migration slice. Existing feature behavior should remain sta
 - [x] Fulfillment/courier foundation exists.
 - [x] Rider application/assignment/location/live map exists.
 - [x] Tenant-scope fulfillment queues.
-- [ ] Tenant-scope courier integrations and credentials.
+- [x] Tenant-scope courier integrations and credentials. (`CourierProviderConfig` is tenant-local, credentials are AES-256-GCM encrypted, adapter calls run inside trusted tenant credential scope, and the guarded provider-config route never returns secrets.)
 - [x] Tenant-scope shipment callbacks/polls. (`ShippingService` resolves through the tenant client; callback tenant binding rides the HMAC cbt token)
 - [x] Tenant-scope rider application.
 - [x] Tenant-scope rider personnel approval.
@@ -778,8 +778,8 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 - [x] Credential vault boundary: **env-files approach accepted** (owner confirmed). AES-256-GCM encryption at rest + env-var master key satisfies PO-010 for current stage. KMS/Secret Manager migration deferred to production infrastructure.
 - [ ] Encrypt provider secrets.
 - [x] Redact secrets from Admin/API/logs. (Tenant registry views omit credential ciphers, provider APIs expose bounded readiness rather than credentials, webhook headers are redacted, and platform/tenant health tests reject secret-bearing errors and payloads.)
-- [ ] Tenant-scope payment providers.
-- [ ] Tenant-scope courier providers.
+- [x] Tenant-scope payment providers. (`CommercePaymentProviderConfig` is tenant-local, encrypted, and injected only inside the resolved tenant context.)
+- [x] Tenant-scope courier providers. (`CourierProviderConfig` is tenant-local; all six courier adapters and readiness/recommendation/polling paths use tenant-scoped credentials with no cross-tenant process fallback.)
 - [ ] Tenant-scope transactional messaging providers/templates.
 - [ ] Tenant-scope Google/Meta integrations where later enabled.
 - [ ] Add credential rotation workflow.
@@ -878,7 +878,7 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 - [x] Delivery zones.
 - [x] COD policy. (Tenant Admin orders exposes the tenant-local COD verification policy read/update flow; checkout and order confirmation consume the same tenant database policy, while the two-tenant vertical suite proves confirmation state remains isolated.)
 - [x] Payment configuration. (Tenant Admin can replace encrypted SSLCommerz/aamarPay credentials, enable a provider only after required fields validate, and receive masked readiness.)
-- [ ] Courier configuration.
+- [x] Courier configuration. (Tenant Admin can manage an allowlisted courier credential set through the guarded provider-config route; responses expose only enabled/configured status.)
 - [x] Notification configuration. (Tenant Admin transactional-message templates are listed and edited through guarded tenant routes and the template service resolves through the tenant client; provider activation and credential tenancy remain separate open controls.)
 - [x] Initial catalog/import guidance. (Store Setup checklist detects whether the tenant has a catalog product and links directly to the product creation flow.)
 - [x] Subscription/plan summary. (tenant-scoped `GET /tenancy/my-plan` and the dashboard Plan & Usage card)
