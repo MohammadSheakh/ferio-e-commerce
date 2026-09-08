@@ -741,7 +741,7 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 
 ## 11.2 BullMQ
 
-- [ ] Inventory every queue.
+- [x] Inventory every queue. (`libs/queue/src/bullmq.constants.ts`, BullMQ registration, feature-owned processors, platform migration processor, and retention processor enumerate the active queue set.)
 - [x] Add tenant ID to trusted job envelope. (scheduled and operator-triggered shipping, transactional dispatch, and payment expiry jobs carry `organizationId` from the resolved context; type-extended)
 - [x] Validate tenant registry record before job DB access.
 - [x] Resolve tenant DB inside worker from control plane. (`TenantFanoutService.forOrganization` → registry → bounded manager → immutable context)
@@ -967,12 +967,12 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 ## 14.3 Migration safety
 
 - [ ] Back up before high-risk migrations.
-- [ ] Define expand/migrate/contract pattern for breaking changes.
-- [ ] Avoid destructive schema changes in one step.
+- [x] Define expand/migrate/contract pattern for breaking changes. (`runbooks/migration-rollback-forward-fix.md` defines additive expand, bounded backfill, and separate contract phases.)
+- [x] Avoid destructive schema changes in one step. (ADR-0005 and the migration runbook require a separate contract phase and reject ad-hoc reverse SQL against live tenants.)
 - [ ] Test old app/new schema and new app/transition schema compatibility where rollout requires it.
 - [x] Add migration timeout. (per-tenant bootstrap is bounded by `TENANT_MIGRATION_TIMEOUT_MS`, default 120 seconds)
 - [x] Add lock/contention strategy. (tenant bootstrap applies per-migration `lock_timeout` and `statement_timeout`; the orchestrator classifies PostgreSQL lock/deadlock/serialization failures as bounded transient retries.)
-- [ ] Add rollback/forward-fix runbook.
+- [x] Add rollback/forward-fix runbook. (`runbooks/migration-rollback-forward-fix.md` defines backup gates, pause/retry behavior, isolated restore, forward-fix recovery, and schema compatibility evidence.)
 - [x] Never run uncontrolled `prisma migrate deploy` against every tenant simultaneously from application startup. (tenant migrations are launched only through the bounded, canary-aware BullMQ orchestrator; application startup has no tenant-fleet migration path.)
 
 ## 14.4 Validation
