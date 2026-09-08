@@ -777,7 +777,7 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 
 - [x] Credential vault boundary: **env-files approach accepted** (owner confirmed). AES-256-GCM encryption at rest + env-var master key satisfies PO-010 for current stage. KMS/Secret Manager migration deferred to production infrastructure.
 - [ ] Encrypt provider secrets.
-- [ ] Redact secrets from Admin/API/logs.
+- [x] Redact secrets from Admin/API/logs. (Tenant registry views omit credential ciphers, provider APIs expose bounded readiness rather than credentials, webhook headers are redacted, and platform/tenant health tests reject secret-bearing errors and payloads.)
 - [ ] Tenant-scope payment providers.
 - [ ] Tenant-scope courier providers.
 - [ ] Tenant-scope transactional messaging providers/templates.
@@ -904,7 +904,7 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 - [x] Policies. (Customer Web renders tenant-local terms, privacy, and return-policy URLs from public commerce settings.)
 - [ ] Social links.
 - [ ] Theme tokens only within approved customization boundary.
-- [ ] No tenant-supplied unsafe arbitrary script/CSS by default.
+- [x] No tenant-supplied unsafe arbitrary script/CSS by default. (Commerce settings and public storefront contracts expose no arbitrary script or CSS injection fields; the current customization surface is limited to typed settings and static content routes.)
 - [ ] Cache invalidation after branding update.
 
 ## 13.4 Storefront tenant behavior
