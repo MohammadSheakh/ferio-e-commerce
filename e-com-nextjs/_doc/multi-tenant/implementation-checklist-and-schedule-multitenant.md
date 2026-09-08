@@ -903,7 +903,7 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 - [x] Contact information. (Customer Web renders tenant-local support phone/email on checkout and the support page.)
 - [x] Policies. (Customer Web renders tenant-local terms, privacy, and return-policy URLs from public commerce settings.)
 - [x] Social links. (Tenant-local HTTPS-only Facebook, Instagram, and WhatsApp links are validated in the admin DTO and rendered in the storefront footer.)
-- [ ] Theme tokens only within approved customization boundary.
+- [x] Theme tokens only within approved customization boundary. (Tenant settings accept only the `default`, `warm`, or `cool` preset; the storefront maps those fixed values to bundled CSS variables and accepts no tenant-supplied CSS, tokens, or scripts.)
 - [x] No tenant-supplied unsafe arbitrary script/CSS by default. (Commerce settings and public storefront contracts expose no arbitrary script or CSS injection fields; the current customization surface is limited to typed settings and static content routes.)
 - [x] Cache invalidation after branding update. (Public commerce settings use `no-store`, and the server-side storefront request forwards the resolved host; branding updates therefore cannot remain in or reuse a shared tenant cache entry.)
 
