@@ -697,7 +697,7 @@ This is the largest migration slice. Existing feature behavior should remain sta
 - [ ] **PARTIAL:** Tenant-scope feature flags/settings. (`SettingsService` — all settings CRUD/pagination/delete paths now resolve through the tenant client; platform-vs-tenant feature-flag separation still open)
 - [ ] Separate platform feature flags from tenant feature flags.
 - [ ] Tenant-scope operations health while keeping platform health separate.
-- [ ] Ensure Platform Admin aggregate metrics use approved metadata/aggregation and do not expose tenant PII by default.
+- [x] Ensure Platform Admin aggregate metrics use approved metadata/aggregation and do not expose tenant PII by default. (`GET /platform/dashboard` reads control-plane group counts only; regression coverage rejects organization IDs, customer/order fields, and contact data)
 - [x] Tenant-scope audit logs. (Audit writes automatically include trusted organization, tenant database, domain, hostname, and correlation context)
 - [ ] Add support-access audit linking when Platform Support views tenant data.
 
