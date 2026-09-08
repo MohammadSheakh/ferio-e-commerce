@@ -892,7 +892,7 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 - [x] Upgrade CTA for plan-gated features. (Plan & Usage card links to the subscription settings surface with an explicit “Review plan or upgrade” action.)
 - [x] Limit warnings before hard limits. (Plan & Usage card marks usage at or above 80% as `near limit` before server-side denial.)
 - [x] Stable errors when limit reached. (`PLAN_LIMIT_REACHED` / `FEATURE_DISABLED` / `SUBSCRIPTION_INACTIVE` from EntitlementsService)
-- [ ] Downgraded tenant can still access historical records appropriately.
+- [x] Downgraded tenant can still access historical records appropriately. (`SubscriptionsService.changePlan` changes only the control-plane subscription plan reference and never deletes tenant commerce records; the subscription regression test proves the non-destructive update, while tenant report/read services remain tenant-database routed.)
 - [x] Suspended tenant gets approved read/write restrictions. (Global tenancy guard permits reads and authentication, and blocks non-read tenant mutations with `COMMERCE_MUTATION_DISABLED_SUSPENDED`; service-level guard remains available for defense in depth.)
 
 ## 13.3 Tenant branding
