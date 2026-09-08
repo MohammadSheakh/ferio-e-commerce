@@ -842,7 +842,7 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 - [x] DB health probe. (`GET /platform/system-health` probes the control-plane database and exposes bounded pool metrics.)
 - [x] Schema version drift view. (Database Health page highlights any tenant database behind the canonical head)
 - [x] Backup evidence. (Platform system health exposes current/stale/missing backup and restore evidence from deployment metadata; it does not claim a backup provider integration.)
-- [ ] Restore workflow status.
+- [x] Restore workflow status. (Platform system health exposes bounded `restoreStatus` and `lastRestoreVerifiedAt` evidence; actual provider restore execution and live drills remain separate open controls.)
 - [x] Domain verification diagnostics. (`GET /platform/domain-health` exposes credential-free domain status, organization status, verification failures, and actionable routing issues without returning verification tokens.)
 - [x] Tenant cache invalidation where safe. (`POST /platform/organizations/:id/domain-cache/invalidate` enumerates control-plane hostnames, invokes the tenancy invalidation hook, and records bounded audit evidence; it never accepts cache keys or database URLs from the caller.)
 
@@ -859,8 +859,8 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 
 ### MT-9 gate
 
-- [ ] Ferio operators can manage tenant lifecycle without direct DB shell access for normal operations.
-- [ ] Platform Admin is not an unrestricted universal tenant superuser.
+- [x] Ferio operators can manage tenant lifecycle without direct DB shell access for normal operations. (Guarded Platform Admin organization, provisioning, migration, domain, closure, and health APIs are used by the console; no normal lifecycle action requires SQL shell access.)
+- [x] Platform Admin is not an unrestricted universal tenant superuser. (Tenant membership rejects platform-realm principals by default; tenant data access requires an explicit, time-bound, organization/user-scoped support grant and audit event.)
 
 ---
 
