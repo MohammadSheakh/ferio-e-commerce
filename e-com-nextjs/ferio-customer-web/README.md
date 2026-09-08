@@ -32,6 +32,7 @@ Default URL: `http://localhost:3000`
 - The opaque cart token is stored in an HTTP-only `ferio_cart` cookie.
 - Browser JavaScript receives cart lines and safe validation issues, never the cart token.
 - Cart-page totals remain estimates; checkout previews add the configured delivery fee and return a server-calculated final COD total.
+- Tenant host forwarding is fail-closed by default. Set `CUSTOMER_WEB_TRUSTED_PROXY=true` only when the ingress strips and overwrites client-supplied `x-forwarded-host`; otherwise the app derives tenant routing from `Host`.
 
 The checkout screen validates Bangladesh mobile numbers, collects a covered
 delivery address, separates optional marketing consent, and persists a checkout

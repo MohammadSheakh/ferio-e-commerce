@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { headers } from "next/headers";
+import { tenantHostFromHeaders } from "@/lib/host-forward";
 import { getCategories, getProducts } from "@/lib/catalog";
 import { getStoreConfig } from "@/lib/store";
 import { getTenantStatus } from "@/lib/tenancy";
@@ -9,7 +10,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   if (tenant.code !== "ACTIVE" && tenant.code !== "LEGACY") return [];
 
   const headerList = headers();
-  const host = headerList.get("x-forwarded-host") ?? headerList.get("host");
+  const host = tenantHostFromHeaders(headerList);
   const protocol = headerList.get("x-forwarded-proto") ?? "http";
   const siteUrl = host
     ? `${protocol}://${host}`

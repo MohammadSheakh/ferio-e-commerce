@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { tenantHostFromHeaders } from "./lib/host-forward";
 
 const safeMethods = new Set(["GET", "HEAD", "OPTIONS"]);
 
@@ -7,9 +8,7 @@ function firstHeaderValue(value: string | null) {
 }
 
 function requestOrigin(request: NextRequest) {
-  const host =
-    firstHeaderValue(request.headers.get("x-forwarded-host")) ??
-    firstHeaderValue(request.headers.get("host"));
+  const host = tenantHostFromHeaders(request.headers);
   const forwardedProtocol = firstHeaderValue(
     request.headers.get("x-forwarded-proto"),
   );

@@ -1,12 +1,13 @@
 import type { MetadataRoute } from "next";
 import { headers } from "next/headers";
+import { tenantHostFromHeaders } from "@/lib/host-forward";
 import { getTenantStatus } from "@/lib/tenancy";
 
 export default async function robots(): Promise<MetadataRoute.Robots> {
   const tenant = await getTenantStatus();
   const disallowAll = tenant.code !== "ACTIVE" && tenant.code !== "LEGACY";
   const headerList = headers();
-  const host = headerList.get("x-forwarded-host") ?? headerList.get("host");
+  const host = tenantHostFromHeaders(headerList);
   const protocol = headerList.get("x-forwarded-proto") ?? "http";
   const origin = host
     ? `${protocol}://${host}`

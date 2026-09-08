@@ -16,9 +16,15 @@ let provider: HostHeaderProvider | null = null;
 
 const VALID_HOST = /^(?:[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?\.)*[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?(?::\d{1,5})?$/i;
 
+function trustsForwardedHost(): boolean {
+  return process.env.CUSTOMER_WEB_TRUSTED_PROXY === 'true';
+}
+
 export function normalizeForwardedTenantHost(rawHost: string | null): string | null {
   if (!rawHost) return null;
-  const host = rawHost.split(",", 1)[0].trim().toLowerCase();
+  const values = rawHost.split(",").map((value) => value.trim()).filter(Boolean);
+  if (values.length !== 1) return null;
+  const host = values[0].toLowerCase();
   if (!host || host.length > 259 || !VALID_HOST.test(host)) return null;
 
   const port = host.match(/:(\d+)$/)?.[1];
@@ -26,10 +32,17 @@ export function normalizeForwardedTenantHost(rawHost: string | null): string | n
   return host;
 }
 
+export function tenantHostFromHeaders(
+  headers: Pick<Headers, 'get'>,
+): string | null {
+  const rawHost = trustsForwardedHost()
+    ? headers.get('x-forwarded-host') ?? headers.get('host')
+    : headers.get('host');
+  return normalizeForwardedTenantHost(rawHost);
+}
+
 export function hostForwardHeadersFromRequest(request: Request): Record<string, string> {
-  const host = normalizeForwardedTenantHost(
-    request.headers.get("x-forwarded-host") ?? request.headers.get("host"),
-  );
+  const host = tenantHostFromHeaders(request.headers);
   return host ? { "x-forwarded-host": host } : {};
 }
 
