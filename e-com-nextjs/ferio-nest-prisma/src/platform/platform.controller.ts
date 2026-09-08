@@ -24,6 +24,7 @@ import {
 import { UsageReconciliationService } from '../tenancy/services/usage-reconciliation.service';
 import { RetentionSweepService } from '../tenancy/services/retention-sweep.service';
 import { TenantSchemaBootstrapper } from '../tenancy/services/tenant-schema.bootstrapper';
+import { PlatformOperationsHealthService } from './services/platform-operations-health.service';
 import {
   PlatformAuthGuard,
   PLATFORM_PERMISSION,
@@ -60,6 +61,7 @@ export class PlatformAdminController {
     private readonly usageReconciliation: UsageReconciliationService,
     private readonly retentionSweep: RetentionSweepService,
     private readonly tenantSchemaBootstrapper: TenantSchemaBootstrapper,
+    private readonly operationsHealth: PlatformOperationsHealthService,
   ) {}
 
   @Post('organizations')
@@ -368,6 +370,12 @@ export class PlatformAdminController {
       provisioningFailures: provisioningFailed,
       activeSupportGrants: activeGrants,
     };
+  }
+
+  @Get('system-health')
+  @PlatformPermissions(PLATFORM_PERMISSION.PLATFORM_HEALTH_READ)
+  systemHealth() {
+    return this.operationsHealth.getHealth();
   }
 
   @Get('organizations/:id/provisioning-runs')

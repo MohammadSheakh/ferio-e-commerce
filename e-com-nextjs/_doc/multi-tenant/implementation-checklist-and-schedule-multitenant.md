@@ -804,9 +804,9 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 - [x] Tenant DB health. (fleet view surfaces registry status + schema version per tenant database)
 - [x] Platform billing outcomes. (`GET /platform/billing/invoices` + `/billing/payment-attempts`; Billing console page with invoice/payment tables and PAID/OPEN states)
 - [x] Usage/limit alerts. (`usage_warning_threshold_crossed` counter + structured warn exactly once per crossing; per-org Usage card on the console organization detail renders NEAR LIMIT states and a "Recount from facts" reconcile action)
-- [ ] Queue/system health.
-- [ ] Backup status.
-- [ ] Security/support-access alerts.
+- [x] Queue/system health. (`GET /platform/system-health` returns bounded control-plane queue probes and runtime status behind `platform_health:read`.)
+- [x] Backup status. (`GET /platform/system-health` reports deployment-provided backup freshness/protection and restore verification without credentials.)
+- [x] Security/support-access alerts. (`GET /platform/system-health` reports active support grants and bounded isolation-metric series; raw grant reasons and secrets are excluded.)
 
 ## 12.2 Organization management
 
@@ -839,9 +839,9 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 - [x] Persist and honor the requested migration canary organization. (`TenantMigrationRun.canaryOrganizationId` is stored in the platform plane and the orchestrator migrates that organization before the remaining ordered fleet)
 - [x] Pause rollout. (Queued workers re-check the durable run status before touching any tenant database, so an operator pause wins races with already-enqueued jobs.)
 - [x] Retry failed tenant. (failed result rows remain retryable; queued resume retries them while skipping successful tenants)
-- [ ] DB health probe.
+- [x] DB health probe. (`GET /platform/system-health` probes the control-plane database and exposes bounded pool metrics.)
 - [x] Schema version drift view. (Database Health page highlights any tenant database behind the canonical head)
-- [ ] Backup evidence.
+- [x] Backup evidence. (Platform system health exposes current/stale/missing backup and restore evidence from deployment metadata; it does not claim a backup provider integration.)
 - [ ] Restore workflow status.
 - [ ] Domain verification diagnostics.
 - [ ] Tenant cache invalidation where safe.

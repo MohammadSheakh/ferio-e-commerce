@@ -36,6 +36,7 @@ describe('PlatformAdminController dashboard boundaries', () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
     );
 
     await expect(controller.dashboard()).resolves.toEqual({
@@ -49,5 +50,27 @@ describe('PlatformAdminController dashboard boundaries', () => {
     expect(JSON.stringify(dashboard)).not.toMatch(
       /organizationId|email|phone|customer|order|tenantName/i,
     );
+  });
+
+  it('exposes system health only through the platform operations service', async () => {
+    const health = { runtimeStatus: 'HEALTHY', alerts: [] };
+    const operationsHealth = { getHealth: jest.fn().mockResolvedValue(health) };
+    const controller = new PlatformAdminController(
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      operationsHealth as never,
+    );
+
+    await expect(controller.systemHealth()).resolves.toBe(health);
+    expect(operationsHealth.getHealth).toHaveBeenCalledTimes(1);
   });
 });

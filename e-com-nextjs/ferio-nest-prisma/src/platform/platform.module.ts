@@ -28,6 +28,7 @@ import { TenantMigrationProcessor } from './migration-orchestrator.processor';
 import { TenantClosureService } from './services/tenant-closure.service';
 import { PlanGateService } from './services/plan-gate.service';
 import { PlatformBillingService } from './services/platform-billing.service';
+import { PlatformOperationsHealthService } from './services/platform-operations-health.service';
 import { LocalPostgresProvisioner } from './services/local-postgres-provisioner';
 import {
   PlatformBillingCallbackController,
@@ -81,6 +82,7 @@ import {
     PlanGateService,
     LocalPostgresProvisioner,
     PlatformBillingService,
+    PlatformOperationsHealthService,
     {
       provide: 'TENANT_DB_PROVISIONER',
       useExisting: LocalPostgresProvisioner,
