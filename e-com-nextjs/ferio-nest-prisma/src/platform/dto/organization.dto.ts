@@ -65,9 +65,8 @@ export class InitiateClosureDto {
 }
 
 export class FinalizeClosureDto {
-  @IsOptional()
   @IsBoolean()
-  retentionAcknowledged?: boolean;
+  retentionAcknowledged!: boolean;
 
   @IsOptional()
   @IsBoolean()

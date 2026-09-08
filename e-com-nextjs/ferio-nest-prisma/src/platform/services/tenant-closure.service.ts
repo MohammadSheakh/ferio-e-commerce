@@ -94,6 +94,9 @@ export class TenantClosureService {
     if (organization.status !== 'CLOSURE_PENDING') {
       throw new ConflictException('ORGANIZATION_NOT_IN_CLOSURE');
     }
+    if (options.retentionAcknowledged !== true) {
+      throw new ConflictException('CLOSURE_CONFIRMATION_REQUIRED');
+    }
 
     // PO-013: a 90-day recoverable period runs from the CLOSURE_PENDING
     // transition. Finalizing inside the window requires an explicit
@@ -131,9 +134,7 @@ export class TenantClosureService {
 
     await this.organizations.transition(organizationId, 'CLOSED', {
       actorId: options.actorId,
-      reason: options.retentionAcknowledged
-        ? 'retention acknowledged'
-        : undefined,
+      reason: 'retention acknowledged',
     });
   }
 }

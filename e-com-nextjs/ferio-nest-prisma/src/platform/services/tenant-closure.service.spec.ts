@@ -106,6 +106,15 @@ describe('TenantClosureService (PO-013)', () => {
     );
   });
 
+  it('requires explicit retention confirmation after the recoverable window', async () => {
+    const built = build(91);
+
+    await expect(built.service.finalizeClosure('org-1', {})).rejects.toThrow(
+      'CLOSURE_CONFIRMATION_REQUIRED',
+    );
+    expect(built.platform.client.tenantDatabase.update).not.toHaveBeenCalled();
+  });
+
   it('permits an explicit operator override inside the window (audited path)', async () => {
     const built = build(5);
     await expect(
