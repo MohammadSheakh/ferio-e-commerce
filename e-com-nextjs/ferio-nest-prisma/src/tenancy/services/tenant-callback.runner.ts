@@ -26,8 +26,13 @@ export class TenantCallbackRunner {
   ): Promise<T> {
     const registry = await this.platform.client.tenantDatabase.findUnique({
       where: { organizationId },
+      include: { organization: { select: { status: true } } },
     });
-    if (!registry || registry.status !== 'READY') {
+    if (
+      !registry ||
+      registry.status !== 'READY' ||
+      registry.organization.status !== 'ACTIVE'
+    ) {
       throw new NotFoundException('TENANT_DATABASE_NOT_READY');
     }
 
