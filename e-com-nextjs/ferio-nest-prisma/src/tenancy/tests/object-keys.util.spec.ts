@@ -35,6 +35,7 @@ describe('tenantObjectKey', () => {
   it('namespaces keys with the immutable resolved organization', () => {
     process.env.TENANCY_ENABLED = 'true';
     const context = {
+      correlationId: 'correlation-org-1',
       organizationId: 'org-1',
       tenantDatabaseId: 'tdb-1',
       database: {
@@ -60,6 +61,7 @@ describe('tenantObjectKey', () => {
   it('rejects another organization key in the current tenant context', () => {
     process.env.TENANCY_ENABLED = 'true';
     const context = {
+      correlationId: 'correlation-org-1',
       organizationId: 'org-1',
       tenantDatabaseId: 'tdb-1',
       database: {

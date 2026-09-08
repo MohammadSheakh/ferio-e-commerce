@@ -48,6 +48,7 @@ describe('ShippingPollingQueue', () => {
 
     await runWithTenantContext(
       {
+        correlationId: 'correlation-org-a',
         organizationId: 'org-a',
         tenantDatabaseId: 'tdb-a',
         database: {

@@ -76,7 +76,6 @@ describe('PlansService', () => {
 
     await expect(
       service.create({
-        key: 'starter',
         displayName: 'Starter',
         entitlements: [{ featureKey: 'orders_per_month', limit: 100 }],
         ...overrides,

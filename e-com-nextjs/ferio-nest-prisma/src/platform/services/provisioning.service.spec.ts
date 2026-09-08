@@ -34,6 +34,7 @@ describe('ProvisioningService idempotency boundary', () => {
           findUnique: jest.fn(),
           create: jest.fn(),
         },
+        provisioningStep: { update: jest.fn() },
       },
     };
     const organizations = { transition: jest.fn() };

@@ -97,11 +97,21 @@ describe('ReportsService tenant isolation', () => {
 
     const exportA = await runWithTenantContext(
       context('org-a', 'tenant_a'),
-      () => service.ordersExport(query, { userId: 'staff-a', role: 'staff' }),
+      () =>
+        service.ordersExport(query, {
+          userId: 'staff-a',
+          email: 'staff-a@example.test',
+          role: 'staff',
+        }),
     );
     const exportB = await runWithTenantContext(
       context('org-b', 'tenant_b'),
-      () => service.ordersExport(query, { userId: 'staff-b', role: 'staff' }),
+      () =>
+        service.ordersExport(query, {
+          userId: 'staff-b',
+          email: 'staff-b@example.test',
+          role: 'staff',
+        }),
     );
     expect(exportA.rowCount).toBe(1);
     expect(exportB.rowCount).toBe(1);

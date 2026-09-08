@@ -13,6 +13,7 @@ type RequestStub = {
 
 function suspendedContext(): TenantContext {
   return Object.freeze({
+    correlationId: 'correlation-org-1',
     organizationId: 'org-1',
     tenantDatabaseId: 'tdb-1',
     database: Object.freeze({

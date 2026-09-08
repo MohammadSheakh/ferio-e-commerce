@@ -6,6 +6,7 @@ import {
 
 function tenantContext(organizationId: string): TenantContext {
   return Object.freeze({
+    correlationId: `correlation-${organizationId}`,
     organizationId,
     tenantDatabaseId: `tdb-${organizationId}`,
     database: Object.freeze({

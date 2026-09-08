@@ -91,6 +91,7 @@ describe('TenantMembershipGuard (MT-2 §5.3 / ADR-0004)', () => {
     await expect(
       runWithTenantContext(
         {
+          correlationId: 'correlation-org-A',
           organizationId: 'org-A',
           tenantDatabaseId: 'tdb-1',
           database: {} as never,
@@ -120,6 +121,7 @@ describe('TenantMembershipGuard (MT-2 §5.3 / ADR-0004)', () => {
     await expect(
       runWithTenantContext(
         {
+          correlationId: 'correlation-org-A',
           organizationId: 'org-A',
           tenantDatabaseId: 'tdb-1',
           database: {} as never,
@@ -152,6 +154,7 @@ describe('TenantMembershipGuard (MT-2 §5.3 / ADR-0004)', () => {
     await expect(
       runWithTenantContext(
         {
+          correlationId: 'correlation-org-A',
           organizationId: 'org-A',
           tenantDatabaseId: 'tdb-1',
           database: {} as never,
@@ -180,6 +183,7 @@ describe('TenantMembershipGuard (MT-2 §5.3 / ADR-0004)', () => {
     await expect(
       runWithTenantContext(
         {
+          correlationId: 'correlation-org-A',
           organizationId: 'org-A',
           tenantDatabaseId: 'tdb-1',
           database: {} as never,
@@ -210,6 +214,7 @@ describe('TenantMembershipGuard (MT-2 §5.3 / ADR-0004)', () => {
     await expect(
       runWithTenantContext(
         {
+          correlationId: 'correlation-org-A',
           organizationId: 'org-A',
           tenantDatabaseId: 'tdb-1',
           database: {} as never,

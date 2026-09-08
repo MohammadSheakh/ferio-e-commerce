@@ -40,6 +40,7 @@ describe('TenantDbService database selection', () => {
   it('uses the resolved tenant client when a tenant context exists', async () => {
     process.env.TENANCY_ENABLED = 'true';
     const context = {
+      correlationId: 'correlation-org-1',
       organizationId: 'org-1',
       tenantDatabaseId: 'tdb-1',
       database: {

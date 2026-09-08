@@ -432,7 +432,7 @@ All surfaces live in the ferio-platform-admin console:
 - [x] Add reserved subdomain list (`www`, `admin`, `api`, `app`, etc.). (`RESERVED_SUBDOMAINS`)
 - [x] Prevent organization slugs from colliding with reserved/system routes. (`OrganizationsService` rejects the canonical reserved subdomain set before opening the control-plane transaction.)
 - [x] Ensure storefront SSR/server requests resolve tenant before fetching tenant data. (Customer Web root layout gates rendering on backend `/tenancy/status`; all server-side BFF fetches forward `x-forwarded-host` via the instrumentation-registered provider)
-- [ ] **PARTIAL:** Make metadata/SEO tenant-aware. (layout metadata falls back neutrally on non-active states; per-tenant SEO titles/descriptions arrive with MT-7 settings reads)
+- [x] Make metadata/SEO tenant-aware. (Customer Web `generateMetadata()` resolves the trusted tenant before reading tenant-local store settings, emits tenant-specific title/description, and returns `noindex` metadata for non-active or unknown hosts; sitemap/robots apply the same host/status boundary.)
 - [x] Make sitemap/robots tenant-aware. (Customer Web resolves tenant status first, derives public URLs from the forwarded host, and disables indexing for inactive/unknown stores.)
 - [x] Make tenant branding cache-aware. (Store configuration uses `no-store`; server-side API requests forward the original storefront host, preventing shared branding cache reuse.)
 
@@ -463,7 +463,7 @@ All surfaces live in the ferio-platform-admin console:
 
 - [ ] Tenant A and tenant B render different storefronts/data/settings on distinct hosts.
 - [ ] Cache/CDN behavior cannot leak branding/catalog/settings between hosts.
-- [ ] Unknown and removed domains are safe.
+- [x] Unknown and removed domains are safe. (Customer Web renders a dedicated unavailable state and disables indexing; the tenant resolver fails closed for unknown, disabled, closure-pending, closed, archived, and non-active domains.)
 
 ---
 
