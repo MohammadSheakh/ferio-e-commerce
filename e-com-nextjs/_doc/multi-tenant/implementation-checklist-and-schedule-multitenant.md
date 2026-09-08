@@ -882,7 +882,7 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 - [ ] Notification configuration.
 - [x] Initial catalog/import guidance. (Store Setup checklist detects whether the tenant has a catalog product and links directly to the product creation flow.)
 - [x] Subscription/plan summary. (tenant-scoped `GET /tenancy/my-plan` and the dashboard Plan & Usage card)
-- [ ] Usage/limit summary.
+- [x] Usage/limit summary. (Tenant Admin Plan & Usage card renders tenant-scoped usage and limits, with unavailable-state handling and near-limit warnings.)
 - [x] Domain status. (tenant-scoped `GET /tenancy/my-plan` returns active domains and the Store Setup checklist verifies an active primary domain)
 
 ## 13.2 Tenant Admin entitlement UX
@@ -898,10 +898,10 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 ## 13.3 Tenant branding
 
 - [ ] Tenant storefront logo.
-- [ ] Tenant name.
-- [ ] Hero Showcase.
-- [ ] Contact information.
-- [ ] Policies.
+- [x] Tenant name. (Customer Web reads the tenant-local commerce settings store name and uses it in the storefront shell and metadata.)
+- [x] Hero Showcase. (Customer Web requests the tenant-scoped public Hero Showcase settings through the host-forwarding BFF path.)
+- [x] Contact information. (Customer Web renders tenant-local support phone/email on checkout and the support page.)
+- [x] Policies. (Customer Web renders tenant-local terms, privacy, and return-policy URLs from public commerce settings.)
 - [ ] Social links.
 - [ ] Theme tokens only within approved customization boundary.
 - [ ] No tenant-supplied unsafe arbitrary script/CSS by default.
@@ -909,16 +909,16 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 
 ## 13.4 Storefront tenant behavior
 
-- [ ] Tenant-aware catalog.
+- [x] Tenant-aware catalog. (Server-side catalog reads forward the trusted storefront host and the backend routing tests prove tenant reads never fall back to the legacy database.)
 - [ ] Tenant-aware cart cookies/session.
 - [ ] Tenant-aware auth/customer account.
 - [ ] Tenant-aware checkout/payment.
 - [ ] Tenant-aware tracking.
 - [ ] Tenant-aware wallet.
 - [ ] Tenant-aware warranty/services/chat.
-- [ ] Tenant-aware support information.
-- [ ] Tenant-aware SEO.
-- [ ] Unknown/suspended domain states.
+- [x] Tenant-aware support information. (Support and checkout surfaces use tenant-local public commerce settings, with a safe empty-contact state.)
+- [x] Tenant-aware SEO. (Metadata, sitemap, and robots use the resolved storefront host and disable indexing for non-active tenant states.)
+- [x] Unknown/suspended domain states. (Customer Web replaces the storefront shell with explicit unknown, suspended, or unavailable states returned by the backend resolver.)
 
 ### 13.2A Server-side entitlement enforcement hooks (landed)
 
