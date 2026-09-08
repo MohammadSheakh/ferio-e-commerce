@@ -314,7 +314,7 @@ Create a separate control-plane schema/database for platform metadata.
 - [x] Add graceful application shutdown/disconnect. (`OnModuleDestroy` drains creations and disconnects all pools)
 - [x] Add metrics for active clients, evictions, acquisition failures, and pool exhaustion. (`metrics()` plus bounded `TenantMetrics` events)
 - [ ] Design for PgBouncer/managed pooling if tenant count requires it.
-- [ ] Add a circuit-breaker/backoff strategy for repeatedly unhealthy tenant DBs.
+- [x] Add a circuit-breaker/backoff strategy for repeatedly unhealthy tenant DBs. (`TenantDatabaseManager` opens a per-registry circuit after bounded acquisition failures, applies cooldown/backoff, and fails fast until recovery; manager tests cover the breaker boundary.)
 
 ## 6.2 Repository/application-service integration
 
@@ -455,9 +455,9 @@ All surfaces live in the ferio-platform-admin console:
 - [x] Unknown store page.
 - [x] Provisioning/not-ready page.
 - [x] Suspended store page according to approved business policy.
-- [ ] Domain verification pending state.
+- [x] Domain verification pending state. (Custom domains are created as `PENDING_VERIFICATION`, remain unresolvable until the ownership token matches, and expose pending status in platform domain diagnostics.)
 - [x] Tenant branding load failure fallback that does not display another tenant's branding. (Unavailable hosts render the dedicated tenant state page; active-store fetch failures use only the static application fallback and never another host's response.)
-- [ ] Tenant-specific support contacts/policies.
+- [x] Tenant-specific support contacts/policies. (Tenant-local commerce settings provide support phone/email and terms, privacy, and return-policy URLs to Customer Web.)
 
 ### MT-5 gate
 
@@ -1092,7 +1092,7 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 ## 16.4 Dependency/security hygiene
 
 - [x] CI dependency audit. (critical production dependency audit runs for backend and every web/mobile workspace)
-- [ ] Secret scan.
+- [x] Secret scan. (Required CI `security-scan` job runs the full repository through `gitleaks/gitleaks-action@v2`; exposed credentials still require rotation when detected.)
 - [x] SAST/lint/typecheck.
 - [x] Production builds for all web apps/backend. (CI matrix: backend, Customer Web, Admin Web, Platform Admin)
 - [x] Prisma migration validation. (CI runs `check:migrations` before deployment; it validates both PostgreSQL migration roots, naming, SQL presence, duplicate names, and lock providers)
