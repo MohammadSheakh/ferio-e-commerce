@@ -7,6 +7,14 @@ integration, alerting, and production restore evidence remain deployment
 gates; this document must be extended with the selected provider's exact
 commands and dashboard checks before production launch.
 
+Before a production deployment, run `pnpm check:backup-policy` with the
+provider-managed deployment environment. It requires a non-placeholder
+`BACKUP_PROVIDER`, `BACKUP_PITR_ENABLED=true`, retention of at least 30 days,
+`BACKUP_RPO_MINUTES` at most 60, `BACKUP_RTO_MINUTES` at most 240, and a
+bounded `BACKUP_LOGICAL_SCHEDULE`. The validator checks configuration only and
+never reads or prints database credentials; a passing result is not a
+substitute for a provider-side restore drill.
+
 ## Nightly backups
 - Control plane: `PLATFORM_DATABASE_URL=... ./scripts/backup-platform.sh ./backups`.
   The URL must come from the operator's secret-managed environment; the helper

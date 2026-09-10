@@ -26,6 +26,7 @@
     "architecture:check": "node scripts/architecture-boundary-check.mjs",
     "check:migrations": "node scripts/validate-migrations.mjs && node scripts/validate-migration-integrity.mjs",
     "check:migration-compatibility": "node scripts/validate-migration-compatibility.mjs",
+    "check:backup-policy": "node scripts/validate-backup-policy.mjs",
     "verify:domain-readiness": "node scripts/verify-domain-readiness.mjs",
     "lint": "node ./node_modules/eslint/bin/eslint.js \"{src,libs,test}/**/*.ts\"",
     "lint:fix": "node ./node_modules/eslint/bin/eslint.js \"{src,libs,test}/**/*.ts\" --fix",
