@@ -1,4 +1,11 @@
-# Backup & Restore Runbook (PO-012 aligned — pending provider sign-off)
+# Backup & Restore Runbook (PO-012 aligned — ADR-0009 strategy accepted)
+
+The accepted strategy is provider-managed continuous WAL/PITR plus nightly
+logical backups for the control plane and every active tenant. This runbook is
+provider-neutral by design. Provider selection, scheduling, secret-manager
+integration, alerting, and production restore evidence remain deployment
+gates; this document must be extended with the selected provider's exact
+commands and dashboard checks before production launch.
 
 ## Nightly backups
 - Control plane: `PLATFORM_DATABASE_URL=... ./scripts/backup-platform.sh ./backups`.
@@ -68,5 +75,6 @@ in the provider console/API after each deployment.
   restore evidence.
 
 ## Ownership
-Blocked on managed-provider selection (PO-009 follow-up). Until signed off,
-this file is the contract engineering will implement against.
+The backup/PITR strategy is accepted by ADR-0009. The deployment owner still
+owns provider selection, provider-side PITR configuration, protected scheduling
+credentials, stale-backup alerting, and a production-like restore drill.

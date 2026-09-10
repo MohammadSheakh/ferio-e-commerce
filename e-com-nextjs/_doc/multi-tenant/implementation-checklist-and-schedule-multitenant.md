@@ -996,7 +996,7 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 
 ## 15.1 Backup
 
-- [ ] Select managed PostgreSQL backup/PITR strategy.
+- [x] Select managed PostgreSQL backup/PITR strategy. (ADR-0009 accepts provider-managed continuous WAL/PITR plus nightly encrypted logical backups for the control plane and active tenant fleet; provider selection, scheduling, credentials, alerting, and production restore evidence remain open operational gates.)
 - [x] Define RPO. (PO-012: recovery point objective is at most 1 hour.)
 - [x] Define RTO. (PO-012: recovery time objective is at most 4 hours.)
 - [x] Back up control plane. (2026-09-10 local Docker PostgreSQL drill used `scripts/backup-platform.sh` with `PLATFORM_DATABASE_URL`; checksum and migration-head metadata were written. Managed-provider scheduling/PITR remains open.)
