@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { randomBytes } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
 import { Pool } from 'pg';
 import {
   TenantDatabaseProvisioner,
@@ -26,7 +26,7 @@ export class LocalPostgresProvisioner extends TenantDatabaseProvisioner {
       2,
     ).toString('hex')}`;
     const dbPassword = randomBytes(18).toString('base64url');
-    const roleName = `tenant_${params.organizationId.slice(-8)}`;
+    const roleName = tenantRoleName(params.organizationId);
 
     const adminUrl = new URL(url);
     adminUrl.pathname = '/postgres';
@@ -81,4 +81,12 @@ function isDuplicateObjectError(error: unknown): boolean {
     'code' in error &&
     error.code === '42710'
   );
+}
+
+function tenantRoleName(organizationId: string): string {
+  const suffix = createHash('sha256')
+    .update(organizationId)
+    .digest('hex')
+    .slice(0, 24);
+  return `tenant_${suffix}`;
 }
