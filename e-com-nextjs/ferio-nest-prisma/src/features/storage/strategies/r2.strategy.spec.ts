@@ -36,6 +36,27 @@ describe('sanitizeStoragePath', () => {
 });
 
 describe('R2 tenant lifecycle operations', () => {
+  it('rejects spoofed multipart content before calling the provider', async () => {
+    const strategy = new R2Strategy();
+    const send = jest.fn();
+    Object.defineProperty(strategy, 's3Client', { value: { send } });
+
+    await expect(
+      runWithTenantContext(tenantContext, () =>
+        strategy.uploadFile(
+          {
+            buffer: Buffer.from('not a png'),
+            originalname: 'image.png',
+            mimetype: 'image/png',
+            size: 9,
+          },
+          'products',
+        ),
+      ),
+    ).rejects.toThrow('Uploaded content does not match the declared file type');
+    expect(send).not.toHaveBeenCalled();
+  });
+
   it('verifies stored metadata and magic bytes after a direct upload', async () => {
     const strategy = new R2Strategy();
     const send = jest

@@ -69,6 +69,7 @@ import {
   tenantObjectKey,
 } from '../../../tenancy/utils/object-keys.util';
 import { tryGetTenantContext } from '../../../tenancy/context/tenant-context';
+import { assertUploadContent } from '../storage-validation.util';
 
 export function sanitizeStoragePath(value: string, fallback = 'misc'): string {
   const segments = value
@@ -168,6 +169,10 @@ export class R2Strategy implements StorageStrategy {
     },
     folder: string,
   ): Promise<StorageUploadResult> {
+    // Keep content validation at the provider boundary as well as at
+    // controller boundaries so every multipart caller receives the same
+    // fail-closed protection.
+    assertUploadContent(file);
     const key = tenantObjectKey(
       folder,
       `${Date.now()}-${file.originalname.replace(/\s+/g, '-')}`,
