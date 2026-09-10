@@ -28,6 +28,7 @@
     "check:migration-compatibility": "node scripts/validate-migration-compatibility.mjs",
     "check:backup-policy": "node scripts/validate-backup-policy.mjs",
     "check:upload-security": "node scripts/validate-upload-security.mjs",
+    "check:tenant-edge-policy": "node scripts/validate-tenant-edge-policy.mjs",
     "verify:domain-readiness": "node scripts/verify-domain-readiness.mjs",
     "lint": "node ./node_modules/eslint/bin/eslint.js \"{src,libs,test}/**/*.ts\"",
     "lint:fix": "node ./node_modules/eslint/bin/eslint.js \"{src,libs,test}/**/*.ts\" --fix",

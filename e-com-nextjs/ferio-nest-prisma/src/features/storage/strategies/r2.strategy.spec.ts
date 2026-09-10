@@ -76,7 +76,11 @@ describe('R2 tenant lifecycle operations', () => {
       ),
     );
 
-    const command = send.mock.calls[0]?.[0] as { input: { Key: string } };
+    const calls = send.mock.calls as unknown as Array<[
+      { input: { Key: string } },
+    ]>;
+    const command = calls[0]?.[0];
+    expect(command).toBeDefined();
     expect(command.input.Key).toMatch(
       /^tenants\/org-a\/warranty\/evidence\/\d+-proof-image\.png$/,
     );
@@ -174,7 +178,10 @@ describe('R2 tenant lifecycle operations', () => {
       ),
     ).rejects.toThrow('STORAGE_OBJECT_MALWARE_DETECTED');
     expect(send).toHaveBeenCalledTimes(3);
-    expect((send.mock.calls[2]?.[0] as { input: { Key: string } }).input).toEqual(
+    const calls = send.mock.calls as unknown as Array<[
+      { input: { Key: string } },
+    ]>;
+    expect(calls[2]?.[0].input).toEqual(
       expect.objectContaining({ Key: 'tenants/org-a/products/image.png' }),
     );
   });

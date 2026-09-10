@@ -15,6 +15,10 @@ const dataClassification = await readFile(
   resolve(root, '../_doc/multi-tenant/data-classification.md'),
   'utf8',
 );
+const productionCompose = await readFile(
+  resolve(root, '../docker-compose.production.yml'),
+  'utf8',
+);
 let mongoModule = '';
 try {
   mongoModule = await readFile(
@@ -154,6 +158,21 @@ async function checkTenantAdminControllerGuards() {
   }
 }
 
+function checkProductionTenantEdgeContract() {
+  const requiredEntries = [
+    'PLATFORM_PUBLIC_DOMAIN: ${PLATFORM_PUBLIC_DOMAIN:?',
+    'TENANT_TRUSTED_PROXY_CIDRS: ${TENANT_TRUSTED_PROXY_CIDRS:?',
+    'CUSTOMER_WEB_TRUSTED_PROXY: ${CUSTOMER_WEB_TRUSTED_PROXY:?',
+  ];
+  for (const entry of requiredEntries) {
+    if (!productionCompose.includes(entry)) {
+      violations.push(
+        `docker-compose.production.yml must require ${entry.split(':', 1)[0]} explicitly`,
+      );
+    }
+  }
+}
+
 function checkPlatformModelClassification() {
   const platformModels = [...platformPrisma.matchAll(/\bmodel\s+([A-Za-z0-9_]+)/g)].map(
     (match) => match[1],
@@ -199,6 +218,7 @@ checkPlatformModelClassification();
 await checkTenantTransactionEntryPoints();
 await checkTenantServiceDatabaseBoundaries();
 await checkTenantAdminControllerGuards();
+checkProductionTenantEdgeContract();
 
 try {
   await access(resolve(root, '..', 'docker-compose.production.yml'));
