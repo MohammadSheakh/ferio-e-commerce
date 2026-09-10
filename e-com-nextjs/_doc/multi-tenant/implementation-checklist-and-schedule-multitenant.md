@@ -1014,7 +1014,7 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 - [x] Verify schema version after restore. (restore helper requires a completed `_prisma_migrations` row and prints the restored migration name)
 - [ ] Verify object/media references.
 - [ ] Verify financial ledgers/reconciliation.
-- [ ] Document DNS/domain behavior during disaster recovery.
+- [x] Document DNS/domain behavior during disaster recovery. (`runbooks/backup-restore.md` requires isolated restore promotion, fail-closed unavailable domains, and operator-recorded DNS/TLS verification before activation.)
 - [ ] Perform and record restore exercise.
 
 ## 15.3 Tenant export/closure
@@ -1421,7 +1421,7 @@ Every merge affecting tenant-aware code should run:
 - [x] Rider surface production build. (included in the Tenant Admin workspace build)
 - [x] Secret scan. (required gitleaks job)
 - [x] Dependency/security audit. (critical production dependency audit matrix)
-- [ ] Migration compatibility check.
+- [x] Migration compatibility check. (`scripts/validate-migration-compatibility.mjs` runs in required CI and requires every post-baseline migration to declare EXPAND, COMPATIBLE, or CONTRACT intent while rejecting destructive SQL without an explicit CONTRACT marker; live mixed-version integration remains a rollout task.)
 - [x] No use of production tenant credentials in CI. (CI uses disposable PostgreSQL/Redis credentials and synthetic JWT secrets)
 - [x] Fail build on critical tenant-isolation regression. (required integration, queue, typecheck, lint, and build jobs)
 

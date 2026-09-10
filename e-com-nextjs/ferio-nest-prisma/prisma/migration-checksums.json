@@ -54,5 +54,5 @@
   "platform-migrations/20260907210000_pending_tenant_domain_activation/migration.sql": "5b51d0ec32b5202e4c567c47a292b82dcb7e5e812556e9569ea68f684fdf9396",
   "platform-migrations/20260908190000_add_plan_version/migration.sql": "4b281246b392cc5f4cf4a1db9f353b5cee78caf0235a40dc3178a8846fd35eee",
   "platform-migrations/20260908193000_add_subscription_entitlement_overrides/migration.sql": "597ff751702aa6c9a1dbab102b3ca585cadb5d763e54a0e5d1c9bc3592b8ccae",
-  "platform-migrations/20260910100000_backup_evidence/migration.sql": "3a63818ca63d1b8fb96af446544392e7d873ad2e023df40d1fc8e5d1aeba2ee8"
+  "platform-migrations/20260910100000_backup_evidence/migration.sql": "2c0926e2463d60d1476ee812bfc985cfb3b74211042940b83872e9c1653f7ca5"
 }

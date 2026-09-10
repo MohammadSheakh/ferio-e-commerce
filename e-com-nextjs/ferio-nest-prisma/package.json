@@ -25,6 +25,7 @@
     "lint:strict:src": "node scripts/lint-source.mjs",
     "architecture:check": "node scripts/architecture-boundary-check.mjs",
     "check:migrations": "node scripts/validate-migrations.mjs && node scripts/validate-migration-integrity.mjs",
+    "check:migration-compatibility": "node scripts/validate-migration-compatibility.mjs",
     "lint": "node ./node_modules/eslint/bin/eslint.js \"{src,libs,test}/**/*.ts\"",
     "lint:fix": "node ./node_modules/eslint/bin/eslint.js \"{src,libs,test}/**/*.ts\" --fix",
     "test": "node ./node_modules/jest/bin/jest.js",

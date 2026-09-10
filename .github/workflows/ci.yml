@@ -75,6 +75,8 @@ jobs:
         run: pnpm prisma:migrate:platform
         env:
           PLATFORM_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/ferio_ci_test
+      - name: Migration compatibility gate
+        run: pnpm check:migration-compatibility
       - name: Strict typecheck (incl. specs)
         run: pnpm exec tsc --noEmit -p tsconfig.json
       - name: Application lint (read-only)

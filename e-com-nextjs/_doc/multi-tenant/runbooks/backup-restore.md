@@ -34,6 +34,19 @@ in the provider console/API after each deployment.
    registry copy; smoke-test storefront read-only.
 5. Record drill evidence + elapsed time (RTO ≤4h target, PO-012).
 
+## DNS and domain behavior during disaster recovery
+
+- Never repoint a live tenant domain directly to an unverified restore.
+- Restore into a new isolated database, keep the registry unavailable until
+  schema, media, financial, and read-only storefront checks pass, then promote
+  the replacement through the normal control-plane lifecycle.
+- During recovery, keep the original domain disabled or in a pending state if
+  the original tenant is unavailable. Unknown, closed, or not-ready domains
+  must continue to fail closed rather than route to the recovery database.
+- Re-issue or verify TLS at the ingress/provider layer before activation; DNS
+  and certificate changes are operator actions and must be recorded with the
+  restore evidence.
+
 ## Ownership
 Blocked on managed-provider selection (PO-009 follow-up). Until signed off,
 this file is the contract engineering will implement against.

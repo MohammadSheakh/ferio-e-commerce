@@ -1,3 +1,4 @@
+-- FERIO: EXPAND
 -- Durable, secret-free evidence for operator backup and restore runs.
 CREATE TYPE "BackupEvidenceScope" AS ENUM ('CONTROL_PLANE', 'TENANT');
 CREATE TYPE "BackupEvidenceStatus" AS ENUM ('VERIFIED', 'FAILED');
