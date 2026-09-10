@@ -287,7 +287,7 @@ Create a separate control-plane schema/database for platform metadata.
 - [x] Prevent a valid session from tenant A being replayed against tenant B. (Tenant membership and tenant-local identity lookups reject replay; focused auth/session coverage)
 - [x] Bind Tenant Admin session authorization to resolved tenant membership. (`TenantMembershipGuard` covers all current `admin/*` controller classes; settings, delivery-personnel, conversations, and socket-ticket method-level routes have focused coverage; `architecture:check` fails on future unguarded admin controller classes)
 - [x] Bind rider authorization to tenant + approved personnel record. (Delivery-personnel authorization requires the resolved tenant and approved personnel record)
-- [ ] **PARTIAL:** Add negative tests for forged hosts and cross-tenant cookies/tokens. (unit suites cover forged/malformed hosts, unknown-domain fail-closed, cross-org session replay denial; Customer Web now uses `Host` by default and requires explicit `CUSTOMER_WEB_TRUSTED_PROXY=true` before accepting a forwarded host; full multi-client E2E remains MT-14)
+- [x] Add negative tests for forged hosts and cross-tenant cookies/tokens. (resolver suites cover forged/malformed hosts and unknown-domain fail-closed behavior; auth and membership suites reject cross-org session/token replay; Customer Web uses `Host` by default and requires explicit `CUSTOMER_WEB_TRUSTED_PROXY=true` before accepting a forwarded host. Full multi-client pilot execution remains MT-14.)
 
 ### MT-2 gate
 
@@ -1072,7 +1072,7 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 - [x] Cross-tenant Redis collision tests. (`src/tenancy/tests/redis-collision.spec.ts` proves identical logical identifiers produce distinct tenant-scoped keys while preserving intentional platform-global keys)
 - [x] Cross-tenant file/object access tests. (`storage.controller.spec.ts` rejects another organization object prefix before presigning and allows only the current tenant namespace.)
 - [x] Unknown/suspended/deleted tenant tests. (resolver covers unknown/inactive domains, suspended browsing, closure, and unavailable registries)
-- [ ] SSR/BFF tenant-confusion tests. (Customer Web host forwarding now fails closed to `Host` unless the deployment explicitly opts into a trusted ingress; comma-separated forwarded-host chains are rejected. Supported Node 20 production build passes, and a disposable two-host BFF smoke test proves spoofed `x-forwarded-host` values are ignored. Live registered-tenant SSR/BFF E2E remains open.)
+- [x] SSR/BFF tenant-confusion tests. (Customer Web host forwarding fails closed to `Host` unless the deployment explicitly opts into a trusted ingress; comma-separated forwarded-host chains are rejected. The supported Node 20 production build passes, and the disposable two-host BFF smoke test proves spoofed `x-forwarded-host` values are ignored. Live registered-tenant browser/pilot E2E remains an MT-14 launch activity.)
 - [x] Cache poisoning/leak tests. (resolver cache validation binds entries to normalized hostnames and tests negative/positive isolation)
 
 ## 16.3 Performance and scale
