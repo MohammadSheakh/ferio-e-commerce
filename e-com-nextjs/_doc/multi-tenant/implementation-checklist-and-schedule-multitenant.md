@@ -770,7 +770,7 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 - [x] Use signed access where required. (presigned GET via @aws-sdk/s3-request-presigner, R2_PRESIGN_EXPIRES_SECONDS tunable, default 1h)
 - [x] Prevent guessed tenant paths from returning objects. (org prefix derives from ambient TenantContext; a guessed path cannot name another tenant's namespace and objects are private regardless)
 - [ ] Add lifecycle/retention rules. (bucket-level lifecycle config is an ops task on the R2 account)
-- [ ] Add tenant export/deletion support. (wired to MT-12 closure/export flow)
+- [x] Add tenant export/deletion support. (`R2Strategy` exposes fail-closed tenant-prefix listing and batched deletion; both require ambient tenant context and cannot target legacy or another-tenant prefixes. Provider bucket lifecycle policy and automatic closure orchestration remain operational follow-up.)
 - [ ] **PARTIAL:** Add malware/content validation where required by upload type. (Buffered warranty uploads enforce size, allowlisted MIME types, and JPEG/PNG/WebP signature validation; direct presigned uploads enforce allowlisted MIME and signed size but still require post-upload inspection and malware scanning before this control is complete.)
 
 ## 11.5 Tenant integrations

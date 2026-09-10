@@ -44,6 +44,11 @@ workflow and is still an open Release 1 operational control.
 The command accepts only a PostgreSQL identifier-shaped database name. It
 does not accept a URL, password, or arbitrary schema selector.
 
+The R2 storage strategy separately exposes tenant-prefix listing and batched
+deletion for a controlled lifecycle operator. Both operations require the
+ambient tenant context and derive `tenants/{organizationId}/` server-side;
+they cannot enumerate or delete another tenant's objects or legacy objects.
+
 ## Closure Relationship
 
 The package is available before closure, but Release 1 does not yet automate

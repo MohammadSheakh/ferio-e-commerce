@@ -1,9 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import {
   S3Client,
   PutObjectCommand,
   GetObjectCommand,
   DeleteObjectCommand,
+  DeleteObjectsCommand,
+  ListObjectsV2Command,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl as s3Presign } from '@aws-sdk/s3-request-presigner';
 export interface StorageUploadResult {
@@ -32,6 +34,8 @@ export interface StorageStrategy {
     contentType: string,
     sizeBytes: number,
   ): Promise<{ key: string; url: string }>;
+  listTenantObjectKeys(): Promise<readonly string[]>;
+  deleteTenantObjects(): Promise<{ deleted: number }>;
 }
 
 // Legacy strategy contract kept for reference (attachments module is
@@ -53,6 +57,7 @@ import {
   assertTenantObjectKey,
   tenantObjectKey,
 } from '../../../tenancy/utils/object-keys.util';
+import { tryGetTenantContext } from '../../../tenancy/context/tenant-context';
 
 export function sanitizeStoragePath(value: string, fallback = 'misc'): string {
   const segments = value
@@ -127,6 +132,15 @@ export class R2Strategy implements StorageStrategy {
     return 'r2';
   }
 
+  private tenantPrefix(): string {
+    if (!tryGetTenantContext()) {
+      throw new ServiceUnavailableException(
+        'TENANT_IDENTITY_CONTEXT_REQUIRED_FOR_OBJECT_STORAGE',
+      );
+    }
+    return `${tenantObjectKey()}/`;
+  }
+
   /** Tenant-scoped object key; folder/legacy handling mirrors PO-017. */
   private keyFor(publicIdOrKeyOrFolder: string, filename?: string): string {
     void filename;
@@ -172,6 +186,46 @@ export class R2Strategy implements StorageStrategy {
     await this.s3Client.send(
       new DeleteObjectCommand({ Bucket: this.bucket, Key: key }),
     );
+  }
+
+  async listTenantObjectKeys(): Promise<readonly string[]> {
+    const prefix = this.tenantPrefix();
+    const keys: string[] = [];
+    let continuationToken: string | undefined;
+
+    do {
+      const page = await this.s3Client.send(
+        new ListObjectsV2Command({
+          Bucket: this.bucket,
+          Prefix: prefix,
+          ContinuationToken: continuationToken,
+        }),
+      );
+      for (const object of page.Contents ?? []) {
+        if (object.Key?.startsWith(prefix)) keys.push(object.Key);
+      }
+      continuationToken = page.IsTruncated
+        ? page.NextContinuationToken
+        : undefined;
+    } while (continuationToken);
+
+    return keys;
+  }
+
+  async deleteTenantObjects(): Promise<{ deleted: number }> {
+    const keys = await this.listTenantObjectKeys();
+    let deleted = 0;
+    for (let index = 0; index < keys.length; index += 1000) {
+      const batch = keys.slice(index, index + 1000).map((Key) => ({ Key }));
+      await this.s3Client.send(
+        new DeleteObjectsCommand({
+          Bucket: this.bucket,
+          Delete: { Objects: batch, Quiet: true },
+        }),
+      );
+      deleted += batch.length;
+    }
+    return { deleted };
   }
 
   /**
