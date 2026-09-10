@@ -441,8 +441,8 @@ All surfaces live in the ferio-platform-admin console:
 - [x] Select DNS/TLS automation strategy/provider. (Product-owner decisions PO-007/PO-008 select Cloudflare DNS with wildcard subdomains and automated wildcard TLS as the preferred production strategy; record creation, certificate issuance, and custom-domain verification remain operational follow-up controls.)
 - [x] Add custom-domain request. (`POST /platform/organizations/:organizationId/domains/custom` is permission-protected, plan-gated, normalized, and audited.)
 - [x] Generate ownership verification challenge. (The same route returns an ownership token while keeping the domain `PENDING_VERIFICATION`.)
-- [ ] Verify DNS.
-- [ ] Verify TLS readiness.
+- [ ] Verify DNS. (Run `ferio-nest-prisma/scripts/verify-domain-readiness.mjs` against the production hostname; live DNS/provider evidence remains an operational gate.)
+- [ ] Verify TLS readiness. (The same verifier performs strict hostname-validated TLS on port 443; certificate issuance and renewal monitoring remain provider operations.)
 - [x] Activate only after verification. (`POST /platform/organizations/:organizationId/domains/:domainId/verify` requires the organization-scoped challenge before activation.)
 - [x] Support primary/canonical domain. (The organization-scoped primary route rejects inactive domains and atomically clears the previous primary.)
 - [x] Support domain removal. (The organization-scoped disable route revokes routing and invalidates the hostname cache.)
