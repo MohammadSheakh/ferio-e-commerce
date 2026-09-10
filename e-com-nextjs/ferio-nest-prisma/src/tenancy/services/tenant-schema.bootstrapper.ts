@@ -286,7 +286,11 @@ export class TenantSchemaBootstrapper {
       );
       const courierProviders = [
         ['PATHAO', 'Pathao Courier', 'https://api-hermes.pathao.com'],
-        ['STEADFAST', 'Steadfast Courier', 'https://portal.steadfast.com.bd/api/v1'],
+        [
+          'STEADFAST',
+          'Steadfast Courier',
+          'https://portal.steadfast.com.bd/api/v1',
+        ],
         ['REDX', 'REDX Logistics', 'https://openapi.redx.com.bd'],
         ['ECOURIER', 'eCourier', 'https://backoffice.ecourier.com.bd/api'],
         ['PAPERFLY', 'Paperfly Courier', 'https://paperfly.com.bd/api'],
@@ -295,7 +299,7 @@ export class TenantSchemaBootstrapper {
       const providerPlaceholders = courierProviders
         .map((_, index) => {
           const offset = index * 4;
-          return `($${offset + 1}, $${offset + 2}, $${offset + 3}, false, now(), now())`;
+          return `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, false, now(), now())`;
         })
         .join(', ');
       await pool.query(

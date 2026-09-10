@@ -3,6 +3,7 @@ CREATE TABLE "CommercePaymentProviderConfig" (
     "provider" "CommercePaymentProvider" NOT NULL,
     "credentialCipher" TEXT NOT NULL,
     "enabled" BOOLEAN NOT NULL DEFAULT false,
+    "credentialsRotatedAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 

@@ -3,7 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { createHash } from 'crypto';
 import { Pool } from 'pg';
-import { PurchaseActivityService } from '../src/features/purchase-activity/purchase-activity.service';
+import { PurchaseActivityService } from '../src/features/purchase-activity/services/purchase-activity.service';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 if (!databaseUrl) {

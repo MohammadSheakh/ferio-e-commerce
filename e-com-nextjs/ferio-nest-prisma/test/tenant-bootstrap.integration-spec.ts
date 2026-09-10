@@ -17,6 +17,8 @@ const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL;
 
 const conditionalDescribe = TEST_DATABASE_URL ? describe : describe.skip;
 
+jest.setTimeout(240_000);
+
 function serverConfig() {
   const url = new URL(TEST_DATABASE_URL as string);
   return {
@@ -173,9 +175,7 @@ conditionalDescribe('TenantSchemaBootstrapper (real PostgreSQL)', () => {
     const config = serverConfig();
 
     const results = await Promise.all(
-      names.map((database) =>
-        bootstrapper.bootstrap({ ...config, database }),
-      ),
+      names.map((database) => bootstrapper.bootstrap({ ...config, database })),
     );
 
     expect(results).toHaveLength(10);
@@ -183,8 +183,9 @@ conditionalDescribe('TenantSchemaBootstrapper (real PostgreSQL)', () => {
     expect(new Set(results.map((result) => result.schemaVersion)).size).toBe(1);
     await Promise.all(
       names.map((database) =>
-        expect(bootstrapper.verifyReady({ ...config, database })).resolves
-          .toBeUndefined(),
+        expect(
+          bootstrapper.verifyReady({ ...config, database }),
+        ).resolves.toBeUndefined(),
       ),
     );
   }, 240_000);

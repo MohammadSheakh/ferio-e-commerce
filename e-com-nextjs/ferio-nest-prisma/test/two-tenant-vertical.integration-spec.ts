@@ -212,6 +212,7 @@ conditionalDescribe('Two-Tenant End-to-End Vertical Proof', () => {
     const catalog = new CatalogService(
       {} as never,
       auditStub as never,
+      { evaluate: jest.fn().mockResolvedValue({ allowed: true }) } as never,
       tenantDb,
     );
     const settings = new CommerceSettingsService(
@@ -235,6 +236,8 @@ conditionalDescribe('Two-Tenant End-to-End Vertical Proof', () => {
       auditStub as never,
       configStub as never,
       autoStub() as never,
+      autoStub() as never,
+      { evaluate: jest.fn().mockResolvedValue({ allowed: true }) } as never,
       autoStub() as never,
       tenantDb,
     );

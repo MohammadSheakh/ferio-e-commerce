@@ -6,9 +6,9 @@ import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 import { AuditService } from '../src/features/audit/services/audit.service';
-import { SettlementImportsService } from '../src/features/settlements/settlement-imports.service';
-import { SettlementReportParserService } from '../src/features/settlements/settlement-report-parser.service';
-import { SettlementsService } from '../src/features/settlements/settlements.service';
+import { SettlementImportsService } from '../src/features/settlements/services/settlement-imports.service';
+import { SettlementReportParserService } from '../src/features/settlements/services/settlement-report-parser.service';
+import { SettlementsService } from '../src/features/settlements/services/settlements.service';
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 if (!databaseUrl) {

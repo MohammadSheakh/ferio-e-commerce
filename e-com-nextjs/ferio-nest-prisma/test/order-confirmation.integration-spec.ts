@@ -48,9 +48,9 @@ const orders = new OrderService(
   configStub,
   {} as never, // wallet unused in COD placement proofs
   notificationsStub as never,
-  undefined, // tenantDb: legacy-mode database (canonical chain applied below)
   undefined, // entitlements: internal-plan semantics for integration proof
   undefined, // usage metering not asserted here
+  undefined, // tenantDb: legacy-mode database (canonical chain applied below)
 );
 const placementOrders = {
   placeCodOrder: (cartToken: string, idempotencyKey: string) =>

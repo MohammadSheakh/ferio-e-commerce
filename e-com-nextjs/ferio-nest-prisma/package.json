@@ -35,6 +35,7 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register ./node_modules/jest/bin/jest.js --runInBand",
     "test:e2e": "node ./node_modules/jest/bin/jest.js --config ./test/jest-e2e.json",
     "test:integration": "node ./node_modules/jest/bin/jest.js --config ./test/jest-integration.json --runInBand",
+    "test:integration:local": "node scripts/test-integration-local.mjs",
     "test:performance": "node ./node_modules/jest/bin/jest.js --config ./test/jest-integration.json --runInBand --runTestsByPath test/performance-baseline.integration-spec.ts",
     "test:http-capacity": "node scripts/http-capacity-smoke.mjs",
     "test:queue-smoke": "node ./node_modules/jest/bin/jest.js --config ./test/jest-queue-smoke.json --runInBand",

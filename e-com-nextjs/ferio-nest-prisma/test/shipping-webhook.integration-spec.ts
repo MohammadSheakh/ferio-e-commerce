@@ -12,7 +12,8 @@ import { AuditService } from '../src/features/audit/services/audit.service';
 import { PathaoAdapter } from '../src/features/shipping/adapters/pathao.adapter';
 import { SteadfastAdapter } from '../src/features/shipping/adapters/steadfast.adapter';
 import { ShippingService } from '../src/features/shipping/services/shipping.service';
-import { ShippingPollingService } from '../src/features/shipping/shipping-polling.service';
+import { ShippingPollingService } from '../src/features/shipping/services/shipping-polling.service';
+import { CourierRouterService } from '../src/features/shipping/services/courier-router.service';
 import { TransactionalMessagingService } from '../src/features/transactional-messaging/services/transactional-messaging.service';
 import {
   courierWebhookSecrets,
@@ -62,10 +63,7 @@ const shipping = new ShippingService(
   new (require('../src/features/shipping/adapters/carrybee.adapter').CarrybeeAdapter)(
     config,
   ),
-  new (require('../src/features/shipping/courier-router.service').CourierRouterService)(
-    prismaService,
-    config,
-  ),
+  new CourierRouterService(prismaService, config),
   messages,
   audit,
   undefined, // tenantDb: legacy mode; suite targets the canonical database directly

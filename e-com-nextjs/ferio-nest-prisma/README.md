@@ -192,13 +192,23 @@ pnpm build
 pnpm test
 ```
 
-PostgreSQL integration tests require an isolated database URL whose database
-name contains `_test_`, starts with `test_`, or ends with `_test`. The guard
-rejects normal development and production database names.
+PostgreSQL integration tests require an isolated server database URL whose
+database name contains `_test_`, starts with `test_`, or ends with `_test`. The
+guard rejects normal development and production database names. The local
+Docker profile uses `ferio_test_runner` on port `5433`; it is separate from
+`ferio_dev` and must be able to create disposable tenant databases.
 
 ```bash
 TEST_DATABASE_URL=postgresql://.../ferio_reconciliation_test_local \
   pnpm run test:integration
+```
+
+With the local Docker PostgreSQL profile, use the convenience command. It
+creates `TEST_DATABASE_URL`'s server database if needed, applies migrations,
+and runs the same CI integration suite:
+
+```bash
+pnpm run test:integration:local
 ```
 
 The BullMQ runtime smoke test requires a disposable Redis instance on a
