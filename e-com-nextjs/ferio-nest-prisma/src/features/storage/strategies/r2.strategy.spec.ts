@@ -1,6 +1,7 @@
 import { sanitizeStoragePath } from './r2.strategy';
 import { R2Strategy } from './r2.strategy';
 import { runWithTenantContext } from '../../../tenancy/context/tenant-context';
+import { BadRequestException } from '@nestjs/common';
 
 const tenantContext = {
   correlationId: 'correlation-a',
@@ -136,6 +137,46 @@ describe('R2 tenant lifecycle operations', () => {
         ),
       ),
     ).rejects.toThrow('STORAGE_OBJECT_CONTENT_MISMATCH');
+  });
+
+  it('removes a direct-upload object when malware is detected', async () => {
+    const malwareScanner = {
+      required: true,
+      scan: jest
+        .fn()
+        .mockRejectedValue(
+          new BadRequestException('STORAGE_OBJECT_MALWARE_DETECTED'),
+        ),
+    };
+    const strategy = new R2Strategy(malwareScanner);
+    const send = jest
+      .fn()
+      .mockResolvedValueOnce({ ContentType: 'image/png', ContentLength: 8 })
+      .mockResolvedValueOnce({
+        Body: {
+          transformToByteArray: jest
+            .fn()
+            .mockResolvedValue(
+              Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+            ),
+        },
+      })
+      .mockResolvedValueOnce({});
+    Object.defineProperty(strategy, 's3Client', { value: { send } });
+
+    await expect(
+      runWithTenantContext(tenantContext, () =>
+        strategy.inspectUploadedObject(
+          'tenants/org-a/products/image.png',
+          'image/png',
+          8,
+        ),
+      ),
+    ).rejects.toThrow('STORAGE_OBJECT_MALWARE_DETECTED');
+    expect(send).toHaveBeenCalledTimes(3);
+    expect((send.mock.calls[2]?.[0] as { input: { Key: string } }).input).toEqual(
+      expect.objectContaining({ Key: 'tenants/org-a/products/image.png' }),
+    );
   });
 
   it('lists only the ambient tenant prefix across pages', async () => {

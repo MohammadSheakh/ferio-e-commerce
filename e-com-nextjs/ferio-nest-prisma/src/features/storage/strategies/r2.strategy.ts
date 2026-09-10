@@ -340,11 +340,26 @@ export class R2Strategy implements StorageStrategy {
     if (!signatureMatches) {
       throw new BadRequestException('STORAGE_OBJECT_CONTENT_MISMATCH');
     }
-    await this.malwareScanner.scan({
-      key,
-      contentType,
-      body: downloaded,
-    });
+    try {
+      await this.malwareScanner.scan({
+        key,
+        contentType,
+        body: downloaded,
+      });
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        try {
+          await this.s3Client.send(
+            new DeleteObjectCommand({ Bucket: this.bucket, Key: key }),
+          );
+        } catch {
+          throw new ServiceUnavailableException(
+            'STORAGE_QUARANTINE_UNAVAILABLE',
+          );
+        }
+      }
+      throw error;
+    }
     return { key, contentType, sizeBytes: actualSize };
   }
 
