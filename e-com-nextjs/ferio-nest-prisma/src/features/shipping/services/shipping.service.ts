@@ -109,7 +109,7 @@ export class ShippingService {
    * falls back to the legacy single-tenant DB. Never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    return resolveTenantDatabase(this.tenantDb, this.prisma);
+    return resolveTenantDatabase(this.tenantDb, this.prisma, 'shipping-service');
   }
 
   private async tenantCredentials(

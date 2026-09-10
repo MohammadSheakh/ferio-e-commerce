@@ -48,7 +48,7 @@ export class RefundsService {
    * database client; outside one it explicitly falls back to the legacy DB.
    */
   private async db(): Promise<PrismaClient> {
-    return resolveTenantDatabase(this.tenantDb, this.prisma);
+    return resolveTenantDatabase(this.tenantDb, this.prisma, 'refunds-service');
   }
   async eligibility(returnCaseId: string) {
     const db = await this.db();

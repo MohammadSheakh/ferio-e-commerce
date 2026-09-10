@@ -72,7 +72,11 @@ export class DeliveryPersonnelService {
    * legacy fallback otherwise. Never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    return resolveTenantDatabase(this.tenantDb, this.prisma);
+    return resolveTenantDatabase(
+      this.tenantDb,
+      this.prisma,
+      'delivery-personnel-service',
+    );
   }
   /**
    * Public Self-Registration for Bangladesh Candidates

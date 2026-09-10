@@ -79,7 +79,7 @@ export class AuthService {
   ) {}
 
   private async db(): Promise<PrismaClient> {
-    return resolveTenantDatabase(this.tenantDb, this.prisma);
+    return resolveTenantDatabase(this.tenantDb, this.prisma, 'auth-service');
   }
 
   /**

@@ -37,7 +37,11 @@ export class CommerceSettingsService {
 
   /** Tenant client inside resolved storefront requests; legacy otherwise. */
   private async db(): Promise<PrismaClient> {
-    return resolveTenantDatabase(this.tenantDb, this.prisma);
+    return resolveTenantDatabase(
+      this.tenantDb,
+      this.prisma,
+      'commerce-settings-service',
+    );
   }
 
   async get() {

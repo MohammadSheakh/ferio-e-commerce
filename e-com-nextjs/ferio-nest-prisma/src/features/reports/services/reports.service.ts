@@ -269,7 +269,7 @@ export class ReportsService {
    * explicit legacy fallback otherwise. Never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    return resolveTenantDatabase(this.tenantDb, this.prisma);
+    return resolveTenantDatabase(this.tenantDb, this.prisma, 'reports-service');
   }
   async overview(query: ReportQueryDto) {
     const db = await this.db();

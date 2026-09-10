@@ -42,7 +42,15 @@ export class TenantDbService {
    * when the process is running in legacy mode. Keeping this policy here
    * prevents feature services from silently bypassing tenant isolation.
    */
-  async getOrLegacy(legacyClient: PrismaClient): Promise<PrismaClient> {
+  async getOrLegacy(
+    legacyClient: PrismaClient,
+    legacyFallbackReason: string,
+  ): Promise<PrismaClient> {
+    if (!legacyFallbackReason.trim()) {
+      throw new ServiceUnavailableException(
+        'TENANT_LEGACY_FALLBACK_REASON_REQUIRED',
+      );
+    }
     const tenant = await this.tryGet();
     if (tenant) return tenant;
     if (process.env.TENANCY_ENABLED === 'true') {
@@ -63,8 +71,14 @@ export class TenantDbService {
 export async function resolveTenantDatabase(
   tenantDb: TenantDbService | undefined,
   legacyClient: PrismaClient,
+  legacyFallbackReason: string,
 ): Promise<PrismaClient> {
-  if (tenantDb) return tenantDb.getOrLegacy(legacyClient);
+  if (tenantDb) return tenantDb.getOrLegacy(legacyClient, legacyFallbackReason);
+  if (!legacyFallbackReason.trim()) {
+    throw new ServiceUnavailableException(
+      'TENANT_LEGACY_FALLBACK_REASON_REQUIRED',
+    );
+  }
   if (process.env.TENANCY_ENABLED === 'true') {
     throw new ServiceUnavailableException('TENANT_DATABASE_SERVICE_REQUIRED');
   }

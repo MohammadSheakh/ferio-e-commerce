@@ -129,6 +129,16 @@ async function checkTenantServiceDatabaseBoundaries() {
         `${relative} performs a direct PrismaService query instead of using its resolved db client`,
       );
     }
+
+    if (
+      /resolveTenantDatabase\s*\(\s*this\.tenantDb\s*,\s*this\.prisma\s*\)/s.test(
+        source,
+      )
+    ) {
+      violations.push(
+        `${relative} uses a legacy database fallback without an explicit reason`,
+      );
+    }
   }
 }
 

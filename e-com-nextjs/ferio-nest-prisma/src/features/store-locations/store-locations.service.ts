@@ -31,7 +31,11 @@ export class StoreLocationsService {
    * MT-7: tenant client inside resolved contexts; explicit legacy fallback.
    */
   private async db(): Promise<PrismaClient> {
-    return resolveTenantDatabase(this.tenantDb, this.prisma);
+    return resolveTenantDatabase(
+      this.tenantDb,
+      this.prisma,
+      'store-locations-service',
+    );
   }
   async listPublicStores() {
     const db = await this.db();

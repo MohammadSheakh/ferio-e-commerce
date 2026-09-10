@@ -91,7 +91,7 @@ export class OrderService {
    * explicitly falls back to the legacy single-tenant DB. Never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    return resolveTenantDatabase(this.tenantDb, this.prisma);
+    return resolveTenantDatabase(this.tenantDb, this.prisma, 'order-service');
   }
   private hashIdempotencyKey(value: string): string {
     return createHash('sha256').update(value).digest('hex');

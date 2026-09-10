@@ -31,7 +31,11 @@ export class ServiceBookingService {
    * fallback outside resolved requests. Never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    return resolveTenantDatabase(this.tenantDb, this.prisma);
+    return resolveTenantDatabase(
+      this.tenantDb,
+      this.prisma,
+      'service-booking-service',
+    );
   }
   private slug(v: string) {
     return v

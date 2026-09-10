@@ -48,7 +48,7 @@ export class StaffAccessService {
    * outside resolved requests. Never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    return resolveTenantDatabase(this.tenantDb, this.prisma);
+    return resolveTenantDatabase(this.tenantDb, this.prisma, 'staff-access-service');
   }
 
   async list() {

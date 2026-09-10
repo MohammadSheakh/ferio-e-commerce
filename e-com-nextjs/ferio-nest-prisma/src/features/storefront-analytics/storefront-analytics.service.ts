@@ -46,7 +46,11 @@ export class StorefrontAnalyticsService {
    * explicit legacy fallback otherwise. Never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    return resolveTenantDatabase(this.tenantDb, this.prisma);
+    return resolveTenantDatabase(
+      this.tenantDb,
+      this.prisma,
+      'storefront-analytics-service',
+    );
   }
   async create(dto: CreateStorefrontAnalyticsEventDto) {
     const db = await this.db();

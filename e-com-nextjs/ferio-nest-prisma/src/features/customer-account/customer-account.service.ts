@@ -32,7 +32,11 @@ export class CustomerAccountService {
    * outside resolved requests. Never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    return resolveTenantDatabase(this.tenantDb, this.prisma);
+    return resolveTenantDatabase(
+      this.tenantDb,
+      this.prisma,
+      'customer-account-service',
+    );
   }
   async link(dto: LinkCustomerAccountDto, actor: UserPayload) {
     const db = await this.db();

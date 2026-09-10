@@ -165,7 +165,11 @@ export class TransactionalMessageDispatcher {
   }
 
   private async db(): Promise<PrismaClient> {
-    return resolveTenantDatabase(this.tenantDb, this.prisma);
+    return resolveTenantDatabase(
+      this.tenantDb,
+      this.prisma,
+      'transactional-message-dispatcher',
+    );
   }
 
   private async providerConfigs(db: PrismaClient) {

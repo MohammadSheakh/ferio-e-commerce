@@ -21,7 +21,11 @@ export class PurchaseActivityService {
    * explicit legacy fallback otherwise. Never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    return resolveTenantDatabase(this.tenantDb, this.prisma);
+    return resolveTenantDatabase(
+      this.tenantDb,
+      this.prisma,
+      'purchase-activity-service',
+    );
   }
   async getPublic(query: PurchaseActivityQueryDto) {
     const settings = await this.getSettings();

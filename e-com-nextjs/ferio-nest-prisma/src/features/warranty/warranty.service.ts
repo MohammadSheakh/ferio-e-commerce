@@ -48,7 +48,7 @@ export class WarrantyService {
    * MT-7: tenant client inside resolved contexts; explicit legacy fallback.
    */
   private async db(): Promise<PrismaClient> {
-    return resolveTenantDatabase(this.tenantDb, this.prisma);
+    return resolveTenantDatabase(this.tenantDb, this.prisma, 'warranty-service');
   }
   private async verifiedOrder(dto: VerifyWarrantyOrderDto) {
     const db = await this.db();

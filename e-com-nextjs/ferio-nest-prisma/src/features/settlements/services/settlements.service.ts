@@ -45,7 +45,11 @@ export class SettlementsService {
    * database client; outside one it explicitly falls back to the legacy DB.
    */
   private async db(): Promise<PrismaClient> {
-    return resolveTenantDatabase(this.tenantDb, this.prisma);
+    return resolveTenantDatabase(
+      this.tenantDb,
+      this.prisma,
+      'settlements-service',
+    );
   }
   async list() {
     const db = await this.db();
