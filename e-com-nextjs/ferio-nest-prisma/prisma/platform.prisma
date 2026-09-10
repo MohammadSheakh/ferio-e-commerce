@@ -227,6 +227,35 @@ model TenantMigrationResult {
   @@unique([migrationRunId, tenantDatabaseId])
 }
 
+enum BackupEvidenceScope {
+  CONTROL_PLANE
+  TENANT
+}
+
+enum BackupEvidenceStatus {
+  VERIFIED
+  FAILED
+}
+
+model BackupEvidence {
+  id                  String               @id @default(cuid())
+  scope               BackupEvidenceScope
+  organizationId      String?
+  databaseName        String
+  artifactName        String
+  checksum            String
+  schemaVersion       String?
+  status              BackupEvidenceStatus @default(VERIFIED)
+  completedAt         DateTime
+  restoreVerifiedAt   DateTime?
+  protectedAt         DateTime?
+  detail              Json?
+  createdAt           DateTime             @default(now())
+
+  @@index([scope, status, completedAt])
+  @@index([organizationId, completedAt])
+}
+
 // ─────────────────────────────────────────────────────────────
 // Plans, entitlements, subscriptions, SaaS billing
 // ─────────────────────────────────────────────────────────────

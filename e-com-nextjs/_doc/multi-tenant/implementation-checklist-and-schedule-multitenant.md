@@ -1001,7 +1001,7 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 - [x] Define RTO. (PO-012: recovery time objective is at most 4 hours.)
 - [ ] Back up control plane.
 - [ ] Back up every tenant DB.
-- [ ] Track backup evidence/status centrally.
+- [x] Track backup evidence/status centrally. (`BackupEvidence` is a control-plane, secret-free ledger with tenant/control-plane scope, checksum, schema-version, completion, protection, and restore-verification fields; `POST /api/v1/platform/operations/backup-evidence` is restricted to Platform Ops and validates bounded evidence before recording it.)
 - [ ] Alert on stale/failed backup.
 - [ ] Protect backup credentials.
 - [x] Define retention by plan/legal requirement. (PO-012 sets the initial backup retention to 30 days; legal/plan-specific extensions remain an operations policy follow-up.)

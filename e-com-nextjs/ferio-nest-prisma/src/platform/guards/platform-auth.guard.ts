@@ -35,6 +35,7 @@ export const PLATFORM_PERMISSION = {
   AUDIT_READ: 'audit:read',
   FEATURE_FLAG_READ: 'feature_flag:read',
   FEATURE_FLAG_WRITE: 'feature_flag:write',
+  BACKUP_EVIDENCE_WRITE: 'backup_evidence:write',
 } as const;
 
 export type PlatformPermission =
@@ -59,6 +60,7 @@ const ROLE_PERMISSIONS: Record<
     'usage:read',
     'audit:read',
     'platform_health:read',
+    'backup_evidence:write',
   ],
   SUPPORT: [
     'organization:read',
