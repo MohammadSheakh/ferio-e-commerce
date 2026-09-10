@@ -15,6 +15,9 @@ pnpm dev
 
 Default URL: `http://localhost:3000`
 
+Use Node 20 and pnpm 9 locally, matching the CI workflow and production
+Dockerfile. Other Node majors are unsupported for the Next.js 14 build.
+
 ## Current routes
 
 - `/` — public categories and published products
