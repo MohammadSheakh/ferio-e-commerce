@@ -1139,7 +1139,7 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 - [ ] Monitor support volume.
 - [ ] Collect onboarding friction.
 - [ ] Collect plan/limit feedback.
-- [ ] Freeze destructive schema changes during pilot unless required.
+- [x] Freeze destructive schema changes during pilot unless required. (`scripts/validate-migration-compatibility.mjs` supports `PILOT_SCHEMA_FREEZE=true`; destructive SQL fails closed unless `PILOT_SCHEMA_OVERRIDE=true` and a 20+ character `PILOT_SCHEMA_OVERRIDE_REASON` are supplied. The override is explicit and remains covered by the normal migration marker/contract checks.)
 
 ## 17.3 Production launch gate
 
