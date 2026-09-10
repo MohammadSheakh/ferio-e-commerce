@@ -54,4 +54,17 @@ describe('Release 1 backup and restore runbook contracts', () => {
     expect(source).toContain('"_prisma_migrations"');
     expect(source).toContain('no completed Prisma migration found');
   });
+
+  it('defines bounded tenant object retention without accepting credentials', () => {
+    const source = script('configure-r2-lifecycle.sh');
+
+    expect(source).toContain('R2_BUCKET');
+    expect(source).toContain('R2_ENDPOINT_URL');
+    expect(source).toContain('put-bucket-lifecycle-configuration');
+    expect(source).toContain('"Prefix": "tenants/"');
+    expect(source).toContain('RETENTION_DAYS="${1:-30}"');
+    expect(source).toContain('3650');
+    expect(source).not.toContain('R2_SECRET_ACCESS_KEY="$1"');
+    expect(source).not.toContain('R2_ACCESS_KEY_ID="$1"');
+  });
 });

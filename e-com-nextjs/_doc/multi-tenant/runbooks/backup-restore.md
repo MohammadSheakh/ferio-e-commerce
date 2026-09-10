@@ -6,6 +6,21 @@
   and dump each tenant DB the same way.
 - Upload dumps to object storage; retain 30 days (PO-012); encrypt at rest.
 
+## Object-storage lifecycle
+
+Apply the tenant-prefix lifecycle rule through a protected operator environment:
+
+```bash
+R2_BUCKET=... R2_ENDPOINT_URL=... \
+  ./scripts/configure-r2-lifecycle.sh 30
+```
+
+The command accepts only the retention period as an argument. AWS-compatible
+credentials must come from the operator's secret-managed environment or CLI
+profile; credentials are never passed on the command line or written to the
+repository. The rule applies only to `tenants/` objects and must be verified
+in the provider console/API after each deployment.
+
 ## Verification job (weekly)
 - `pg_restore --list <file> >/dev/null` per dump — non-zero exit = alert.
 - Record filename/size/checksum as backup evidence rows (MT-12 §15.1).
