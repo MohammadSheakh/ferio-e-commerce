@@ -35,11 +35,12 @@ describe('LocalPostgresProvisioner', () => {
 
     expect(result.username).toBe('tenant_12345678');
     expect(query).toHaveBeenCalledTimes(4);
-    expect(query.mock.calls[2]?.[0]).toEqual(
+    const queryCalls = query.mock.calls as unknown as Array<[unknown]>;
+    expect(queryCalls[2]?.[0]).toEqual(
       expect.stringMatching(/^ALTER ROLE "tenant_12345678" PASSWORD '/),
     );
-    expect(query.mock.calls[3]?.[0]).toContain(
-      'GRANT ALL PRIVILEGES ON DATABASE',
+    expect(queryCalls[3]?.[0]).toEqual(
+      expect.stringContaining('GRANT ALL PRIVILEGES ON DATABASE'),
     );
     expect(end).toHaveBeenCalledTimes(1);
   });
