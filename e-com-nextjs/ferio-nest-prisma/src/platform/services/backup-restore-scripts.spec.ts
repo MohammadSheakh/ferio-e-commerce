@@ -15,6 +15,7 @@ describe('Release 1 backup and restore runbook contracts', () => {
     expect(source).toContain('sha256sum -- "$FILE"');
     expect(source).toContain('$FILE.metadata.json');
     expect(source).toContain('"platform-control-plane"');
+    expect(source).toContain('^[0-9]{14}_[A-Za-z0-9_-]+$');
     expect(source).not.toContain('PGPASSWORD=');
   });
 
@@ -40,6 +41,7 @@ describe('Release 1 backup and restore runbook contracts', () => {
     expect(source).toContain('sha256sum -- "$FILE"');
     expect(source).toContain('$FILE.metadata.json');
     expect(source).toContain('"schemaVersion"');
+    expect(source).toContain('^[0-9]{14}_[A-Za-z0-9_-]+$');
   });
 
   it('exports only a trusted tenant media prefix with checksums', () => {
@@ -72,6 +74,7 @@ describe('Release 1 backup and restore runbook contracts', () => {
     expect(source).not.toContain('pg_restore --clean');
     expect(source).toContain('"_prisma_migrations"');
     expect(source).toContain('no completed Prisma migration found');
+    expect(source).toContain('^[0-9]{14}_[A-Za-z0-9_-]+$');
   });
 
   it('verifies restored media, relational, financial, and reconciliation structure read-only', () => {
@@ -87,6 +90,7 @@ describe('Release 1 backup and restore runbook contracts', () => {
     expect(source).toContain('invalid_completed_wallet_balances');
     expect(source).toContain('ReconciliationRun');
     expect(source).toContain('provider_check_required');
+    expect(source).toContain('^[0-9]{14}_[A-Za-z0-9_-]+$');
     expect(source).not.toContain('CREATE ');
     expect(source).not.toContain('DROP ');
     expect(source).not.toContain('UPDATE ');

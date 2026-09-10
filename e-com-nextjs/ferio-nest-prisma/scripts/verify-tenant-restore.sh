@@ -60,7 +60,7 @@ assert_zero "invalid_completed_wallet_balances" \
   "SELECT count(*) FROM \"WalletTransactionHistory\" WHERE \"status\" = 'completed' AND ((\"type\" = 'credit' AND \"balanceAfter\" <> \"balanceBefore\" + \"amount\") OR (\"type\" IN ('debit', 'withdrawal') AND \"balanceAfter\" <> \"balanceBefore\" - \"amount\"))"
 
 schema_version="$("${PSQL[@]}" --command='SELECT migration_name FROM "_prisma_migrations" WHERE finished_at IS NOT NULL ORDER BY finished_at DESC LIMIT 1' | xargs)"
-if [[ -z "$schema_version" ]]; then
+if [[ ! "$schema_version" =~ ^[0-9]{14}_[A-Za-z0-9_-]+$ ]]; then
   echo "restore verification failed: no completed Prisma migration found" >&2
   exit 74
 fi

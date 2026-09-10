@@ -48,7 +48,7 @@ sed -i '/^SET transaction_timeout = 0;$/d' "$RESTORE_SQL"
 psql --dbname "$TARGET" --set ON_ERROR_STOP=1 --file="$RESTORE_SQL"
 schema_version="$(psql --dbname "$TARGET" --tuples-only --no-align \
   --command='SELECT migration_name FROM "_prisma_migrations" WHERE finished_at IS NOT NULL ORDER BY finished_at DESC LIMIT 1' | xargs)"
-if [[ -z "$schema_version" ]]; then
+if [[ ! "$schema_version" =~ ^[0-9]{14}_[A-Za-z0-9_-]+$ ]]; then
   echo "restore verification failed: no completed Prisma migration found" >&2
   exit 74
 fi
