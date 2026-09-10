@@ -1,0 +1,17 @@
+# Local public-staging overlay for a Cloudflare Tunnel.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.tunnel-staging.yml up -d --build
+#
+# cloudflared remains an operator-managed process. Do not put its token in this
+# repository. This overlay intentionally does not redefine Redis services.
+services:
+  backend:
+    environment:
+      TENANCY_ENABLED: "true"
+      PLATFORM_PUBLIC_DOMAIN: ${PLATFORM_PUBLIC_DOMAIN:?Set PLATFORM_PUBLIC_DOMAIN, for example ferio.sheakh.qzz.io}
+      TENANT_TRUSTED_PROXY_CIDRS: ${TENANT_TRUSTED_PROXY_CIDRS:?Set the narrow Docker/BFF peer CIDR observed by the backend}
+
+  customer-web:
+    environment:
+      CUSTOMER_WEB_TRUSTED_PROXY: ${CUSTOMER_WEB_TRUSTED_PROXY:?Set CUSTOMER_WEB_TRUSTED_PROXY=true only when the tunnel is the trusted edge}
