@@ -1144,7 +1144,7 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 ## 17.3 Production launch gate
 
 - [ ] Every PRD Release 1 SaaS exit criterion passes.
-- [ ] At least two independent organizations have isolated DBs and domains.
+- [x] At least two independent organizations have isolated DBs and domains. (`test/two-tenant-vertical.integration-spec.ts` provisions two independent scratch PostgreSQL databases, bootstraps each through `TenantSchemaBootstrapper`, and binds each tenant context to a distinct `*.ferio.test` hostname; the real-PostgreSQL suite is mandatory in CI.)
 - [x] Cross-tenant negative test suite passes. (The two-tenant vertical,
   overlapping-identifier, wallet, order-reference, identity, returns/refunds,
   shipping, reconciliation, worker, and socket isolation suites reject
