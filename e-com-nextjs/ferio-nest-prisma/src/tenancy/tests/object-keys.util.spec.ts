@@ -114,4 +114,32 @@ describe('tenantObjectKey', () => {
       ),
     ).toThrow('STORAGE_KEY_FORBIDDEN');
   });
+
+  it.each([
+    'tenants/org-1/products/../secrets.txt',
+    'tenants/org-1\\products\\image.png',
+    'tenants/org-1/products/./image.png',
+  ])('rejects ambiguous path key %s', (key) => {
+    process.env.TENANCY_ENABLED = 'true';
+    const context = {
+      correlationId: 'correlation-org-1',
+      organizationId: 'org-1',
+      tenantDatabaseId: 'tdb-1',
+      database: {
+        id: 'tdb-1',
+        host: 'localhost',
+        port: 5432,
+        databaseName: 'tenant_org_1',
+        username: 'tenant',
+        credentialCipher: 'encrypted',
+      },
+      domainId: 'domain-1',
+      hostname: 'store.example.com',
+      subscriptionStatus: 'ACTIVE' as const,
+    };
+
+    expect(() =>
+      runWithTenantContext(context, () => assertTenantObjectKey(key)),
+    ).toThrow('STORAGE_KEY_FORBIDDEN');
+  });
 });
