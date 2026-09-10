@@ -138,7 +138,7 @@ Implementation tracking: `_doc/multi-tenant/skill-related-discussion/file-folder
 - [x] Establish the feature role and test-folder convention.
 - [x] Apply the convention to complex existing backend modules.
 - [x] Move nested feature tests into dedicated `tests/` folders.
-- [ ] Complete the controlled kebab-case naming migration for legacy folders.
+- [x] Complete the controlled kebab-case naming migration for legacy folders. (`features/socket.gateway` was atomically renamed to `features/socket-gateway`; all application and integration-test imports were updated and validated by typecheck, focused socket tests, and the architecture boundary check.)
 - [x] Replace or isolate legacy Mongoose-shaped feature boundaries. (No active Mongoose imports, package dependencies, or root registration remain; the architecture check rejects reintroduction and the empty legacy database directory is outside the application graph.)
 
 ## 3.2 Data classification

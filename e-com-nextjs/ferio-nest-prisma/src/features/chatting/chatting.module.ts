@@ -10,7 +10,7 @@ import { MessageController } from './message/message.controller';
 import { MessageService } from './message/message.service';
 import { ChatNotificationProcessor } from './processors/chat-notification.processor';
 
-import { SocketModule } from '../socket.gateway/socket.module';
+import { SocketModule } from '../socket-gateway/socket.module';
 import { RedisModule } from '@app/redis';
 import { TenancyModule } from '../../tenancy/tenancy.module';
 import { BULLMQ_NOTIFY_PARTICIPANTS_QUEUE, QUEUE_NAMES } from '@app/queue';

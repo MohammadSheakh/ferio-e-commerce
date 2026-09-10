@@ -70,7 +70,7 @@ Important decisions:
 | settings | 90% | Controllers, services, DTOs, constants, and tests are cleanly grouped. | Keep layout; this is a reference pattern. |
 | settlements | 88% | Parser/import/services/dto separation is good. | Keep layout. |
 | shipping | 88% | Adapters, DTO, processors, queues, and services are separated. | Keep layout; avoid moving files without dependency benefit. |
-| socket.gateway | 80% | Services and guards are separated; dotted folder name is inconsistent. | Rename to `socket-gateway` only with a complete import migration. |
+| socket-gateway | 84% | Services and guards are separated; the feature folder now follows kebab-case. | Keep layout; avoid moving files without dependency benefit. |
 | staff-access | 82% | Small cohesive module. | Keep layout. |
 | storage | 80% | Strategy/controller/module are appropriately small. | Keep layout. |
 | store-locations | 80% | DTO and service/controller split are appropriate. | Keep layout. |
@@ -107,6 +107,8 @@ Important decisions:
   order, product-request, rto, staff-access, store-locations,
   storefront-analytics, transactional-messaging, wallet, and warranty.
 - Updated all affected application, test, and integration-test imports.
+- Renamed the remaining dotted runtime feature folder from `socket.gateway` to
+  `socket-gateway` and updated all application and integration-test imports.
 - Moved the remaining historical `user-management` completion report out of
   `src/features` into the module documentation area.
 - Verification for this refactor: `pnpm exec tsc --noEmit` passed;
@@ -119,8 +121,6 @@ Important decisions:
 - Rename `userProfile` to `user-profile`, `userDevices` to `user-devices`,
   `oauthAccount` to `oauth-account`, and `messageReadStatus` to
   `message-read-status`.
-- Rename `socket.gateway` to `socket-gateway` only after updating application,
-  chat, legacy-worker, integration-test, and TypeScript exclusion imports.
 - Use one atomic change per rename with typecheck and full test verification.
 
 ### Wave 2: Legacy Boundaries

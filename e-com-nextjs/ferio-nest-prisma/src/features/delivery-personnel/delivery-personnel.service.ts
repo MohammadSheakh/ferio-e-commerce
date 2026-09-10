@@ -30,7 +30,7 @@ import {
   UpdateDeliveryPersonnelDto,
   UpdateLocationDto,
 } from './delivery-personnel.dto';
-import { SocketGateway } from '../socket.gateway/gateway/socket.gateway';
+import { SocketGateway } from '../socket-gateway/gateway/socket.gateway';
 
 function normalizePhone(phone: string): string {
   const digits = phone.replace(/\D/g, '');

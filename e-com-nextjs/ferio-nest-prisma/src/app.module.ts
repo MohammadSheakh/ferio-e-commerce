@@ -32,7 +32,7 @@ import { WarrantyModule } from './features/warranty/warranty.module';
 import { PurchaseActivityModule } from './features/purchase-activity/purchase-activity.module';
 import { CustomersModule } from './features/customers/customers.module';
 import { CustomerAccountModule } from './features/customer-account/customer-account.module';
-import { SocketModule } from './features/socket.gateway/socket.module';
+import { SocketModule } from './features/socket-gateway/socket.module';
 import { ChattingModule } from './features/chatting/chatting.module';
 import { ProductRequestModule } from './features/product-request/product-request.module';
 import { StoreLocationsModule } from './features/store-locations/store-locations.module';

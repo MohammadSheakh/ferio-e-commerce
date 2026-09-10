@@ -7,8 +7,8 @@ import {
   resolveTenantDatabase,
   TenantDbService,
 } from '../../../tenancy/services/tenant-db.service';
-import { SocketGateway } from '../../socket.gateway/gateway/socket.gateway';
-import { SocketRoomService } from '../../socket.gateway/services/socket-room.service';
+import { SocketGateway } from '../../socket-gateway/gateway/socket.gateway';
+import { SocketRoomService } from '../../socket-gateway/services/socket-room.service';
 import { BULLMQ_NOTIFY_PARTICIPANTS_QUEUE } from '@app/queue';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { ConversationType, ParticipantRole } from './conversation.constant';
