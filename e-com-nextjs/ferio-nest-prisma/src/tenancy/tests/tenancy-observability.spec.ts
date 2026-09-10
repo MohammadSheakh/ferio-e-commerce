@@ -119,6 +119,11 @@ describe('TenancyObservabilityService.emitSnapshot', () => {
     (service as unknown as { logger: Record<string, unknown> }).logger = {
       log: (event: string, metadata: Record<string, unknown>) =>
         logged.push({ event, metadata }),
+      error: (
+        event: string,
+        _error: unknown,
+        metadata: Record<string, unknown>,
+      ) => logged.push({ event, metadata }),
     };
 
     service.emitSnapshot();
@@ -127,7 +132,7 @@ describe('TenancyObservabilityService.emitSnapshot', () => {
     TenantMetrics.increment('db_breaker_opened', { tenantDatabaseId: 'tdb-1' });
     service.emitSnapshot();
 
-    expect(logged).toHaveLength(1);
+    expect(logged).toHaveLength(2);
     expect(logged[0].event).toBe('tenant_metrics_snapshot');
     expect(logged[0].metadata.counters).toEqual([
       {
@@ -136,5 +141,38 @@ describe('TenancyObservabilityService.emitSnapshot', () => {
         value: 1,
       },
     ]);
+  });
+
+  it('emits an actionable alert for isolation-critical counters', () => {
+    const logged: Array<{ event: string; metadata: Record<string, unknown> }> =
+      [];
+    const service = Object.create(
+      TenancyObservabilityService.prototype,
+    ) as TenancyObservabilityService;
+    (service as unknown as { logger: Record<string, unknown> }).logger = {
+      log: (event: string, metadata: Record<string, unknown>) =>
+        logged.push({ event, metadata }),
+      error: (
+        event: string,
+        _error: unknown,
+        metadata: Record<string, unknown>,
+      ) => logged.push({ event, metadata }),
+    };
+
+    TenantMetrics.increment('db_breaker_opened', {
+      tenantDatabaseId: 'tdb-a',
+    });
+    service.emitSnapshot();
+
+    expect(logged).toHaveLength(2);
+    expect(logged[1]).toEqual({
+      event: 'tenant_isolation_alert',
+      metadata: {
+        metric: 'db_breaker_opened',
+        value: 1,
+        threshold: 1,
+        labels: { tenantDatabaseId: 'tdb-a' },
+      },
+    });
   });
 });

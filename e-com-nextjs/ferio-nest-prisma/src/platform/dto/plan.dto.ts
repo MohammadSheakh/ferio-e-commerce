@@ -121,3 +121,30 @@ export class TransitionSubscriptionDto {
   @MaxLength(500)
   note?: string;
 }
+
+export class SubscriptionEntitlementOverrideDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(100)
+  @Matches(/^[a-z][a-z0-9_-]*$/)
+  featureKey!: string;
+
+  @IsOptional()
+  @IsBoolean()
+  enabled?: boolean;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(2_147_483_647)
+  limit?: number | null;
+
+  @IsString()
+  @MinLength(10)
+  @MaxLength(500)
+  reason!: string;
+
+  @IsString()
+  expiresAt!: string;
+}

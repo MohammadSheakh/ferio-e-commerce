@@ -38,6 +38,14 @@ describe('TenantFanoutService (MT-8 §11.2)', () => {
       client: {
         tenantDatabase: {
           findMany,
+          findUnique: jest.fn().mockImplementation(({ where }) => {
+            const found = registries.find(
+              ({ organizationId }) => organizationId === where.organizationId,
+            );
+            return Promise.resolve(
+              found ? { ...found, organization: { status: 'ACTIVE' } } : null,
+            );
+          }),
         },
       },
     };
@@ -192,7 +200,7 @@ describe('TenantFanoutService (MT-8 §11.2)', () => {
     ]);
   });
 
-  it('keeps healthy tenants progressing while one tenant is slow', async () => {
+  it('prevents one noisy tenant from starving healthy background work', async () => {
     process.env.TENANCY_ENABLED = 'true';
     process.env.TENANT_FANOUT_CONCURRENCY = '2';
     const built = build([
@@ -202,18 +210,41 @@ describe('TenantFanoutService (MT-8 §11.2)', () => {
     ]);
     const completed: string[] = [];
 
-    const outcome = await built.service.forEachTenant(async () => {
-      const organizationId = getTenantContext().organizationId;
-      if (organizationId === 'org-slow') {
-        await new Promise((resolve) => setTimeout(resolve, 20));
-      }
-      completed.push(organizationId);
-    }, { label: 'slow-tenant-test' });
+    const outcome = await built.service.forEachTenant(
+      async () => {
+        const organizationId = getTenantContext().organizationId;
+        if (organizationId === 'org-slow') {
+          await new Promise((resolve) => setTimeout(resolve, 20));
+        }
+        completed.push(organizationId);
+      },
+      { label: 'noisy-neighbor-test' },
+    );
 
     expect(outcome.processed).toBe(3);
     expect(outcome.failures).toEqual([]);
     expect(completed.slice(0, 2)).toEqual(
       expect.arrayContaining(['org-fast-1', 'org-fast-2']),
     );
+  });
+
+  it('rejects a targeted callback job for an inactive organization', async () => {
+    process.env.TENANCY_ENABLED = 'true';
+    const built = build([registry('org-closed')]);
+    built.platform.client.tenantDatabase.findUnique.mockResolvedValue({
+      ...registry('org-closed'),
+      organization: { status: 'CLOSED' },
+    });
+
+    await expect(
+      built.service.forOrganization('org-closed', () => Promise.resolve()),
+    ).rejects.toThrow('TENANT_DATABASE_NOT_READY:org-closed');
+    expect(built.manager.getClient).not.toHaveBeenCalled();
+    expect(
+      built.platform.client.tenantDatabase.findUnique,
+    ).toHaveBeenCalledWith({
+      where: { organizationId: 'org-closed' },
+      include: { organization: { select: { status: true } } },
+    });
   });
 });

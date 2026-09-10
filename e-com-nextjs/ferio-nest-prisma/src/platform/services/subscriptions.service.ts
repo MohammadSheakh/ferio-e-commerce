@@ -7,6 +7,8 @@ import { SubscriptionStatus } from '../generated/platform-client';
 import { PlatformPrismaService } from '../platform-prisma.service';
 import { PlatformAuditService } from './platform-audit.service';
 
+const FEATURE_KEY_PATTERN = /^[a-z][a-z0-9_-]*$/;
+
 /** PO-004: grace period before a past-due subscription may be suspended. */
 const GRACE_PERIOD_DAYS = 7;
 
@@ -191,5 +193,122 @@ export class SubscriptionsService {
       newValue: { planId: plan.id, planKey },
     });
     return updated;
+  }
+
+  async upsertEntitlementOverride(
+    organizationId: string,
+    input: {
+      featureKey: string;
+      enabled?: boolean;
+      limit?: number | null;
+      reason: string;
+      expiresAt: Date;
+      actorId?: string;
+    },
+  ) {
+    const featureKey = input.featureKey.trim().toLowerCase();
+    if (!FEATURE_KEY_PATTERN.test(featureKey)) {
+      throw new ConflictException('ENTITLEMENT_FEATURE_KEY_INVALID');
+    }
+    if (input.reason.trim().length < 10) {
+      throw new ConflictException('ENTITLEMENT_OVERRIDE_REASON_REQUIRED');
+    }
+    if (
+      Number.isNaN(input.expiresAt.getTime()) ||
+      input.expiresAt <= new Date()
+    ) {
+      throw new ConflictException('ENTITLEMENT_OVERRIDE_EXPIRY_INVALID');
+    }
+    if (
+      input.limit !== undefined &&
+      input.limit !== null &&
+      (!Number.isSafeInteger(input.limit) || input.limit < 0)
+    ) {
+      throw new ConflictException('ENTITLEMENT_OVERRIDE_LIMIT_INVALID');
+    }
+
+    const subscription = await this.getForOrganization(organizationId);
+    const previous =
+      await this.platform.client.subscriptionEntitlementOverride.findUnique({
+        where: {
+          subscriptionId_featureKey: {
+            subscriptionId: subscription.id,
+            featureKey,
+          },
+        },
+      });
+    const override =
+      await this.platform.client.subscriptionEntitlementOverride.upsert({
+        where: {
+          subscriptionId_featureKey: {
+            subscriptionId: subscription.id,
+            featureKey,
+          },
+        },
+        create: {
+          subscriptionId: subscription.id,
+          featureKey,
+          enabled: input.enabled ?? true,
+          limit: input.limit ?? null,
+          reason: input.reason.trim(),
+          actorId: input.actorId,
+          expiresAt: input.expiresAt,
+        },
+        update: {
+          enabled: input.enabled ?? true,
+          limit: input.limit ?? null,
+          reason: input.reason.trim(),
+          actorId: input.actorId,
+          expiresAt: input.expiresAt,
+          revokedAt: null,
+        },
+      });
+    await this.audit.record({
+      action: previous
+        ? 'SUBSCRIPTION_ENTITLEMENT_OVERRIDE_UPDATED'
+        : 'SUBSCRIPTION_ENTITLEMENT_OVERRIDE_CREATED',
+      entityType: 'SubscriptionEntitlementOverride',
+      entityId: override.id,
+      actorId: input.actorId,
+      previousValue: previous,
+      newValue: override,
+      metadata: { organizationId, reason: input.reason.trim() },
+    });
+    return override;
+  }
+
+  async revokeEntitlementOverride(
+    organizationId: string,
+    featureKey: string,
+    actorId?: string,
+  ) {
+    const subscription = await this.getForOrganization(organizationId);
+    const override =
+      await this.platform.client.subscriptionEntitlementOverride.findUnique({
+        where: {
+          subscriptionId_featureKey: {
+            subscriptionId: subscription.id,
+            featureKey: featureKey.trim().toLowerCase(),
+          },
+        },
+      });
+    if (!override || override.revokedAt) {
+      throw new NotFoundException('ENTITLEMENT_OVERRIDE_NOT_FOUND');
+    }
+    const revoked =
+      await this.platform.client.subscriptionEntitlementOverride.update({
+        where: { id: override.id },
+        data: { revokedAt: new Date(), actorId },
+      });
+    await this.audit.record({
+      action: 'SUBSCRIPTION_ENTITLEMENT_OVERRIDE_REVOKED',
+      entityType: 'SubscriptionEntitlementOverride',
+      entityId: revoked.id,
+      actorId,
+      previousValue: override,
+      newValue: revoked,
+      metadata: { organizationId, featureKey: override.featureKey },
+    });
+    return revoked;
   }
 }

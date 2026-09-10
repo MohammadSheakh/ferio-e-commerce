@@ -32,6 +32,8 @@ import { PlatformBillingService } from './services/platform-billing.service';
 import { PlatformOperationsHealthService } from './services/platform-operations-health.service';
 import { PlatformFeatureFlagsService } from './services/platform-feature-flags.service';
 import { PlatformFeatureFlagsController } from './platform-feature-flags.controller';
+import { BackupEvidenceController } from './backup-evidence.controller';
+import { BackupEvidenceService } from './services/backup-evidence.service';
 import { LocalPostgresProvisioner } from './services/local-postgres-provisioner';
 import {
   PlatformBillingCallbackController,
@@ -76,6 +78,7 @@ import {
     PlatformBillingController,
     PlatformBillingCallbackController,
     PlatformFeatureFlagsController,
+    BackupEvidenceController,
   ],
   // Tenant migration queue processor registered below with providers.
   providers: [
@@ -89,6 +92,7 @@ import {
     PlatformBillingService,
     PlatformOperationsHealthService,
     PlatformFeatureFlagsService,
+    BackupEvidenceService,
     {
       provide: 'TENANT_DB_PROVISIONER',
       useExisting: LocalPostgresProvisioner,

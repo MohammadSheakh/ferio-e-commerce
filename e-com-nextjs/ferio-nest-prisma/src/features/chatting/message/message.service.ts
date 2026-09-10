@@ -14,7 +14,7 @@ import {
   resolveTenantDatabase,
   TenantDbService,
 } from '../../../tenancy/services/tenant-db.service';
-import { SocketGateway } from '../../socket.gateway/gateway/socket.gateway';
+import { SocketGateway } from '../../socket-gateway/gateway/socket.gateway';
 import { BULLMQ_NOTIFY_PARTICIPANTS_QUEUE } from '@app/queue';
 import { SendMessageDto } from './dto/message.dto';
 import { tryGetTenantContext } from '../../../tenancy/context/tenant-context';

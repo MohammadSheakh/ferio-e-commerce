@@ -40,6 +40,7 @@ import {
   type CourierCredentials,
 } from '../utils/courier-credentials.util';
 import { UpdateCourierProviderConfigDto } from '../dto/shipping.dto';
+import { PlanGateService } from '../../../platform/services/plan-gate.service';
 
 const shipmentInclude = {
   provider: true,
@@ -70,6 +71,7 @@ export class ShippingService {
     private readonly messages: TransactionalMessagingService,
     private readonly audit: AuditService,
     private readonly config: ConfigService,
+    private readonly planGate: PlanGateService,
 
     private readonly tenantDb?: TenantDbService,
   ) {}
@@ -244,6 +246,13 @@ export class ShippingService {
         `${code} credentials must be configured before activation`,
       );
     }
+    const tenantContext = tryGetTenantContext();
+    if (dto.isActive && tenantContext) {
+      await this.planGate.assertFeatureEnabled(
+        tenantContext.organizationId,
+        'couriers_basic',
+      );
+    }
     return db.$transaction(async (transaction) => {
       const previous = await transaction.shipmentProvider.findUniqueOrThrow({
         where: { code },
@@ -328,6 +337,39 @@ export class ShippingService {
         configured,
         credentialsRotatedAt: updated.credentialsRotatedAt,
       };
+    });
+  }
+
+  async revokeProviderConfig(
+    provider: ShipmentProviderCode,
+    actor: UserPayload,
+  ): Promise<{ provider: ShipmentProviderCode; revoked: boolean }> {
+    const db = await this.db();
+    return db.$transaction(async (transaction) => {
+      const previous = await transaction.courierProviderConfig.findUnique({
+        where: { provider },
+      });
+      if (!previous) return { provider, revoked: false };
+
+      await transaction.courierProviderConfig.delete({
+        where: { provider },
+      });
+      await transaction.shipmentProvider.updateMany({
+        where: { code: provider },
+        data: { isActive: false },
+      });
+      await this.audit.record(
+        {
+          action: 'COURIER_PROVIDER_CONFIG_REVOKED',
+          entityType: 'CourierProviderConfig',
+          entityId: previous.id,
+          actor,
+          previousValue: { provider, enabled: previous.enabled },
+          newValue: { provider, revoked: true, isActive: false },
+        },
+        transaction,
+      );
+      return { provider, revoked: true };
     });
   }
 

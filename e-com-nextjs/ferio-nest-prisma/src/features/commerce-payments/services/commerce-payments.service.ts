@@ -22,6 +22,7 @@ import { AuditService } from '../../audit/services/audit.service';
 import { PaymentLedgerQueryDto } from '../dto/payment-ledger.dto';
 import type { UserPayload } from '@app/common';
 import { UpdatePaymentProviderConfigDto } from '../dto/payment-provider-config.dto';
+import { PlanGateService } from '../../../platform/services/plan-gate.service';
 import {
   decryptPaymentCredentials,
   encryptPaymentCredentials,
@@ -41,6 +42,7 @@ export class CommercePaymentsService {
     private readonly orders: OrderService,
     private readonly gateways: PaymentGatewayRegistry,
     private readonly audit: AuditService,
+    private readonly planGate: PlanGateService,
     private readonly tenantDb?: TenantDbService,
   ) {}
 
@@ -97,6 +99,13 @@ export class CommercePaymentsService {
     if (dto.enabled && !gateway.isConfigured(credentials)) {
       throw new ConflictException('Required payment credentials are missing');
     }
+    const tenantContext = tryGetTenantContext();
+    if (dto.enabled && tenantContext) {
+      await this.planGate.assertFeatureEnabled(
+        tenantContext.organizationId,
+        'online_payments',
+      );
+    }
     const db = await this.db();
     const secret = this.config.get<string>('PLATFORM_DB_CREDENTIAL_KEY');
     const cipher = encryptPaymentCredentials(credentials, secret);
@@ -136,6 +145,35 @@ export class CommercePaymentsService {
         configured: gateway.isConfigured(credentials),
         credentialsRotatedAt: updated.credentialsRotatedAt,
       };
+    });
+  }
+
+  async revokeProviderConfig(
+    provider: CommercePaymentProvider,
+    actor: UserPayload,
+  ): Promise<{ provider: CommercePaymentProvider; revoked: boolean }> {
+    const db = await this.db();
+    return db.$transaction(async (transaction) => {
+      const previous = await transaction.commercePaymentProviderConfig.findUnique({
+        where: { provider },
+      });
+      if (!previous) return { provider, revoked: false };
+
+      await transaction.commercePaymentProviderConfig.delete({
+        where: { provider },
+      });
+      await this.audit.record(
+        {
+          action: 'PAYMENT_PROVIDER_CONFIG_REVOKED',
+          entityType: 'CommercePaymentProviderConfig',
+          entityId: previous.id,
+          actor,
+          previousValue: { provider, enabled: previous.enabled },
+          newValue: { provider, revoked: true },
+        },
+        transaction,
+      );
+      return { provider, revoked: true };
     });
   }
 

@@ -8,6 +8,11 @@ type SubscriptionsPlatform = {
       create: jest.Mock;
       update: jest.Mock;
     };
+    subscriptionEntitlementOverride: {
+      findUnique: jest.Mock;
+      upsert: jest.Mock;
+      update: jest.Mock;
+    };
     subscriptionEvent: { create: jest.Mock; findFirst: jest.Mock };
     plan: { findUnique: jest.Mock };
     $transaction: jest.Mock;
@@ -52,6 +57,15 @@ describe('SubscriptionsService lifecycle state machine', () => {
           }),
         },
         plan: { findUnique: jest.fn() },
+        subscriptionEntitlementOverride: {
+          findUnique: jest.fn().mockResolvedValue(null),
+          upsert: jest
+            .fn()
+            .mockImplementation(({ create }) =>
+              Promise.resolve({ id: 'override-1', ...create }),
+            ),
+          update: jest.fn().mockResolvedValue({ id: 'override-1' }),
+        },
         $transaction: jest.fn(
           (fn: (client: SubscriptionsPlatform['client']) => unknown) =>
             Promise.resolve(fn(platform.client)),
@@ -169,6 +183,58 @@ describe('SubscriptionsService lifecycle state machine', () => {
           planKey: 'internal',
           status: 'ACTIVE',
         },
+      }),
+    );
+  });
+
+  it('creates an expiring entitlement override with an audit record', async () => {
+    mockCurrent('ACTIVE');
+    const expiresAt = new Date(Date.now() + 60_000);
+
+    await expect(
+      service.upsertEntitlementOverride('org-1', {
+        featureKey: 'staff_seats',
+        limit: 10,
+        reason: 'Temporary onboarding capacity',
+        expiresAt,
+        actorId: 'platform-user-1',
+      }),
+    ).resolves.toMatchObject({ id: 'override-1', featureKey: 'staff_seats' });
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'SUBSCRIPTION_ENTITLEMENT_OVERRIDE_CREATED',
+        actorId: 'platform-user-1',
+      }),
+    );
+  });
+
+  it('revokes an active entitlement override and audits the revocation', async () => {
+    mockCurrent('ACTIVE');
+    platform.client.subscriptionEntitlementOverride.findUnique.mockResolvedValue(
+      {
+        id: 'override-1',
+        featureKey: 'staff_seats',
+        revokedAt: null,
+      },
+    );
+
+    await expect(
+      service.revokeEntitlementOverride(
+        'org-1',
+        'staff_seats',
+        'platform-user-1',
+      ),
+    ).resolves.toMatchObject({ id: 'override-1' });
+    expect(
+      platform.client.subscriptionEntitlementOverride.update,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ actorId: 'platform-user-1' }),
+      }),
+    );
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'SUBSCRIPTION_ENTITLEMENT_OVERRIDE_REVOKED',
       }),
     );
   });

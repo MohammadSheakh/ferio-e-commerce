@@ -67,6 +67,7 @@ describe('organization control-plane DTOs', () => {
   it('accepts explicit closure acknowledgement flags', async () => {
     const dto = plainToInstance(FinalizeClosureDto, {
       retentionAcknowledged: true,
+      exportAttested: true,
       overrideRetentionPeriod: false,
     });
 

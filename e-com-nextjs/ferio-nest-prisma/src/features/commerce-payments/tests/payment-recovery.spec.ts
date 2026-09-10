@@ -33,6 +33,7 @@ describe('payment expiry recovery', () => {
       orders as never,
       {} as never,
       audit as never,
+      {} as never,
     );
 
     await expect(service.expireAttempt('attempt-1')).resolves.toMatchObject({

@@ -1,10 +1,12 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
   Post,
+  Put,
   Query,
   Req,
   UseGuards,
@@ -25,6 +27,7 @@ import { UsageReconciliationService } from '../tenancy/services/usage-reconcilia
 import { RetentionSweepService } from '../tenancy/services/retention-sweep.service';
 import { TenantSchemaBootstrapper } from '../tenancy/services/tenant-schema.bootstrapper';
 import { PlatformOperationsHealthService } from './services/platform-operations-health.service';
+import { SubscriptionsService } from './services/subscriptions.service';
 import {
   PlatformAuthGuard,
   PLATFORM_PERMISSION,
@@ -39,6 +42,7 @@ import {
   ProvisionOrganizationDto,
   TransitionOrganizationDto,
 } from './dto/organization.dto';
+import { SubscriptionEntitlementOverrideDto } from './dto/plan.dto';
 
 /**
  * Minimal Platform Admin API (MT-1 foundation). The full operational UI is
@@ -62,6 +66,7 @@ export class PlatformAdminController {
     private readonly retentionSweep: RetentionSweepService,
     private readonly tenantSchemaBootstrapper: TenantSchemaBootstrapper,
     private readonly operationsHealth: PlatformOperationsHealthService,
+    private readonly subscriptions: SubscriptionsService,
   ) {}
 
   @Post('organizations')
@@ -116,6 +121,38 @@ export class PlatformAdminController {
         cancelAtPeriodEnd: row.cancelAtPeriodEnd,
       })),
     };
+  }
+
+  @Put('organizations/:id/entitlement-overrides/:featureKey')
+  @PlatformPermissions('subscription:write')
+  upsertEntitlementOverride(
+    @Param('id') id: string,
+    @Param('featureKey') featureKey: string,
+    @Body() body: SubscriptionEntitlementOverrideDto,
+    @Req() request: PlatformRequest,
+  ) {
+    return this.subscriptions.upsertEntitlementOverride(id, {
+      featureKey,
+      enabled: body.enabled,
+      limit: body.limit,
+      reason: body.reason,
+      expiresAt: new Date(body.expiresAt),
+      actorId: request.platformPrincipal?.platformUserId,
+    });
+  }
+
+  @Delete('organizations/:id/entitlement-overrides/:featureKey')
+  @PlatformPermissions('subscription:write')
+  revokeEntitlementOverride(
+    @Param('id') id: string,
+    @Param('featureKey') featureKey: string,
+    @Req() request: PlatformRequest,
+  ) {
+    return this.subscriptions.revokeEntitlementOverride(
+      id,
+      featureKey,
+      request.platformPrincipal?.platformUserId,
+    );
   }
 
   /** MT-9 §12.3 — platform invoices with payment outcome at a glance. */
@@ -424,6 +461,7 @@ export class PlatformAdminController {
     return this.closure.finalizeClosure(id, {
       actorId: request.platformPrincipal?.platformUserId,
       retentionAcknowledged: body.retentionAcknowledged === true,
+      exportAttested: body.exportAttested === true,
       overrideRetentionPeriod: body.overrideRetentionPeriod === true,
     });
   }

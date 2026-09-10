@@ -3,6 +3,7 @@ import { AuthGuard, PermissionsGuard, Roles, RolesGuard } from '@app/common';
 import { TenantMembershipGuard } from '../../tenancy/guards/tenant-membership.guard';
 import { assertTenantObjectKey } from '../../tenancy/utils/object-keys.util';
 import type { StorageStrategy } from './strategies/r2.strategy';
+import { PresignPutDto } from './storage.dto';
 
 /**
  * MT-10 storage surface (owner decision #6): presigned direct-to-bucket
@@ -28,20 +29,14 @@ export class StorageController {
   }
 
   @Post('presign-put')
-  async presignPut(
-    @Body()
-    body: {
-      folder: string;
-      filename: string;
-      contentType: string;
-    },
-  ) {
+  async presignPut(@Body() body: PresignPutDto) {
     // The strategy builds the server-side tenant-scoped key; clients cannot
     // rename paths or escape their own prefix.
     return this.strategy.presignPut(
       body.folder ?? 'misc',
       body.filename ?? 'upload.bin',
       body.contentType ?? 'application/octet-stream',
+      body.sizeBytes,
     );
   }
 }

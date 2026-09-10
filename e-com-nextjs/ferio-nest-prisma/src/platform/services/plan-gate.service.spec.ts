@@ -2,6 +2,19 @@ import { ForbiddenException } from '@nestjs/common';
 import { PlanGateService } from './plan-gate.service';
 
 describe('PlanGateService', () => {
+  it('rejects disabled features using the evaluator denial code', async () => {
+    const evaluate = jest.fn().mockResolvedValue({
+      allowed: false,
+      code: 'FEATURE_DISABLED',
+    });
+    const service = new PlanGateService({ evaluate } as never);
+
+    await expect(
+      service.assertFeatureEnabled('org-1', 'online_payments'),
+    ).rejects.toEqual(new ForbiddenException('FEATURE_DISABLED'));
+    expect(evaluate).toHaveBeenCalledWith('org-1', 'online_payments');
+  });
+
   it('delegates staff seats to the shared entitlement evaluator', async () => {
     const evaluate = jest.fn().mockResolvedValue({
       allowed: true,

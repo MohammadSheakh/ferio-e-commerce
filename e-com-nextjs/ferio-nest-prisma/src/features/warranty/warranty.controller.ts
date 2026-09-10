@@ -27,6 +27,7 @@ import {
 } from '@app/common';
 import type { UserPayload } from '@app/common';
 import type { StorageStrategy } from '../storage/strategies/r2.strategy';
+import { assertUploadContent } from '../storage/storage-validation.util';
 import { WarrantyService } from './warranty.service';
 import { CommerceSettingsService } from '../settings/services/commerce-settings.service';
 import {
@@ -78,6 +79,7 @@ export class WarrantyController {
         'Upload at least one JPG, PNG, or WebP image',
       );
     }
+    files.forEach(assertUploadContent);
     const uploaded = await Promise.all(
       files.map((file) => this.upload.uploadFile(file, 'warranty')),
     );

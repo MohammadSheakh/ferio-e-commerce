@@ -93,6 +93,76 @@
         ]
       }
     },
+    "/api/v1/platform/organizations/{id}/entitlement-overrides/{featureKey}": {
+      "put": {
+        "operationId": "PlatformAdminController_upsertEntitlementOverride",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "featureKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubscriptionEntitlementOverrideDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "PlatformAdmin"
+        ]
+      },
+      "delete": {
+        "operationId": "PlatformAdminController_revokeEntitlementOverride",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "featureKey",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "PlatformAdmin"
+        ]
+      }
+    },
     "/api/v1/platform/billing/invoices": {
       "get": {
         "operationId": "PlatformAdminController_listInvoices",
@@ -936,6 +1006,30 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/ManualBillingActionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Platform Billing"
+        ]
+      }
+    },
+    "/api/v1/platform/billing/payment-attempts/recover": {
+      "post": {
+        "operationId": "PlatformBillingController_recoverPaymentAttempts",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecoverPlatformPaymentAttemptsDto"
               }
             }
           }
@@ -3941,6 +4035,16 @@
       "post": {
         "operationId": "StorageController_presignPut",
         "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PresignPutDto"
+              }
+            }
+          }
+        },
         "responses": {
           "201": {
             "description": ""
@@ -4672,6 +4776,63 @@
         ]
       }
     },
+    "/api/v1/admin/transactional-messages/providers": {
+      "get": {
+        "operationId": "TransactionalMessagingController_getProviders",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Admin Transactional Messages"
+        ]
+      }
+    },
+    "/api/v1/admin/transactional-messages/providers/{channel}": {
+      "patch": {
+        "operationId": "TransactionalMessagingController_updateProvider",
+        "parameters": [
+          {
+            "name": "channel",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMessagingProviderConfigDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Admin Transactional Messages"
+        ]
+      }
+    },
     "/api/v1/admin/transactional-messages/templates/{key}": {
       "patch": {
         "operationId": "TransactionalMessagingController_updateTemplate",
@@ -5286,6 +5447,32 @@
             }
           }
         },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Admin Shipping"
+        ]
+      },
+      "delete": {
+        "operationId": "AdminShippingController_revokeProviderConfig",
+        "parameters": [
+          {
+            "name": "code",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": ""
@@ -6999,6 +7186,32 @@
         "tags": [
           "Admin Payments"
         ]
+      },
+      "delete": {
+        "operationId": "AdminCommercePaymentsController_revokeProvider",
+        "parameters": [
+          {
+            "name": "provider",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Admin Payments"
+        ]
       }
     },
     "/api/v1/admin/payments/recovery/queue-health": {
@@ -8090,6 +8303,10 @@
         "type": "object",
         "properties": {}
       },
+      "SubscriptionEntitlementOverrideDto": {
+        "type": "object",
+        "properties": {}
+      },
       "TransitionOrganizationDto": {
         "type": "object",
         "properties": {}
@@ -8143,6 +8360,10 @@
         "properties": {}
       },
       "ManualBillingActionDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "RecoverPlatformPaymentAttemptsDto": {
         "type": "object",
         "properties": {}
       },
@@ -8844,6 +9065,10 @@
         "type": "object",
         "properties": {}
       },
+      "PresignPutDto": {
+        "type": "object",
+        "properties": {}
+      },
       "CheckoutPreviewDto": {
         "type": "object",
         "properties": {}
@@ -8897,6 +9122,10 @@
         "properties": {}
       },
       "ResolveFulfillmentExceptionDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "UpdateMessagingProviderConfigDto": {
         "type": "object",
         "properties": {}
       },

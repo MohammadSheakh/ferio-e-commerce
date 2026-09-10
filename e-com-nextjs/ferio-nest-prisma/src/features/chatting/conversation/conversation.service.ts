@@ -7,8 +7,8 @@ import {
   resolveTenantDatabase,
   TenantDbService,
 } from '../../../tenancy/services/tenant-db.service';
-import { SocketGateway } from '../../socket.gateway/gateway/socket.gateway';
-import { SocketRoomService } from '../../socket.gateway/services/socket-room.service';
+import { SocketGateway } from '../../socket-gateway/gateway/socket.gateway';
+import { SocketRoomService } from '../../socket-gateway/services/socket-room.service';
 import { BULLMQ_NOTIFY_PARTICIPANTS_QUEUE } from '@app/queue';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { ConversationType, ParticipantRole } from './conversation.constant';
@@ -20,6 +20,16 @@ type ConversationMessage = Prisma.MessageGetPayload<{
     sender: { select: { name: true; profileImageUrl: true; role: true } };
   };
 }>;
+
+export function buildDirectConversationLockKey(
+  participantIds: readonly string[],
+): string {
+  const participantKey = [...participantIds].sort().join(':');
+  const organizationId = tryGetTenantContext()?.organizationId;
+  return organizationId
+    ? `${organizationId}:${participantKey}`
+    : participantKey;
+}
 
 @Injectable()
 export class ConversationService {
@@ -59,7 +69,7 @@ export class ConversationService {
         ? ConversationType.GROUP
         : ConversationType.DIRECT;
 
-    const directKey = [...allParticipants].sort().join(':');
+    const directKey = buildDirectConversationLockKey(allParticipants);
     const result = await db.$transaction(async (tx) => {
       // Serialize direct-conversation creation across API instances without
       // adding a second denormalized participant key to the schema.

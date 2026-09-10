@@ -125,8 +125,13 @@ export class RetentionSweepService {
   ): Promise<RetentionSweepReport> {
     const registry = await this.platform.client.tenantDatabase.findUnique({
       where: { organizationId },
+      include: { organization: { select: { status: true } } },
     });
-    if (!registry || registry.status !== 'READY') {
+    if (
+      !registry ||
+      registry.status !== 'READY' ||
+      registry.organization.status !== 'ACTIVE'
+    ) {
       throw new Error(`TENANT_DATABASE_NOT_READY:${organizationId}`);
     }
 
@@ -278,7 +283,10 @@ export class RetentionSweepService {
     totalDeleted: number;
   }> {
     const registries = await this.platform.client.tenantDatabase.findMany({
-      where: { status: 'READY' },
+      where: {
+        status: 'READY',
+        organization: { status: 'ACTIVE' },
+      },
       select: { organizationId: true },
       orderBy: { organizationId: 'asc' },
     });

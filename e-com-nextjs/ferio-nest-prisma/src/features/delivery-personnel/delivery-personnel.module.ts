@@ -5,7 +5,7 @@ import { AuditModule } from '../audit/audit.module';
 import { DeliveryPersonnelController } from './delivery-personnel.controller';
 import { DeliveryPersonnelService } from './delivery-personnel.service';
 import { TenancyModule } from '../../tenancy/tenancy.module';
-import { SocketModule } from '../socket.gateway/socket.module';
+import { SocketModule } from '../socket-gateway/socket.module';
 
 @Module({
   imports: [TenancyModule, PrismaModule, AuthModule, AuditModule, SocketModule],

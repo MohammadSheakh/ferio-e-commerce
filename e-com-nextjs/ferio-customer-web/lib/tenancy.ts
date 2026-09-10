@@ -1,4 +1,5 @@
 import { headers } from "next/headers";
+import { tenantHostFromHeaders } from "@/lib/host-forward";
 
 export type TenantStateCode =
   | "LEGACY"
@@ -22,8 +23,7 @@ export interface TenantStatus {
  */
 export async function getTenantStatus(): Promise<TenantStatus> {
   const headerList = headers();
-  const forwardedHost =
-    headerList.get("x-forwarded-host") ?? headerList.get("host") ?? undefined;
+  const forwardedHost = tenantHostFromHeaders(headerList) ?? undefined;
   if (!forwardedHost) return { code: "LEGACY" };
 
   const backendUrl =

@@ -3,8 +3,16 @@ import { resolve } from 'node:path';
 
 const root = resolve(import.meta.dirname, '..');
 const appModule = await readFile(resolve(root, 'src/app.module.ts'), 'utf8');
+const platformPrisma = await readFile(
+  resolve(root, 'prisma/platform.prisma'),
+  'utf8',
+);
 const platformBilling = await readFile(
   resolve(root, 'src/platform/services/platform-billing.service.ts'),
+  'utf8',
+);
+const dataClassification = await readFile(
+  resolve(root, '../_doc/multi-tenant/data-classification.md'),
   'utf8',
 );
 let mongoModule = '';
@@ -43,6 +51,83 @@ async function listControllerFiles(directory) {
   return files;
 }
 
+async function checkTenantTransactionEntryPoints() {
+  const featureRoot = resolve(root, 'src/features');
+  const files = [];
+
+  async function walk(directory) {
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      const path = resolve(directory, entry.name);
+      if (entry.isDirectory()) {
+        await walk(path);
+      } else if (
+        entry.isFile() &&
+        entry.name.endsWith('.service.ts') &&
+        !entry.name.endsWith('.spec.ts')
+      ) {
+        files.push(path);
+      }
+    }
+  }
+
+  await walk(featureRoot);
+  for (const file of files) {
+    const source = withoutComments(await readFile(file, 'utf8'));
+    if (/\$transaction\s*\(/.test(source) && !/\bdb\s*=\s*await\s+this\.db\(\)/.test(source)) {
+      violations.push(
+        `${file.replace(`${root}/`, '')} uses a transaction without resolving the tenant db client first`,
+      );
+    }
+    for (const line of source.split('\n')) {
+      if (line.includes('$transaction(') && !line.includes('db.$transaction(')) {
+        violations.push(
+          `${file.replace(`${root}/`, '')} must enter tenant transactions through db.$transaction`,
+        );
+        break;
+      }
+    }
+  }
+}
+
+async function checkTenantServiceDatabaseBoundaries() {
+  const featureRoot = resolve(root, 'src/features');
+  const files = [];
+
+  async function walk(directory) {
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      const path = resolve(directory, entry.name);
+      if (entry.isDirectory()) {
+        await walk(path);
+      } else if (
+        entry.isFile() &&
+        entry.name.endsWith('.service.ts') &&
+        !entry.name.endsWith('.spec.ts')
+      ) {
+        files.push(path);
+      }
+    }
+  }
+
+  await walk(featureRoot);
+  for (const file of files) {
+    const source = withoutComments(await readFile(file, 'utf8'));
+    if (!source.includes('PrismaService')) continue;
+
+    const relative = file.replace(`${root}/`, '');
+    if (!source.includes('resolveTenantDatabase')) {
+      violations.push(
+        `${relative} injects PrismaService without the shared tenant database resolver`,
+      );
+    }
+
+    if (/this\.prisma\.(?!poolMetrics\b)[A-Za-z_$][\w$]*/.test(source)) {
+      violations.push(
+        `${relative} performs a direct PrismaService query instead of using its resolved db client`,
+      );
+    }
+  }
+}
+
 async function checkTenantAdminControllerGuards() {
   const featureRoot = resolve(root, 'src/features');
   const controllerFiles = await listControllerFiles(featureRoot);
@@ -65,6 +150,23 @@ async function checkTenantAdminControllerGuards() {
           `${file.replace(`${root}/`, '')} exposes an admin controller without TenantMembershipGuard`,
         );
       }
+    }
+  }
+}
+
+function checkPlatformModelClassification() {
+  const platformModels = [...platformPrisma.matchAll(/\bmodel\s+([A-Za-z0-9_]+)/g)].map(
+    (match) => match[1],
+  );
+  const controlPlaneSection = dataClassification.match(
+    /### New CONTROL_PLANE models[\s\S]*?(?=###|$)/,
+  )?.[0] ?? '';
+
+  for (const model of platformModels) {
+    if (!controlPlaneSection.includes(`\`${model}\``)) {
+      violations.push(
+        `platform Prisma model ${model} is missing from the CONTROL_PLANE classification`,
+      );
     }
   }
 }
@@ -93,6 +195,9 @@ if (
   );
 }
 
+checkPlatformModelClassification();
+await checkTenantTransactionEntryPoints();
+await checkTenantServiceDatabaseBoundaries();
 await checkTenantAdminControllerGuards();
 
 try {

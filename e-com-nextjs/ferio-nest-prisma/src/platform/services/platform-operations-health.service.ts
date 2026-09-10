@@ -1,10 +1,15 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import type { Queue } from 'bullmq';
 import { QUEUE_NAMES } from '@app/queue';
 import { TenantMetrics } from '@app/common';
 import { PlatformPrismaService } from '../platform-prisma.service';
 import { SupportAccessService } from './support-access.service';
+import {
+  BackupEvidenceScope,
+  BackupEvidenceStatus,
+} from '../generated/platform-client';
+import { BackupEvidenceService } from './backup-evidence.service';
 
 type QueueHealth = {
   name: string;
@@ -26,6 +31,7 @@ export class PlatformOperationsHealthService {
     @InjectQueue(QUEUE_NAMES.TRANSACTIONAL_MESSAGE)
     transactionalMessageQueue: Queue,
     @InjectQueue(QUEUE_NAMES.PAYMENT_RECOVERY) paymentRecoveryQueue: Queue,
+    @Optional() private readonly backupEvidenceLedger?: BackupEvidenceService,
   ) {
     this.queues = [
       { name: 'Authentication email', queue: emailQueue },
@@ -48,7 +54,10 @@ export class PlatformOperationsHealthService {
         }),
         this.supportAccess.countActive(),
       ]);
-    const backup = this.backupEvidence();
+    const [backup, centralBackup] = await Promise.all([
+      Promise.resolve(this.backupEvidence()),
+      this.centralBackupEvidence(),
+    ]);
     const metrics = TenantMetrics.snapshot();
     const failedQueues = queues.filter((queue) => !queue.available).length;
     const alerts = [
@@ -63,6 +72,9 @@ export class PlatformOperationsHealthService {
         : []),
       ...(backup.restoreStatus !== 'VERIFIED'
         ? ['Database restore evidence is missing or stale.']
+        : []),
+      ...(centralBackup?.status === 'STALE_OR_FAILED'
+        ? ['Central backup evidence is stale or failed.']
         : []),
     ];
 
@@ -79,6 +91,7 @@ export class PlatformOperationsHealthService {
         tenantDatabases.map((row) => [row.status, row._count._all]),
       ),
       backup,
+      centralBackup,
       support: { activeGrants: activeSupportGrants },
       alerts,
       metrics: {
@@ -143,7 +156,11 @@ export class PlatformOperationsHealthService {
     const restoreVerified =
       lastRestoreAt !== null &&
       Date.now() - lastRestoreAt.getTime() <= 180 * 24 * 60 * 60 * 1000;
-    const status = current ? 'CURRENT' : enabled ? 'STALE_OR_UNPROTECTED' : 'MISSING';
+    const status = current
+      ? 'CURRENT'
+      : enabled
+        ? 'STALE_OR_UNPROTECTED'
+        : 'MISSING';
     const restoreStatus = restoreVerified ? 'VERIFIED' : 'MISSING_OR_STALE';
     TenantMetrics.increment('backup_freshness_observed', {
       status,
@@ -156,6 +173,24 @@ export class PlatformOperationsHealthService {
       protectedStorage,
       lastSuccessAt: lastSuccessAt?.toISOString() ?? null,
       lastRestoreVerifiedAt: lastRestoreAt?.toISOString() ?? null,
+    };
+  }
+
+  private async centralBackupEvidence() {
+    if (!this.backupEvidenceLedger) return null;
+    const latest = await this.backupEvidenceLedger.latest(
+      BackupEvidenceScope.CONTROL_PLANE,
+    );
+    if (!latest) return { status: 'MISSING' as const };
+    const fresh =
+      latest.status === BackupEvidenceStatus.VERIFIED &&
+      Date.now() - latest.completedAt.getTime() <= 25 * 60 * 60 * 1000;
+    return {
+      status: fresh ? ('CURRENT' as const) : ('STALE_OR_FAILED' as const),
+      completedAt: latest.completedAt.toISOString(),
+      restoreVerifiedAt: latest.restoreVerifiedAt?.toISOString() ?? null,
+      artifactName: latest.artifactName,
+      schemaVersion: latest.schemaVersion,
     };
   }
 

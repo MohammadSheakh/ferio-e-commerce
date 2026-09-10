@@ -1374,6 +1374,17 @@ model CommerceMessagingPolicy {
   updatedAt                   DateTime                 @updatedAt
 }
 
+model CommerceMessagingProviderConfig {
+  id                   String               @id @default(cuid())
+  channel              CommerceMessageChannel @unique
+  provider             String
+  credentialCipher     String
+  enabled              Boolean              @default(false)
+  credentialsRotatedAt DateTime?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+}
+
 model CommerceMessageAttempt {
   id                String                       @id @default(cuid())
   attemptNumber     Int

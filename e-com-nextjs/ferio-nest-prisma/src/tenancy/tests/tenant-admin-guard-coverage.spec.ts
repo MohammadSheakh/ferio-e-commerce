@@ -3,7 +3,7 @@ import { TenantMembershipGuard } from '../guards/tenant-membership.guard';
 import { ConversationController } from '../../features/chatting/conversation/conversation.controller';
 import { DeliveryPersonnelController } from '../../features/delivery-personnel/delivery-personnel.controller';
 import { SettingsController } from '../../features/settings/controllers/settings.controller';
-import { SocketAuthController } from '../../features/socket.gateway/controllers/socket-auth.controller';
+import { SocketAuthController } from '../../features/socket-gateway/controllers/socket-auth.controller';
 
 function methodGuards(controller: object, method: string): unknown[] {
   const metadata: unknown = Reflect.getMetadata(

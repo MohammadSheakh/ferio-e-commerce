@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -23,6 +24,7 @@ import type { UserPayload } from '@app/common';
 import {
   TransactionalMessageQueryDto,
   UpdateMessageTemplateDto,
+  UpdateMessagingProviderConfigDto,
   UpdateMessagingPolicyDto,
 } from '../dto/transactional-message.dto';
 import { TransactionalMessagingService } from '../services/transactional-messaging.service';
@@ -53,6 +55,24 @@ export class TransactionalMessagingController {
   @Get('templates')
   getTemplates() {
     return this.messages.getTemplates();
+  }
+
+  @Get('providers')
+  getProviders() {
+    return this.messages.getProviderConfigs();
+  }
+
+  @Patch('providers/:channel')
+  @Permissions(PERMISSIONS.MESSAGING_MANAGE)
+  updateProvider(
+    @Param('channel') channel: 'WHATSAPP' | 'SMS' | 'EMAIL',
+    @Body() dto: UpdateMessagingProviderConfigDto,
+    @User() actor: UserPayload,
+  ) {
+    if (!['WHATSAPP', 'SMS', 'EMAIL'].includes(channel)) {
+      throw new BadRequestException('Unknown messaging channel');
+    }
+    return this.messages.updateProviderConfig(channel, dto, actor);
   }
 
   @Patch('templates/:key')

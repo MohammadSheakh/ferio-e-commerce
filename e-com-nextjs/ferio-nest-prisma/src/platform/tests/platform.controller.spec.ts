@@ -37,6 +37,7 @@ describe('PlatformAdminController dashboard boundaries', () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
     );
 
     await expect(controller.dashboard()).resolves.toEqual({
@@ -68,6 +69,7 @@ describe('PlatformAdminController dashboard boundaries', () => {
       {} as never,
       {} as never,
       operationsHealth as never,
+      {} as never,
     );
 
     await expect(controller.systemHealth()).resolves.toBe(health);

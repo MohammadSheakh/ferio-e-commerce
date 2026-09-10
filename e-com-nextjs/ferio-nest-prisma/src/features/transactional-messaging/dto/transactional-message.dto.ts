@@ -7,6 +7,7 @@ import {
   IsBoolean,
   IsIn,
   IsInt,
+  IsObject,
   IsOptional,
   IsString,
   Max,
@@ -54,6 +55,19 @@ export class TransactionalMessageQueryDto {
 }
 
 const messageChannels = ['WHATSAPP', 'SMS', 'EMAIL'] as const;
+
+export class UpdateMessagingProviderConfigDto {
+  @IsString()
+  @MaxLength(80)
+  provider!: string;
+
+  @IsObject()
+  credentials!: Record<string, string>;
+
+  @IsOptional()
+  @IsBoolean()
+  enabled?: boolean;
+}
 
 export class UpdateMessagingPolicyDto {
   @IsOptional()

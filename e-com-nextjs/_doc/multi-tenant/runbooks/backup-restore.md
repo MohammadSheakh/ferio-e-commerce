@@ -6,6 +6,21 @@
   and dump each tenant DB the same way.
 - Upload dumps to object storage; retain 30 days (PO-012); encrypt at rest.
 
+## Object-storage lifecycle
+
+Apply the tenant-prefix lifecycle rule through a protected operator environment:
+
+```bash
+R2_BUCKET=... R2_ENDPOINT_URL=... \
+  ./scripts/configure-r2-lifecycle.sh 30
+```
+
+The command accepts only the retention period as an argument. AWS-compatible
+credentials must come from the operator's secret-managed environment or CLI
+profile; credentials are never passed on the command line or written to the
+repository. The rule applies only to `tenants/` objects and must be verified
+in the provider console/API after each deployment.
+
 ## Verification job (weekly)
 - `pg_restore --list <file> >/dev/null` per dump — non-zero exit = alert.
 - Record filename/size/checksum as backup evidence rows (MT-12 §15.1).
@@ -18,6 +33,19 @@
 4. Point a throwaway resolver host at the drill DB via TenantDomain +
    registry copy; smoke-test storefront read-only.
 5. Record drill evidence + elapsed time (RTO ≤4h target, PO-012).
+
+## DNS and domain behavior during disaster recovery
+
+- Never repoint a live tenant domain directly to an unverified restore.
+- Restore into a new isolated database, keep the registry unavailable until
+  schema, media, financial, and read-only storefront checks pass, then promote
+  the replacement through the normal control-plane lifecycle.
+- During recovery, keep the original domain disabled or in a pending state if
+  the original tenant is unavailable. Unknown, closed, or not-ready domains
+  must continue to fail closed rather than route to the recovery database.
+- Re-issue or verify TLS at the ingress/provider layer before activation; DNS
+  and certificate changes are operator actions and must be recorded with the
+  restore evidence.
 
 ## Ownership
 Blocked on managed-provider selection (PO-009 follow-up). Until signed off,

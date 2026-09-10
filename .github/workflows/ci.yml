@@ -67,6 +67,16 @@ jobs:
           # Prisma 7 config resolves the datasource URL even for generate;
           # no connection is attempted, so the service container URL suffices.
           DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/postgres
+      - name: Apply tenant migrations
+        run: pnpm prisma:migrate:deploy
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/ferio_ci_test
+      - name: Apply control-plane migrations
+        run: pnpm prisma:migrate:platform
+        env:
+          PLATFORM_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/ferio_ci_test
+      - name: Migration compatibility gate
+        run: pnpm check:migration-compatibility
       - name: Strict typecheck (incl. specs)
         run: pnpm exec tsc --noEmit -p tsconfig.json
       - name: Application lint (read-only)
@@ -100,22 +110,25 @@ jobs:
   dependency-audit:
     name: Dependency audit (backend + web apps)
     runs-on: ubuntu-latest
-    continue-on-error: true # advisory noise tolerated initially; tighten after pilot
     strategy:
       matrix:
         app: [ferio-nest-prisma, ferio-customer-web, ferio-admin-dashboard/ferio-admin, ferio-platform-admin]
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: pnpm
+          cache-dependency-path: e-com-nextjs/${{ matrix.app }}/pnpm-lock.yaml
+      - name: Install dependencies
+        working-directory: e-com-nextjs/${{ matrix.app }}
+        run: pnpm install --frozen-lockfile
       - name: Audit production dependencies (${{ matrix.app }})
-        continue-on-error: true
-        run: |
-          cd ${{ matrix.app }}
-          if command -v pnpm >/dev/null 2>&1; then true; fi
-          npm install -g pnpm@9 >/dev/null 2>&1
-          pnpm audit --prod --audit-level critical
+        working-directory: e-com-nextjs/${{ matrix.app }}
+        run: pnpm audit --prod --audit-level critical
 
   customer-web:
     name: Customer Web — typecheck & build
@@ -135,6 +148,8 @@ jobs:
           cache-dependency-path: e-com-nextjs/ferio-customer-web/pnpm-lock.yaml
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: OpenAPI client drift check
+        run: pnpm api:check
       - name: TypeScript check
         run: pnpm exec tsc --noEmit
       - name: Production build
@@ -160,6 +175,8 @@ jobs:
           cache-dependency-path: e-com-nextjs/ferio-admin-dashboard/ferio-admin/pnpm-lock.yaml
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: OpenAPI client drift check
+        run: pnpm api:check
       - name: TypeScript check
         run: pnpm exec tsc --noEmit
       - name: Production build
@@ -183,6 +200,8 @@ jobs:
           cache-dependency-path: e-com-nextjs/ferio-platform-admin/pnpm-lock.yaml
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: OpenAPI client drift check
+        run: pnpm api:check
       - name: TypeScript check
         run: pnpm exec tsc --noEmit
       - name: Production build

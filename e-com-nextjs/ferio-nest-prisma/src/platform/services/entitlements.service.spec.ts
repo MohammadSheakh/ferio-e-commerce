@@ -21,6 +21,7 @@ describe('EntitlementsService evaluation matrix (ADR-0006)', () => {
       id: 'sub-1',
       status: plan.status,
       plan: { entitlements: plan.entitlements },
+      entitlementOverrides: [],
     });
   }
 
@@ -103,6 +104,71 @@ describe('EntitlementsService evaluation matrix (ADR-0006)', () => {
     expect(
       await service.evaluate('org', 'staff_seats', { requestedCount: 2 }),
     ).toMatchObject({ allowed: false, code: 'PLAN_LIMIT_REACHED' });
+  });
+
+  it('uses an active tenant-specific override before the plan entitlement', async () => {
+    mockSubscription({
+      status: 'ACTIVE',
+      entitlements: [{ featureKey: 'staff_seats', enabled: true, limit: 1 }],
+    });
+    platform.client.subscription.findUnique.mockResolvedValueOnce({
+      id: 'sub-1',
+      status: 'ACTIVE',
+      plan: {
+        entitlements: [{ featureKey: 'staff_seats', enabled: true, limit: 1 }],
+      },
+      entitlementOverrides: [
+        {
+          featureKey: 'staff_seats',
+          enabled: true,
+          limit: 10,
+          revokedAt: null,
+          expiresAt: new Date(Date.now() + 60_000),
+        },
+      ],
+    });
+    usage.getValue.mockResolvedValue(BigInt(5));
+
+    await expect(
+      service.evaluate('org', 'staff_seats', { requestedCount: 1 }),
+    ).resolves.toMatchObject({ allowed: true, limit: 10, currentUsage: '5' });
+  });
+
+  it('ignores expired and revoked tenant-specific overrides', async () => {
+    platform.client.subscription.findUnique.mockResolvedValue({
+      id: 'sub-1',
+      status: 'ACTIVE',
+      plan: {
+        entitlements: [{ featureKey: 'staff_seats', enabled: true, limit: 1 }],
+      },
+      entitlementOverrides: [
+        {
+          featureKey: 'staff_seats',
+          enabled: true,
+          limit: 10,
+          revokedAt: null,
+          expiresAt: new Date(Date.now() - 60_000),
+        },
+        {
+          featureKey: 'custom_domain',
+          enabled: true,
+          limit: null,
+          revokedAt: new Date(),
+          expiresAt: new Date(Date.now() + 60_000),
+        },
+      ],
+    });
+    usage.getValue.mockResolvedValue(BigInt(1));
+
+    await expect(
+      service.evaluate('org', 'staff_seats', { requestedCount: 1 }),
+    ).resolves.toMatchObject({ allowed: false, code: 'PLAN_LIMIT_REACHED' });
+    await expect(
+      service.evaluate('org', 'custom_domain'),
+    ).resolves.toMatchObject({
+      allowed: false,
+      code: 'FEATURE_DISABLED',
+    });
   });
 
   it('compares large limits without converting bigint usage to number', async () => {

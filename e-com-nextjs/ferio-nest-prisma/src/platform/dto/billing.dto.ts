@@ -1,9 +1,12 @@
 import {
   IsIn,
+  IsInt,
   IsISO8601,
   IsOptional,
   IsString,
+  Max,
   MaxLength,
+  Min,
   MinLength,
 } from 'class-validator';
 
@@ -30,6 +33,14 @@ export class ManualBillingActionDto {
   @MinLength(10)
   @MaxLength(500)
   reason!: string;
+}
+
+export class RecoverPlatformPaymentAttemptsDto {
+  @IsOptional()
+  @IsInt()
+  @Min(5)
+  @Max(1440)
+  staleAfterMinutes?: number;
 }
 
 export class PlatformBillingCallbackQueryDto {

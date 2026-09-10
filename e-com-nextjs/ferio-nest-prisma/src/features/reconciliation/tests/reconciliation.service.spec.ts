@@ -2,6 +2,10 @@ import type { UserPayload } from '@app/common';
 import type { PrismaService } from '@app/database';
 import type { AuditService } from '../../audit/services/audit.service';
 import { ReconciliationService } from '../services/reconciliation.service';
+import {
+  getTenantContext,
+  runWithTenantContext,
+} from '../../../tenancy/context/tenant-context';
 
 const actor = { userId: 'admin-1', role: 'admin' } as UserPayload;
 
@@ -32,6 +36,30 @@ function findingCreate(mock: jest.Mock, type: string): FindingCreate {
 }
 
 describe('ReconciliationService', () => {
+  const originalTenancy = process.env.TENANCY_ENABLED;
+
+  afterEach(() => {
+    if (originalTenancy === undefined) delete process.env.TENANCY_ENABLED;
+    else process.env.TENANCY_ENABLED = originalTenancy;
+  });
+
+  const tenantContext = (organizationId: string, databaseName: string) => ({
+    correlationId: `correlation-${organizationId}`,
+    organizationId,
+    tenantDatabaseId: `database-${organizationId}`,
+    database: {
+      id: `database-${organizationId}`,
+      host: 'localhost',
+      port: 5432,
+      databaseName,
+      username: 'tenant',
+      credentialCipher: 'encrypted',
+    },
+    domainId: `domain-${organizationId}`,
+    hostname: `${organizationId}.ferio.test`,
+    subscriptionStatus: 'ACTIVE' as const,
+  });
+
   const completedRun = {
     id: 'run-1',
     reference: 'REC-260811-ABC123',
@@ -193,6 +221,61 @@ describe('ReconciliationService', () => {
       take: 20,
       orderBy: [{ severity: 'desc' }, { lastSeenAt: 'desc' }],
     });
+  });
+
+  it('keeps overlapping reconciliation findings isolated by tenant database', async () => {
+    process.env.TENANCY_ENABLED = 'true';
+    const tenantA = {
+      reconciliationFinding: {
+        findMany: jest.fn().mockResolvedValue([{ id: 'finding-1', domain: 'PAYMENT' }]),
+        count: jest.fn().mockResolvedValue(1),
+      },
+      $transaction: jest.fn((queries: readonly Promise<unknown>[]) =>
+        Promise.all(queries),
+      ),
+    };
+    const tenantB = {
+      reconciliationFinding: {
+        findMany: jest.fn().mockResolvedValue([{ id: 'finding-1', domain: 'REFUND' }]),
+        count: jest.fn().mockResolvedValue(1),
+      },
+      $transaction: jest.fn((queries: readonly Promise<unknown>[]) =>
+        Promise.all(queries),
+      ),
+    };
+    const tenantDb = {
+      getOrLegacy: jest.fn(() =>
+        getTenantContext().database.databaseName === 'tenant_a'
+          ? tenantA
+          : tenantB,
+      ),
+    };
+    const tenantService = new ReconciliationService(
+      prisma as unknown as PrismaService,
+      audit as unknown as AuditService,
+      tenantDb as never,
+    );
+
+    const query = {
+      status: undefined,
+      domain: undefined,
+      severity: undefined,
+      page: 1,
+      limit: 20,
+    };
+    const resultA = await runWithTenantContext(
+      tenantContext('org-a', 'tenant_a'),
+      () => tenantService.list(query),
+    );
+    const resultB = await runWithTenantContext(
+      tenantContext('org-b', 'tenant_b'),
+      () => tenantService.list(query),
+    );
+
+    expect(resultA.items).toEqual([{ id: 'finding-1', domain: 'PAYMENT' }]);
+    expect(resultB.items).toEqual([{ id: 'finding-1', domain: 'REFUND' }]);
+    expect(tenantA.reconciliationFinding.findMany).toHaveBeenCalledTimes(1);
+    expect(tenantB.reconciliationFinding.findMany).toHaveBeenCalledTimes(1);
   });
 
   it('persists detected findings and auto-resolves stale conditions', async () => {
