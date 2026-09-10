@@ -5,6 +5,19 @@ const script = (name: string): string =>
   readFileSync(resolve(__dirname, '../../../scripts', name), 'utf8');
 
 describe('Release 1 backup and restore runbook contracts', () => {
+  it('backs up the control plane through the protected platform URL', () => {
+    const source = script('backup-platform.sh');
+
+    expect(source).toContain('PLATFORM_DATABASE_URL is required');
+    expect(source).toContain('pg_dump --format=custom');
+    expect(source).toContain('--dbname="$PLATFORM_DATABASE_URL"');
+    expect(source).toContain('pg_restore --list "$FILE"');
+    expect(source).toContain('sha256sum -- "$FILE"');
+    expect(source).toContain('$FILE.metadata.json');
+    expect(source).toContain('"platform-control-plane"');
+    expect(source).not.toContain('PGPASSWORD=');
+  });
+
   it('defines a credential-free tenant portability package', () => {
     const source = script('export-tenant.sh');
 

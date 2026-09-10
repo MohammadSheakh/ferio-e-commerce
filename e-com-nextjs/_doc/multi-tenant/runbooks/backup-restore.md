@@ -1,7 +1,10 @@
 # Backup & Restore Runbook (PO-012 aligned — pending provider sign-off)
 
 ## Nightly backups
-- Control plane: `pg_dump --format=custom "$PLATFORM_DATABASE_URL" > control_$(date +%F).dump`
+- Control plane: `PLATFORM_DATABASE_URL=... ./scripts/backup-platform.sh ./backups`.
+  The URL must come from the operator's secret-managed environment; the helper
+  writes a checksum and migration-head metadata sidecar without printing the
+  connection string.
 - Per tenant: enumerate registries (`SELECT "databaseName" FROM "TenantDatabase" WHERE status='READY'`)
   and dump each tenant DB the same way.
 - Upload dumps to object storage; retain 30 days (PO-012); encrypt at rest.
@@ -27,12 +30,15 @@ in the provider console/API after each deployment.
 
 ## Restore drill (quarterly, MUST be rehearsed)
 1. Create scratch database `restore_drill_<date>` on an isolated instance.
-2. `pg_restore --no-owner --role=postgres -d restore_drill_<date> <file>`
+2. `./scripts/restore-tenant.sh <file> restore_drill_<date>` for either a
+   tenant backup or the control-plane backup. The helper requires checksum
+   metadata, refuses an existing target, and stops on the first SQL error.
 3. Assert: `_ferio_tenant_migrations` count matches canonical head;
    spot-check latest Order/Customer counts vs production pre-drill snapshot.
 4. Point a throwaway resolver host at the drill DB via TenantDomain +
    registry copy; smoke-test storefront read-only.
-5. Record drill evidence + elapsed time (RTO ≤4h target, PO-012).
+5. Record drill evidence + elapsed time (RTO ≤4h target, PO-012), including
+   whether the restored dump was control-plane or tenant scope.
 
 ## DNS and domain behavior during disaster recovery
 

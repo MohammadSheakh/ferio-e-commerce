@@ -999,7 +999,7 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 - [ ] Select managed PostgreSQL backup/PITR strategy.
 - [x] Define RPO. (PO-012: recovery point objective is at most 1 hour.)
 - [x] Define RTO. (PO-012: recovery time objective is at most 4 hours.)
-- [ ] Back up control plane.
+- [x] Back up control plane. (2026-09-10 local Docker PostgreSQL drill used `scripts/backup-platform.sh` with `PLATFORM_DATABASE_URL`; checksum and migration-head metadata were written. Managed-provider scheduling/PITR remains open.)
 - [ ] Back up every tenant DB.
 - [x] Track backup evidence/status centrally. (`BackupEvidence` is a control-plane, secret-free ledger with tenant/control-plane scope, checksum, schema-version, completion, protection, and restore-verification fields; `POST /api/v1/platform/operations/backup-evidence` is restricted to Platform Ops and validates bounded evidence before recording it.)
 - [x] Alert on stale/failed backup. (`PlatformOperationsHealthService` evaluates deployment evidence and the central `BackupEvidence` ledger, exposes bounded backup/restore status, and emits safe system-health alerts for missing, stale, or failed evidence; external notification routing remains deployment-owned.)
@@ -1008,8 +1008,8 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 
 ## 15.2 Restore
 
-- [ ] Restore control plane to isolated environment.
-- [ ] Restore one tenant independently.
+- [x] Restore control plane to isolated environment. (2026-09-10 local drill restored `platform_control_plane_20260910T093335Z.dump` into isolated `restore_drill_platform_20260910` and verified the migration ledger plus control-plane registry counts; evidence: `project-progress/2026-09-10-mt12-control-plane-restore-drill.md`.)
+- [x] Restore one tenant independently. (2026-09-10 local drill restored the tenant dump into isolated `restore_drill_20260910` without overwriting the source or another database; evidence: `project-progress/2026-09-10-mt12-local-restore-drill.md`. Managed-provider backup/PITR execution remains open.)
 - [x] Restore tenant without overwriting another. (restore helper requires a new `restore_drill_*` database and refuses an existing target)
 - [x] Verify schema version after restore. (restore helper requires a completed `_prisma_migrations` row and prints the restored migration name)
 - [ ] Verify object/media references.
