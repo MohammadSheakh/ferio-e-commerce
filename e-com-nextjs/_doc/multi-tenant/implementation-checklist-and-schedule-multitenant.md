@@ -1122,10 +1122,10 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 - [ ] Run warranty/service/chat/pickup flow.
 - [ ] Run tenant suspension/reactivation.
 - [x] Run plan upgrade/downgrade. (`test/plan-limit-lifecycle.integration-spec.ts` runs limit enforcement, upgrade unlock, and downgrade data-preservation behavior against a real tenant database.)
-- [ ] Run provisioning retry.
-- [ ] Run tenant migration canary/batch.
+- [x] Run provisioning retry. (`src/platform/services/provisioning.service.spec.ts` exercises raced replay, idempotency ownership rejection, and replay without recreating domains or tenant databases.)
+- [x] Run tenant migration canary/batch. (`src/platform/services/migration-orchestrator.service.spec.ts` exercises canary ordering, bounded batches, transient retry, isolated failure, threshold pause, and resume.)
 - [x] Run tenant backup/restore. (2026-09-10 local PostgreSQL drill backed up `ferio_test_runner`, verified checksum/schema metadata, and restored into isolated `restore_drill_20260910`; evidence: `project-progress/2026-09-10-mt12-local-restore-drill.md` and `project-progress/2026-09-10-mt14-release-gate-reconciliation.md`. Managed-provider scheduling/PITR remains open.)
-- [ ] Run support-access workflow.
+- [x] Run support-access workflow. (`src/platform/services/support-access.service.spec.ts` exercises scoped grant creation, expiry/revocation, usage auditing, exact-organization enforcement, and idempotent revoke.)
 
 ## 17.2 Pilot beta
 
