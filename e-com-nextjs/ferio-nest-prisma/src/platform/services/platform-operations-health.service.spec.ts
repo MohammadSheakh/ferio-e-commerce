@@ -25,9 +25,9 @@ describe('PlatformOperationsHealthService', () => {
         client: {
           $queryRaw: jest.fn().mockResolvedValue([]),
           tenantDatabase: {
-            groupBy: jest.fn().mockResolvedValue([
-              { status: 'READY', _count: { _all: 2 } },
-            ]),
+            groupBy: jest
+              .fn()
+              .mockResolvedValue([{ status: 'READY', _count: { _all: 2 } }]),
           },
         },
         poolMetrics: { totalCount: 2 },
@@ -48,6 +48,7 @@ describe('PlatformOperationsHealthService', () => {
     expect(result.tenantDatabases).toEqual({ READY: 2 });
     expect(result.backup.status).toBe('CURRENT');
     expect(result.backup.restoreStatus).toBe('VERIFIED');
+    expect(result.centralBackup).toBeNull();
     expect(TenantMetrics.snapshot().counters).toContainEqual({
       name: 'backup_freshness_observed',
       labels: { restoreStatus: 'VERIFIED', status: 'CURRENT' },
@@ -62,7 +63,9 @@ describe('PlatformOperationsHealthService', () => {
 
   it('degrades when a queue probe fails without exposing provider errors', async () => {
     const queue = {
-      getJobCounts: jest.fn().mockRejectedValue(new Error('secret queue error')),
+      getJobCounts: jest
+        .fn()
+        .mockRejectedValue(new Error('secret queue error')),
     };
     const service = new PlatformOperationsHealthService(
       {
