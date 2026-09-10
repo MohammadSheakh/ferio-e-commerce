@@ -244,82 +244,90 @@ conditionalDescribe('Two-Tenant End-to-End Vertical Proof', () => {
     };
 
     // ── Identical catalog seeded into BOTH tenants ──
-    for (const tenant of [tA, tB]) {
-      await inTenant(tenant, async () => {
-        const category = await catalog.createCategory(
-          { name: 'Shared Category' } as never,
-          adminActor as never,
-        );
-        await catalog.createProduct(
-          {
-            name: 'Shared Product',
-            description: 'Identical product seeded into every tenant',
-            categoryId: category.id,
-            status: 'ACTIVE',
-            publishedAt: new Date(),
-            variants: [
-              {
-                sku: 'SKU-SHARED',
-                name: 'Default',
-                price: 150000,
-                initialStock: 5,
-              },
-            ],
-          } as never,
-          adminActor as never,
-        );
-      });
-    }
+    await Promise.all(
+      [tA, tB].map((tenant) =>
+        inTenant(tenant, async () => {
+          const category = await catalog.createCategory(
+            { name: 'Shared Category' } as never,
+            adminActor as never,
+          );
+          await catalog.createProduct(
+            {
+              name: 'Shared Product',
+              description: 'Identical product seeded into every tenant',
+              categoryId: category.id,
+              status: 'ACTIVE',
+              publishedAt: new Date(),
+              variants: [
+                {
+                  sku: 'SKU-SHARED',
+                  name: 'Default',
+                  price: 150000,
+                  initialStock: 5,
+                },
+              ],
+            } as never,
+            adminActor as never,
+          );
+        }),
+      ),
+    );
 
     // ── Guest carts: independent tokens per tenant ──
-    for (const tenant of [tA, tB]) {
-      await inTenant(tenant, async () => {
-        const variant = await (
-          await tenantDb.get()
-        ).productVariant.findFirstOrThrow({
-          select: { id: true },
-        });
-        const added = await carts.addItem(
-          { variantId: variant.id, quantity: 2 },
-          undefined,
-        );
-        tenant.token = added.cartToken!;
-      });
-    }
+    await Promise.all(
+      [tA, tB].map((tenant) =>
+        inTenant(tenant, async () => {
+          const variant = await (
+            await tenantDb.get()
+          ).productVariant.findFirstOrThrow({
+            select: { id: true },
+          });
+          const added = await carts.addItem(
+            { variantId: variant.id, quantity: 2 },
+            undefined,
+          );
+          tenant.token = added.cartToken!;
+        }),
+      ),
+    );
     expect(tA.token).toBeTruthy();
     expect(tB.token).toBeTruthy();
 
     // ── Checkout drafts from identical inputs ──
-    for (const tenant of [tA, tB]) {
-      await inTenant(tenant, () =>
-        checkout.preview(
-          {
-            name: 'E2E Customer',
-            phone: '01712345678',
-            district: 'Dhaka',
-            area: 'Gulshan',
-            detailedAddress: 'House 1, Road 1',
-            paymentMethod: 'COD',
-            termsAccepted: true,
-          } as never,
-          tenant.token,
+    await Promise.all(
+      [tA, tB].map((tenant) =>
+        inTenant(tenant, () =>
+          checkout.preview(
+            {
+              name: 'E2E Customer',
+              phone: '01712345678',
+              district: 'Dhaka',
+              area: 'Gulshan',
+              detailedAddress: 'House 1, Road 1',
+              paymentMethod: 'COD',
+              termsAccepted: true,
+            } as never,
+            tenant.token,
+          ),
         ),
-      );
-    }
+      ),
+    );
 
     // ── Place COD orders with the SAME idempotency key ──
-    for (const tenant of [tA, tB]) {
-      await inTenant(tenant, async () => {
-        const confirmation = await orders.placeOrder(
-          'COD',
-          tenant.token,
-          'IDEM-SHARED-ACROSS-TENANTS-0123456789',
-          adminActor as never,
-        );
-        tenant.orderReference = confirmation.reference;
-        tenant.orderId = confirmation.id;
-      });
-    }
+    await Promise.all(
+      [tA, tB].map((tenant) =>
+        inTenant(tenant, async () => {
+          const confirmation = await orders.placeOrder(
+            'COD',
+            tenant.token,
+            'IDEM-SHARED-ACROSS-TENANTS-0123456789',
+            adminActor as never,
+          );
+          tenant.orderReference = confirmation.reference;
+          tenant.orderId = confirmation.id;
+        }),
+      ),
+    );
     expect(tA.orderId).not.toBe(tB.orderId);
 
     // ── Cross-tenant impossibility: references cannot leak ──

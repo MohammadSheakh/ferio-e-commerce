@@ -930,7 +930,7 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 ### MT-10 gate
 
 - [ ] A business owner can receive a tenant, configure it, publish products, receive an order, fulfill it, and see only that business's data.
-- [ ] A second tenant can perform the same flow concurrently with no shared state.
+- [x] A second tenant can perform the same flow concurrently with no shared state. (`test/two-tenant-vertical.integration-spec.ts` now runs catalog, cart, checkout, and COD order placement concurrently against two disposable PostgreSQL databases with identical identifiers, then proves tenant-local confirmation, cart tokens, and rider authorization.)
 
 ---
 
