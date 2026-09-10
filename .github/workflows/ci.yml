@@ -77,6 +77,20 @@ jobs:
           PLATFORM_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/ferio_ci_test
       - name: Migration compatibility gate
         run: pnpm check:migration-compatibility
+      - name: Production operations configuration contracts
+        run: |
+          BACKUP_POLICY_ENV=production \
+          BACKUP_PROVIDER=managed-postgresql \
+          BACKUP_PITR_ENABLED=true \
+          BACKUP_RETENTION_DAYS=30 \
+          BACKUP_RPO_MINUTES=60 \
+          BACKUP_RTO_MINUTES=240 \
+          BACKUP_LOGICAL_SCHEDULE='0 2 * * *' \
+          pnpm check:backup-policy
+          UPLOAD_SECURITY_POLICY_ENV=production \
+          MALWARE_SCANNER_URL=https://scanner.ci.invalid/scan \
+          MALWARE_SCANNER_TIMEOUT_MS=10000 \
+          pnpm check:upload-security
       - name: Strict typecheck (incl. specs)
         run: pnpm exec tsc --noEmit -p tsconfig.json
       - name: Application lint (read-only)
