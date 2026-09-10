@@ -38,16 +38,17 @@ not select a tenant.
    only trusted public edge for customer-web. Never enable it on an origin
    directly reachable by untrusted clients.
 5. Set `TENANT_TRUSTED_PROXY_CIDRS` to the narrow peer CIDR that the NestJS
-   container actually sees for customer-web BFF requests. The base Compose
-   development default is not production evidence; inspect the backend access
-   log or container network before choosing the value.
+   container actually sees for customer-web BFF requests. The current local
+   Compose network inspection reported `172.18.0.0/16`; this is a staging
+   observation, not a permanent production allowlist. Re-check it after
+   recreating the network or changing the Compose project.
 6. Run the overlay without adding or changing any Redis service/configuration:
 
 ```sh
 cd e-com-nextjs
 export PLATFORM_PUBLIC_DOMAIN=ferio.sheakh.qzz.io
 export CUSTOMER_WEB_TRUSTED_PROXY=true
-export TENANT_TRUSTED_PROXY_CIDRS=172.16.0.0/12 # replace with the observed narrow peer range
+export TENANT_TRUSTED_PROXY_CIDRS=172.18.0.0/16 # replace if the Compose subnet changes
 docker compose -f docker-compose.yml -f docker-compose.tunnel-staging.yml up -d --build
 ```
 
