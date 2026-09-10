@@ -377,6 +377,26 @@ conditionalDescribe('Two-Tenant End-to-End Vertical Proof', () => {
         orders.confirmOrder(tA.orderId, {} as never, adminActor as never),
       );
 
+      // The courier handover remains provider-gated, but the warehouse
+      // lifecycle is exercised through the real tenant-scoped OrderService.
+      for (const status of ['PICKING', 'PACKED', 'QUALITY_CHECKED'] as const) {
+        await inTenant(tA, () =>
+          orders.updateFulfillment(
+            tA.orderId,
+            { status } as never,
+            adminActor as never,
+          ),
+        );
+      }
+      const fulfillmentState = await inTenant(tA, () =>
+        orders.getOrder(tA.orderId),
+      );
+      expect(fulfillmentState.fulfillmentStatus).toBe('QUALITY_CHECKED');
+      const foreignFulfillmentState = await inTenant(tB, () =>
+        orders.getOrder(tA.orderId).catch(() => null),
+      );
+      expect(foreignFulfillmentState).toBeNull();
+
       const reservedAfter = await poolA.query(
         `SELECT COALESCE(SUM("reserved"),0)::int AS r FROM "InventoryStock"`,
       );
