@@ -7,6 +7,10 @@ import type { OrderService } from '../../order/order.service';
 import type { AuditService } from '../../audit/services/audit.service';
 import type { PlanGateService } from '../../../platform/services/plan-gate.service';
 import { AdminCommercePaymentsController } from '../controllers/commerce-payments.controller';
+import {
+  getTenantContext,
+  runWithTenantContext,
+} from '../../../tenancy/context/tenant-context';
 import type { UserPayload } from '@app/common';
 
 type PaymentAuditRecord = {
@@ -20,6 +24,30 @@ type PaymentAuditRecord = {
 };
 
 describe('CommercePaymentsService', () => {
+  const originalTenancy = process.env.TENANCY_ENABLED;
+
+  afterEach(() => {
+    if (originalTenancy === undefined) delete process.env.TENANCY_ENABLED;
+    else process.env.TENANCY_ENABLED = originalTenancy;
+  });
+
+  const tenantContext = (organizationId: string, databaseName: string) => ({
+    correlationId: `correlation-${organizationId}`,
+    organizationId,
+    tenantDatabaseId: `database-${organizationId}`,
+    database: {
+      id: `database-${organizationId}`,
+      host: 'localhost',
+      port: 5432,
+      databaseName,
+      username: 'tenant',
+      credentialCipher: 'encrypted',
+    },
+    domainId: `domain-${organizationId}`,
+    hostname: `${organizationId}.ferio.test`,
+    subscriptionStatus: 'ACTIVE' as const,
+  });
+
   const transaction = {
     commercePaymentProviderConfig: {
       findUnique: jest.fn(),
@@ -242,6 +270,66 @@ describe('CommercePaymentsService', () => {
         'credentialCipher',
       );
     });
+  });
+
+  it('reads overlapping payment state from the resolved tenant database only', async () => {
+    process.env.TENANCY_ENABLED = 'true';
+    const tenantA = {
+      order: {
+        findUnique: jest.fn().mockResolvedValue({
+          reference: 'FER-A',
+          status: 'PENDING',
+          paymentStatus: 'UNPAID',
+        }),
+      },
+    };
+    const tenantB = {
+      order: {
+        findUnique: jest.fn().mockResolvedValue({
+          reference: 'FER-B',
+          status: 'CONFIRMED',
+          paymentStatus: 'PAID',
+        }),
+      },
+    };
+    const tenantDb = {
+      getOrLegacy: jest.fn(() =>
+        getTenantContext().database.databaseName === 'tenant_a'
+          ? tenantA
+          : tenantB,
+      ),
+    };
+    const tenantService = new CommercePaymentsService(
+      prisma as unknown as PrismaService,
+      config as unknown as ConfigService,
+      orders as unknown as OrderService,
+      gateways as unknown as PaymentGatewayRegistry,
+      audit as unknown as AuditService,
+      planGate as unknown as PlanGateService,
+      tenantDb as never,
+    );
+
+    const resultA = await runWithTenantContext(
+      tenantContext('org-a', 'tenant_a'),
+      () => tenantService.returnContext('same-order-id'),
+    );
+    const resultB = await runWithTenantContext(
+      tenantContext('org-b', 'tenant_b'),
+      () => tenantService.returnContext('same-order-id'),
+    );
+
+    expect(resultA).toEqual({
+      reference: 'FER-A',
+      status: 'PENDING',
+      paymentStatus: 'UNPAID',
+    });
+    expect(resultB).toEqual({
+      reference: 'FER-B',
+      status: 'CONFIRMED',
+      paymentStatus: 'PAID',
+    });
+    expect(tenantA.order.findUnique).toHaveBeenCalledTimes(1);
+    expect(tenantB.order.findUnique).toHaveBeenCalledTimes(1);
   });
 
   describe('initiate', () => {

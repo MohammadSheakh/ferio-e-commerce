@@ -717,7 +717,7 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 ### MT-7 gate
 
 - [x] Every existing protected commerce controller/service has a documented tenant boundary. (The MT-7 sweep inventory lists every commerce service and the architecture test enforces `TenantMembershipGuard` on protected tenant-admin controllers; identity-plane exceptions remain explicitly documented.)
-- [ ] Automated tests cover at least two tenants for every high-risk financial/identity/real-time module.
+- [x] Automated tests cover at least two tenants for every high-risk financial/identity/real-time module. (Evidence matrix: `_doc/multi-tenant/skill-related-discussion/high-risk-two-tenant-test-matrix.md`; financial coverage includes checkout/COD, payment state/callbacks, wallet, post-purchase records, settlements, and reconciliation; identity and live WebSocket/worker boundaries have overlapping-ID and negative cross-tenant assertions.)
 - [x] No legacy single-store global setting or default tenant DB remains on production request paths. (Production configuration rejects legacy tenancy mode, and tenant-scoped services fail closed before using their explicit compatibility client when the tenant boundary is enabled.)
 
 ---
