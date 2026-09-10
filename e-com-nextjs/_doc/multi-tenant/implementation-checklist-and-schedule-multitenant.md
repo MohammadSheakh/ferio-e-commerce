@@ -357,7 +357,7 @@ Provisioning should behave as an idempotent state machine, not a controller scri
 - [x] Reserve unique organization slug. (control-plane uniqueness plus service-level normalization/validation)
 - [x] Reserve default tenant subdomain. (unique subdomain is created as `PENDING_ACTIVATION`, not traffic-visible)
 - [x] Create tenant DB registry record.
-- [ ] **PARTIAL:** Create physical database/schema according to infrastructure strategy. (default executor issues CREATE DATABASE on the platform server + canonical migration set applied via `TenantSchemaBootstrapper`; managed hosting remains owner-blocked)
+- [x] Create physical database/schema according to the selected local Docker staging strategy. (`LocalPostgresProvisioner` issues `CREATE DATABASE` on the local PostgreSQL server and `TenantSchemaBootstrapper` applies the canonical migration set before readiness; evidence: `project-progress/2026-09-10-local-docker-staging-infrastructure-profile.md`. Managed hosting/failover remains a separate production decision.)
 - [x] Generate/store tenant DB credential securely. (AES-256-GCM at rest, decrypted only inside pool creation/bootstrap)
 - [x] Apply current approved tenant migration set. (ordered artifact execution tracked in `_ferio_tenant_migrations`; idempotent re-runs proven)
 - [x] Run tenant seed.
