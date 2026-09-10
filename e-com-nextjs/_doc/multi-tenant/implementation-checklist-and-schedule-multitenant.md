@@ -1101,7 +1101,7 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 
 ### MT-13 gate
 
-- [ ] Security review finds no known path for tenant A to read/write tenant B data.
+- [x] Security review finds no known path for tenant A to read/write tenant B data. (2026-09-10 application-level review found no tenant-crossing path under the tenancy-enabled request contract; evidence and limitations: `project-progress/2026-09-10-mt13-tenant-isolation-security-review.md`. External penetration testing, provider/ingress review, and legacy fallback removal remain open.)
 - [x] Capacity test demonstrates bounded DB connection behavior. (real PostgreSQL performance baseline plus the connection-budget gate prove bounded client-cache and pool behavior)
 - [x] Critical SaaS metrics and alerts are operational. (Tenant observability emits `tenant_metrics_snapshot` and thresholded `tenant_isolation_alert` events for resolver, database, queue, migration, provisioning, and backup failures; platform operations health exposes queue/database/backup/support alerts and metric freshness. External alert routing and retention remain deployment follow-up.)
 
