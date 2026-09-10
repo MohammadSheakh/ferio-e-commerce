@@ -3,6 +3,7 @@
 # Credentials must come from the AWS CLI environment or a configured profile.
 # Usage: ./scripts/configure-r2-lifecycle.sh [retention-days]
 set -euo pipefail
+umask 077
 
 RETENTION_DAYS="${1:-30}"
 if [[ ! "$RETENTION_DAYS" =~ ^[1-9][0-9]*$ ]]; then

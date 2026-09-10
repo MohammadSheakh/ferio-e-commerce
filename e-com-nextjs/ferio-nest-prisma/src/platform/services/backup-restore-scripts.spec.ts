@@ -109,4 +109,25 @@ describe('Release 1 backup and restore runbook contracts', () => {
     expect(source).not.toContain('R2_SECRET_ACCESS_KEY="$1"');
     expect(source).not.toContain('R2_ACCESS_KEY_ID="$1"');
   });
+
+  it('keeps all backup and export helpers credential-safe at the shell boundary', () => {
+    const scripts = [
+      'backup-platform.sh',
+      'backup-tenant.sh',
+      'export-tenant.sh',
+      'export-tenant-media.sh',
+      'restore-tenant.sh',
+      'verify-tenant-restore.sh',
+      'configure-r2-lifecycle.sh',
+    ];
+
+    for (const name of scripts) {
+      const source = script(name);
+
+      expect(source).toContain('umask 077');
+      expect(source).not.toMatch(/(PASSWORD|SECRET_ACCESS_KEY|DATABASE_URL)=\$[12]/);
+      expect(source).not.toMatch(/(password|secret|credential)[^\n]*(argv|\$[12])/i);
+      expect(source).not.toContain('set -x');
+    }
+  });
 });

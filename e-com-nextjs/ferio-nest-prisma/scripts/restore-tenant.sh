@@ -2,6 +2,7 @@
 # MT-12 restore drill helper — ALWAYS restore into a new isolated database.
 # Usage: ./scripts/restore-tenant.sh <dump-file> <target-database>
 set -euo pipefail
+umask 077
 if [[ $# -ne 2 ]]; then
   echo "usage: $0 <dump-file> <restore_drill_database>" >&2
   exit 64

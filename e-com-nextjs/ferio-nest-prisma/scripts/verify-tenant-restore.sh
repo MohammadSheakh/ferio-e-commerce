@@ -2,6 +2,7 @@
 # MT-12 restore verification helper. Read-only: never changes the target DB.
 # Usage: ./scripts/verify-tenant-restore.sh <restore_drill_database>
 set -euo pipefail
+umask 077
 
 if [[ $# -ne 1 ]]; then
   echo "usage: $0 <restore_drill_database>" >&2

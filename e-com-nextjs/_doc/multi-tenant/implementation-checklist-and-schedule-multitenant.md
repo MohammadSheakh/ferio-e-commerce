@@ -1003,7 +1003,11 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 - [ ] Back up every tenant DB.
 - [x] Track backup evidence/status centrally. (`BackupEvidence` is a control-plane, secret-free ledger with tenant/control-plane scope, checksum, schema-version, completion, protection, and restore-verification fields; `POST /api/v1/platform/operations/backup-evidence` is restricted to Platform Ops and validates bounded evidence before recording it.)
 - [x] Alert on stale/failed backup. (`PlatformOperationsHealthService` evaluates deployment evidence and the central `BackupEvidence` ledger, exposes bounded backup/restore status, and emits safe system-health alerts for missing, stale, or failed evidence; external notification routing remains deployment-owned.)
-- [ ] Protect backup credentials.
+- [x] Protect backup credentials. (Backup/export/restore helpers require
+  operator-provided environment or CLI-profile credentials, never positional
+  passwords/connection strings; they set `umask 077`, avoid shell tracing, and
+  emit only secret-free checksum/schema metadata. Provider secret-manager
+  selection and rotation remain a production deployment gate.)
 - [x] Define retention by plan/legal requirement. (PO-012 sets the initial backup retention to 30 days; legal/plan-specific extensions remain an operations policy follow-up.)
 
 ## 15.2 Restore
