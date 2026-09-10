@@ -13,7 +13,35 @@ Use this workflow when the user explicitly requests a commit, a push, or both.
 2. Review the diff before staging. Preserve unrelated user changes and untracked files.
 3. Stage only files belonging to the current task. Never stage secrets such as `.env` files.
 4. Run relevant validation and report failures honestly; do not hide known test or type-check failures.
-5. Review the staged diff and use a concise Conventional Commit message describing the main change.
+5. Review the staged diff and generate a semantic Conventional Commit message.
+
+## Commit Message
+
+Analyze the diff to determine:
+
+    Type: What kind of change is this?
+    Scope: What area/module is affected?
+    Description: One-line summary of what changed (imperative mood, <72 chars)
+
+The subject must use the Conventional Commits form `type(scope): description`.
+The subject must be followed by a blank line and a concise 2–4 line body that
+explains the important implementation change, reason, and validation performed.
+Use a footer only when the change needs issue, breaking-change, or reviewer
+metadata. Do not create a subject-only commit unless the user explicitly asks
+for a minimal commit message.
+
+## Commit Structure
+
+git commit -m "$(cat <<'EOF'
+<type>(<scope>): <description>
+
+<implementation change and why it matters>
+<validation performed and any important remaining limitation>
+
+<optional footer>
+EOF
+)"
+
 6. Verify the commit was created, then push only the requested current branch to its configured remote.
 7. Verify the final status and report the commit hash, branch, remote, and any remaining changes.
 
