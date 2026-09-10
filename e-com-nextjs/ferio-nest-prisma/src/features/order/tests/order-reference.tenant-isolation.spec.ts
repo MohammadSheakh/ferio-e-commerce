@@ -91,11 +91,11 @@ describe('OrderService tracking tenant isolation', () => {
     expect(orderB.status).toBe('DELIVERED');
     expect(tenantA.order.findUnique).toHaveBeenCalledTimes(1);
     expect(tenantB.order.findUnique).toHaveBeenCalledTimes(1);
-    expect(tenantA.order.findUnique.mock.calls[0][0].where).toEqual({
-      reference: 'FER-260908-SHARED',
-    });
-    expect(tenantB.order.findUnique.mock.calls[0][0].where).toEqual({
-      reference: 'FER-260908-SHARED',
-    });
+    expect(tenantA.order.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { reference: 'FER-260908-SHARED' } }),
+    );
+    expect(tenantB.order.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { reference: 'FER-260908-SHARED' } }),
+    );
   });
 });

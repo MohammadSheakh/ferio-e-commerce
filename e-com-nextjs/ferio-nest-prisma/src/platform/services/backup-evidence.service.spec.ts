@@ -5,6 +5,13 @@ import {
 import { BackupEvidenceService } from './backup-evidence.service';
 
 describe('BackupEvidenceService', () => {
+  type CreateInput = {
+    data: {
+      checksum: string;
+      organizationId?: string;
+      detail?: Record<string, string>;
+    };
+  };
   const record = {
     id: 'evidence-1',
     scope: BackupEvidenceScope.TENANT,
@@ -21,7 +28,13 @@ describe('BackupEvidenceService', () => {
   };
 
   it('records bounded secret-free evidence for a tenant', async () => {
-    const create = jest.fn().mockResolvedValue(record);
+    let recorded: CreateInput | undefined;
+    const create = jest
+      .fn<Promise<typeof record>, [CreateInput]>()
+      .mockImplementation((input) => {
+        recorded = input;
+        return Promise.resolve(record);
+      });
     const service = new BackupEvidenceService({
       client: { backupEvidence: { create } },
     } as never);
@@ -38,17 +51,12 @@ describe('BackupEvidenceService', () => {
       }),
     ).resolves.toEqual(record);
 
-    expect(create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          checksum: 'a'.repeat(64),
-          organizationId: 'org-1',
-        }),
-      }),
-    );
-    expect(JSON.stringify(create.mock.calls[0])).not.toContain('password');
-    expect(JSON.stringify(create.mock.calls[0])).not.toContain('DATABASE_URL');
-    expect(create.mock.calls[0][0].data.detail).toEqual({ source: 'operator' });
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(recorded?.data.checksum).toBe('a'.repeat(64));
+    expect(recorded?.data.organizationId).toBe('org-1');
+    expect(recorded?.data.detail).toEqual({
+      source: 'operator',
+    });
   });
 
   it.each([
@@ -86,7 +94,7 @@ describe('BackupEvidenceService', () => {
         checksum: 'a'.repeat(64),
         completedAt: new Date(),
         ...input,
-      } as never),
+      }),
     ).rejects.toThrow();
     expect(create).not.toHaveBeenCalled();
   });

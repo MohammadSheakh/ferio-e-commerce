@@ -38,14 +38,21 @@ describe('TenantFanoutService (MT-8 §11.2)', () => {
       client: {
         tenantDatabase: {
           findMany,
-          findUnique: jest.fn().mockImplementation(({ where }) => {
-            const found = registries.find(
-              ({ organizationId }) => organizationId === where.organizationId,
-            );
-            return Promise.resolve(
-              found ? { ...found, organization: { status: 'ACTIVE' } } : null,
-            );
-          }),
+          findUnique: jest
+            .fn()
+            .mockImplementation(
+              ({ where }: { where: { organizationId: string } }) => {
+                const found = registries.find(
+                  ({ organizationId }) =>
+                    organizationId === where.organizationId,
+                );
+                return Promise.resolve(
+                  found
+                    ? { ...found, organization: { status: 'ACTIVE' } }
+                    : null,
+                );
+              },
+            ),
         },
       },
     };
