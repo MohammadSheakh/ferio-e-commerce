@@ -42,7 +42,8 @@
     "openapi:export": "TS_NODE_FILES=true OPENAPI_EXPORT=1 ts-node -r tsconfig-paths/register src/main.ts",
     "openapi:check": "tmp=$(mktemp) && trap 'rm -f \"$tmp\"' EXIT && OPENAPI_OUTPUT=\"$tmp\" pnpm openapi:export >/dev/null && cmp -s \"$tmp\" openapi.json",
     "storage:smoke": "node scripts/storage-smoke.mjs",
-    "tenant:export": "./scripts/export-tenant.sh"
+    "tenant:export": "./scripts/export-tenant.sh",
+    "tenant:export:media": "./scripts/export-tenant-media.sh"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1118.0",

@@ -1023,7 +1023,7 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 - [x] Define export package. (`runbooks/tenant-export.md` defines the `ferio-tenant-export-v1` package, manifest, checksum, scope, and media exclusion.)
 - [x] Export tenant business data. (`scripts/export-tenant.sh` creates a verified custom-format dump from a trusted tenant database name.)
 - [x] Export audit/financial data according to policy. (The tenant export package includes tenant-local business, audit, and financial records; platform audit/control-plane records remain a separate platform export concern.)
-- [ ] Export media where required.
+- [x] Export media where required. (`scripts/export-tenant-media.sh` creates a private, checksum-backed R2 media sidecar from the trusted registry organization ID and a server-derived `tenants/{organizationId}/` prefix; automatic closure orchestration remains separate.)
 - [x] Revoke domains safely. (`TenantClosureService.initiateClosure` disables every domain at CLOSURE_PENDING — takeover/reassignment designed out)
 - [x] Revoke integration credentials. (Tenant payment and courier admin routes delete the encrypted provider configuration in a tenant transaction, disable courier activation, and append secret-free audit evidence; repeated revocation is idempotent.)
 - [ ] **PARTIAL:** Stop scheduled jobs. (tenant fan-out and retention sweeps select only READY databases owned by ACTIVE organizations; explicit queued-job revocation sweep remains pending)

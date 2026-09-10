@@ -16,9 +16,11 @@ version for an owner or controlled support export.
   inclusion status;
 - `README.txt`: human-readable package marker and checksum.
 
-The package does not include media blobs. Media references remain in the
-database, while object-storage export requires a separate provider-approved
-workflow and is still an open Release 1 operational control.
+The package does not include media blobs by default. Media references remain in
+the database. When portability requires media, the trusted operator must
+create a media sidecar with `scripts/export-tenant-media.sh`; it records the
+exact tenant prefix, provider object-key listing, downloaded files, and
+checksums.
 
 ## Safety Rules
 
@@ -39,6 +41,10 @@ workflow and is still an open Release 1 operational control.
 
 ```bash
 ./scripts/export-tenant.sh <trusted-database-name> [private-output-dir]
+
+# Optional media sidecar, using a trusted organization ID from the registry.
+R2_BUCKET=... R2_ENDPOINT_URL=... \
+  ./scripts/export-tenant-media.sh <trusted-organization-id> [private-output-dir]
 ```
 
 The command accepts only a PostgreSQL identifier-shaped database name. It
@@ -53,5 +59,5 @@ they cannot enumerate or delete another tenant's objects or legacy objects.
 
 The package is available before closure, but Release 1 does not yet automate
 provider-backed media export, credential revocation, or mandatory export
-attestation inside `TenantClosureService`. Those controls remain tracked
-separately and must not be inferred from the existence of this helper.
+attestation inside `TenantClosureService`. The media sidecar is a controlled
+operator step and must not be inferred as automatic closure orchestration.
