@@ -82,6 +82,8 @@ export class TenantClosureService {
       actorId?: string;
       /** Confirms export/legal steps are done. */
       retentionAcknowledged?: boolean;
+      /** Confirms the controlled tenant export package was completed. */
+      exportAttested?: boolean;
       /** Explicit early-destruction override inside the 90-day window. */
       overrideRetentionPeriod?: boolean;
     },
@@ -97,6 +99,17 @@ export class TenantClosureService {
     if (options.retentionAcknowledged !== true) {
       throw new ConflictException('CLOSURE_CONFIRMATION_REQUIRED');
     }
+    if (options.exportAttested !== true) {
+      throw new ConflictException('TENANT_EXPORT_ATTESTATION_REQUIRED');
+    }
+
+    await this.audit.record({
+      action: 'TENANT_EXPORT_ATTESTED',
+      entityType: 'Organization',
+      entityId: organizationId,
+      actorId: options.actorId,
+      metadata: { retentionAcknowledged: true },
+    });
 
     // PO-013: a 90-day recoverable period runs from the CLOSURE_PENDING
     // transition. Finalizing inside the window requires an explicit

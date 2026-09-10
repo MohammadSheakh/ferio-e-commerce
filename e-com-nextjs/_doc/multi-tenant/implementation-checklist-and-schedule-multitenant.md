@@ -395,7 +395,7 @@ Provisioning should behave as an idempotent state machine, not a controller scri
 - [x] Implement archived/deleted lifecycle according to retention policy. (`CLOSED` then `ARCHIVED`; physical destruction remains provider/retention controlled)
 - [x] Define which public/storefront operations remain visible during subscription suspension. (browsable storefront, commerce writes denied by policy)
 - [x] Prevent destructive deletion while legal/financial retention applies. (90-day closure retention gate with explicit audited override)
-- [ ] Add export-before-closure workflow if required.
+- [x] Add export-before-closure workflow if required. (Finalize closure requires explicit `exportAttested` and `retentionAcknowledged` confirmations; the service records `TENANT_EXPORT_ATTESTED` before retiring tenant registries, while the controlled database/media export remains an operator step.)
 
 ## 7.4 Provisioning operations UI
 

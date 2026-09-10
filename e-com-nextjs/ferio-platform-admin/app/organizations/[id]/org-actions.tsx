@@ -83,8 +83,12 @@ export function OrgActions({ organizationId, status }: { organizationId: string;
           style={{ background: "#111114" }}
           disabled={working !== null}
           onClick={() => {
+            if (!window.confirm("Confirm the tenant export package and required media sidecar are complete, retained, and encrypted.")) return;
             if (!window.confirm("Finalize closure? The tenant database registry will be retired and the storefront becomes unreachable. This honors the retention window.")) return;
-            void call("Finalize closure", `/platform/organizations/${organizationId}/closure/finalize`, {});
+            void call("Finalize closure", `/platform/organizations/${organizationId}/closure/finalize`, {
+              retentionAcknowledged: true,
+              exportAttested: true,
+            });
           }}
         >
           Finalize closure

@@ -68,6 +68,9 @@ export class FinalizeClosureDto {
   @IsBoolean()
   retentionAcknowledged!: boolean;
 
+  @IsBoolean()
+  exportAttested!: boolean;
+
   @IsOptional()
   @IsBoolean()
   overrideRetentionPeriod?: boolean;

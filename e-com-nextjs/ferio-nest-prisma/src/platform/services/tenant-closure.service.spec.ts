@@ -80,7 +80,10 @@ describe('TenantClosureService (PO-013)', () => {
   it('refuses finalization inside the 90-day recoverable window without override', async () => {
     const built = build(10); // closed 10 days ago
     const failure = await built.service
-      .finalizeClosure('org-1', { retentionAcknowledged: true })
+      .finalizeClosure('org-1', {
+        retentionAcknowledged: true,
+        exportAttested: true,
+      })
       .catch((error: unknown) => error);
     expect(failure).toBeInstanceOf(Error);
     expect(failure instanceof Error ? failure.message : '').toContain(
@@ -93,6 +96,7 @@ describe('TenantClosureService (PO-013)', () => {
     const built = build(91);
     await built.service.finalizeClosure('org-1', {
       retentionAcknowledged: true,
+      exportAttested: true,
     });
 
     // tdb-1 retires; tdb-2 was already retired and is skipped.
@@ -109,9 +113,12 @@ describe('TenantClosureService (PO-013)', () => {
   it('requires explicit retention confirmation after the recoverable window', async () => {
     const built = build(91);
 
-    await expect(built.service.finalizeClosure('org-1', {})).rejects.toThrow(
-      'CLOSURE_CONFIRMATION_REQUIRED',
-    );
+    await expect(
+      built.service.finalizeClosure('org-1', { exportAttested: true }),
+    ).rejects.toThrow('CLOSURE_CONFIRMATION_REQUIRED');
+    await expect(
+      built.service.finalizeClosure('org-1', { retentionAcknowledged: true }),
+    ).rejects.toThrow('TENANT_EXPORT_ATTESTATION_REQUIRED');
     expect(built.platform.client.tenantDatabase.update).not.toHaveBeenCalled();
   });
 
@@ -120,6 +127,7 @@ describe('TenantClosureService (PO-013)', () => {
     await expect(
       built.service.finalizeClosure('org-1', {
         retentionAcknowledged: true,
+        exportAttested: true,
         overrideRetentionPeriod: true,
       }),
     ).resolves.toBeUndefined();

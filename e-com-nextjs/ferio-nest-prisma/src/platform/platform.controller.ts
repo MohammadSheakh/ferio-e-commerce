@@ -461,6 +461,7 @@ export class PlatformAdminController {
     return this.closure.finalizeClosure(id, {
       actorId: request.platformPrincipal?.platformUserId,
       retentionAcknowledged: body.retentionAcknowledged === true,
+      exportAttested: body.exportAttested === true,
       overrideRetentionPeriod: body.overrideRetentionPeriod === true,
     });
   }
