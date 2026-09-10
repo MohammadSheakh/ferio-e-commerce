@@ -5,8 +5,12 @@
   The URL must come from the operator's secret-managed environment; the helper
   writes a checksum and migration-head metadata sidecar without printing the
   connection string.
-- Per tenant: enumerate registries (`SELECT "databaseName" FROM "TenantDatabase" WHERE status='READY'`)
-  and dump each tenant DB the same way.
+- Tenant fleet: `PLATFORM_DATABASE_URL=... PGSERVICE=... ./scripts/backup-tenant-fleet.sh ./backups`.
+  The helper enumerates only ACTIVE organizations with READY tenant registries
+  from the control plane, then invokes `backup-tenant.sh` once per database and
+  writes artifacts under the organization ID. `PGSERVICE` must resolve through
+  the operator's protected PostgreSQL service profile; credentials are never
+  passed as arguments or read from tenant rows by the shell helper.
 - Upload dumps to object storage; retain 30 days (PO-012); encrypt at rest.
 
 ## Object-storage lifecycle

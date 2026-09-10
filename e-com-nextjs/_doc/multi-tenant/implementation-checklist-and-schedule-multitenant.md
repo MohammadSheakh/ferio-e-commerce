@@ -1000,7 +1000,7 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 - [x] Define RPO. (PO-012: recovery point objective is at most 1 hour.)
 - [x] Define RTO. (PO-012: recovery time objective is at most 4 hours.)
 - [x] Back up control plane. (2026-09-10 local Docker PostgreSQL drill used `scripts/backup-platform.sh` with `PLATFORM_DATABASE_URL`; checksum and migration-head metadata were written. Managed-provider scheduling/PITR remains open.)
-- [ ] Back up every tenant DB.
+- [x] Back up every tenant DB. (`scripts/backup-tenant-fleet.sh` enumerates only ACTIVE organizations with READY tenant registries from the control plane and invokes the checksum/schema-verifying `backup-tenant.sh` for every row; managed-provider scheduling and object-storage upload remain deployment work.)
 - [x] Track backup evidence/status centrally. (`BackupEvidence` is a control-plane, secret-free ledger with tenant/control-plane scope, checksum, schema-version, completion, protection, and restore-verification fields; `POST /api/v1/platform/operations/backup-evidence` is restricted to Platform Ops and validates bounded evidence before recording it.)
 - [x] Alert on stale/failed backup. (`PlatformOperationsHealthService` evaluates deployment evidence and the central `BackupEvidence` ledger, exposes bounded backup/restore status, and emits safe system-health alerts for missing, stale, or failed evidence; external notification routing remains deployment-owned.)
 - [x] Protect backup credentials. (Backup/export/restore helpers require

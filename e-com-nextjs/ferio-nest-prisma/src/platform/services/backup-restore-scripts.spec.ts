@@ -44,6 +44,20 @@ describe('Release 1 backup and restore runbook contracts', () => {
     expect(source).toContain('^[0-9]{14}_[A-Za-z0-9_-]+$');
   });
 
+  it('backs up every active ready tenant through the registry fleet helper', () => {
+    const source = script('backup-tenant-fleet.sh');
+
+    expect(source).toContain('PLATFORM_DATABASE_URL is required');
+    expect(source).toContain('PGSERVICE is required');
+    expect(source).toContain('FROM "TenantDatabase"');
+    expect(source).toContain("t.status = '\\''READY'\\''");
+    expect(source).toContain("o.status = '\\''ACTIVE'\\''");
+    expect(source).toContain('backup-tenant.sh');
+    expect(source).toContain('tenant_backups_written');
+    expect(source).toContain('no active READY tenant databases found');
+    expect(source).not.toContain('PGPASSWORD=');
+  });
+
   it('exports only a trusted tenant media prefix with checksums', () => {
     const source = script('export-tenant-media.sh');
 
@@ -114,6 +128,7 @@ describe('Release 1 backup and restore runbook contracts', () => {
     const scripts = [
       'backup-platform.sh',
       'backup-tenant.sh',
+      'backup-tenant-fleet.sh',
       'export-tenant.sh',
       'export-tenant-media.sh',
       'restore-tenant.sh',
@@ -125,8 +140,12 @@ describe('Release 1 backup and restore runbook contracts', () => {
       const source = script(name);
 
       expect(source).toContain('umask 077');
-      expect(source).not.toMatch(/(PASSWORD|SECRET_ACCESS_KEY|DATABASE_URL)=\$[12]/);
-      expect(source).not.toMatch(/(password|secret|credential)[^\n]*(argv|\$[12])/i);
+      expect(source).not.toMatch(
+        /(PASSWORD|SECRET_ACCESS_KEY|DATABASE_URL)=\$[12]/,
+      );
+      expect(source).not.toMatch(
+        /(password|secret|credential)[^\n]*(argv|\$[12])/i,
+      );
       expect(source).not.toContain('set -x');
     }
   });
