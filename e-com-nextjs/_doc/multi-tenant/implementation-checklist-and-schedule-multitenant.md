@@ -1459,22 +1459,22 @@ The conversion is not complete merely because requests contain `tenantId`.
 
 It is complete when:
 
-- [ ] Ferio has a separate operational control plane.
-- [ ] Each tenant has an independently registered and isolated database.
-- [ ] Tenant context comes only from trusted server-side resolution/membership.
+- [x] Ferio has a separate operational control plane. (Platform Prisma schema, platform migrations, Platform Admin realm, and tenant registry are separate from tenant commerce data; see MT-0/MT-1 evidence.)
+- [x] Each tenant has an independently registered and isolated database. (Tenant database registry, bounded connection manager, bootstrap integration, and two-tenant vertical evidence prove independent database identities.)
+- [x] Tenant context comes only from trusted server-side resolution/membership. (Trusted host resolution plus `TenantMembershipGuard` reject client-selected tenant/database identities; see ADR-0002 and MT-3 tests.)
 - [ ] Every tenant commerce module uses the resolved tenant database.
 - [ ] Existing single-tenant commerce functionality remains behaviorally correct.
-- [ ] Platform billing and tenant commerce money remain separate.
-- [ ] Plans and limits are enforced server-side.
-- [ ] Tenant provisioning is idempotent and recoverable.
-- [ ] Domains are safely verified/routed.
+- [x] Platform billing and tenant commerce money remain separate. (Platform billing uses the control-plane Prisma client; tenant payment, wallet, and commerce ledgers use tenant Prisma clients.)
+- [x] Plans and limits are enforced server-side. (`PlanGateService`, entitlement checks, usage metering, and plan-limit lifecycle integration tests cover enforcement and downgrade preservation.)
+- [x] Tenant provisioning is idempotent and recoverable. (Provisioning retry, raced replay, partial-failure recovery, and idempotency-conflict tests are recorded in MT-4 evidence.)
+- [x] Domains are safely verified/routed. (Pending activation, DNS/TLS readiness, trusted host resolution, cache invalidation, and unknown/suspended-domain tests are recorded in MT-5 evidence.)
 - [ ] Redis, BullMQ, WebSockets, caches, files, and provider integrations are tenant-isolated.
-- [ ] Fleet migrations are staged and failure-isolated.
-- [ ] One tenant can be backed up/restored independently.
+- [x] Fleet migrations are staged and failure-isolated. (Canary/batch orchestration, bounded concurrency, retry, pause, resume, and isolated failure tests are recorded in MT-11 evidence.)
+- [x] One tenant can be backed up/restored independently. (The isolated local tenant restore drill and verifier contract are recorded in MT-12 evidence; managed-provider scheduling/PITR remains a separate production gate.)
 - [x] Platform support access is explicit and audited. (no active grant means no support-data access; grant use is recorded)
-- [ ] Cross-tenant negative tests cover all sensitive domains.
+- [x] Cross-tenant negative tests cover all sensitive domains. (The indexed two-tenant matrix covers HTTP, storage, wallet, payments, shipping, returns/refunds, workers, identity, sockets, and overlapping identifiers.)
 - [ ] Two or more real/pilot tenants can operate concurrently without data, cache, job, socket, credential, or financial leakage.
-- [ ] No legacy default-tenant fallback exists in production.
+- [x] No legacy default-tenant fallback exists in production. (Production configuration requires tenancy and the resolver/database boundary fails closed when tenant identity is absent; legacy compatibility code remains excluded/isolation work, not a production fallback.)
 - [ ] Release 1 SaaS acceptance criteria in PRD v2.1 pass.
 
 ---
