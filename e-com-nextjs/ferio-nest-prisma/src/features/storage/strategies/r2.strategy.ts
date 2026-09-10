@@ -1,8 +1,14 @@
-import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import {
   S3Client,
   PutObjectCommand,
   GetObjectCommand,
+  HeadObjectCommand,
   DeleteObjectCommand,
   DeleteObjectsCommand,
   ListObjectsV2Command,
@@ -34,6 +40,11 @@ export interface StorageStrategy {
     contentType: string,
     sizeBytes: number,
   ): Promise<{ key: string; url: string }>;
+  inspectUploadedObject(
+    key: string,
+    contentType: string,
+    sizeBytes: number,
+  ): Promise<{ key: string; contentType: string; sizeBytes: number }>;
   listTenantObjectKeys(): Promise<readonly string[]>;
   deleteTenantObjects(): Promise<{ deleted: number }>;
 }
@@ -254,6 +265,64 @@ export class R2Strategy implements StorageStrategy {
       { expiresIn: this.presignExpiresSeconds },
     );
     return { key, url };
+  }
+
+  /**
+   * Verify the object that arrived through a direct PUT before it is used by
+   * the application. Presigning validates client intent; this validates the
+   * stored object's metadata and magic bytes under the tenant namespace.
+   */
+  async inspectUploadedObject(
+    key: string,
+    contentType: string,
+    sizeBytes: number,
+  ): Promise<{ key: string; contentType: string; sizeBytes: number }> {
+    assertTenantObjectKey(key);
+    const head = await this.s3Client.send(
+      new HeadObjectCommand({ Bucket: this.bucket, Key: key }),
+    );
+    const actualContentType = head.ContentType;
+    const actualSize = head.ContentLength;
+    if (
+      actualContentType !== contentType ||
+      actualSize !== sizeBytes ||
+      actualSize === undefined
+    ) {
+      throw new BadRequestException('STORAGE_OBJECT_METADATA_MISMATCH');
+    }
+
+    const object = await this.s3Client.send(
+      new GetObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+        Range: 'bytes=0-15',
+      }),
+    );
+    if (!object.Body) {
+      throw new ServiceUnavailableException('STORAGE_OBJECT_BODY_MISSING');
+    }
+    const prefix = Buffer.from(await object.Body.transformToByteArray());
+    const signatureMatches =
+      (contentType === 'image/jpeg' &&
+        prefix.length >= 3 &&
+        prefix.subarray(0, 3).equals(Buffer.from([0xff, 0xd8, 0xff]))) ||
+      (contentType === 'image/png' &&
+        prefix.length >= 8 &&
+        prefix
+          .subarray(0, 8)
+          .equals(
+            Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+          )) ||
+      (contentType === 'image/webp' &&
+        prefix.length >= 12 &&
+        prefix.subarray(0, 4).toString('ascii') === 'RIFF' &&
+        prefix.subarray(8, 12).toString('ascii') === 'WEBP') ||
+      (contentType === 'application/pdf' &&
+        prefix.subarray(0, 5).toString('ascii') === '%PDF-');
+    if (!signatureMatches) {
+      throw new BadRequestException('STORAGE_OBJECT_CONTENT_MISMATCH');
+    }
+    return { key, contentType, sizeBytes: actualSize };
   }
 
   /**

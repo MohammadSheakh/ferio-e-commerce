@@ -3,7 +3,7 @@ import { AuthGuard, PermissionsGuard, Roles, RolesGuard } from '@app/common';
 import { TenantMembershipGuard } from '../../tenancy/guards/tenant-membership.guard';
 import { assertTenantObjectKey } from '../../tenancy/utils/object-keys.util';
 import type { StorageStrategy } from './strategies/r2.strategy';
-import { PresignPutDto } from './storage.dto';
+import { FinalizePutDto, PresignPutDto } from './storage.dto';
 
 /**
  * MT-10 storage surface (owner decision #6): presigned direct-to-bucket
@@ -36,6 +36,16 @@ export class StorageController {
       body.folder ?? 'misc',
       body.filename ?? 'upload.bin',
       body.contentType ?? 'application/octet-stream',
+      body.sizeBytes,
+    );
+  }
+
+  @Post('finalize-put')
+  async finalizePut(@Body() body: FinalizePutDto) {
+    assertTenantObjectKey(body.key);
+    return this.strategy.inspectUploadedObject(
+      body.key,
+      body.contentType,
       body.sizeBytes,
     );
   }

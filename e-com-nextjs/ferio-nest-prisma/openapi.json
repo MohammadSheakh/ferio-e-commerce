@@ -4055,6 +4055,30 @@
         ]
       }
     },
+    "/api/v1/admin/storage/finalize-put": {
+      "post": {
+        "operationId": "StorageController_finalizePut",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FinalizePutDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Storage"
+        ]
+      }
+    },
     "/api/v1/checkout/delivery-options": {
       "get": {
         "operationId": "PublicCheckoutController_getDeliveryOptions",
@@ -9066,6 +9090,10 @@
         "properties": {}
       },
       "PresignPutDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "FinalizePutDto": {
         "type": "object",
         "properties": {}
       },

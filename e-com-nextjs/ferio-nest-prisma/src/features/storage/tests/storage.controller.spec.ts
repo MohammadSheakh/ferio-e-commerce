@@ -88,4 +88,40 @@ describe('StorageController tenant object access', () => {
       1024,
     );
   });
+
+  it('rejects a finalize request for another tenant before object inspection', async () => {
+    process.env.TENANCY_ENABLED = 'true';
+    const inspectUploadedObject = jest.fn();
+    const controller = new StorageController({
+      inspectUploadedObject,
+    } as never);
+
+    await expect(
+      runWithTenantContext(
+        {
+          correlationId: 'correlation-a',
+          organizationId: 'org-a',
+          tenantDatabaseId: 'database-a',
+          database: {
+            id: 'database-a',
+            host: 'localhost',
+            port: 5432,
+            databaseName: 'tenant_a',
+            username: 'tenant',
+            credentialCipher: 'encrypted',
+          },
+          domainId: 'domain-a',
+          hostname: 'a.ferio.test',
+          subscriptionStatus: 'ACTIVE' as const,
+        },
+        () =>
+          controller.finalizePut({
+            key: 'tenants/org-b/products/image.png',
+            contentType: 'image/png',
+            sizeBytes: 1024,
+          }),
+      ),
+    ).rejects.toThrow('STORAGE_KEY_FORBIDDEN');
+    expect(inspectUploadedObject).not.toHaveBeenCalled();
+  });
 });
