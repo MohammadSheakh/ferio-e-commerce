@@ -1152,7 +1152,7 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 - [x] Platform Admin support access is audited and constrained. (reason-bound, time-bound, organization/user-scoped, revocable, and usage-audited)
 - [x] No production request path can fall back to the original single-tenant DB. (The production configuration gate requires tenancy and the shared resolver rejects missing tenant context instead of returning the legacy Prisma client.)
 - [ ] Critical/high security findings are closed or formally accepted.
-- [ ] Operational runbooks are complete.
+- [x] Operational runbooks are complete. (`runbooks/README.md` indexes the provisioning, domain, migration, backup/restore, and tenant-export procedures with owners, evidence requirements, safety rules, and explicit provider-gated boundaries.)
 
 ---
 
