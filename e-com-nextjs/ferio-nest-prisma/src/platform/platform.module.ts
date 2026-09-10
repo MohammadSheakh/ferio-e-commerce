@@ -35,6 +35,7 @@ import { PlatformFeatureFlagsController } from './platform-feature-flags.control
 import { BackupEvidenceController } from './backup-evidence.controller';
 import { BackupEvidenceService } from './services/backup-evidence.service';
 import { LocalPostgresProvisioner } from './services/local-postgres-provisioner';
+import { DomainReadinessService } from './services/domain-readiness.service';
 import {
   PlatformBillingCallbackController,
   PlatformBillingController,
@@ -93,6 +94,7 @@ import {
     PlatformOperationsHealthService,
     PlatformFeatureFlagsService,
     BackupEvidenceService,
+    DomainReadinessService,
     {
       provide: 'TENANT_DB_PROVISIONER',
       useExisting: LocalPostgresProvisioner,
