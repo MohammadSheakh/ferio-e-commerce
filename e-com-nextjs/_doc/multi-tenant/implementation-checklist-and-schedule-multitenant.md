@@ -1020,9 +1020,9 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 ## 15.3 Tenant export/closure
 
 - [x] Approve retention/deletion policy. (PO-013 approves a 90-day recoverable closure window, followed by deletion only when legal/financial retention permits; the closure service enforces the window and requires explicit acknowledgement.)
-- [ ] Define export package.
-- [ ] Export tenant business data.
-- [ ] Export audit/financial data according to policy.
+- [x] Define export package. (`runbooks/tenant-export.md` defines the `ferio-tenant-export-v1` package, manifest, checksum, scope, and media exclusion.)
+- [x] Export tenant business data. (`scripts/export-tenant.sh` creates a verified custom-format dump from a trusted tenant database name.)
+- [x] Export audit/financial data according to policy. (The tenant export package includes tenant-local business, audit, and financial records; platform audit/control-plane records remain a separate platform export concern.)
 - [ ] Export media where required.
 - [x] Revoke domains safely. (`TenantClosureService.initiateClosure` disables every domain at CLOSURE_PENDING — takeover/reassignment designed out)
 - [ ] Revoke integration credentials.
@@ -1238,25 +1238,25 @@ These are trigger-based candidates, not launch prerequisites.
 The following decisions should be recorded in a dedicated ADR/product decision log.
 
 - [x] **RESOLVED** (Plan names/structure resolved (PO-001); prices remain pilot-dependent.) — was: Initial SaaS plan names, prices, billing intervals.
-- [ ] **RESOLVED-DIRECTION** (Resolved: 14-day trial; INTERNAL plan (PO-002).) — was: Trial/free/internal tenant policy.
+- [x] **RESOLVED-DIRECTION** (Resolved: 14-day trial; INTERNAL plan (PO-002).) — was: Trial/free/internal tenant policy.
 - [x] RESOLVED-DIRECTION (limits defined per plan for seats/products/warehouses/features; NO GMV limit per owner #12; prices remain TBD until cost baseline).
-- [ ] **RESOLVED-DIRECTION** (Resolved: 7-day grace; browsable storefront, checkout disabled (PO-004/005).) — was: Subscription grace-period and suspension behavior.
-- [ ] **RESOLVED-DIRECTION** (Resolved direction: provider abstraction, SSLCOMMERZ first (PO-006) — adapter build pending.) — was: SaaS subscription payment provider.
-- [ ] **RESOLVED-DIRECTION** (Resolved: {slug}.{FERIO_PUBLIC_DOMAIN} (PO-007).) — was: Default production tenant hostname/domain.
+- [x] **RESOLVED-DIRECTION** (Resolved: 7-day grace; browsable storefront, checkout disabled (PO-004/005).) — was: Subscription grace-period and suspension behavior.
+- [x] **RESOLVED-DIRECTION** (Resolved direction: provider abstraction, SSLCOMMERZ first (PO-006) — adapter build pending.) — was: SaaS subscription payment provider.
+- [x] **RESOLVED-DIRECTION** (Resolved: {slug}.{FERIO_PUBLIC_DOMAIN} (PO-007).) — was: Default production tenant hostname/domain.
 - [x] RESOLVED-DIRECTION (Cloudflare DNS + wildcard subdomains + automated TLS; record creation is ops-on-production-domain).
 - [x] RESOLVED-DIRECTION (automated wildcard TLS preferred; custom domains post-alpha per PO-008).
-- [ ] **RESOLVED-DIRECTION** (Resolved: shared managed cluster initially (PO-009).) — was: PostgreSQL hosting model for database-per-tenant.
-- [ ] **RESOLVED-DIRECTION** (Resolved: AES-256-GCM + external master key (PO-010).) — was: Tenant DB credential storage/KMS strategy.
+- [x] **RESOLVED-DIRECTION** (Resolved: shared managed cluster initially (PO-009).) — was: PostgreSQL hosting model for database-per-tenant.
+- [x] **RESOLVED-DIRECTION** (Resolved: AES-256-GCM + external master key (PO-010).) — was: Tenant DB credential storage/KMS strategy.
 - [x] **RESOLVED-DIRECTION** (Resolved sequencing: bounded LRU now, PgBouncer at scale (PO-011); ADR-0003 now records the concrete rollout and verification contract.) — was: PgBouncer/connection-pooling infrastructure.
-- [ ] **RESOLVED-DIRECTION** (Resolved: RPO ≤1h, RTO ≤4h (PO-012).) — was: RPO/RTO.
-- [ ] **RESOLVED-DIRECTION** (Resolved: 30 days (PO-012).) — was: Backup retention.
-- [ ] **RESOLVED-DIRECTION** (Resolved: 90-day recoverable window (PO-013), implemented in TenantClosureService.) — was: Tenant closure/export/deletion retention.
-- [ ] **RESOLVED-DIRECTION** (Resolved: tenant-local for Release 1 (PO-015).) — was: Customer identity scope across tenants.
-- [ ] **RESOLVED-DIRECTION** (Resolved: yes, global identity + memberships (PO-014); switcher UX later.) — was: Whether one global login may have memberships in multiple tenant businesses.
+- [x] **RESOLVED-DIRECTION** (Resolved: RPO ≤1h, RTO ≤4h (PO-012).) — was: RPO/RTO.
+- [x] **RESOLVED-DIRECTION** (Resolved: 30 days (PO-012).) — was: Backup retention.
+- [x] **RESOLVED-DIRECTION** (Resolved: 90-day recoverable window (PO-013), implemented in TenantClosureService.) — was: Tenant closure/export/deletion retention.
+- [x] **RESOLVED-DIRECTION** (Resolved: tenant-local for Release 1 (PO-015).) — was: Customer identity scope across tenants.
+- [x] **RESOLVED-DIRECTION** (Resolved: yes, global identity + memberships (PO-014); switcher UX later.) — was: Whether one global login may have memberships in multiple tenant businesses.
 - [x] RESOLVED (owner #10: tenant OWNER grants explicitly with reason/expiry/scope/audit; emergency override Super Admin-only + security event).
-- [ ] **RESOLVED-DIRECTION** (Resolved abstraction + keys tenants/{orgId}/… (PO-017); provider selection pending for production tenancy.) — was: Object storage provider and tenant object-key strategy.
+- [x] **RESOLVED-DIRECTION** (Resolved abstraction + keys tenants/{orgId}/… (PO-017); provider selection pending for production tenancy.) — was: Object storage provider and tenant object-key strategy.
 - [ ] **BLOCKED:** Plan treatment of custom domains, advanced CRM, campaigns, integrations, warehouses, staff counts, products/SKUs, and usage.
-- [ ] **RESOLVED-DIRECTION** (Resolved: Platform Admin/sales-assisted initially (PO-018).) — was: Production tenant onboarding model: self-service, sales-assisted, or Platform Admin-only for initial launch.
+- [x] **RESOLVED-DIRECTION** (Resolved: Platform Admin/sales-assisted initially (PO-018).) — was: Production tenant onboarding model: self-service, sales-assisted, or Platform Admin-only for initial launch.
 - [x] RESOLVED (PO-005 stands: storefront browsable, checkout disabled)
 - [x] RESOLVED (owner #14: compatible migrations canary->batch->fleet; destructive/locking require announced window + tested rollback; bootstrapper now enforces lock/statement timeouts + NON_TRANSACTIONAL marker).
 - [ ] **OPEN:** Legal review still pending; engineering posture unchanged.
