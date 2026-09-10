@@ -1116,12 +1116,12 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 ## 17.1 Internal alpha
 
 - [ ] Provision at least three internal tenants.
-- [ ] Use intentionally overlapping customer/product/order identifiers.
+- [x] Use intentionally overlapping customer/product/order identifiers. (`test/two-tenant-vertical.integration-spec.ts` seeds identical catalog/order identifiers in two independently bootstrapped tenant databases and proves each tenant reads only its own records.)
 - [ ] Run browse → checkout → order → payment/COD → fulfillment → rider/courier → return/refund flows.
-- [ ] Run wallet flow.
+- [x] Run wallet flow. (`test/wallet-isolation.integration-spec.ts` runs tenant-local top-up, debit, refund, and idempotency flows against real PostgreSQL databases and proves ledger isolation.)
 - [ ] Run warranty/service/chat/pickup flow.
 - [ ] Run tenant suspension/reactivation.
-- [ ] Run plan upgrade/downgrade.
+- [x] Run plan upgrade/downgrade. (`test/plan-limit-lifecycle.integration-spec.ts` runs limit enforcement, upgrade unlock, and downgrade data-preservation behavior against a real tenant database.)
 - [ ] Run provisioning retry.
 - [ ] Run tenant migration canary/batch.
 - [x] Run tenant backup/restore. (2026-09-10 local PostgreSQL drill backed up `ferio_test_runner`, verified checksum/schema metadata, and restored into isolated `restore_drill_20260910`; evidence: `project-progress/2026-09-10-mt12-local-restore-drill.md` and `project-progress/2026-09-10-mt14-release-gate-reconciliation.md`. Managed-provider scheduling/PITR remains open.)
