@@ -33,7 +33,8 @@ in the provider console/API after each deployment.
 2. `./scripts/restore-tenant.sh <file> restore_drill_<date>` for either a
    tenant backup or the control-plane backup. The helper requires checksum
    metadata, refuses an existing target, and stops on the first SQL error.
-3. Assert: `_ferio_tenant_migrations` count matches canonical head;
+3. Assert: `_prisma_migrations` contains the canonical completed migration
+   head;
    spot-check latest Order/Customer counts vs production pre-drill snapshot.
 4. Run `./scripts/verify-tenant-restore.sh restore_drill_<date>` to check
    required tables, non-empty media references, foreign-key reachability,
