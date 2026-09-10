@@ -39,7 +39,13 @@ if psql --dbname="${PGMAINTENANCE_DB:-postgres}" --tuples-only --no-align \
   exit 73
 fi
 createdb "$TARGET"
-pg_restore --exit-on-error --no-owner --no-privileges --dbname "$TARGET" "$DUMP"
+# Render SQL before execution so the helper can remove session settings added
+# by a newer pg_dump client than the target PostgreSQL server supports.
+RESTORE_SQL="$(mktemp)"
+trap 'rm -f -- "$RESTORE_SQL"' EXIT
+pg_restore --no-owner --no-privileges --file="$RESTORE_SQL" "$DUMP"
+sed -i '/^SET transaction_timeout = 0;$/d' "$RESTORE_SQL"
+psql --dbname "$TARGET" --set ON_ERROR_STOP=1 --file="$RESTORE_SQL"
 schema_version="$(psql --dbname "$TARGET" --tuples-only --no-align \
   --command='SELECT migration_name FROM "_prisma_migrations" WHERE finished_at IS NOT NULL ORDER BY finished_at DESC LIMIT 1' | xargs)"
 if [[ -z "$schema_version" ]]; then

@@ -50,6 +50,12 @@ describe('Release 1 backup and restore runbook contracts', () => {
     expect(source).toContain('restore_drill_');
     expect(source).toContain('refusing to restore into an existing database');
     expect(source).toContain('createdb "$TARGET"');
+    expect(source).toContain(
+      'pg_restore --no-owner --no-privileges --file="$RESTORE_SQL"',
+    );
+    expect(source).toContain('sed -i');
+    expect(source).toContain('transaction_timeout');
+    expect(source).toContain('--set ON_ERROR_STOP=1');
     expect(source).not.toContain('pg_restore --clean');
     expect(source).toContain('"_prisma_migrations"');
     expect(source).toContain('no completed Prisma migration found');

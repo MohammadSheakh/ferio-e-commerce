@@ -1015,7 +1015,7 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 - [ ] Verify object/media references.
 - [ ] Verify financial ledgers/reconciliation.
 - [x] Document DNS/domain behavior during disaster recovery. (`runbooks/backup-restore.md` requires isolated restore promotion, fail-closed unavailable domains, and operator-recorded DNS/TLS verification before activation.)
-- [ ] Perform and record restore exercise.
+- [x] Perform and record restore exercise. (2026-09-10 local PostgreSQL drill: `ferio_test_runner` was backed up with checksum `99ea368be95cebb7844c4f3e0b5fe1db9543bc3d2f1c7ea0b4c3da79322703f7`, restored into isolated `restore_drill_20260910`, and verified at migration head `20260908193000_tenant_messaging_provider_configs`; evidence: `project-progress/2026-09-10-mt12-local-restore-drill.md`. Managed-provider scheduling remains open.)
 
 ## 15.3 Tenant export/closure
 
@@ -1034,7 +1034,7 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 
 ### MT-12 gate
 
-- [ ] One tenant can be restored independently from backup.
+- [x] One tenant can be restored independently from backup. (The local drill restored the tenant dump into a new isolated database without overwriting the source or another database; managed-provider backup/PITR execution remains open.)
 - [x] A documented closure flow exists before accepting production tenants. (`TenantClosureService` and its tests cover CLOSURE_PENDING, domain revocation, retention-window refusal, explicit finalization acknowledgement, registry retirement, and audit evidence)
 
 ---
