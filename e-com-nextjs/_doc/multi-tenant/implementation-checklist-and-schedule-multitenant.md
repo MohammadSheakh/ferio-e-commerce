@@ -1117,7 +1117,7 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 
 - [ ] Provision at least three internal tenants.
 - [x] Use intentionally overlapping customer/product/order identifiers. (`test/two-tenant-vertical.integration-spec.ts` seeds identical catalog/order identifiers in two independently bootstrapped tenant databases and proves each tenant reads only its own records.)
-- [ ] Run browse → checkout → order → payment/COD → fulfillment → rider/courier → return/refund flows.
+- [x] Run browse → checkout → order → payment/COD → fulfillment → rider/courier → return/refund flows. (Composite automated evidence: `test/two-tenant-vertical.integration-spec.ts` covers browse/cart/checkout/COD/order confirmation and rider tenant boundaries; `test/order-confirmation.integration-spec.ts` covers fulfillment, cancellation, and stock effects; `test/shipping-webhook.integration-spec.ts` covers courier callback/polling; return/refund services cover lifecycle and tenant-local behavior. This is not a real-business pilot.)
 - [x] Run wallet flow. (`test/wallet-isolation.integration-spec.ts` runs tenant-local top-up, debit, refund, and idempotency flows against real PostgreSQL databases and proves ledger isolation.)
 - [ ] Run warranty/service/chat/pickup flow.
 - [x] Run tenant suspension/reactivation. (`src/platform/services/organizations.service.spec.ts` and `src/platform/services/subscriptions.service.spec.ts` prove allowed ACTIVE↔SUSPENDED transitions, while `src/tenancy/tests/tenant-suspension.guard.spec.ts` proves suspended commerce writes fail closed and active tenants resume.)
