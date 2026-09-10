@@ -142,6 +142,36 @@ async function checkTenantServiceDatabaseBoundaries() {
   }
 }
 
+async function checkWorkerDatabaseBoundaries() {
+  const featureRoot = resolve(root, 'src/features');
+  const files = [];
+
+  async function walk(directory) {
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      const path = resolve(directory, entry.name);
+      if (entry.isDirectory()) {
+        await walk(path);
+      } else if (
+        entry.isFile() &&
+        (entry.name.endsWith('.queue.ts') || entry.name.endsWith('.processor.ts')) &&
+        !entry.name.endsWith('.spec.ts')
+      ) {
+        files.push(path);
+      }
+    }
+  }
+
+  await walk(featureRoot);
+  for (const file of files) {
+    const source = withoutComments(await readFile(file, 'utf8'));
+    if (/this\.prisma\.(?!poolMetrics\b)[A-Za-z_$][\w$]*/.test(source)) {
+      violations.push(
+        `${file.replace(`${root}/`, '')} performs a direct PrismaService query from a queue/processor`,
+      );
+    }
+  }
+}
+
 async function checkTenantAdminControllerGuards() {
   const featureRoot = resolve(root, 'src/features');
   const controllerFiles = await listControllerFiles(featureRoot);
@@ -227,6 +257,7 @@ if (
 checkPlatformModelClassification();
 await checkTenantTransactionEntryPoints();
 await checkTenantServiceDatabaseBoundaries();
+await checkWorkerDatabaseBoundaries();
 await checkTenantAdminControllerGuards();
 checkProductionTenantEdgeContract();
 

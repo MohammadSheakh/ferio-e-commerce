@@ -150,6 +150,7 @@ describe('ShippingWebhookQueue', () => {
     process.env.TENANCY_ENABLED = 'true';
     const tenantPrisma = {
       shipmentWebhookLog: {
+        count: jest.fn().mockResolvedValue(3),
         findUnique: jest.fn().mockResolvedValue({
           id: 'log-tenant',
           authValid: true,
@@ -205,5 +206,31 @@ describe('ShippingWebhookQueue', () => {
       },
       { jobId: 't:org-a:courier-callback-retry-log-tenant-2' },
     );
+
+    await runWithTenantContext(
+      {
+        correlationId: 'correlation-org-a',
+        organizationId: 'org-a',
+        tenantDatabaseId: 'tdb-a',
+        database: {
+          id: 'tdb-a',
+          host: 'db.internal',
+          port: 5432,
+          databaseName: 'tenant_a',
+          username: 'tenant_a',
+          credentialCipher: 'ciphertext',
+        },
+        domainId: 'domain-a',
+        hostname: 'a.ferio.local',
+        subscriptionStatus: 'ACTIVE',
+      },
+      async () => {
+        await expect(tenantService.health()).resolves.toMatchObject({
+          recoverableCount: 3,
+        });
+      },
+    );
+    expect(tenantPrisma.shipmentWebhookLog.count).toHaveBeenCalledTimes(1);
+    expect(prisma.shipmentWebhookLog.count).not.toHaveBeenCalled();
   });
 });
