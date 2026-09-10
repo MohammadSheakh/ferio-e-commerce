@@ -74,6 +74,25 @@ describe('Release 1 backup and restore runbook contracts', () => {
     expect(source).toContain('no completed Prisma migration found');
   });
 
+  it('verifies restored media, relational, financial, and reconciliation structure read-only', () => {
+    const source = script('verify-tenant-restore.sh');
+
+    expect(source).toContain('restore_drill_');
+    expect(source).toContain('--set ON_ERROR_STOP=1');
+    expect(source).toContain('ProductMedia');
+    expect(source).toContain('Attachment');
+    expect(source).toContain('orphan_order_items');
+    expect(source).toContain('orphan_payment_users');
+    expect(source).toContain('orphan_wallet_transactions');
+    expect(source).toContain('invalid_completed_wallet_balances');
+    expect(source).toContain('ReconciliationRun');
+    expect(source).toContain('provider_check_required');
+    expect(source).not.toContain('CREATE ');
+    expect(source).not.toContain('DROP ');
+    expect(source).not.toContain('UPDATE ');
+    expect(source).not.toContain('DELETE ');
+  });
+
   it('defines bounded tenant object retention without accepting credentials', () => {
     const source = script('configure-r2-lifecycle.sh');
 
