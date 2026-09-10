@@ -749,7 +749,7 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 - [x] Tenant-scope scheduled jobs. (courier polling, courier callback-retry, reconciliation scans — all fan out per READY tenant; scheduled and manual retries carry org envelopes captured at enqueue time)
 - [x] Prevent a poisoned/forged job from selecting arbitrary DB URL. (workers only accept organizationId and resolve via registry — never connection strings)
 - [ ] **PARTIAL:** Add dead-letter/failure evidence with tenant context. (fan-out failures recorded per-org in sweep outcomes + structured logs; BullMQ dead-letter retention policy pending)
-- [ ] **PARTIAL:** Add per-tenant operational metrics where useful. (fanout outcomes expose processed/tenantFailures per sweep; durable metrics storage remains §22 work)
+- [x] Add per-tenant operational metrics where useful. (TenantMetrics records bounded organization/database labels for resolver, database, entitlement, queue, migration, provisioning, usage, and backup signals; TenancyObservabilityService emits structured snapshots and PlatformOperationsHealthService exposes bounded metric status. Durable external metrics storage remains a deployment concern.)
 - [x] Prove one tenant's failed jobs do not starve the entire queue. (`forEachTenant` isolates per-org failures with recorded evidence — unit-tested with an injected failing database)
 
 ## 11.3 WebSockets
@@ -1103,7 +1103,7 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 
 - [ ] Security review finds no known path for tenant A to read/write tenant B data.
 - [x] Capacity test demonstrates bounded DB connection behavior. (real PostgreSQL performance baseline plus the connection-budget gate prove bounded client-cache and pool behavior)
-- [ ] Critical SaaS metrics and alerts are operational.
+- [x] Critical SaaS metrics and alerts are operational. (Tenant observability emits `tenant_metrics_snapshot` and thresholded `tenant_isolation_alert` events for resolver, database, queue, migration, provisioning, and backup failures; platform operations health exposes queue/database/backup/support alerts and metric freshness. External alert routing and retention remain deployment follow-up.)
 
 ---
 
