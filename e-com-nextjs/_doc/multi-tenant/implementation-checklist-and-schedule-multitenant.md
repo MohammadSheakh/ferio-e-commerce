@@ -969,7 +969,7 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 - [x] Back up before high-risk migrations. (`runbooks/migration-rollback-forward-fix.md` requires verified control-plane and tenant backup evidence for every target batch and aborts the batch when evidence is missing or stale; provider scheduling and live backup execution remain MT-12 operations work.)
 - [x] Define expand/migrate/contract pattern for breaking changes. (`runbooks/migration-rollback-forward-fix.md` defines additive expand, bounded backfill, and separate contract phases.)
 - [x] Avoid destructive schema changes in one step. (ADR-0005 and the migration runbook require a separate contract phase and reject ad-hoc reverse SQL against live tenants.)
-- [ ] Test old app/new schema and new app/transition schema compatibility where rollout requires it.
+- [x] Test old app/new schema and new app/transition schema compatibility where rollout requires it. (The current post-baseline artifact set contains only the additive `20260910100000_backup_evidence` migration marked `-- FERIO: EXPAND`, so no breaking mixed-version matrix is required for the current Release 1 rollout; the compatibility gate and migration runbook require the matrix before any future breaking rollout. Evidence: `project-progress/2026-09-10-mt14-release-gate-reconciliation.md`.)
 - [x] Add migration timeout. (per-tenant bootstrap is bounded by `TENANT_MIGRATION_TIMEOUT_MS`, default 120 seconds)
 - [x] Add lock/contention strategy. (tenant bootstrap applies per-migration `lock_timeout` and `statement_timeout`; the orchestrator classifies PostgreSQL lock/deadlock/serialization failures as bounded transient retries.)
 - [x] Add rollback/forward-fix runbook. (`runbooks/migration-rollback-forward-fix.md` defines backup gates, pause/retry behavior, isolated restore, forward-fix recovery, and schema compatibility evidence.)
@@ -1120,7 +1120,7 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 - [ ] Run plan upgrade/downgrade.
 - [ ] Run provisioning retry.
 - [ ] Run tenant migration canary/batch.
-- [ ] Run tenant backup/restore.
+- [x] Run tenant backup/restore. (2026-09-10 local PostgreSQL drill backed up `ferio_test_runner`, verified checksum/schema metadata, and restored into isolated `restore_drill_20260910`; evidence: `project-progress/2026-09-10-mt12-local-restore-drill.md` and `project-progress/2026-09-10-mt14-release-gate-reconciliation.md`. Managed-provider scheduling/PITR remains open.)
 - [ ] Run support-access workflow.
 
 ## 17.2 Pilot beta
