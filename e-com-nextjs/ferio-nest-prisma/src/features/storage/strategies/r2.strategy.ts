@@ -70,6 +70,8 @@ import {
 } from '../../../tenancy/utils/object-keys.util';
 import { tryGetTenantContext } from '../../../tenancy/context/tenant-context';
 import { assertUploadContent } from '../storage-validation.util';
+import { createMalwareScanner } from '../malware-scanner';
+import type { MalwareScanner } from '../malware-scanner';
 
 export function sanitizeStoragePath(value: string, fallback = 'misc'): string {
   const segments = value
@@ -108,8 +110,10 @@ export class R2Strategy implements StorageStrategy {
   private readonly s3Client: S3Client;
   private readonly bucket: string;
   private readonly presignExpiresSeconds: number;
+  private readonly malwareScanner: MalwareScanner;
 
-  constructor() {
+  constructor(malwareScanner: MalwareScanner = createMalwareScanner()) {
+    this.malwareScanner = malwareScanner;
     const accountId = process.env.R2_ACCOUNT_ID;
     this.bucket = process.env.R2_BUCKET ?? '';
     this.presignExpiresSeconds = Number(
@@ -300,13 +304,16 @@ export class R2Strategy implements StorageStrategy {
       new GetObjectCommand({
         Bucket: this.bucket,
         Key: key,
-        Range: 'bytes=0-15',
+        ...(this.malwareScanner.required ? {} : { Range: 'bytes=0-15' }),
       }),
     );
     if (!object.Body) {
       throw new ServiceUnavailableException('STORAGE_OBJECT_BODY_MISSING');
     }
-    const prefix = Buffer.from(await object.Body.transformToByteArray());
+    const downloaded = Buffer.from(await object.Body.transformToByteArray());
+    const prefix = this.malwareScanner.required
+      ? downloaded.subarray(0, 16)
+      : downloaded;
     const signatureMatches =
       (contentType === 'image/jpeg' &&
         prefix.length >= 3 &&
@@ -327,6 +334,11 @@ export class R2Strategy implements StorageStrategy {
     if (!signatureMatches) {
       throw new BadRequestException('STORAGE_OBJECT_CONTENT_MISMATCH');
     }
+    await this.malwareScanner.scan({
+      key,
+      contentType,
+      body: downloaded,
+    });
     return { key, contentType, sizeBytes: actualSize };
   }
 
