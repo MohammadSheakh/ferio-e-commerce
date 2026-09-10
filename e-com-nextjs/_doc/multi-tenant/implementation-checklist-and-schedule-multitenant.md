@@ -1072,7 +1072,7 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 - [x] Cross-tenant Redis collision tests. (`src/tenancy/tests/redis-collision.spec.ts` proves identical logical identifiers produce distinct tenant-scoped keys while preserving intentional platform-global keys)
 - [x] Cross-tenant file/object access tests. (`storage.controller.spec.ts` rejects another organization object prefix before presigning and allows only the current tenant namespace.)
 - [x] Unknown/suspended/deleted tenant tests. (resolver covers unknown/inactive domains, suspended browsing, closure, and unavailable registries)
-- [ ] SSR/BFF tenant-confusion tests. (Customer Web host forwarding now fails closed to `Host` unless the deployment explicitly opts into a trusted ingress; comma-separated forwarded-host chains are rejected. Live two-host SSR/BFF E2E remains open.)
+- [ ] SSR/BFF tenant-confusion tests. (Customer Web host forwarding now fails closed to `Host` unless the deployment explicitly opts into a trusted ingress; comma-separated forwarded-host chains are rejected. Supported Node 20 production build passes, and a disposable two-host BFF smoke test proves spoofed `x-forwarded-host` values are ignored. Live registered-tenant SSR/BFF E2E remains open.)
 - [x] Cache poisoning/leak tests. (resolver cache validation binds entries to normalized hostnames and tests negative/positive isolation)
 
 ## 16.3 Performance and scale
