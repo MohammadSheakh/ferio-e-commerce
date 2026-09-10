@@ -72,6 +72,21 @@ describe('Release 1 backup and restore runbook contracts', () => {
     expect(source).not.toContain('DATABASE_URL');
   });
 
+  it('verifies restored media references against the tenant object namespace', () => {
+    const source = script('verify-tenant-media.sh');
+
+    expect(source).toContain('restore_drill_');
+    expect(source).toContain('ProductMedia');
+    expect(source).toContain('Attachment');
+    expect(source).toContain('tenants/${ORGANIZATION_ID}/');
+    expect(source).toContain('s3api head-object');
+    expect(source).toContain(
+      'media reference is outside the tenant object namespace',
+    );
+    expect(source).toContain('media_references_verified');
+    expect(source).not.toContain('s3api delete');
+  });
+
   it('requires an isolated, new restore database and verifies migration history', () => {
     const source = script('restore-tenant.sh');
 
@@ -135,6 +150,7 @@ describe('Release 1 backup and restore runbook contracts', () => {
       'backup-tenant-fleet.sh',
       'export-tenant.sh',
       'export-tenant-media.sh',
+      'verify-tenant-media.sh',
       'restore-tenant.sh',
       'verify-tenant-restore.sh',
       'configure-r2-lifecycle.sh',

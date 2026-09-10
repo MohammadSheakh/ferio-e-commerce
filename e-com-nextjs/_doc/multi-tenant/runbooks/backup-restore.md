@@ -45,8 +45,10 @@ in the provider console/API after each deployment.
    completed wallet ledger arithmetic, and reconciliation-run presence. The
    helper is read-only and fails closed on structural corruption.
 5. Verify external object/media existence against the approved storage
-   provider using the tenant prefix and export/restore manifest; the local
-   helper cannot prove provider-side blob availability.
+   provider using the tenant prefix and export/restore manifest:
+   `R2_BUCKET=... R2_ENDPOINT_URL=... ./scripts/verify-tenant-media.sh
+   restore_drill_<date> <organization-id>`. The helper is read-only and fails
+   closed on any reference outside the tenant prefix or any missing object.
 6. Point a throwaway resolver host at the drill DB via TenantDomain +
    registry copy; smoke-test storefront read-only.
 7. Record drill evidence + elapsed time (RTO ≤4h target, PO-012), including
