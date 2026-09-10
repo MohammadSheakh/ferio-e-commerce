@@ -24,6 +24,8 @@ for table in \
   Order \
   OrderItem \
   PaymentTransaction \
+  CommerceRefund \
+  RefundAttempt \
   Wallet \
   WalletTransactionHistory \
   ReconciliationRun \
@@ -55,10 +57,18 @@ assert_zero "orphan_order_items" \
   'SELECT count(*) FROM "OrderItem" item LEFT JOIN "Order" ord ON ord."id" = item."orderId" WHERE ord."id" IS NULL'
 assert_zero "orphan_payment_users" \
   'SELECT count(*) FROM "PaymentTransaction" payment LEFT JOIN "User" usr ON usr."id" = payment."userId" WHERE usr."id" IS NULL'
+assert_zero "negative_payment_amounts" \
+  'SELECT count(*) FROM "PaymentTransaction" WHERE "amount" < 0'
+assert_zero "orphan_refund_attempts" \
+  'SELECT count(*) FROM "RefundAttempt" attempt LEFT JOIN "CommerceRefund" refund ON refund."id" = attempt."refundId" WHERE refund."id" IS NULL'
+assert_zero "negative_refund_amounts" \
+  'SELECT count(*) FROM "CommerceRefund" WHERE "amount" < 0'
 assert_zero "orphan_wallet_transactions" \
   'SELECT count(*) FROM "WalletTransactionHistory" txn LEFT JOIN "Wallet" wallet ON wallet."id" = txn."walletId" WHERE wallet."id" IS NULL'
 assert_zero "invalid_completed_wallet_balances" \
   "SELECT count(*) FROM \"WalletTransactionHistory\" WHERE \"status\" = 'completed' AND ((\"type\" = 'credit' AND \"balanceAfter\" <> \"balanceBefore\" + \"amount\") OR (\"type\" IN ('debit', 'withdrawal') AND \"balanceAfter\" <> \"balanceBefore\" - \"amount\"))"
+assert_zero "invalid_reconciliation_counters" \
+  'SELECT count(*) FROM "ReconciliationRun" WHERE "detectedCount" < 0 OR "openedCount" < 0 OR "autoResolvedCount" < 0 OR "openedCount" > "detectedCount" OR "autoResolvedCount" > "detectedCount"'
 
 schema_version="$("${PSQL[@]}" --command='SELECT migration_name FROM "_prisma_migrations" WHERE finished_at IS NOT NULL ORDER BY finished_at DESC LIMIT 1' | xargs)"
 if [[ ! "$schema_version" =~ ^[0-9]{14}_[A-Za-z0-9_-]+$ ]]; then

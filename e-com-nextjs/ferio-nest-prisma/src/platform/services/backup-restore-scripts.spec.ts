@@ -100,8 +100,12 @@ describe('Release 1 backup and restore runbook contracts', () => {
     expect(source).toContain('Attachment');
     expect(source).toContain('orphan_order_items');
     expect(source).toContain('orphan_payment_users');
+    expect(source).toContain('negative_payment_amounts');
+    expect(source).toContain('orphan_refund_attempts');
+    expect(source).toContain('negative_refund_amounts');
     expect(source).toContain('orphan_wallet_transactions');
     expect(source).toContain('invalid_completed_wallet_balances');
+    expect(source).toContain('invalid_reconciliation_counters');
     expect(source).toContain('ReconciliationRun');
     expect(source).toContain('provider_check_required');
     expect(source).toContain('^[0-9]{14}_[A-Za-z0-9_-]+$');
