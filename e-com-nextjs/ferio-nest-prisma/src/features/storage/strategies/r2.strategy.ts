@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  Inject,
   Injectable,
   Logger,
   ServiceUnavailableException,
@@ -70,7 +71,7 @@ import {
 } from '../../../tenancy/utils/object-keys.util';
 import { tryGetTenantContext } from '../../../tenancy/context/tenant-context';
 import { assertUploadContent } from '../storage-validation.util';
-import { createMalwareScanner } from '../malware-scanner';
+import { createMalwareScanner, MALWARE_SCANNER } from '../malware-scanner';
 import type { MalwareScanner } from '../malware-scanner';
 
 export function sanitizeStoragePath(value: string, fallback = 'misc'): string {
@@ -113,7 +114,10 @@ export class R2Strategy implements StorageStrategy {
   private readonly presignExpiresSeconds: number;
   private readonly malwareScanner: MalwareScanner;
 
-  constructor(malwareScanner: MalwareScanner = createMalwareScanner()) {
+  constructor(
+    @Inject(MALWARE_SCANNER)
+    malwareScanner: MalwareScanner = createMalwareScanner(),
+  ) {
     this.malwareScanner = malwareScanner;
     const accountId = process.env.R2_ACCOUNT_ID;
     this.bucket = process.env.R2_BUCKET ?? '';
@@ -182,10 +186,7 @@ export class R2Strategy implements StorageStrategy {
     const safeName =
       sanitizeStorageSegment(file.originalname.replace(/[\\/]+/g, '-')) ||
       'upload.bin';
-    const key = tenantObjectKey(
-      safeFolder,
-      `${Date.now()}-${safeName}`,
-    );
+    const key = tenantObjectKey(safeFolder, `${Date.now()}-${safeName}`);
 
     await this.s3Client.send(
       new PutObjectCommand({
