@@ -86,6 +86,7 @@ function sanitizeStorageSegment(value: string): string {
   return value
     .replace(/\.+/g, '.')
     .replace(/[^A-Za-z0-9._-]+/g, '-')
+    .replace(/^\.+/, '')
     .replace(/^-+|-+$/g, '')
     .slice(0, 120);
 }
@@ -177,9 +178,13 @@ export class R2Strategy implements StorageStrategy {
     // controller boundaries so every multipart caller receives the same
     // fail-closed protection.
     assertUploadContent(file);
+    const safeFolder = sanitizeStoragePath(folder);
+    const safeName =
+      sanitizeStorageSegment(file.originalname.replace(/[\\/]+/g, '-')) ||
+      'upload.bin';
     const key = tenantObjectKey(
-      folder,
-      `${Date.now()}-${file.originalname.replace(/\s+/g, '-')}`,
+      safeFolder,
+      `${Date.now()}-${safeName}`,
     );
 
     await this.s3Client.send(

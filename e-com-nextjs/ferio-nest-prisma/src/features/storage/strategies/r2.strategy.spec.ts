@@ -57,6 +57,30 @@ describe('R2 tenant lifecycle operations', () => {
     expect(send).not.toHaveBeenCalled();
   });
 
+  it('canonicalizes multipart folder and filename before provider upload', async () => {
+    const strategy = new R2Strategy();
+    const send = jest.fn().mockResolvedValue({});
+    Object.defineProperty(strategy, 's3Client', { value: { send } });
+    jest.spyOn(strategy, 'getSignedUrl').mockResolvedValue('https://signed.example');
+
+    await runWithTenantContext(tenantContext, () =>
+      strategy.uploadFile(
+        {
+          buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+          originalname: '../proof\\image.png',
+          mimetype: 'image/png',
+          size: 8,
+        },
+        '../warranty\\evidence',
+      ),
+    );
+
+    const command = send.mock.calls[0]?.[0] as { input: { Key: string } };
+    expect(command.input.Key).toMatch(
+      /^tenants\/org-a\/warranty\/evidence\/\d+-proof-image\.png$/,
+    );
+  });
+
   it('verifies stored metadata and magic bytes after a direct upload', async () => {
     const strategy = new R2Strategy();
     const send = jest
