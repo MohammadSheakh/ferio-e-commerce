@@ -3,6 +3,7 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Post,
@@ -231,6 +232,18 @@ export class AdminCommercePaymentsController {
       throw new BadRequestException('Unknown payment provider');
     }
     return this.payments.updateProviderConfig(provider, dto, actor);
+  }
+
+  @Delete('providers/:provider')
+  @Permissions(PERMISSIONS.PAYMENTS_MANAGE)
+  revokeProvider(
+    @Param('provider') provider: CommercePaymentProvider,
+    @User() actor: UserPayload,
+  ) {
+    if (!Object.values(CommercePaymentProvider).includes(provider)) {
+      throw new BadRequestException('Unknown payment provider');
+    }
+    return this.payments.revokeProviderConfig(provider, actor);
   }
 
   @Get('recovery/queue-health')

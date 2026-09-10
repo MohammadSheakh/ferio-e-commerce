@@ -1025,7 +1025,7 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 - [x] Export audit/financial data according to policy. (The tenant export package includes tenant-local business, audit, and financial records; platform audit/control-plane records remain a separate platform export concern.)
 - [ ] Export media where required.
 - [x] Revoke domains safely. (`TenantClosureService.initiateClosure` disables every domain at CLOSURE_PENDING — takeover/reassignment designed out)
-- [ ] Revoke integration credentials.
+- [x] Revoke integration credentials. (Tenant payment and courier admin routes delete the encrypted provider configuration in a tenant transaction, disable courier activation, and append secret-free audit evidence; repeated revocation is idempotent.)
 - [ ] **PARTIAL:** Stop scheduled jobs. (tenant fan-out and retention sweeps select only READY databases owned by ACTIVE organizations; explicit queued-job revocation sweep remains pending)
 - [x] Close DB connections. (registry RETIRED → connection manager refuses; graceful disconnect path exists)
 - [ ] **PARTIAL:** Archive/delete DB according to policy. (90-day recoverable window implemented per PO-013 — finalize refuses inside the window without operator override; registry retirement + CLOSED transition landed; physical destruction awaits hosting decision)

@@ -148,6 +148,35 @@ export class CommercePaymentsService {
     });
   }
 
+  async revokeProviderConfig(
+    provider: CommercePaymentProvider,
+    actor: UserPayload,
+  ): Promise<{ provider: CommercePaymentProvider; revoked: boolean }> {
+    const db = await this.db();
+    return db.$transaction(async (transaction) => {
+      const previous = await transaction.commercePaymentProviderConfig.findUnique({
+        where: { provider },
+      });
+      if (!previous) return { provider, revoked: false };
+
+      await transaction.commercePaymentProviderConfig.delete({
+        where: { provider },
+      });
+      await this.audit.record(
+        {
+          action: 'PAYMENT_PROVIDER_CONFIG_REVOKED',
+          entityType: 'CommercePaymentProviderConfig',
+          entityId: previous.id,
+          actor,
+          previousValue: { provider, enabled: previous.enabled },
+          newValue: { provider, revoked: true },
+        },
+        transaction,
+      );
+      return { provider, revoked: true };
+    });
+  }
+
   private async tenantCredentials(provider: CommercePaymentProvider): Promise<PaymentCredentials | undefined> {
     const context = tryGetTenantContext();
     if (!context) return undefined;

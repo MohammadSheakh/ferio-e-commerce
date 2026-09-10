@@ -340,6 +340,39 @@ export class ShippingService {
     });
   }
 
+  async revokeProviderConfig(
+    provider: ShipmentProviderCode,
+    actor: UserPayload,
+  ): Promise<{ provider: ShipmentProviderCode; revoked: boolean }> {
+    const db = await this.db();
+    return db.$transaction(async (transaction) => {
+      const previous = await transaction.courierProviderConfig.findUnique({
+        where: { provider },
+      });
+      if (!previous) return { provider, revoked: false };
+
+      await transaction.courierProviderConfig.delete({
+        where: { provider },
+      });
+      await transaction.shipmentProvider.updateMany({
+        where: { code: provider },
+        data: { isActive: false },
+      });
+      await this.audit.record(
+        {
+          action: 'COURIER_PROVIDER_CONFIG_REVOKED',
+          entityType: 'CourierProviderConfig',
+          entityId: previous.id,
+          actor,
+          previousValue: { provider, enabled: previous.enabled },
+          newValue: { provider, revoked: true, isActive: false },
+        },
+        transaction,
+      );
+      return { provider, revoked: true };
+    });
+  }
+
   async getOrderShipment(orderId: string) {
     const db = await this.db();
     return db.shipment.findUnique({

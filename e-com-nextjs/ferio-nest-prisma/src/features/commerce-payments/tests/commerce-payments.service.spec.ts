@@ -7,6 +7,7 @@ import type { OrderService } from '../../order/order.service';
 import type { AuditService } from '../../audit/services/audit.service';
 import type { PlanGateService } from '../../../platform/services/plan-gate.service';
 import { AdminCommercePaymentsController } from '../controllers/commerce-payments.controller';
+import type { UserPayload } from '@app/common';
 
 type PaymentAuditRecord = {
   action: string;
@@ -20,6 +21,10 @@ type PaymentAuditRecord = {
 
 describe('CommercePaymentsService', () => {
   const transaction = {
+    commercePaymentProviderConfig: {
+      findUnique: jest.fn(),
+      delete: jest.fn(),
+    },
     commercePaymentAttempt: {
       update: jest.fn(),
     },
@@ -31,6 +36,10 @@ describe('CommercePaymentsService', () => {
     },
   };
   const prisma = {
+    commercePaymentProviderConfig: {
+      findMany: jest.fn(),
+      findUnique: jest.fn(),
+    },
     order: {
       findUnique: jest.fn(),
     },
@@ -114,6 +123,7 @@ describe('CommercePaymentsService', () => {
         'providers',
         'recoveryHealth',
         'recoverySweep',
+        'revokeProvider',
         'updateProvider',
       ].sort(),
     );
@@ -198,6 +208,39 @@ describe('CommercePaymentsService', () => {
       expect(select).not.toHaveProperty('initiationResponse');
       expect(select).not.toHaveProperty('validatedResponse');
       expect(select.callbacks.select).not.toHaveProperty('payload');
+    });
+  });
+
+  describe('provider credential revocation', () => {
+    it('deletes tenant credentials and records a secret-free audit event', async () => {
+      transaction.commercePaymentProviderConfig.findUnique.mockResolvedValueOnce({
+        id: 'config-1',
+        provider: 'SSLCOMMERZ',
+        enabled: true,
+      });
+
+      await expect(
+        service.revokeProviderConfig('SSLCOMMERZ', {
+          userId: 'admin-1',
+          email: 'admin@example.test',
+          role: 'admin',
+        } satisfies UserPayload),
+      ).resolves.toEqual({ provider: 'SSLCOMMERZ', revoked: true });
+
+      expect(transaction.commercePaymentProviderConfig.delete).toHaveBeenCalledWith({
+        where: { provider: 'SSLCOMMERZ' },
+      });
+      expect(audit.record).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'PAYMENT_PROVIDER_CONFIG_REVOKED',
+          previousValue: { provider: 'SSLCOMMERZ', enabled: true },
+          newValue: { provider: 'SSLCOMMERZ', revoked: true },
+        }),
+        transaction,
+      );
+      expect(JSON.stringify(audit.record.mock.calls.at(-1))).not.toContain(
+        'credentialCipher',
+      );
     });
   });
 

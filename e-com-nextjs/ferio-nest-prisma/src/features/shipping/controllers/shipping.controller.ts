@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Headers,
   HttpStatus,
@@ -128,6 +129,15 @@ export class AdminShippingController {
     @User() actor: UserPayload,
   ) {
     return this.shippingService.updateProviderConfig(code, dto, actor);
+  }
+
+  @Delete('providers/:code/config')
+  @Permissions(PERMISSIONS.SHIPPING_PROVIDER_MANAGE)
+  revokeProviderConfig(
+    @Param('code') code: ShipmentProviderCode,
+    @User() actor: UserPayload,
+  ) {
+    return this.shippingService.revokeProviderConfig(code, actor);
   }
 
   @Get('orders/:orderId')
