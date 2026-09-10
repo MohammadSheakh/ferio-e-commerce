@@ -1145,7 +1145,11 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 
 - [ ] Every PRD Release 1 SaaS exit criterion passes.
 - [ ] At least two independent organizations have isolated DBs and domains.
-- [ ] Cross-tenant negative test suite passes.
+- [x] Cross-tenant negative test suite passes. (The two-tenant vertical,
+  overlapping-identifier, wallet, order-reference, identity, returns/refunds,
+  shipping, reconciliation, worker, and socket isolation suites reject
+  cross-tenant reads/writes; evidence is indexed in
+  `skill-related-discussion/high-risk-two-tenant-test-matrix.md`.)
 - [x] Provisioning is idempotent. (`organizations.service.spec.ts` and `provisioning.service.spec.ts` cover concurrent replay, completed replay, and cross-organization idempotency-key conflict.)
 - [x] Migration orchestration is proven. (`migration-orchestrator.service.spec.ts` covers canary/batch progression, isolated tenant failure, threshold pause, and queued resume without re-running successful tenants.)
 - [x] Subscription/entitlement enforcement is proven. (`plan-limit-lifecycle.integration-spec.ts` covers plan limits, activation, usage enforcement, and lifecycle transitions; focused entitlement service tests cover overrides.)
