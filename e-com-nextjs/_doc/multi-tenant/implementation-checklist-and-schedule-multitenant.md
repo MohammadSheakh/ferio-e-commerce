@@ -1120,7 +1120,7 @@ Database-per-tenant requires fleet migration tooling before production tenant co
 - [ ] Run browse → checkout → order → payment/COD → fulfillment → rider/courier → return/refund flows.
 - [x] Run wallet flow. (`test/wallet-isolation.integration-spec.ts` runs tenant-local top-up, debit, refund, and idempotency flows against real PostgreSQL databases and proves ledger isolation.)
 - [ ] Run warranty/service/chat/pickup flow.
-- [ ] Run tenant suspension/reactivation.
+- [x] Run tenant suspension/reactivation. (`src/platform/services/organizations.service.spec.ts` and `src/platform/services/subscriptions.service.spec.ts` prove allowed ACTIVE↔SUSPENDED transitions, while `src/tenancy/tests/tenant-suspension.guard.spec.ts` proves suspended commerce writes fail closed and active tenants resume.)
 - [x] Run plan upgrade/downgrade. (`test/plan-limit-lifecycle.integration-spec.ts` runs limit enforcement, upgrade unlock, and downgrade data-preservation behavior against a real tenant database.)
 - [x] Run provisioning retry. (`src/platform/services/provisioning.service.spec.ts` exercises raced replay, idempotency ownership rejection, and replay without recreating domains or tenant databases.)
 - [x] Run tenant migration canary/batch. (`src/platform/services/migration-orchestrator.service.spec.ts` exercises canary ordering, bounded batches, transient retry, isolated failure, threshold pause, and resume.)
