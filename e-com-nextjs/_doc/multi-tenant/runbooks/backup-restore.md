@@ -35,9 +35,16 @@ in the provider console/API after each deployment.
    metadata, refuses an existing target, and stops on the first SQL error.
 3. Assert: `_ferio_tenant_migrations` count matches canonical head;
    spot-check latest Order/Customer counts vs production pre-drill snapshot.
-4. Point a throwaway resolver host at the drill DB via TenantDomain +
+4. Run `./scripts/verify-tenant-restore.sh restore_drill_<date>` to check
+   required tables, non-empty media references, foreign-key reachability,
+   completed wallet ledger arithmetic, and reconciliation-run presence. The
+   helper is read-only and fails closed on structural corruption.
+5. Verify external object/media existence against the approved storage
+   provider using the tenant prefix and export/restore manifest; the local
+   helper cannot prove provider-side blob availability.
+6. Point a throwaway resolver host at the drill DB via TenantDomain +
    registry copy; smoke-test storefront read-only.
-5. Record drill evidence + elapsed time (RTO ≤4h target, PO-012), including
+7. Record drill evidence + elapsed time (RTO ≤4h target, PO-012), including
    whether the restored dump was control-plane or tenant scope.
 
 ## DNS and domain behavior during disaster recovery
