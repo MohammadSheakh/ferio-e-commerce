@@ -736,7 +736,7 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 - [x] Tenant-scope OTP/rate-limit keys where business semantics require it. (OTP scoped; rate limits intentionally IP-global as abuse control, not business data)
 - [x] Tenant-scope catalog/settings caches. (Settings cache keys include the resolved organization; catalog reads have no shared cache layer and remain tenant-routed, so neither path can reuse another tenant's catalog/settings entry.)
 - [x] Tenant-scope idempotency keys.
-- [ ] Tenant-scope distributed locks.
+- [x] Tenant-scope distributed locks. (Direct-conversation PostgreSQL advisory lock keys include the trusted organization ID before participant IDs; `conversation.service.spec.ts` proves identical participants receive different lock keys in two tenant contexts, while legacy mode preserves the existing participant-only key.)
 - [x] Add collision tests using identical record IDs in two tenants. (`src/tenancy/redis-collision.spec.ts`: scopedRedisKey, OTP keys, and settings cache keys all diverge per organization for identical identifiers; legacy key shape preserved outside contexts)
 
 ## 11.2 BullMQ

@@ -1,6 +1,10 @@
 import { ForbiddenException } from '@nestjs/common';
-import { ConversationService } from '../conversation.service';
+import {
+  buildDirectConversationLockKey,
+  ConversationService,
+} from '../conversation.service';
 import { ParticipantRole } from '../conversation.constant';
+import { runWithTenantContext } from '../../../../tenancy/context/tenant-context';
 
 describe('ConversationService participant authorization', () => {
   function createService(actor: { role: string } | null) {
@@ -61,5 +65,35 @@ describe('ConversationService participant authorization', () => {
       data: { isDeleted: true },
     });
     expect(socketGateway.emitToRoom).toHaveBeenCalled();
+  });
+
+  it('namespaces direct-conversation locks by the trusted organization', () => {
+    const context = (organizationId: string) => ({
+      correlationId: `correlation-${organizationId}`,
+      organizationId,
+      tenantDatabaseId: `database-${organizationId}`,
+      database: {
+        id: `database-${organizationId}`,
+        host: 'localhost',
+        port: 5432,
+        databaseName: `tenant_${organizationId}`,
+        username: 'tenant',
+        credentialCipher: 'encrypted',
+      },
+      domainId: `domain-${organizationId}`,
+      hostname: `${organizationId}.ferio.test`,
+      subscriptionStatus: 'ACTIVE' as const,
+    });
+
+    const lockKeyA = runWithTenantContext(context('org-a'), () =>
+      buildDirectConversationLockKey(['user-2', 'user-1']),
+    );
+    const lockKeyB = runWithTenantContext(context('org-b'), () =>
+      buildDirectConversationLockKey(['user-2', 'user-1']),
+    );
+
+    expect(lockKeyA).toBe('org-a:user-1:user-2');
+    expect(lockKeyB).toBe('org-b:user-1:user-2');
+    expect(lockKeyA).not.toBe(lockKeyB);
   });
 });

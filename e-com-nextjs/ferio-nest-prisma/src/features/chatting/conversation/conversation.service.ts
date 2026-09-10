@@ -21,6 +21,16 @@ type ConversationMessage = Prisma.MessageGetPayload<{
   };
 }>;
 
+export function buildDirectConversationLockKey(
+  participantIds: readonly string[],
+): string {
+  const participantKey = [...participantIds].sort().join(':');
+  const organizationId = tryGetTenantContext()?.organizationId;
+  return organizationId
+    ? `${organizationId}:${participantKey}`
+    : participantKey;
+}
+
 @Injectable()
 export class ConversationService {
   private readonly logger = new Logger(ConversationService.name);
@@ -59,7 +69,7 @@ export class ConversationService {
         ? ConversationType.GROUP
         : ConversationType.DIRECT;
 
-    const directKey = [...allParticipants].sort().join(':');
+    const directKey = buildDirectConversationLockKey(allParticipants);
     const result = await db.$transaction(async (tx) => {
       // Serialize direct-conversation creation across API instances without
       // adding a second denormalized participant key to the schema.
