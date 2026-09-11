@@ -1,6 +1,6 @@
 # API Verification Status
 
-**Date of verification:** August 26, 2026
+**Date of verification:** September 11, 2026
 **Method:** Every endpoint table in this folder was derived from the NestJS
 controller tree (`src/features/**/*.controller.ts`, 245 routes) and
 cross-checked against the actual frontend call sites in
@@ -33,6 +33,16 @@ cross-checked against the actual frontend call sites in
 | platform-admin/plans-billing-subscriptions.md | Plans, trial, subscriptions directory, invoices/attempts/callback/configured | ✅ verified |
 | platform-admin/usage-fleet-migrations.md | Migrations start/status/pause/resume, database-health drift view, retention sweep | ✅ verified |
 | platform-admin/support-access.md | List/request(5min–8h)/revoke | ✅ verified |
+
+## September 11 integration correction
+
+The customer storefront tenancy status client now unwraps the backend success
+envelope for `GET /tenancy/status` before reading `code` and `storeName`.
+NestJS applies the global response contract `{ success, data, message }`, so a
+top-level `ACTIVE` read was incorrect and could render a healthy tenant as
+unavailable. The client retains a compatibility path for older unwrapped
+staging responses while treating malformed payloads as
+`TENANT_UNAVAILABLE`.
 
 ## Known documentation gaps (honest)
 
