@@ -229,3 +229,12 @@ edits enabled state, channel priority, and fallback policy, and continues to
 integrate outbox, templates, queue health, and retry. Provider credential PATCH
 remains intentionally operator-controlled because its request accepts secrets;
 the browser receives only non-secret provider metadata.
+
+The store-outlet/pickup review fixed two integration gaps. The tenant-admin
+store BFF now forwards page, limit, and search to the paginated NestJS outlet
+list. Customer checkout now calls the existing availability BFF for the
+selected outlet and cart variant IDs and renders ready-versus-transfer status;
+the final checkout transaction remains authoritative for stock and reservation
+races. API checks, typechecks, lint, and diff validation passed. Runtime
+tenant forwarding, browser behavior, stock races, and cross-tenant isolation
+remain required evidence; Redis was not changed.

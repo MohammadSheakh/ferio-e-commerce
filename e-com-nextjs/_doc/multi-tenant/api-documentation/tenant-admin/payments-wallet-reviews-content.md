@@ -60,4 +60,12 @@ non-secret provider state and routing policy.
 ## Store outlets
 | # | Method | Endpoint | Purpose |
 |---|---|---|---|
-| 1 | GET/POST/PATCH/DELETE | `/admin/store-locations[...]` | Outlet CRUD feeding pickup availability |
+| 1 | GET | `/admin/store-locations?page=&limit=&search=` | Paginated tenant-scoped outlet/warehouse list |
+| 2 | POST | `/admin/store-locations` | Create an outlet |
+| 3 | PATCH | `/admin/store-locations/:id` | Update outlet details or active state |
+| 4 | DELETE | `/admin/store-locations/:id` | Delete an outlet |
+
+The stores dashboard forwards the pagination/search query to the admin API.
+Customer checkout separately calls `GET /store-locations` and
+`POST /store-locations/check-availability` through its BFF; the latter checks
+the selected outlet against the cart variant IDs before pickup placement.

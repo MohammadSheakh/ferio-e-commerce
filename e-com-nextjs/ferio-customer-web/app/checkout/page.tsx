@@ -64,6 +64,19 @@ type PublicStore = {
   phone?: string;
 };
 
+type StoreAvailability = {
+  storeId: string;
+  storeName: string;
+  allAvailableInStore: boolean;
+  statusMessage: string;
+  items: Array<{
+    variantId: string;
+    storeAvailable: number;
+    hubAvailable: number;
+    availableInStore: boolean;
+  }>;
+};
+
 const emptyForm: CheckoutForm = {
   name: "",
   phone: "",
@@ -129,6 +142,10 @@ export default function CheckoutPage() {
   const [userLoggedIn, setUserLoggedIn] = useState(false);
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const [publicStores, setPublicStores] = useState<PublicStore[]>([]);
+  const [storeAvailability, setStoreAvailability] =
+    useState<StoreAvailability | null>(null);
+  const [availabilityLoading, setAvailabilityLoading] = useState(false);
+  const [availabilityError, setAvailabilityError] = useState("");
 
   useEffect(() => {
     trackStorefrontEvent(
@@ -159,6 +176,55 @@ export default function CheckoutPage() {
     if (hydrated)
       window.sessionStorage.setItem(storageKey, JSON.stringify(form));
   }, [form, hydrated]);
+
+  useEffect(() => {
+    if (
+      form.deliveryMethod !== "STORE_PICKUP" ||
+      !form.pickupStoreId ||
+      lines.length === 0
+    ) {
+      setStoreAvailability(null);
+      setAvailabilityError("");
+      return;
+    }
+
+    const controller = new AbortController();
+    async function checkStoreAvailability() {
+      setAvailabilityLoading(true);
+      setAvailabilityError("");
+      try {
+        const response = await fetch("/api/store-locations/check-availability", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            storeId: form.pickupStoreId,
+            variantIds: lines.map((line) => line.variantId),
+          }),
+          cache: "no-store",
+          signal: controller.signal,
+        });
+        const payload = (await response.json()) as {
+          data?: StoreAvailability;
+          message?: string;
+        };
+        if (!response.ok || !payload.data) {
+          throw new Error(payload.message || "Unable to check store stock.");
+        }
+        setStoreAvailability(payload.data);
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setStoreAvailability(null);
+        setAvailabilityError(
+          error instanceof Error ? error.message : "Unable to check store stock.",
+        );
+      } finally {
+        if (!controller.signal.aborted) setAvailabilityLoading(false);
+      }
+    }
+
+    void checkStoreAvailability();
+    return () => controller.abort();
+  }, [form.deliveryMethod, form.pickupStoreId, lines]);
 
   useEffect(() => {
     async function loadDeliveryOptions() {
@@ -671,6 +737,33 @@ export default function CheckoutPage() {
                             )}
                             {store.phone && <span>Phone: {store.phone}</span>}
                           </div>
+                          {isSelected && (
+                            <div className="mt-2 border-t border-line pt-2 text-[11px]">
+                              {availabilityLoading && (
+                                <span className="text-ink2">
+                                  Checking stock at this outlet…
+                                </span>
+                              )}
+                              {!availabilityLoading && availabilityError && (
+                                <span className="text-red-700">
+                                  {availabilityError}
+                                </span>
+                              )}
+                              {!availabilityLoading &&
+                                !availabilityError &&
+                                storeAvailability?.storeId === store.id && (
+                                  <span
+                                    className={
+                                      storeAvailability.allAvailableInStore
+                                        ? "text-emerald-700"
+                                        : "text-amber-700"
+                                    }
+                                  >
+                                    {storeAvailability.statusMessage}
+                                  </span>
+                                )}
+                            </div>
+                          )}
                         </label>
                       );
                     })}

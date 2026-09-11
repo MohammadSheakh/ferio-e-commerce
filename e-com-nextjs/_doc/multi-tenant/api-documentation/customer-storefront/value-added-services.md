@@ -36,7 +36,11 @@ tenant-admin only.
 | # | Method | Endpoint | Purpose |
 |---|---|---|---|
 | 1 | GET | `/store-locations` | Active outlets |
-| 2 | POST | `/store-locations/check-availability` | Stock at outlet per variant |
+| 2 | POST | `/store-locations/check-availability` `{ storeId, variantIds[] }` | Checkout stock at selected outlet per cart variant |
+
+Checkout calls availability whenever store pickup is selected and renders the
+server result as either ready for pickup or transfer required. The final
+checkout transaction remains authoritative for stock and reservation races.
 | 3 | PATCH | `/orders/:id/store-pickup/schedule` `{ pickupScheduledAt?, preferredPickupSlot?, customerPickupNotes? }` | Authenticated customer schedules or updates pickup from account order history |
 
 The customer account order history exposes this action only for
