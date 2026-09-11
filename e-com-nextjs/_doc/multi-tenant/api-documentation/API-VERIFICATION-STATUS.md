@@ -84,6 +84,14 @@ payment initiation after prepaid order placement. Source-level route coverage
 was clean; duplicate-submit, payment callback, stock/price race, live-host,
 and provider-credential behavior still require runtime evidence.
 
+The account/value-added API review also fixed a shared transport edge case:
+customer-session BFF calls now normalize `HeadersInit` before adding the
+server-owned Authorization and tenant-forwarding headers, preserving wallet
+top-up idempotency and correlation headers. Account profile and address docs
+were corrected to match the backend PUT contracts. This remains source-level
+evidence; replay, upload/malware, provider, cookie, and live-isolation tests
+are still required.
+
 ## Known documentation gaps (honest)
 
 - Response bodies for endpoints whose controllers return inline literals are

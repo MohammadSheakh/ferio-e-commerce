@@ -20,14 +20,14 @@
 | # | Method | Endpoint | Purpose |
 |---|---|---|---|
 | 1 | GET | `/account/commerce` | Profile + addresses + recent orders summary |
-| 2 | PATCH | `/account/commerce/profile` | Update name/phone/avatar |
+| 2 | PUT | `/account/commerce/profile` | Update name/phone/avatar |
 | 3 | POST | `/account/commerce/link` `{ reference, phone }` | Link past guest orders via order-reference + phone proof |
 
 ## Screen 3: Addresses
 | # | Method | Endpoint | Purpose |
 |---|---|---|---|
 | 1 | POST | `/account/commerce/addresses` | Add address (default handling) |
-| 2 | PATCH/DELETE | `/account/commerce/addresses/:id` | Edit/remove; historical orders keep their snapshot |
+| 2 | PUT/DELETE | `/account/commerce/addresses/:id` | Edit/remove; historical orders keep their snapshot |
 
 ## Screen 4: Order history / reorder / saved carts
 | # | Method | Endpoint | Purpose |
