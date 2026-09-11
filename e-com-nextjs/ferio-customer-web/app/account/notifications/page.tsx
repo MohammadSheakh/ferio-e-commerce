@@ -9,6 +9,7 @@ export default function NotificationsPage() {
   const [data, setData] = useState<CustomerNotificationPage | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   async function load(page = 1) {
     setLoading(true);
@@ -53,6 +54,31 @@ export default function NotificationsPage() {
     }
   }
 
+  async function removeNotification(notification: CustomerNotificationPage["items"][number]) {
+    setDeletingId(notification.id);
+    setError("");
+    try {
+      const response = await fetch(`/api/account/notifications/${notification.id}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => ({}))) as { message?: string };
+        throw new Error(payload.message || "Unable to delete notification.");
+      }
+      setData((current) => current ? {
+        ...current,
+        unread: notification.isRead ? current.unread : Math.max(0, current.unread - 1),
+        total: Math.max(0, current.total - 1),
+        totalPages: Math.max(1, Math.ceil(Math.max(0, current.total - 1) / current.limit)),
+        items: current.items.filter((item) => item.id !== notification.id),
+      } : current);
+    } catch (deleteError) {
+      setError(getErrorMessage(deleteError, "Unable to delete notification."));
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   if (loading && !data) return <main className="mx-auto max-w-4xl px-6 py-20 text-[13px] text-ink2">Loading notifications…</main>;
 
   return (
@@ -83,6 +109,9 @@ export default function NotificationsPage() {
               <div className="flex shrink-0 gap-2">
                 {notification.linkFor && <Link href={notification.linkFor} onClick={() => !notification.isRead && void markRead(notification.id)} className="rounded-full border border-line px-3 py-1.5 text-[11px] text-ink">Open</Link>}
                 {!notification.isRead && <button onClick={() => void markRead(notification.id)} className="rounded-full bg-ink px-3 py-1.5 text-[11px] text-white">Mark read</button>}
+                <button disabled={deletingId === notification.id} onClick={() => void removeNotification(notification)} className="rounded-full border border-line px-3 py-1.5 text-[11px] text-ink disabled:opacity-40">
+                  {deletingId === notification.id ? "Deleting…" : "Delete"}
+                </button>
               </div>
             </div>
           </article>
