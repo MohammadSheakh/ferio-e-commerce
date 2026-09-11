@@ -19,6 +19,10 @@ const productionCompose = await readFile(
   resolve(root, '../docker-compose.production.yml'),
   'utf8',
 );
+const tenantContextManifest = await readFile(
+  resolve(root, 'scripts/tenant-context-boundaries.json'),
+  'utf8',
+);
 let mongoModule = '';
 try {
   mongoModule = await readFile(
@@ -213,6 +217,21 @@ function checkProductionTenantEdgeContract() {
   }
 }
 
+function checkTenantContextManifest() {
+  try {
+    const manifest = JSON.parse(tenantContextManifest);
+    const entryCount = Object.values(manifest).reduce(
+      (count, entries) => count + (Array.isArray(entries) ? entries.length : 0),
+      0,
+    );
+    if (entryCount < 10) {
+      violations.push('tenant context manifest must inventory at least 10 entry points');
+    }
+  } catch {
+    violations.push('tenant context boundary manifest must be valid JSON');
+  }
+}
+
 function checkPlatformModelClassification() {
   const platformModels = [...platformPrisma.matchAll(/\bmodel\s+([A-Za-z0-9_]+)/g)].map(
     (match) => match[1],
@@ -260,6 +279,7 @@ await checkTenantServiceDatabaseBoundaries();
 await checkWorkerDatabaseBoundaries();
 await checkTenantAdminControllerGuards();
 checkProductionTenantEdgeContract();
+checkTenantContextManifest();
 
 try {
   await access(resolve(root, '..', 'docker-compose.production.yml'));

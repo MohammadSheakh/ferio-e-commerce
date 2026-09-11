@@ -1,0 +1,58 @@
+{
+  "http": [
+    {
+      "file": "src/tenancy/services/tenant-resolver.service.ts",
+      "markers": ["TenantContextMiddleware", "resolveFromHost", "runWithTenantContext"]
+    }
+  ],
+  "workers": [
+    {
+      "file": "src/features/commerce-payments/processors/payment-recovery.processor.ts",
+      "markers": ["TenantFanoutService", "organizationId", "TENANCY_ENABLED"]
+    },
+    {
+      "file": "src/features/reconciliation/processors/reconciliation.processor.ts",
+      "markers": ["TenantFanoutService", "organizationId", "TENANCY_ENABLED"]
+    },
+    {
+      "file": "src/features/shipping/processors/shipping-polling.processor.ts",
+      "markers": ["TenantFanoutService", "organizationId", "TENANCY_ENABLED"]
+    },
+    {
+      "file": "src/features/shipping/processors/shipping-webhook.processor.ts",
+      "markers": ["TenantFanoutService", "organizationId", "TENANCY_ENABLED"]
+    },
+    {
+      "file": "src/features/transactional-messaging/processors/transactional-message.processor.ts",
+      "markers": ["TenantFanoutService", "organizationId", "TENANCY_ENABLED"]
+    },
+    {
+      "file": "src/features/chatting/processors/chat-notification.processor.ts",
+      "markers": ["TenantFanoutService", "organizationId", "TENANCY_ENABLED"]
+    },
+    {
+      "file": "src/tenancy/processors/retention.processor.ts",
+      "markers": ["RetentionSweepService", "organizationId", "sweepAllReady"]
+    },
+    {
+      "file": "src/platform/migration-orchestrator.processor.ts",
+      "markers": ["MigrationOrchestratorService", "migrationRunId", "processRun"]
+    }
+  ],
+  "sockets": [
+    {
+      "file": "src/features/socket-gateway/gateway/socket.gateway.ts",
+      "markers": ["authenticateSocket", "scopedSocketRoom", "organizationId"]
+    },
+    {
+      "file": "src/features/socket-gateway/services/socket-auth.service.ts",
+      "markers": ["resolveTenantDatabase", "organizationId", "inOrganization"]
+    }
+  ],
+  "fanout": [
+    {
+      "file": "src/tenancy/services/tenant-fanout.service.ts",
+      "markers": ["runWithTenantContext", "READY", "organizationId"]
+    }
+  ]
+}
