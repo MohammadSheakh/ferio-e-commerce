@@ -8,7 +8,7 @@
 | # | Method | Endpoint | Purpose |
 |---|---|---|---|
 | 1 | GET | `/platform/support-access` | Active/expired grants |
-| 2 | POST | `/platform/support-access` `{ organizationId, reason(≥10 chars), expiresAt(5min–8h) }` | Time-boxed, reason-bound grant (audited) |
+| 2 | POST | `/platform/support-access` `{ organizationId, reason(≥10 chars), ttlMinutes?(5min–8h), scope? }` | Time-boxed, reason-bound grant (audited) |
 | 3 | POST | `/platform/support-access/:grantId/revoke` | Immediate revoke (audited) |
 
 Policy (owner #10): tenant OWNER grants explicitly; emergency override is

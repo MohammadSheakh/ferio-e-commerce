@@ -9,7 +9,7 @@ migration routes, database-health endpoint
 ## Fleet migrations (canary → batch → fleet)
 | # | Method | Endpoint | Purpose |
 |---|---|---|---|
-| 1 | POST | `/platform/migrations` `{ canaryOrganizationId?, batchSize?, concurrencyLimit? }` | Start run (1–10 clamp) |
+| 1 | POST | `/platform/migrations` `{ canaryOrganizationId?, concurrencyLimit?, failureThreshold? }` | Start run with bounded concurrency and pause threshold |
 | 2 | GET | `/platform/migrations` · `/platform/migrations/:runId` | Run status + per-tenant results |
 | 3 | POST | `/platform/migrations/:runId/pause` / `resume` | Operator controls (two-failure pause proven) |
 

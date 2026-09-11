@@ -22,11 +22,11 @@ permissions (`organization:read|write` etc.).
 ## Screen: Lifecycle actions
 | # | Method | Endpoint | Purpose |
 |---|---|---|---|
-| 1 | POST | `/platform/organizations/:id/provision` | Idempotent resumable provisioning (DB→migrate→seed→READY) |
+| 1 | POST | `/platform/organizations/:id/provision` `{ idempotencyKey? }` | Idempotent resumable provisioning (DB→migrate→seed→READY) |
 | 2 | PATCH | `/platform/organizations/:id/status` `{ status:SUSPENDED\|ACTIVE, reason }` | Suspend/reactivate (audited) |
 | 3 | GET | `/platform/organizations/:id/provisioning-runs` | Step-by-step timeline |
-| 4 | POST | `/platform/organizations/:id/closure/initiate` `{ reason }` | CLOSURE_PENDING + disables all domains |
-| 5 | POST | `/platform/organizations/:id/closure/finalize` | Retires registry after retention window confirm |
+| 4 | POST | `/platform/organizations/:id/closure/initiate` `{ reason? }` (10–1,000 chars when supplied) | CLOSURE_PENDING + disables all domains |
+| 5 | POST | `/platform/organizations/:id/closure/finalize` `{ retentionAcknowledged, exportAttested, overrideRetentionPeriod? }` | Retires registry after retention window confirm |
 
 ## Screen: Usage & reconcile
 | # | Method | Endpoint | Purpose |

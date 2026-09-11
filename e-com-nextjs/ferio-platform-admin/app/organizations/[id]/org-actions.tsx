@@ -67,8 +67,8 @@ export function OrgActions({ organizationId, status }: { organizationId: string;
           disabled={working !== null}
           onClick={() => {
             const reason = window.prompt("Closure reason (recorded in the audit log):");
-            if (!reason || reason.trim().length < 3) {
-              setMessage("A reason is required to start closure.");
+            if (!reason || reason.trim().length < 10) {
+              setMessage("A closure reason of at least 10 characters is required.");
               return;
             }
             void call("Start closure", `/platform/organizations/${organizationId}/closure/initiate`, { reason: reason.trim() });
