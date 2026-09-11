@@ -77,6 +77,13 @@ ticket plus message-history calls match the documented backend controllers.
 This is not browser cookie, live host-forwarding, WebSocket room-isolation,
 or production identity-provider proof.
 
+The customer cart/checkout review corrected two documentation contracts:
+`/cart/validate` is POST, and `/payments/initiate` is POST with the order
+identity, phone proof, and provider in the body. The customer BFF performs
+payment initiation after prepaid order placement. Source-level route coverage
+was clean; duplicate-submit, payment callback, stock/price race, live-host,
+and provider-credential behavior still require runtime evidence.
+
 ## Known documentation gaps (honest)
 
 - Response bodies for endpoints whose controllers return inline literals are

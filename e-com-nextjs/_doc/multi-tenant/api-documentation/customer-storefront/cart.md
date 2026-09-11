@@ -18,7 +18,7 @@ cart automatically.
 | 5 | POST | `/cart/save` | Save cart to account (auth) |
 | 6 | GET | `/cart/saved` | List saved carts |
 | 7 | POST | `/cart/reorder/:orderId` | Reorder past order into cart |
-| 8 | GET | `/cart/validate` | Pre-checkout validation (invalid/repriced lines flagged) |
+| 8 | POST | `/cart/validate` | Pre-checkout validation (invalid/repriced lines flagged) |
 | 9 | POST | `/cart/merge` | Merge guest cart into customer cart on login |
 
 Totals shown in UI are estimates; the server recalculates at checkout
