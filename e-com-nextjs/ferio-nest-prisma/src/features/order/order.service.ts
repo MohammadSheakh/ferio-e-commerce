@@ -53,6 +53,15 @@ const orderDetailInclude = {
   customer: true,
   address: true,
   pickupStore: true,
+  assignedDeliveryPersonnel: {
+    select: {
+      id: true,
+      name: true,
+      phoneOriginal: true,
+      status: true,
+      isOnline: true,
+    },
+  },
   items: {
     orderBy: { createdAt: 'asc' as const },
     include: {
@@ -164,6 +173,7 @@ export class OrderService {
         phone: order.customer.phoneNormalized,
         email: order.customer.email,
       },
+      assignedDeliveryPersonnel: order.assignedDeliveryPersonnel,
       address: order.address,
       items: order.items,
       statusHistory: order.statusHistory,

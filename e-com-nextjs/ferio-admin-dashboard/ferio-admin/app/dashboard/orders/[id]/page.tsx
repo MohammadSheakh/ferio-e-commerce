@@ -1192,6 +1192,17 @@ export default function OrderDetailPage() {
               <h2 className="text-[13px] font-medium text-ink">
                 Assign delivery rider
               </h2>
+              {order.assignedDeliveryPersonnel && (
+                <div className="mt-3 rounded-card bg-surface p-3 text-[12px] text-ink2">
+                  <p className="font-medium text-ink">Current rider</p>
+                  <p className="mt-1">
+                    {order.assignedDeliveryPersonnel.name} · {order.assignedDeliveryPersonnel.phoneOriginal}
+                  </p>
+                  <p className="mt-1">
+                    {order.assignedDeliveryPersonnel.isOnline ? "Online" : "Offline"} · {formatEnum(order.assignedDeliveryPersonnel.status)}
+                  </p>
+                </div>
+              )}
               <p className="mt-1 text-[12px] leading-5 text-ink2">
                 Only approved riders from this tenant are available for
                 assignment.

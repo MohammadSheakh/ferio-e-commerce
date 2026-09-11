@@ -116,6 +116,13 @@ export type OrderDetail = {
     phone: string;
     email: string | null;
   };
+  assignedDeliveryPersonnel: {
+    id: string;
+    name: string;
+    phoneOriginal: string;
+    status: "PENDING_APPROVAL" | "APPROVED" | "REJECTED" | "SUSPENDED";
+    isOnline: boolean;
+  } | null;
   address: {
     recipientName: string;
     phoneOriginal: string;
