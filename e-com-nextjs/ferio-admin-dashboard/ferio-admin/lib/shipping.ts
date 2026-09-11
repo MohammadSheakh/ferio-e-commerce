@@ -28,6 +28,19 @@ export type CourierScorecardRow = {
   pickupSlaPercent: number;
 };
 
+export type CourierRouteRecommendation = {
+  selectedProvider: CourierCode;
+  reason: string;
+  score: number;
+  availableProviders: Array<{
+    code: CourierCode;
+    name: string;
+    isConfigured: boolean;
+    isActive: boolean;
+    score: number;
+  }>;
+};
+
 export type ShipmentEvent = {
   id: string;
   rawStatus: string;

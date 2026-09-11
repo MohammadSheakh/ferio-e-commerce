@@ -182,3 +182,9 @@ admin BFF and renders tenant-local delivery, RTO, and pickup-SLA metrics. The
 separate courier recommendation action remains a follow-up because it requires
 explicit destination, weight, COD, and urgency inputs; no guessed operational
 values are sent from the dashboard.
+
+The same shipping review now also integrates the documented courier routing
+operation: `POST /admin/shipping/router/recommend` is forwarded by the admin
+BFF and called from an explicit district/upazila/weight/COD/urgency form. The
+recommendation is advisory only; shipment creation still requires a separate
+provider choice and `parcelReady` contract.

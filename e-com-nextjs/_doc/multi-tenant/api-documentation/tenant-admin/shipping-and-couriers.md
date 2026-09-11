@@ -22,6 +22,14 @@ courier webhook controller (`webhooks/couriers` — provider-facing, not admin)
 | 2 | GET | `/admin/shipping/orders/:orderId` | Load the shipment for one order |
 | 3 | POST | `/admin/shipping/orders/:orderId` `{ provider, parcelReady: true, note?, providerData? }` | Creates via adapter; stores AWB/tracking URL/raw request-response |
 
+## Routing recommendation
+| # | Method | Endpoint | Purpose |
+|---|---|---|---|
+| 1 | POST | `/admin/shipping/router/recommend` `{ district, upazila?, weightGrams, codAmount, urgent? }` | Score configured/active providers and recommend one without mutating shipment state |
+
+The tenant-admin shipping screen exposes this as an explicit input form. It does
+not infer destination, weight, COD amount, or urgency from an unrelated order.
+
 ## Callbacks & polling
 | # | Method | Endpoint | Purpose |
 |---|---|---|---|
