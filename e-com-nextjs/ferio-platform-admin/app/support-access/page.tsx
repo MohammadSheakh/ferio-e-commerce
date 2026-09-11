@@ -9,12 +9,7 @@ interface GrantRow {
 }
 
 export default async function SupportAccessPage() {
-  let rows: GrantRow[] = [];
-  try {
-    rows = await platformApi<GrantRow[]>("/platform/support-access");
-  } catch {
-    /* error boundary */
-  }
+  const rows = await platformApi<GrantRow[]>("/platform/support-access");
   return (
     <>
       <p className="eyebrow">Security</p>

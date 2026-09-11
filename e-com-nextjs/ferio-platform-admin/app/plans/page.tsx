@@ -3,12 +3,7 @@ import { CreatePlanForm } from "./create-form";
 import { PlanEditor, type EditablePlan } from "./plan-editor";
 
 export default async function PlansPage() {
-  let rows: EditablePlan[] = [];
-  try {
-    rows = await platformApi<EditablePlan[]>("/platform/plans");
-  } catch {
-    /* handled by error boundary */
-  }
+  const rows = await platformApi<EditablePlan[]>("/platform/plans");
   return (
     <>
       <p className="eyebrow">SaaS Operations</p>
