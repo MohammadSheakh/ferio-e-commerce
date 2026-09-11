@@ -210,3 +210,10 @@ attempts, provider readiness, recovery sweep/health, wallet top-up listing, and
 wallet review are already wired through the admin BFF. Payment credential
 PUT/DELETE remain intentionally operator-controlled secret operations rather
 than browser forms.
+
+The tenant-admin product-content/request/store review found one real BFF gap:
+requested-products client refreshes now have a GET `/api/admin/product-requests`
+route forwarding the documented `/product-requests` backend endpoint. Review
+moderation and store CRUD already have browser callers. Review-banner
+GET/PATCH/DELETE remain explicitly open for a dedicated banner-management UI;
+the existing screen currently integrates banner creation only.
