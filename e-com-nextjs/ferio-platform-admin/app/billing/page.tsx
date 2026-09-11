@@ -1,4 +1,5 @@
 import { platformApi } from "@/lib/platform-session";
+import { BillingControls, InvoiceActions } from "./billing-controls";
 
 interface InvoiceRow {
   id: string;
@@ -44,13 +45,15 @@ export default async function BillingPage() {
       <p className="eyebrow">SaaS Operations</p>
       <h1 className="h1">Billing</h1>
       <div style={{ height: 24 }} />
+      <BillingControls />
+      <div style={{ height: 24 }} />
 
       <h2 className="eyebrow">Invoices</h2>
       <table>
         <thead>
           <tr>
             <th>Number</th><th>Organization</th><th>Period</th>
-            <th>Amount</th><th>Status</th><th>Created</th>
+            <th>Amount</th><th>Status</th><th>Created</th><th>Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -66,10 +69,11 @@ export default async function BillingPage() {
                 <span className="statuspill">{invoice.paid ? "PAID" : "OPEN"}</span>
               </td>
               <td className="muted">{dateOnly(invoice.createdAt)}</td>
+              <td><InvoiceActions invoiceId={invoice.id} paid={invoice.paid} /></td>
             </tr>
           ))}
           {invoices.length === 0 && (
-            <tr><td colSpan={6} className="muted">No invoices yet.</td></tr>
+            <tr><td colSpan={7} className="muted">No invoices yet.</td></tr>
           )}
         </tbody>
       </table>

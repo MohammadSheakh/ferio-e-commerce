@@ -31,3 +31,10 @@
 
 SaaS money NEVER touches tenant Payment/Wallet/COD/refund/settlement tables —
 separate schemas and services by construction.
+
+The platform billing screen now calls the safe operator endpoints through the
+authenticated BFF: provider readiness, invoice creation, payment-session start,
+stale-attempt recovery, and invoice receipt lookup. Callback GET/POST remains a
+gateway-owned public integration and is not exposed as a browser action. The
+screen does not collect provider credentials or allow an operator to self-assert
+payment success.

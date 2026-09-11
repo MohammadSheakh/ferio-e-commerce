@@ -39,3 +39,7 @@ but no frontend screen should allow an operator to self-assert a backup. The
 backup job supplies the artifact, checksum, scope, completion time, and optional
 restore/protection timestamps; operations health consumes the ledger for the
 control-plane backup posture.
+
+Retention sweep and backup-evidence writes remain automation-owned for the same
+reason. The platform console may consume resulting health/read-only evidence,
+but must not manufacture deletion or recovery proof from a browser.

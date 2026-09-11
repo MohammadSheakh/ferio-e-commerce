@@ -288,6 +288,15 @@ API contract checks, TypeScript, lint, and production build passed. Live operato
 permissions, provisioned tenant domains, DNS/TLS, two-host SSR/BFF isolation,
 and production acceptance remain open.
 
+Shot 66 audited platform billing and operations integration. The billing screen
+now calls provider-readiness GET, invoice-create POST, invoice-pay POST,
+stale-payment-recovery POST, and receipt GET through the authenticated BFF, with
+operator feedback and no credential/payment-success fabrication. Gateway
+callbacks, retention-sweep writes, and backup-evidence writes remain
+automation-owned by design. Platform API check, TypeScript, lint, and
+production build passed; provider credentials, gateway delivery, recovery
+correctness, backup/restore, permissions, and production evidence remain open.
+
 The customer public-operational review also cross-checked order tracking,
 store pickup outlet listing/availability, and privacy-safe storefront analytics.
 `POST /orders/track`, `GET /store-locations`,
