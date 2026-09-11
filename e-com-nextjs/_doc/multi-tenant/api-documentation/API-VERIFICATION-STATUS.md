@@ -264,6 +264,20 @@ PostgreSQL Docker service on host port `5433`. The disposable
 is useful backend/database evidence, but it does not close frontend browser,
 Cloudflare host-routing, SSR/BFF, or two-tenant runtime gates.
 
+Shot 64 exercised the full local Compose runtime. Backend, customer web,
+tenant-admin web, platform-admin web, PostgreSQL, MinIO, and the project Redis
+container started successfully; the project Redis container used temporary host
+port `6380` because an existing host Redis already owns `6379`, and that host
+process was not replaced. Backend `/api/v1/health` returned 200, customer and
+tenant-admin SSR roots returned 200, platform-admin correctly redirected to
+login, and the customer BFF returned the expected `TENANT_RESOLUTION_FAILED`
+response for an unprovisioned host rather than serving ambiguous tenant data.
+The Compose backend healthcheck was corrected from nonexistent `/api/v1/ready`
+to the active `/api/v1/health` endpoint and from `localhost` to IPv4 loopback,
+with a startup grace period. This proves local runtime wiring only; provisioned
+two-tenant host isolation, Cloudflare ingress, browser SSR/BFF behavior, and
+production Redis evidence remain open.
+
 The customer public-operational review also cross-checked order tracking,
 store pickup outlet listing/availability, and privacy-safe storefront analytics.
 `POST /orders/track`, `GET /store-locations`,
