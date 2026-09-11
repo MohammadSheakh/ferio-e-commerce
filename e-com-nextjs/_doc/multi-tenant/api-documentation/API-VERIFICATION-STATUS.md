@@ -202,3 +202,11 @@ CSV preflight/template, settlement recording, findings, scan, queue health,
 alerts, finding actions, and failed-run retry. Run evidence is supplied by
 `GET /admin/reconciliation/queue-health` as `recentRuns`; the nonexistent
 standalone run-detail route was removed from the documented surface.
+
+The tenant-admin payments/wallet review corrected two stale contracts. Wallet
+review is `PATCH /admin/wallet/top-ups/:id`, not a nonexistent `/review` action
+path, and the documentation now points to the real dashboard pages. Payment
+attempts, provider readiness, recovery sweep/health, wallet top-up listing, and
+wallet review are already wired through the admin BFF. Payment credential
+PUT/DELETE remain intentionally operator-controlled secret operations rather
+than browser forms.

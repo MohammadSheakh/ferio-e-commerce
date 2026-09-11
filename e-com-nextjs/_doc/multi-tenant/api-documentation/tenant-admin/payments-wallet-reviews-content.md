@@ -1,7 +1,8 @@
 # Tenant Admin — Payments, Wallet, Reviews & Messaging
 
-**Frontend:** `app/payments`, `app/wallet`, `app/reviews`, `app/messages`,
-`app/requested-products`, `app/feedback`, `app/stores`
+**Frontend:** `app/dashboard/payments/page.tsx`, `app/dashboard/wallet/page.tsx`,
+`app/dashboard/reviews/page.tsx`, `app/dashboard/messages/page.tsx`,
+`app/dashboard/stores/page.tsx`, and the corresponding `components/*`/BFF routes
 **Verified against:** commerce-payments, admin/wallet, product-content,
 transactional-messages, store-locations controllers
 
@@ -18,11 +19,15 @@ transactional-messages, store-locations controllers
 | 6 | POST | `/admin/payments/recovery/sweep` | Queue expiry/recovery sweep |
 | 7 | GET | `/admin/payments/recovery/queue-health` | Recovery backlog |
 
+Payment provider credential PUT/DELETE routes are intentionally not exposed as
+browser forms. Provider readiness is read by the dashboard, while secret
+provisioning and revocation remain in the operator-controlled path.
+
 ## Wallet review desk
 | # | Method | Endpoint | Purpose |
 |---|---|---|---|
 | 1 | GET | `/admin/wallet/top-ups?status=PENDING_REVIEW` | Evidence queue |
-| 2 | POST | `/admin/wallet/top-ups/:id/review` `{ status: COMPLETED\|REJECTED, reviewNote }` | Atomic credit + immutable ledger entry; replay-safe |
+| 2 | PATCH | `/admin/wallet/top-ups/:id` `{ status: COMPLETED\|REJECTED, reviewNote }` | Atomic credit + immutable ledger entry; replay-safe |
 
 ## Reviews / banners moderation + requests + feedback
 | # | Method | Endpoint | Purpose |
