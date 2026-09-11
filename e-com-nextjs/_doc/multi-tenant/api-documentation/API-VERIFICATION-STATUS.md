@@ -161,3 +161,10 @@ caller that supplies checksums and restore/protection evidence. It is documented
 in `platform-admin/usage-fleet-migrations.md`; no dashboard form was added that
 could let an operator manufacture recovery evidence. Live backup-provider,
 restore, and permission evidence remain operational gates.
+
+The tenant-admin hero-showcase review also closed the documented settings-delete
+gap. The admin BFF now forwards `DELETE /settings?type=heroShowcase`, and the
+hero-showcase screen exposes a confirmed removal action that restores the
+storefront's built-in defaults after server success. The mutation remains
+tenant-scoped and audited by the Nest settings controller; live authorization,
+cache invalidation, and browser evidence remain runtime gates.

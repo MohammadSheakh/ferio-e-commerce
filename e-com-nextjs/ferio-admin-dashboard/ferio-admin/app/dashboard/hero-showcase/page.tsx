@@ -167,12 +167,18 @@ export default function AdminHeroShowcasePage() {
         const response = await fetch("/api/hero-showcase", {
           cache: "no-store",
         });
-        const payload = await response.json();
-        if (response.ok && payload.data && Array.isArray(payload.data) && payload.data.length > 0) {
+        const payload = (await response.json()) as {
+          data?: SlideData[];
+          message?: string;
+        };
+        if (!response.ok) {
+          throw new Error(payload.message || "Unable to load hero showcase settings.");
+        }
+        if (payload.data && Array.isArray(payload.data) && payload.data.length > 0) {
           setSlides(payload.data);
         }
       } catch (err) {
-        console.error("Failed to load hero showcase settings", err);
+        setError(err instanceof Error ? err.message : "Unable to load hero showcase settings.");
       } finally {
         setLoading(false);
       }
@@ -198,6 +204,32 @@ export default function AdminHeroShowcasePage() {
       setMessage("Hero Showcase carousel updated successfully!");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save settings");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteSavedShowcase = async () => {
+    if (!window.confirm("Remove the saved hero showcase and restore storefront defaults?")) return;
+    setSaving(true);
+    setError("");
+    setMessage("");
+    try {
+      const response = await fetch("/api/hero-showcase", { method: "DELETE" });
+      const payload = (await response.json()) as { message?: string };
+      if (!response.ok) {
+        throw new Error(payload.message || "Unable to remove hero showcase settings.");
+      }
+      setSlides(DEFAULT_SLIDES);
+      setActiveSlideIdx(0);
+      setActiveHotspotIdx(null);
+      setMessage("Saved hero showcase removed. Storefront defaults are active.");
+    } catch (deleteError) {
+      setError(
+        deleteError instanceof Error
+          ? deleteError.message
+          : "Unable to remove hero showcase settings.",
+      );
     } finally {
       setSaving(false);
     }
@@ -353,6 +385,14 @@ export default function AdminHeroShowcasePage() {
                   className="px-3.5 py-2 text-xs font-medium text-rose-600 border border-rose-200 rounded-lg hover:bg-rose-50 transition"
                 >
                   Delete Slide {activeSlideIdx + 1}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleDeleteSavedShowcase()}
+                  disabled={saving}
+                  className="px-3.5 py-2 text-xs font-medium text-rose-600 border border-rose-200 rounded-lg hover:bg-rose-50 transition disabled:opacity-50"
+                >
+                  Remove Saved Showcase
                 </button>
                 <button
                   type="submit"
