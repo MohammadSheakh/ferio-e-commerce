@@ -24,10 +24,22 @@ async function handle(request: Request, method: PlatformMethod) {
     });
     return NextResponse.json({ data });
   } catch (error) {
-    const status =
-      (error as { status?: number }).status ?? 502;
+    const platformError = error as {
+      status?: number;
+      code?: string;
+      correlationId?: string;
+      message?: string;
+    };
+    const status = platformError.status ?? 502;
     return NextResponse.json(
-      { message: (error as Error).message || "Control plane unavailable." },
+      {
+        success: false,
+        message: platformError.message || "Control plane unavailable.",
+        ...(platformError.code ? { code: platformError.code } : {}),
+        ...(platformError.correlationId
+          ? { correlationId: platformError.correlationId }
+          : {}),
+      },
       { status },
     );
   }

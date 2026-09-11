@@ -14,6 +14,7 @@ backend controller tree (`ferio-nest-prisma/src/features/**`) — 245 routes.
 | Correlation | Send `x-correlation-id`; it is echoed back and stamped in logs |
 | Auth (storefront/admin) | `Authorization: Bearer <accessJWT>`; refresh via `POST /auth/refresh` cookie flow |
 | Auth (platform) | `POST /platform/auth/login` issues an 8-hour token from the separate `PLATFORM_JWT_SECRET` realm; the Platform Admin BFF stores it in an httpOnly cookie, local sign-out clears that cookie, and tenant staff tokens are rejected by design |
+| Platform BFF errors | Backend status, machine `code`, and `correlationId` are preserved by `/api/platform/[...path]`; platform tokens remain server-side and are never returned to browser JavaScript |
 | Tenant resolution | Server-side only, from the storefront Host (`x-forwarded-host` on server-side fetches). No body/query/header may choose a database. |
 | Admin tenancy gate | Tenant-admin controllers add `TenantMembershipGuard` — session email must be an active OWNER/STAFF of the resolved org |
 | Pagination (admin lists) | `{ docs, page, limit, total, totalPages }` |

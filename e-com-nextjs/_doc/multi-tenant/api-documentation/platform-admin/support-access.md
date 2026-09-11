@@ -14,3 +14,8 @@
 Policy (owner #10): tenant OWNER grants explicitly; emergency override is
 Platform Super Admin-only and emits a security event. Metadata-first
 support — no casual tenant-data access.
+
+The platform screen now integrates grant creation and revocation through the
+httpOnly-token BFF. The scope input is sent as a JSON object and the UI only
+performs shape/TTL/reason validation; backend scope allow-listing, permission
+checks, audit events, expiry, and revocation remain authoritative.

@@ -306,6 +306,15 @@ automation boundaries. Platform API check, TypeScript, lint, and production
 build passed; live permissions, queue/Redis behavior, backup/restore, and
 production evidence remain open.
 
+Shot 68 audited platform authentication, support access, and BFF forwarding.
+Added the missing support-grant POST form with JSON-object scope validation and
+kept the existing revoke POST caller. Hardened the platform catch-all BFF to
+preserve backend HTTP status, machine error code, and correlation ID rather
+than reducing failures to message-only payloads; the operator token remains an
+httpOnly cookie. Platform API check, TypeScript, lint, and production build
+passed. Live identity, permission, support-scope, expiry/revocation, and
+production auth evidence remain open.
+
 The customer public-operational review also cross-checked order tracking,
 store pickup outlet listing/availability, and privacy-safe storefront analytics.
 `POST /orders/track`, `GET /store-locations`,

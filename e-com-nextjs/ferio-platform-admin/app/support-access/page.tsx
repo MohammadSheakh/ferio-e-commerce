@@ -1,4 +1,5 @@
 import { platformApi } from "@/lib/platform-session";
+import { SupportGrantForm } from "./support-grant-form";
 import { RevokeButton } from "./revoke-button";
 
 interface GrantRow {
@@ -18,6 +19,8 @@ export default async function SupportAccessPage() {
         Every grant is reason-bound and time-bound. Operators have zero tenant-data access without one.
       </p>
       <div style={{ height: 20 }} />
+      <SupportGrantForm />
+      <div style={{ height: 24 }} />
       <table>
         <thead><tr><th>Organization</th><th>Reason</th><th>Expires</th><th /></tr></thead>
         <tbody>
