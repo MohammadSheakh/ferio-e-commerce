@@ -39,9 +39,11 @@
 ## Screen 5: Notifications inbox
 | # | Method | Endpoint | Purpose |
 |---|---|---|---|
-| 1 | GET | `/account/notifications?page=&unread=` | Paginated inbox |
+| 1 | GET | `/account/notifications?page=&limit=&unreadOnly=true` | Paginated inbox; `unreadOnly` is the supported filter |
 | 2 | GET | `/account/notifications/unread-count` | Badge count |
-| 3 | POST | `/account/notifications/read-all` | Mark read (dedup keys prevent duplicates) |
+| 3 | PATCH | `/account/notifications/:id/read` | Mark one notification read |
+| 4 | POST | `/account/notifications/read-all` | Mark all notifications read |
+| 5 | DELETE | `/account/notifications/:id` | Delete one notification |
 
 ## Screen 6: Wallet (customer)
 | # | Method | Endpoint | Purpose |

@@ -36,8 +36,14 @@ transactional-messages, store-locations controllers
 ## Transactional messaging ops
 | # | Method | Endpoint | Purpose |
 |---|---|---|---|
-| 1 | GET | `/admin/transactional-messages/templates` | Template registry (per tenant) |
-| 2 | GET | `/admin/transactional-messages/queue-health` | Outbox backlog evidence |
+| 1 | GET | `/admin/transactional-messages?page=&limit=&status=&eventType=&search=` | Tenant-scoped message outbox |
+| 2 | GET | `/admin/transactional-messages/templates` | Template registry (per tenant) |
+| 3 | PATCH | `/admin/transactional-messages/templates/:key` `{ subject?, body?, enabled? }` | Update a message template |
+| 4 | GET | `/admin/transactional-messages/providers` | Configured SMS/WhatsApp/email provider state |
+| 5 | PATCH | `/admin/transactional-messages/providers/:channel` | Update a provider configuration |
+| 6 | GET/PATCH | `/admin/transactional-messages/policy` | Read/update tenant messaging policy |
+| 7 | GET | `/admin/transactional-messages/queue-health` | Outbox backlog evidence |
+| 8 | POST | `/admin/transactional-messages/:id/retry` | Retry a failed message with audit/permission checks |
 
 ## Store outlets
 | # | Method | Endpoint | Purpose |

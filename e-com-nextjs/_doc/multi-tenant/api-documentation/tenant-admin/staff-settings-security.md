@@ -22,9 +22,11 @@ membership cache.
 ## Settings
 | # | Method | Endpoint | Purpose |
 |---|---|---|---|
-| 1 | GET/PATCH | `/settings?type=…` | Per-type settings documents (hero showcase, policies…) — tenant-local CRUD |
-| 2 | GET/PATCH | `/admin/commerce-settings` | Store identity, contacts, feature flags (CommerceSettingsService) |
-| 3 | GET | `/admin/commerce-settings/public` | Public projection consumed by storefront |
+| 1 | GET | `/settings/all` or `/settings/paginate[v2]` | Tenant-local settings inventory |
+| 2 | POST | `/settings?type=…` `{ type, details }` | Create/update a per-type settings document (hero showcase, policies…) |
+| 3 | DELETE | `/settings?type=…` | Delete a per-type settings document |
+| 4 | GET/PATCH | `/admin/commerce-settings` | Store identity, contacts, feature flags (CommerceSettingsService) |
+| 5 | GET | `/store/config` | Public store identity/contacts/policies projection consumed by storefront |
 
 ## Security (owner/admin)
 | # | Method | Endpoint | Purpose |

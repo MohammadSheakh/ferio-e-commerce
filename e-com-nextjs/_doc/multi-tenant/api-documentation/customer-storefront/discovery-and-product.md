@@ -10,7 +10,7 @@
 
 | # | Method | Endpoint | Purpose |
 |---|---|---|---|
-| 1 | GET | `/settings?type=hero_showcase` | Hero slides for this tenant (public, rate-limited) |
+| 1 | GET | `/settings?type=heroShowcase` | Hero slides for this tenant (public, rate-limited) |
 | 2 | GET | `/catalog/categories` | Active category tree |
 | 3 | GET | `/store/config` | Public store identity/contacts/policies |
 

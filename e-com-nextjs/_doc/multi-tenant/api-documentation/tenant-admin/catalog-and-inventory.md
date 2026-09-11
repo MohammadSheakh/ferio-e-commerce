@@ -31,4 +31,10 @@ settings controller (hero showcase type)
 ## Hero Showcase
 | # | Method | Endpoint | Purpose |
 |---|---|---|---|
-| 1 | GET `/settings?type=…` (public read) · admin CRUD via `/settings` POST + `/settings/all` + `/settings/paginate[v2]` | Tenant-local settings documents incl. hero showcase type; Redis cache keys are org-scoped |
+| 1 | GET | `/settings?type=heroShowcase` | Public tenant-local hero settings read |
+| 2 | POST | `/settings?type=heroShowcase` `{ type, details }` | Admin create/update of the hero settings document |
+| 3 | GET | `/settings/all` or `/settings/paginate[v2]` | Admin settings inventory with offset/cursor pagination |
+| 4 | DELETE | `/settings?type=heroShowcase` | Admin remove the hero settings document |
+
+Settings are tenant-local and cache keys are organization-scoped. The
+customer storefront uses the public `GET /settings?type=heroShowcase` contract.
