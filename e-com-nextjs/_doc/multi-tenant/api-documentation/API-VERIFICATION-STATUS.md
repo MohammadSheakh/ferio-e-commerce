@@ -44,6 +44,11 @@ unavailable. The client retains a compatibility path for older unwrapped
 staging responses while treating malformed payloads as
 `TENANT_UNAVAILABLE`.
 
+The platform-admin catch-all BFF also now forwards `PUT` and `DELETE` in
+addition to `GET`, `POST`, and `PATCH`, matching the platform OpenAPI surface
+for entitlement overrides and feature-flag operations. This closes a proxy
+method gap; it does not claim that every platform screen has browser E2E proof.
+
 ## Known documentation gaps (honest)
 
 - Response bodies for endpoints whose controllers return inline literals are

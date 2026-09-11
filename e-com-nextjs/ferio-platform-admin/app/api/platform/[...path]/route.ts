@@ -6,7 +6,9 @@ import { platformApi } from "@/lib/platform-session";
  * an httpOnly cookie; this route attaches it server-side and never exposes
  * it to client JavaScript.
  */
-async function handle(request: Request, method: "GET" | "POST" | "PATCH") {
+type PlatformMethod = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
+
+async function handle(request: Request, method: PlatformMethod) {
   const url = new URL(request.url);
   const path = url.pathname.replace(/^\/api\/platform/, "");
   const backendPath = `/platform${path}`;
@@ -34,3 +36,5 @@ async function handle(request: Request, method: "GET" | "POST" | "PATCH") {
 export const GET = (request: Request) => handle(request, "GET");
 export const POST = (request: Request) => handle(request, "POST");
 export const PATCH = (request: Request) => handle(request, "PATCH");
+export const PUT = (request: Request) => handle(request, "PUT");
+export const DELETE = (request: Request) => handle(request, "DELETE");
