@@ -1,6 +1,6 @@
 # Tenant Admin — Shipping & Couriers
 
-**Frontend:** `app/shipping/*`, `lib/shipping.ts`
+**Frontend:** `app/dashboard/shipping/page.tsx`, `app/dashboard/orders/[id]/page.tsx`, `lib/shipping.ts`
 **Verified against:** `shipping.controller.ts` (`@Controller('admin/shipping')`),
 courier webhook controller (`webhooks/couriers` — provider-facing, not admin)
 

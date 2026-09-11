@@ -188,3 +188,10 @@ operation: `POST /admin/shipping/router/recommend` is forwarded by the admin
 BFF and called from an explicit district/upazila/weight/COD/urgency form. The
 recommendation is advisory only; shipment creation still requires a separate
 provider choice and `parcelReady` contract.
+
+The provider configuration boundary was also audited: provider listing and
+activation are integrated through the tenant-admin BFF and dashboard, while
+credential PUT/DELETE remain intentionally automation/operator-only because
+they accept or revoke secrets. The shipping documentation now points to the
+actual dashboard paths, and the UI no longer describes tenant credentials as
+environment-only values.

@@ -294,8 +294,8 @@ export default function ShippingPage() {
                 Courier providers
               </h2>
               <p className="mt-1 text-[12px] text-ink2">
-                Credentials stay in environment secrets. Activation is blocked
-                until configuration is complete.
+                Credentials are provisioned through the operator-controlled
+                secret path. Activation is blocked until configuration is complete.
               </p>
             </div>
           </div>
