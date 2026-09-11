@@ -8,7 +8,7 @@ export type OrderTracking = {
   reference: string;
   status: string;
   statusLabel: string;
-  paymentMethod: "COD";
+  paymentMethod: "COD" | "PREPAID" | "PAY_AT_STORE";
   total: number;
   currency: "BDT";
   createdAt: string;

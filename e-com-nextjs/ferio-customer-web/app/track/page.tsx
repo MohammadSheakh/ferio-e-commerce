@@ -129,6 +129,12 @@ function getOrderStages(tracking: OrderTracking) {
   ];
 }
 
+function paymentMethodLabel(paymentMethod: OrderTracking["paymentMethod"]) {
+  if (paymentMethod === "PREPAID") return "Prepaid";
+  if (paymentMethod === "PAY_AT_STORE") return "Pay at store";
+  return "Cash on delivery";
+}
+
 function TrackOrderContent() {
   const searchParams = useSearchParams();
   const [tracking, setTracking] = useState<OrderTracking | null>(null);
@@ -205,7 +211,7 @@ function TrackOrderContent() {
                   <h2 className="mt-2 text-[24px] font-semibold tracking-tight text-ink">{tracking.shipment?.statusLabel ?? tracking.statusLabel}</h2>
                 </div>
                 <div className="text-right text-[12px] text-ink2">
-                  <p>{formatTaka(tracking.total)} · Cash on delivery</p>
+                  <p>{formatTaka(tracking.total)} · {paymentMethodLabel(tracking.paymentMethod)}</p>
                   <p className="mt-1">Placed {new Date(tracking.createdAt).toLocaleDateString("en-BD")}</p>
                 </div>
               </div>

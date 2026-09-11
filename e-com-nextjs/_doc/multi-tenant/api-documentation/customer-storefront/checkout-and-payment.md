@@ -71,4 +71,7 @@ The authenticated customer BFF forwards the httpOnly `ferio_cart` cookie as
 ## Screen 6: Public tracking
 | # | Method | Endpoint | Purpose |
 |---|---|---|---|
-| 1 | POST | `/orders/track` `{ reference, phone? }` or signed token | Status timeline without account login |
+| 1 | POST | `/orders/track` `{ reference, phone }` | Status timeline without account login; phone is required and verified against the order address |
+
+The tracking response preserves the order payment method (`COD`, `PREPAID`,
+or `PAY_AT_STORE`). No signed-token tracking contract is currently exposed.
