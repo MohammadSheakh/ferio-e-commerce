@@ -32,9 +32,15 @@
 ## Screen 4: Order history / reorder / saved carts
 | # | Method | Endpoint | Purpose |
 |---|---|---|---|
-| 1 | GET | `/orders?page=` (Bearer) | Paginated own history |
-| 2 | GET | `/orders/:id` | Detail incl. items/timeline |
-| 3 | POST | `/cart/reorder/:orderId` | Reorder ownership-checked |
+| 1 | GET | `/account/commerce` | Authenticated profile plus the customer's recent order projection |
+| 2 | POST | `/account/commerce/link` `{ reference, phone }` | Link an eligible guest order before it appears in the account projection |
+| 3 | POST | `/cart/reorder/:orderId` | Reorder ownership-checked; optional `orderItemIds` selects items |
+
+The shipped customer UI does not call generic `/orders?page=` or `/orders/:id`
+customer endpoints. Order detail, timeline, and fulfillment state are exposed by
+the account commerce projection and the dedicated reorder/store-pickup actions;
+the public `/orders/*` controller is reserved for tracking and store-pickup
+flows documented in `checkout-and-payment.md`.
 
 ## Screen 5: Notifications inbox
 | # | Method | Endpoint | Purpose |
@@ -48,6 +54,6 @@
 ## Screen 6: Wallet (customer)
 | # | Method | Endpoint | Purpose |
 |---|---|---|---|
-| 1 | GET | `/account/wallet?page=` | Balance + ledger + top-up status |
-| 2 | POST | `/account/wallet/top-ups` `{ provider, amount, customerReference }` + idempotency key | Request recharge → PENDING_REVIEW |
+| 1 | GET | `/account/wallet?page=&limit=` | Balance + ledger + top-up status |
+| 2 | POST | `/account/wallet/top-ups` `{ provider, amount, customerReference, customerNote? }` + `Idempotency-Key` header | Request recharge → PENDING_REVIEW; amount is minor units |
 Admin approval credits atomically exactly once (FR-WAL-005).

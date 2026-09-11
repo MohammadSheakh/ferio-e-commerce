@@ -40,12 +40,17 @@ export default function AccountOrdersPage() {
   } | null>(null);
 
   async function load() {
-    const response = await fetch("/api/account/commerce", { cache: "no-store" });
-    const payload = await response.json();
-    if (response.status === 401) setUnauthorized(true);
-    else if (response.ok) setAccount(payload.data);
-    else setMessage(payload.message || "Unable to load your account.");
-    setLoading(false);
+    try {
+      const response = await fetch("/api/account/commerce", { cache: "no-store" });
+      const payload = (await response.json().catch(() => ({}))) as { data?: CommerceAccount; message?: string };
+      if (response.status === 401) setUnauthorized(true);
+      else if (response.ok && payload.data) setAccount(payload.data);
+      else setMessage(payload.message || "Unable to load your account.");
+    } catch (loadError) {
+      setMessage(getErrorMessage(loadError, "Network error loading your account."));
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {

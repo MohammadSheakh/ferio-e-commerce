@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { CustomerNotificationPage } from "@/lib/customer-notifications";
+import { getErrorMessage } from "@/lib/error-message";
 
 export default function NotificationsPage() {
   const [data, setData] = useState<CustomerNotificationPage | null>(null);
@@ -11,23 +12,45 @@ export default function NotificationsPage() {
 
   async function load(page = 1) {
     setLoading(true);
-    const response = await fetch(`/api/account/notifications?page=${page}&limit=20`, { cache: "no-store" });
-    const payload = await response.json();
-    if (response.ok) setData(payload.data);
-    else setError(payload.message || "Unable to load notifications.");
-    setLoading(false);
+    setError("");
+    try {
+      const response = await fetch(`/api/account/notifications?page=${page}&limit=20`, { cache: "no-store" });
+      const payload = (await response.json().catch(() => ({}))) as { data?: CustomerNotificationPage; message?: string };
+      if (response.ok && payload.data) setData(payload.data);
+      else setError(payload.message || "Unable to load notifications.");
+    } catch (loadError) {
+      setError(getErrorMessage(loadError, "Network error loading notifications."));
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => { void load(); }, []);
 
   async function markRead(id: string) {
-    await fetch(`/api/account/notifications/${id}/read`, { method: "PATCH" });
-    setData((current) => current ? { ...current, unread: Math.max(0, current.unread - 1), items: current.items.map((item) => item.id === id ? { ...item, isRead: true } : item) } : current);
+    try {
+      const response = await fetch(`/api/account/notifications/${id}/read`, { method: "PATCH" });
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => ({}))) as { message?: string };
+        throw new Error(payload.message || "Unable to mark notification as read.");
+      }
+      setData((current) => current ? { ...current, unread: Math.max(0, current.unread - 1), items: current.items.map((item) => item.id === id ? { ...item, isRead: true } : item) } : current);
+    } catch (readError) {
+      setError(getErrorMessage(readError, "Unable to mark notification as read."));
+    }
   }
 
   async function markAllRead() {
-    await fetch("/api/account/notifications/read-all", { method: "POST" });
-    setData((current) => current ? { ...current, unread: 0, items: current.items.map((item) => ({ ...item, isRead: true })) } : current);
+    try {
+      const response = await fetch("/api/account/notifications/read-all", { method: "POST" });
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => ({}))) as { message?: string };
+        throw new Error(payload.message || "Unable to mark notifications as read.");
+      }
+      setData((current) => current ? { ...current, unread: 0, items: current.items.map((item) => ({ ...item, isRead: true })) } : current);
+    } catch (readError) {
+      setError(getErrorMessage(readError, "Unable to mark notifications as read."));
+    }
   }
 
   if (loading && !data) return <main className="mx-auto max-w-4xl px-6 py-20 text-[13px] text-ink2">Loading notifications…</main>;

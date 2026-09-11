@@ -5,6 +5,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { createBrowserIdempotencyKey } from "@/lib/browser-identifiers";
 import { formatTaka } from "@/lib/catalog";
 import type { WalletSummary } from "@/lib/wallet";
+import { getErrorMessage } from "@/lib/error-message";
 
 export default function WalletPage() {
   const [summary, setSummary] = useState<WalletSummary | null>(null);
@@ -14,12 +15,17 @@ export default function WalletPage() {
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   async function load() {
-    const response = await fetch("/api/account/wallet", { cache: "no-store" });
-    const payload = await response.json();
-    if (response.status === 401) setUnauthorized(true);
-    else if (response.ok) setSummary(payload.data);
-    else setMessage({ type: "error", text: payload.message || "Unable to load your wallet." });
-    setLoading(false);
+    try {
+      const response = await fetch("/api/account/wallet", { cache: "no-store" });
+      const payload = (await response.json().catch(() => ({}))) as { data?: WalletSummary; message?: string };
+      if (response.status === 401) setUnauthorized(true);
+      else if (response.ok && payload.data) setSummary(payload.data);
+      else setMessage({ type: "error", text: payload.message || "Unable to load your wallet." });
+    } catch (loadError) {
+      setMessage({ type: "error", text: getErrorMessage(loadError, "Network error loading your wallet.") });
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -31,31 +37,35 @@ export default function WalletPage() {
     setSubmitting(true);
     setMessage(null);
     const form = new FormData(event.currentTarget);
-    const response = await fetch("/api/account/wallet/top-ups", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Idempotency-Key": createBrowserIdempotencyKey(),
-      },
-      body: JSON.stringify({
-        provider: form.get("provider"),
-        amount: Math.round(Number(form.get("amount")) * 100),
-        customerReference: form.get("customerReference"),
-        customerNote: form.get("customerNote") || undefined,
-      }),
-    });
-    const payload = await response.json();
-    if (response.ok) {
+    try {
+      const response = await fetch("/api/account/wallet/top-ups", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": createBrowserIdempotencyKey(),
+        },
+        body: JSON.stringify({
+          provider: form.get("provider"),
+          amount: Math.round(Number(form.get("amount")) * 100),
+          customerReference: form.get("customerReference"),
+          customerNote: form.get("customerNote") || undefined,
+        }),
+      });
+      const payload = (await response.json().catch(() => ({}))) as { message?: string };
+      if (!response.ok) {
+        throw new Error(payload.message || "Unable to submit top-up.");
+      }
       event.currentTarget.reset();
       setMessage({
         type: "success",
         text: "Top-up submitted for verification. Your balance changes only after approval.",
       });
       await load();
-    } else {
-      setMessage({ type: "error", text: payload.message || "Unable to submit top-up." });
+    } catch (submitError) {
+      setMessage({ type: "error", text: getErrorMessage(submitError, "Unable to submit top-up.") });
+    } finally {
+      setSubmitting(false);
     }
-    setSubmitting(false);
   }
 
   if (loading) {
