@@ -13,7 +13,7 @@ backend controller tree (`ferio-nest-prisma/src/features/**`) — 245 routes.
 | Error envelope | `{ "success": false, "message": string \| string[], "code": string, "correlationId": string }` with proper HTTP status |
 | Correlation | Send `x-correlation-id`; it is echoed back and stamped in logs |
 | Auth (storefront/admin) | `Authorization: Bearer <accessJWT>`; refresh via `POST /auth/refresh` cookie flow |
-| Auth (platform) | Separate realm token (`PLATFORM_JWT_SECRET`); staff tokens are rejected by design |
+| Auth (platform) | `POST /platform/auth/login` issues an 8-hour token from the separate `PLATFORM_JWT_SECRET` realm; the Platform Admin BFF stores it in an httpOnly cookie, local sign-out clears that cookie, and tenant staff tokens are rejected by design |
 | Tenant resolution | Server-side only, from the storefront Host (`x-forwarded-host` on server-side fetches). No body/query/header may choose a database. |
 | Admin tenancy gate | Tenant-admin controllers add `TenantMembershipGuard` — session email must be an active OWNER/STAFF of the resolved org |
 | Pagination (admin lists) | `{ docs, page, limit, total, totalPages }` |
