@@ -30,11 +30,11 @@
 |---|---|---|---|
 | 1 | GET | `/store-locations` | Active outlets |
 | 2 | POST | `/store-locations/check-availability` | Stock at outlet per variant |
-| 3 | PATCH | `/orders/:id/store-pickup/schedule` `{ pickupScheduledAt?, customerPickupNotes? }` | Authenticated customer schedules or updates pickup |
+| 3 | PATCH | `/orders/:id/store-pickup/schedule` `{ pickupScheduledAt?, preferredPickupSlot?, customerPickupNotes? }` | Authenticated customer schedules or updates pickup from account order history |
 
-The pickup scheduling contract exists in NestJS/OpenAPI, but the current
-customer-web source audit found no browser call site for it. Keep this item
-open until the account/order flow exposes and validates the schedule action.
+The customer account order history exposes this action only for
+`STORE_PICKUP` orders. The BFF owns the session and tenant-host forwarding;
+the backend confirms that the authenticated customer owns the order.
 
 ## Support chat (realtime)
 | # | Method | Endpoint | Purpose |
