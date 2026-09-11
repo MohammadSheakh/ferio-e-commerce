@@ -25,10 +25,13 @@ transactional-messages, store-locations controllers
 ## Reviews / banners moderation + requests + feedback
 | # | Method | Endpoint | Purpose |
 |---|---|---|---|
-| 1 | GET | `/admin/product-content/reviews?status=PENDING` | YouTube review moderation queue |
+| 1 | GET | `/admin/product-content/reviews` | YouTube review moderation queue; the current controller returns the full tenant-scoped queue and does not accept a `status` filter |
 | 2 | PATCH | `/admin/product-content/reviews/:id` `{ status }` | Approve/reject (feeds PDP) |
-| 3 | GET/POST/PATCH/DELETE | `/admin/product-content/products/:productId/banners[/:id]` | Review banner CRUD (sort order) |
-| 4 | GET | `/admin/requested-products` … (product-request admin) | Requested products queue |
+| 3 | GET/POST | `/admin/product-content/products/:productId/banners` | Read/create review banners (sort order) |
+| 4 | PATCH/DELETE | `/admin/product-content/banners/:id` | Update/delete a review banner |
+| 5 | GET | `/product-requests?status=&search=&page=&limit=` | Tenant-admin requested-products queue; the backend controller is guarded admin access but is not mounted under `/admin` |
+| 6 | PATCH | `/product-requests/:id/status` `{ status?, notes? }` | Update requested-product status |
+| 7 | DELETE | `/product-requests/:id` | Delete a requested-product record |
 
 ## Transactional messaging ops
 | # | Method | Endpoint | Purpose |

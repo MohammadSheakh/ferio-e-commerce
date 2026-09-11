@@ -28,9 +28,9 @@ tenant-admin only.
 ## Product requests & YouTube reviews
 | # | Method | Endpoint | Purpose |
 |---|---|---|---|
-| 1 | POST | `/product-requests` | Customer asks for a product |
+| 1 | POST | `/product-requests` `{ productName, name?, phone? }` | Customer asks for a product; authentication is optional and the server associates an authenticated request when available |
 | 2 | GET | `/product-content/:slug` | Approved banners + reviews for PDP |
-| 3 | POST | `/product-content/:productId/reviews` `{ youtubeUrl,title }` | Customer submission (moderation queue) |
+| 3 | POST | `/product-content/:productId/reviews` `{ youtubeUrl, title?, reviewerName? }` | Authenticated customer submission (moderation queue; YouTube URL only) |
 
 ## Store pickup & outlets
 | # | Method | Endpoint | Purpose |
