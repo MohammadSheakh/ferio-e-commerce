@@ -119,6 +119,15 @@ scheduling action for store-pickup orders, and the BFF forwards the session and
 tenant host context server-side. Runtime ownership, schedule-conflict, OTP,
 and live-host evidence remain required.
 
+The customer after-sales review corrected warranty contracts to the actual
+controller surface: claims history GET, delivered-order item verification POST,
+multipart evidence upload POST, and claim creation POST. The customer-web
+warranty screen already calls these through its authenticated BFF. Purchase
+activity documentation now matches the supported `surface/page/limit` query
+contract; `productId` filtering is not implemented. Customer returns are not
+presented as a customer API in the current NestJS controller, so return
+review/inspection remains tenant-admin only.
+
 ## Known documentation gaps (honest)
 
 - Response bodies for endpoints whose controllers return inline literals are

@@ -30,7 +30,11 @@ drafts or hidden variants regardless of direct URL.
 | # | Method | Endpoint | Purpose |
 |---|---|---|---|
 | 1 | GET | `/catalog/products/:slug` | Full product: variants+stock messaging, media order, reviews(banners), youtube reviews, Q&A if enabled |
-| 2 | GET | `/purchase-activity?productId=` | Consented social-proof ticker (configurable visibility) |
+| 2 | GET | `/purchase-activity?surface=toast&limit=` | Consented social-proof ticker (configurable visibility) |
 
 Variant add-to-cart uses `variant.id`; stock messaging reflects
 on-hand − reserved − damaged per FR-INV-002.
+
+The public purchase-activity contract supports `surface`, `page`, and `limit`
+query parameters. It does not expose a product-specific `productId` filter;
+the customer-web product surfaces use the bounded tenant-wide activity feed.
