@@ -28,8 +28,12 @@
 ## Screen 4: Store pickup
 | # | Method | Endpoint | Purpose |
 |---|---|---|---|
-| 1 | PATCH | `/admin/orders/:id/store-pickup/schedule` `{ date, slot }` | Schedule handover |
-| 2 | PATCH | `/admin/orders/:id/store-pickup/status` | Pickup lifecycle |
-| 3 | POST | `/admin/orders/:id/store-pickup/verify-handover` `{ otp }` | OTP-verified handover |
+| 1 | PATCH | `/admin/orders/:id/store-pickup/status` | Admin pickup lifecycle |
+| 2 | POST | `/admin/orders/:id/store-pickup/verify-handover` `{ otp }` | OTP-verified handover |
+
+Customer scheduling is not an admin operation. The customer contract is
+`PATCH /orders/:id/store-pickup/schedule` with the authenticated customer's
+pickup timestamp/notes; it is currently tracked separately from this admin
+screen.
 
 All mutations write OrderStatusHistory rows (old→new, actor, source).

@@ -16,7 +16,7 @@ cross-checked against the actual frontend call sites in
 | customer-storefront/cart.md | Add/edit/remove, validate, save/share/reorder/merge | ✅ verified |
 | customer-storefront/checkout-and-payment.md | Delivery/payment options, preview, COD place (idempotent), prepaid initiate/retry, wallet order, public tracking | ✅ verified |
 | customer-storefront/auth-and-account.md | Register/login/OAuth/refresh, profile link, addresses, history/reorder, notifications, wallet | ✅ verified |
-| customer-storefront/value-added-services.md | Services booking, warranty, product requests, reviews submission, outlets, chat ticket | ✅ verified |
+| customer-storefront/value-added-services.md | Services booking, warranty, product requests, reviews submission, outlets, pickup scheduling, chat ticket | ⚠️ partial |
 | customer-storefront/rider-portal.md | Apply, portal home, assigned orders, delivery lifecycle | ✅ verified |
 | tenant-admin/dashboard-overview.md | Reports overview + queue-health tiles + plan usage | ✅ verified |
 | tenant-admin/catalog-and-inventory.md | Products CRUD/status, categories, brands, inventory adjust, hero settings | ✅ verified |
@@ -110,6 +110,13 @@ location-history, and order-detail assignment flows are wired through the
 tenant-admin BFF. This is source-level evidence; current-assignment display,
 live authorization, cross-tenant denial, concurrent assignment behavior, and
 browser E2E remain required.
+
+The tenant-admin pickup review corrected the documentation boundary: pickup
+scheduling is the authenticated customer route
+`PATCH /orders/:id/store-pickup/schedule`, while tenant-admin only owns pickup
+status and OTP handover. The customer-web API contract exists, but no current
+browser call site was found for scheduling, so storefront pickup coverage is
+partial until the account/order flow integrates that action.
 
 ## Known documentation gaps (honest)
 

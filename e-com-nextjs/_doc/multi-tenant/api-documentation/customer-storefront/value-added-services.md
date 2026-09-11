@@ -30,6 +30,11 @@
 |---|---|---|---|
 | 1 | GET | `/store-locations` | Active outlets |
 | 2 | POST | `/store-locations/check-availability` | Stock at outlet per variant |
+| 3 | PATCH | `/orders/:id/store-pickup/schedule` `{ pickupScheduledAt?, customerPickupNotes? }` | Authenticated customer schedules or updates pickup |
+
+The pickup scheduling contract exists in NestJS/OpenAPI, but the current
+customer-web source audit found no browser call site for it. Keep this item
+open until the account/order flow exposes and validates the schedule action.
 
 ## Support chat (realtime)
 | # | Method | Endpoint | Purpose |
