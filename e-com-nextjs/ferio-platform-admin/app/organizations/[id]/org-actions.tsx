@@ -9,15 +9,20 @@ export function OrgActions({ organizationId, status }: { organizationId: string;
   async function call(action: string, path: string, body?: unknown) {
     setWorking(action);
     setMessage("");
-    const res = await fetch(`/api/platform${path}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      ...(body ? { body: JSON.stringify(body) } : {}),
-    });
-    const data = await readJsonRecord(res);
-    setWorking(null);
-    setMessage(res.ok ? `${action} OK.` : responseMessage(data, `${action} failed.`));
-    if (res.ok) window.location.reload();
+    try {
+      const res = await fetch(`/api/platform${path}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        ...(body ? { body: JSON.stringify(body) } : {}),
+      });
+      const data = await readJsonRecord(res);
+      setMessage(res.ok ? `${action} OK.` : responseMessage(data, `${action} failed.`));
+      if (res.ok) window.location.reload();
+    } catch {
+      setMessage(`${action} failed: control plane unavailable.`);
+    } finally {
+      setWorking(null);
+    }
   }
 
   return (
