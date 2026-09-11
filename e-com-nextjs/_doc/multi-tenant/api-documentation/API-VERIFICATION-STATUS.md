@@ -22,6 +22,7 @@ cross-checked against the actual frontend call sites in
 | tenant-admin/catalog-and-inventory.md | Products CRUD/status, categories, brands, inventory adjust, hero settings | ✅ verified |
 | tenant-admin/orders-and-fulfillment.md | Queue/filters/detail, COD confirm/cancel, fulfillment pipeline + exceptions, store pickup OTP | ✅ verified |
 | tenant-admin/shipping-and-couriers.md | Providers, shipments create/list, webhooks evidence+retry, polls+backlog, router scorecard | ✅ verified |
+| tenant-admin/delivery-personnel.md | Rider list/create/edit/approval, map and location-history cleanup; assignment route remains unintegrated | ⚠️ partial |
 | tenant-admin/customers.md | Search/detail scoped to tenant | ✅ verified |
 | tenant-admin/payments-wallet-reviews-content.md | Attempts+recovery, wallet review desk, review/banner moderation, messaging ops, outlets | ✅ verified |
 | tenant-admin/returns-rto-refunds.md | Eligibility→case→review→inspect→refund; RTO inspect | ✅ verified |
@@ -98,6 +99,16 @@ of expecting browser JavaScript to send an Authorization header. Profile,
 assigned-orders, online-status, and GPS routes already used the cookie
 boundary. Live authorization, GPS retention, transition races, COD staff
 confirmation, and cross-tenant host tests remain required.
+
+The tenant-admin operations review corrected the shipping documentation to
+match the actual BFF and NestJS routes: shipment creation is
+`POST /admin/shipping/orders/:orderId`, polling is
+`POST /admin/shipping/shipments/:id/poll`, and callback retry is
+`POST /admin/shipping/webhooks/:id/retry`. Provider configuration uses the
+separate PUT/DELETE config endpoints. Delivery personnel CRUD, approval, map,
+and location-history flows are wired; the existing assignment BFF route has
+no browser caller and remains an open integration item rather than being
+reported as verified.
 
 ## Known documentation gaps (honest)
 
