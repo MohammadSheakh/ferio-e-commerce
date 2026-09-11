@@ -27,3 +27,15 @@ Every migration executes with lock/statement timeouts and supports the
 | 1 | POST | `/platform/maintenance/retention-sweep` | Prune CommerceMessage/analytics/GPS across fleet (AuditLog 7y default) — audited |
 
 Daily scheduler runs automatically when RETENTION_SWEEP_ENABLED=true.
+
+## Backup evidence ledger
+| # | Method | Endpoint | Purpose |
+|---|---|---|---|
+| 1 | POST | `/platform/operations/backup-evidence` | Record checksum/protection/restore evidence from the trusted backup automation path |
+
+This is an operations automation endpoint, not a browser form: the platform
+admin catch-all BFF can forward the route with the platform httpOnly session,
+but no frontend screen should allow an operator to self-assert a backup. The
+backup job supplies the artifact, checksum, scope, completion time, and optional
+restore/protection timestamps; operations health consumes the ledger for the
+control-plane backup posture.

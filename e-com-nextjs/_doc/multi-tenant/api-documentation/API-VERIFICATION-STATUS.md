@@ -153,3 +153,11 @@ This inventory is not live integration proof. Webhook signatures, browser
 cookie behavior, SSR host forwarding, WebSocket room isolation, provider
 delivery, concurrency/idempotency races, and production authorization still
 require runtime evidence.
+
+The platform operations backup-evidence write is intentionally automation-only,
+not a browser UI feature: the platform catch-all can forward
+`POST /platform/operations/backup-evidence`, while trusted backup jobs are the
+caller that supplies checksums and restore/protection evidence. It is documented
+in `platform-admin/usage-fleet-migrations.md`; no dashboard form was added that
+could let an operator manufacture recovery evidence. Live backup-provider,
+restore, and permission evidence remain operational gates.
