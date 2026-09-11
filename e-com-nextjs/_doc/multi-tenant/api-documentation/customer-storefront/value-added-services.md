@@ -32,6 +32,13 @@ tenant-admin only.
 | 2 | GET | `/product-content/:slug` | Approved banners + reviews for PDP |
 | 3 | POST | `/product-content/:productId/reviews` `{ youtubeUrl, title?, reviewerName? }` | Authenticated customer submission (moderation queue; YouTube URL only) |
 
+The customer-web product-request BFF uses the shared customer session client
+when an access or refresh session exists, so an expired access cookie can be
+rotated before the optional account association is sent upstream. Anonymous
+requests use the same BFF and preserve the forwarded tenant host without an
+Authorization header. Review submission is authenticated and does not have a
+guest fallback.
+
 ## Store pickup & outlets
 | # | Method | Endpoint | Purpose |
 |---|---|---|---|

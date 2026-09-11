@@ -264,3 +264,12 @@ OAuth, logout, refresh rotation, automatic guest-cart merge, saved-cart
 sharing/import/save-to-account/delete, and reorder match their BFF and NestJS
 contracts. Runtime cookie replay, provider identity, cart ownership, browser,
 and cross-tenant evidence remain required.
+
+The customer value-added review confirmed warranty multipart evidence, claim
+history/order-item verification, public service booking, product-content reads,
+and authenticated review submission against the active controllers. It also
+fixed the optional-auth product-request BFF: authenticated callers now use the
+shared customer session client for access-token refresh and tenant-host
+forwarding, while guests retain the public submission path. Runtime multipart
+content checks, booking races, moderation authorization, browser behavior, and
+cross-tenant evidence remain required.

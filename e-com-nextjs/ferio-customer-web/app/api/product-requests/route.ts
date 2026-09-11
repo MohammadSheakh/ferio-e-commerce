@@ -1,38 +1,32 @@
-import { cookies } from "next/headers";
 import {
   bffErrorResponse,
   forwardedHeaders,
   proxyBackendResponse,
 } from "@/lib/bff-response";
+import { backendApiUrl, customerSessionFetch } from "@/lib/customer-session";
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const cookieStore = await cookies();
-    const token =
-      cookieStore.get("ferio_customer_access")?.value ||
-      cookieStore.get("ferio_token")?.value;
-
-    const rawBackend =
-      process.env.FERIO_API_URL ||
-      process.env.NEXT_PUBLIC_FERIO_API_URL ||
-      process.env.NEST_BACKEND_URL ||
-      "http://localhost:6733";
-    const backendUrl = rawBackend.replace(/\/api\/v1\/?$/, "");
-
-    const headers = forwardedHeaders(request, {
-      "Content-Type": "application/json",
-    });
-    if (token) {
-      headers.set("Authorization", `Bearer ${token}`);
-    }
-
-    const res = await fetch(`${backendUrl}/api/v1/product-requests`, {
+    const sessionResponse = await customerSessionFetch("/product-requests", {
       method: "POST",
-      headers,
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
-      cache: "no-store",
     });
+
+    // Product requests are intentionally public. Only the authenticated path
+    // needs session rotation; guests still submit through the same tenant-aware
+    // BFF with the original forwarded host context.
+    const res =
+      sessionResponse?.response ??
+      (await fetch(`${backendApiUrl}/product-requests`, {
+        method: "POST",
+        headers: forwardedHeaders(request, {
+          "Content-Type": "application/json",
+        }),
+        body: JSON.stringify(body),
+        cache: "no-store",
+      }));
 
     return proxyBackendResponse(res, "Failed to submit product request.");
   } catch {
