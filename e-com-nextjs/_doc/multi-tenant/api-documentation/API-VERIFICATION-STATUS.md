@@ -248,3 +248,11 @@ initiation call; the retry screen calls the separate retry endpoint with order
 reference, phone, and provider. Corrected the documentation to reflect this
 two-step contract. Runtime duplicate-submit, payment callback, provider,
 stock-race, browser, live-host, and cross-tenant evidence remain required.
+
+The customer account review fixed the wallet pagination integration. The wallet
+screen now forwards `page` and `limit` to `GET /account/wallet` and exposes
+navigation from the backend `totalPages`, while preserving the idempotent
+top-up submission. Profile, addresses, order linking/reorder, notifications,
+unread badge, and session-refresh BFF paths matched their controllers. Runtime
+ownership, refresh replay, wallet credit idempotency, browser cookies, and
+cross-tenant evidence remain required.

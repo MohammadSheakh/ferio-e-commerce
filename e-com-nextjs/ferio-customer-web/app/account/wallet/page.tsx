@@ -14,9 +14,9 @@ export default function WalletPage() {
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  async function load() {
+  async function load(page = 1) {
     try {
-      const response = await fetch("/api/account/wallet", { cache: "no-store" });
+      const response = await fetch(`/api/account/wallet?page=${page}&limit=20`, { cache: "no-store" });
       const payload = (await response.json().catch(() => ({}))) as { data?: WalletSummary; message?: string };
       if (response.status === 401) setUnauthorized(true);
       else if (response.ok && payload.data) setSummary(payload.data);
@@ -159,6 +159,29 @@ export default function WalletPage() {
               </div>
             )) : <p className="py-8 text-[13px] text-ink2">No top-up requests yet.</p>}
           </div>
+          {summary && summary.totalPages > 1 && (
+            <div className="mt-5 flex items-center justify-between text-[12px]">
+              <button
+                type="button"
+                disabled={summary.page <= 1 || loading}
+                onClick={() => void load(summary.page - 1)}
+                className="rounded-full border border-line px-4 py-2 disabled:opacity-30"
+              >
+                Previous
+              </button>
+              <span className="text-ink2">
+                Page {summary.page} of {summary.totalPages}
+              </span>
+              <button
+                type="button"
+                disabled={summary.page >= summary.totalPages || loading}
+                onClick={() => void load(summary.page + 1)}
+                className="rounded-full border border-line px-4 py-2 disabled:opacity-30"
+              >
+                Next
+              </button>
+            </div>
+          )}
         </section>
       </div>
     </main>

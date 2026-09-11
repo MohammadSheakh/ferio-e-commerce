@@ -57,3 +57,7 @@ flows documented in `checkout-and-payment.md`.
 | 1 | GET | `/account/wallet?page=&limit=` | Balance + ledger + top-up status |
 | 2 | POST | `/account/wallet/top-ups` `{ provider, amount, customerReference, customerNote? }` + `Idempotency-Key` header | Request recharge → PENDING_REVIEW; amount is minor units |
 Admin approval credits atomically exactly once (FR-WAL-005).
+
+The wallet screen forwards page and limit to the BFF and exposes previous/next
+navigation for the returned `totalPages`; it does not assume the first page is
+the complete ledger.
