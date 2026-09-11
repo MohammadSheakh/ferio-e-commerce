@@ -1,9 +1,7 @@
-import { NextResponse } from "next/server";
 import {
-  backendErrorResponse,
   bffErrorResponse,
   forwardedHeaders,
-  type BackendErrorPayload,
+  proxyBackendResponse,
 } from "@/lib/bff-response";
 
 const backendUrl =
@@ -20,17 +18,7 @@ export async function POST(request: Request) {
       body: JSON.stringify(body),
     });
 
-    const payload = (await response.json()) as BackendErrorPayload;
-
-    if (!response.ok) {
-      return backendErrorResponse(
-        payload,
-        response.status,
-        "Application failed.",
-      );
-    }
-
-    return NextResponse.json({ data: payload });
+    return proxyBackendResponse(response, "Application failed.");
   } catch {
     return bffErrorResponse(
       "The application service is unavailable.",
