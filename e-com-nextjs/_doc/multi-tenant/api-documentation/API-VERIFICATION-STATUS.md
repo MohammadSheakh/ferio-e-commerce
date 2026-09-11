@@ -195,3 +195,10 @@ credential PUT/DELETE remain intentionally automation/operator-only because
 they accept or revoke secrets. The shipping documentation now points to the
 actual dashboard paths, and the UI no longer describes tenant credentials as
 environment-only values.
+
+The tenant-admin settlements/reconciliation review also corrected the API
+contract documentation. The dashboard already integrates settlement imports,
+CSV preflight/template, settlement recording, findings, scan, queue health,
+alerts, finding actions, and failed-run retry. Run evidence is supplied by
+`GET /admin/reconciliation/queue-health` as `recentRuns`; the nonexistent
+standalone run-detail route was removed from the documented surface.

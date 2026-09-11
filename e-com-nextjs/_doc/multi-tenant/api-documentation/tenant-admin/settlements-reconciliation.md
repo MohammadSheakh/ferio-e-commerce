@@ -1,6 +1,6 @@
 # Tenant Admin — Settlements & Reconciliation (finance role)
 
-**Frontend:** `app/settlements`, `app/reconciliation`
+**Frontend:** `app/dashboard/reconciliation/page.tsx`, `components/reconciliation/*`, `lib/settlements.ts`
 **Verified against:** settlements + settlement-imports + reconciliation controllers
 
 ---
@@ -22,10 +22,13 @@ import atomically and never partially settle valid rows.
 |---|---|---|---|
 | 1 | GET | `/admin/reconciliation/findings?page&limit&domain&severity&status` | Findings queue (INVALID_STOCK_BALANCE etc.) |
 | 2 | POST | `/admin/reconciliation/scan` `{ overdueHours }` | Idempotent scan run (dedup key) |
-| 3 | GET | `/admin/reconciliation/runs/:runId` | Run evidence |
-| 4 | POST | `/admin/reconciliation/findings/:id/action` `{ action: RESOLVE\|AUTO_FIX }` | Manual/auto resolution path |
-| 5 | POST | `/admin/reconciliation/runs/:runId/retry` | Retry failed run |
+| 3 | GET | `/admin/reconciliation/queue-health` | Queue counts, schedule, operations summary, and recent run evidence |
+| 4 | GET | `/admin/reconciliation/alerts` | Operational reconciliation alerts for the dashboard overview |
+| 5 | POST | `/admin/reconciliation/findings/:id/action` `{ action: CLAIM\|ACKNOWLEDGE\|RESOLVE\|REOPEN, note }` | Manual resolution path |
+| 6 | POST | `/admin/reconciliation/runs/:runId/retry` | Retry failed run |
 
-Finding actions use `{ action: CLAIM|ACKNOWLEDGE|RESOLVE|REOPEN, note }`.
+Run evidence is intentionally returned by queue health as `recentRuns`; there is
+no standalone `GET /admin/reconciliation/runs/:runId` route. The dashboard uses
+that bounded operational view when presenting failed-run retry controls.
 The reconciliation scan accepts `{ overdueHours? }` and forwards the
 `Idempotency-Key` header for safe retries.
