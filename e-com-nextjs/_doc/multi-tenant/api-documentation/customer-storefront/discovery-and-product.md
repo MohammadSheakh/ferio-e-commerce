@@ -17,7 +17,7 @@
 ## Screen 2: Product Listing + Search + Filters
 | # | Method | Endpoint | Purpose |
 |---|---|---|---|
-| 1 | GET | `/catalog/products?page=&limit=&search=&category=&brand=&minPrice=&maxPrice=&sort=` | Paginated published products; search covers name/sku (trigram-indexed) |
+| 1 | GET | `/catalog/products?page=&limit=&search=&category=&featured=&condition=&minPrice=&maxPrice=&inStock=&sort=&attributeKey=&attributeValue=` | Paginated published products; search covers name/brand/category/SKU |
 | 2 | GET | `/catalog/categories` | Filter rail |
 | 3 | GET | `/catalog/brands` | Brand filter |
 

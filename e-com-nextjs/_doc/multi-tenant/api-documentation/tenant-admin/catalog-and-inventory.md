@@ -20,12 +20,13 @@ settings controller (hero showcase type)
 |---|---|---|---|
 | 1 | GET/POST | `/admin/catalog/categories` | List/create |
 | 2 | PATCH/DELETE | `/admin/catalog/categories/:id` | Update/remove |
-| 3 | GET/POST | `/admin/catalog/brands` · `/admin/catalog/brands/:id` | Brand CRUD (slug uniqueness is tenant-local) |
+| 3 | GET/POST | `/admin/catalog/brands` | List/create brands (slug uniqueness is tenant-local) |
+| 4 | PATCH/DELETE | `/admin/catalog/brands/:id` | Update/remove a brand |
 
 ## Inventory (single warehouse)
 | # | Method | Endpoint | Purpose |
 |---|---|---|---|
-| 1 | GET | `/admin/catalog/inventory?lowStock=` | On-hand/reserved/damaged per variant + low-stock flags |
+| 1 | GET | `/admin/catalog/inventory?page=&limit=&search=&lowStock=` | Paginated on-hand/reserved/damaged per variant + low-stock flags |
 | 2 | PATCH | `/admin/catalog/inventory/:variantId` `{ quantityDelta, adjustmentReason, reason }` | Manual adjustment; every change writes an immutable movement (FR-INV-004) |
 
 ## Hero Showcase
