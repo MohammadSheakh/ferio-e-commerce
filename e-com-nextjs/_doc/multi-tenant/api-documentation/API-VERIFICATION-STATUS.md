@@ -168,3 +168,10 @@ hero-showcase screen exposes a confirmed removal action that restores the
 storefront's built-in defaults after server success. The mutation remains
 tenant-scoped and audited by the Nest settings controller; live authorization,
 cache invalidation, and browser evidence remain runtime gates.
+
+The tenant-admin orders review also closed the pickup lifecycle UI gap. The
+order-detail screen now exposes the backend-supported admin pickup statuses
+(`AVAILABLE_IN_STORE`, `TRANSFER_REQUIRED`, `IN_TRANSFER`, `READY_FOR_PICKUP`,
+and `CANCELLED`) through `PATCH /admin/orders/:id/store-pickup/status` instead
+of hard-coding only the ready state. OTP handover remains a separate server
+action; live transition authorization and browser evidence remain open.

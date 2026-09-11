@@ -57,6 +57,14 @@ const storePickupStatusClass: Record<StorePickupStatus, string> = {
   CANCELLED: "bg-rose-50 text-rose-700",
 };
 
+const adminStorePickupStatuses: StorePickupStatus[] = [
+  "AVAILABLE_IN_STORE",
+  "TRANSFER_REQUIRED",
+  "IN_TRANSFER",
+  "READY_FOR_PICKUP",
+  "CANCELLED",
+];
+
 function formatEnum(value: string) {
   const label = value.replaceAll("_", " ").toLowerCase();
   return label.charAt(0).toUpperCase() + label.slice(1);
@@ -83,6 +91,7 @@ export default function OrderDetailPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [assigningRider, setAssigningRider] = useState(false);
+  const [pickupStatus, setPickupStatus] = useState<StorePickupStatus | "">("");
   const [error, setError] = useState("");
   const [assignmentMessage, setAssignmentMessage] = useState("");
 
@@ -436,8 +445,9 @@ export default function OrderDetailPage() {
     }
   }
 
-  async function markStorePickupReady(event: FormEvent<HTMLFormElement>) {
+  async function updateStorePickupStatus(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!order || !pickupStatus || pickupStatus === order.storePickupStatus) return;
     setSaving(true);
     setError("");
     try {
@@ -446,7 +456,7 @@ export default function OrderDetailPage() {
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status: "READY_FOR_PICKUP" }),
+          body: JSON.stringify({ status: pickupStatus }),
         },
       );
       const payload = (await response.json()) as { message?: string };
@@ -848,17 +858,29 @@ export default function OrderDetailPage() {
               {order.storePickupStatus !== "COMPLETED" &&
                 order.storePickupStatus !== "CANCELLED" && (
                   <div className="mt-5 space-y-4 border-t border-line pt-5">
-                    <form onSubmit={markStorePickupReady}>
-                      <button
-                        disabled={
-                          saving ||
-                          order.storePickupStatus === "READY_FOR_PICKUP"
+                    <form onSubmit={updateStorePickupStatus} className="space-y-2">
+                      <label htmlFor="pickup-status" className="block text-[11px] text-ink2">
+                        Update pickup status
+                      </label>
+                      <select
+                        id="pickup-status"
+                        value={pickupStatus || order.storePickupStatus}
+                        onChange={(event) =>
+                          setPickupStatus(event.target.value as StorePickupStatus)
                         }
+                        className={`w-full ${fieldClass}`}
+                      >
+                        {adminStorePickupStatuses.map((status) => (
+                          <option key={status} value={status}>
+                            {formatEnum(status)}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        disabled={saving || !pickupStatus || pickupStatus === order.storePickupStatus}
                         className="w-full rounded-full bg-ink px-5 py-2.5 text-[12px] font-medium text-white transition hover:opacity-90 disabled:opacity-40"
                       >
-                        {order.storePickupStatus === "READY_FOR_PICKUP"
-                          ? "Customer notified — ready for pickup"
-                          : "Mark ready and notify customer"}
+                        {saving ? "Updating…" : "Update pickup status"}
                       </button>
                     </form>
 
