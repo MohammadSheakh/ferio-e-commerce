@@ -14,6 +14,7 @@ export const metadata: Metadata = {
 type ProductSearchParams = {
   category?: string;
   search?: string;
+  page?: string;
   minPrice?: string;
   maxPrice?: string;
   inStock?: string;
@@ -30,6 +31,8 @@ export default async function ProductsPage({
 }) {
   const category = searchParams.category || "";
   const search = searchParams.search || "";
+  const requestedPage = Number(searchParams.page || 1);
+  const page = Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
   const minPrice = searchParams.minPrice ? Number(searchParams.minPrice) : undefined;
   const maxPrice = searchParams.maxPrice ? Number(searchParams.maxPrice) : undefined;
   const inStock = searchParams.inStock === "true";
@@ -42,6 +45,7 @@ export default async function ProductsPage({
     getProducts({
       category,
       search,
+      page,
       minPrice: Number.isFinite(minPrice) ? minPrice : undefined,
       maxPrice: Number.isFinite(maxPrice) ? maxPrice : undefined,
       inStock,
@@ -71,6 +75,7 @@ export default async function ProductsPage({
     const query = new URLSearchParams();
     if (nextCategory) query.set("category", nextCategory);
     if (search) query.set("search", search);
+    if (page > 1) query.set("page", String(page));
     if (searchParams.minPrice) query.set("minPrice", searchParams.minPrice);
     if (searchParams.maxPrice) query.set("maxPrice", searchParams.maxPrice);
     if (inStock) query.set("inStock", "true");
@@ -79,6 +84,21 @@ export default async function ProductsPage({
     if (attributeKey) query.set("attributeKey", attributeKey);
     if (attributeValue) query.set("attributeValue", attributeValue);
     return query.size ? `/products?${query.toString()}` : "/products";
+  }
+
+  function pageHref(nextPage: number): string {
+    const query = new URLSearchParams();
+    query.set("page", String(nextPage));
+    if (category) query.set("category", category);
+    if (search) query.set("search", search);
+    if (searchParams.minPrice) query.set("minPrice", searchParams.minPrice);
+    if (searchParams.maxPrice) query.set("maxPrice", searchParams.maxPrice);
+    if (inStock) query.set("inStock", "true");
+    if (condition) query.set("condition", condition);
+    if (sort !== "newest") query.set("sort", sort);
+    if (attributeKey) query.set("attributeKey", attributeKey);
+    if (attributeValue) query.set("attributeValue", attributeValue);
+    return `/products?${query.toString()}`;
   }
 
   return (
@@ -116,6 +136,13 @@ export default async function ProductsPage({
         {products.items.map((product) => <ProductCard key={product.id} product={product} />)}
       </div>
       {products.items.length === 0 && <div className="py-20 text-center"><p className="text-[15px] text-ink">No matching products</p><p className="mt-2 text-[13px] text-ink2">Clear a filter or try a broader search.</p></div>}
+      {products.totalPages > 1 && (
+        <nav aria-label="Product pages" className="mt-12 flex items-center justify-center gap-4 text-[13px]">
+          {products.page > 1 ? <Link href={pageHref(products.page - 1)} className="rounded-full border border-line px-4 py-2 text-ink2 hover:border-ink hover:text-ink">Previous</Link> : <span className="rounded-full border border-line px-4 py-2 text-ink2/40">Previous</span>}
+          <span className="text-ink2">Page {products.page} of {products.totalPages}</span>
+          {products.page < products.totalPages ? <Link href={pageHref(products.page + 1)} className="rounded-full border border-line px-4 py-2 text-ink2 hover:border-ink hover:text-ink">Next</Link> : <span className="rounded-full border border-line px-4 py-2 text-ink2/40">Next</span>}
+        </nav>
+      )}
     </main>
   );
 }

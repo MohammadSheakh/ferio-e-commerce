@@ -19,7 +19,15 @@
 |---|---|---|---|
 | 1 | GET | `/catalog/products?page=&limit=&search=&category=&featured=&condition=&minPrice=&maxPrice=&inStock=&sort=&attributeKey=&attributeValue=` | Paginated published products; search covers name/brand/category/SKU |
 | 2 | GET | `/catalog/categories` | Filter rail |
-| 3 | GET | `/catalog/brands` | Brand filter |
+| 3 | GET | `/catalog/brands` | Optional brand directory for a future/alternate storefront filter |
+
+The currently shipped `/products` page does not call `/catalog/brands`; its
+active filters are search, category, price range, stock, condition, sort, and
+variant attribute. Do not treat the brand directory as a completed browser
+integration until a storefront surface consumes it.
+
+The listing forwards the backend `page` and `limit` values and renders
+previous/next controls while preserving all active filters.
 
 Unpublished/out-of-stock handling is server-side: listing never returns
 drafts or hidden variants regardless of direct URL.
