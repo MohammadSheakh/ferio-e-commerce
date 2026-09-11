@@ -217,3 +217,8 @@ route forwarding the documented `/product-requests` backend endpoint. Review
 moderation and store CRUD already have browser callers. Review-banner
 GET/PATCH/DELETE remain explicitly open for a dedicated banner-management UI;
 the existing screen currently integrates banner creation only.
+
+That review-banner UI gap is now closed: the reviews screen loads banners by
+product ID and sends the documented GET, PATCH, and DELETE operations through
+the existing wildcard BFF, including active state, sort order, alt text, and
+image URL updates.
