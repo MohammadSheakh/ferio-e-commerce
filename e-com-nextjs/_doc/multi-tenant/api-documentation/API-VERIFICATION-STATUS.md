@@ -297,6 +297,15 @@ automation-owned by design. Platform API check, TypeScript, lint, and
 production build passed; provider credentials, gateway delivery, recovery
 correctness, backup/restore, permissions, and production evidence remain open.
 
+Shot 67 audited platform system-health, feature-flag, and fleet-operation
+integration. Added `app/system-health` for the credential-free operational
+health projection and `app/feature-flags` for audited GET/PUT flag management;
+database health and migration list/start/pause/resume callers were already
+present. Retention sweep and backup-evidence writes remain scheduler/trusted
+automation boundaries. Platform API check, TypeScript, lint, and production
+build passed; live permissions, queue/Redis behavior, backup/restore, and
+production evidence remain open.
+
 The customer public-operational review also cross-checked order tracking,
 store pickup outlet listing/availability, and privacy-safe storefront analytics.
 `POST /orders/track`, `GET /store-locations`,

@@ -43,3 +43,10 @@ control-plane backup posture.
 Retention sweep and backup-evidence writes remain automation-owned for the same
 reason. The platform console may consume resulting health/read-only evidence,
 but must not manufacture deletion or recovery proof from a browser.
+
+The platform console also exposes the safe fleet read/control surfaces:
+`GET /platform/system-health` is rendered by `app/system-health`,
+`GET /platform/database-health` is rendered by `app/database-health`, and the
+migration list/start/pause/resume operations are rendered by `app/migrations`.
+`GET /platform/feature-flags` and `PUT /platform/feature-flags/:key` are
+rendered by `app/feature-flags`; flag updates are audited and note-bearing.
