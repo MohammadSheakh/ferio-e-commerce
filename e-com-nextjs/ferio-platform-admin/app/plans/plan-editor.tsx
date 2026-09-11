@@ -89,20 +89,25 @@ export function PlanEditor({ plan }: { plan: EditablePlan }) {
   async function save() {
     setSaving(true);
     setMessage("");
-    const response = await fetch(`/api/platform/plans/${plan.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        displayName,
-        billingInterval,
-        amountMinor: Number(amountMinor || 0),
-        isActive,
-        entitlements,
-      }),
-    });
-    const data = await readJsonRecord(response);
-    setSaving(false);
-    setMessage(response.ok ? "Saved" : responseMessage(data, "Unable to save changes."));
+    try {
+      const response = await fetch(`/api/platform/plans/${plan.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          displayName,
+          billingInterval,
+          amountMinor: Number(amountMinor || 0),
+          isActive,
+          entitlements,
+        }),
+      });
+      const data = await readJsonRecord(response);
+      setMessage(response.ok ? "Saved" : responseMessage(data, "Unable to save changes."));
+    } catch {
+      setMessage("Unable to save changes: control plane unavailable.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -130,7 +135,7 @@ export function PlanEditor({ plan }: { plan: EditablePlan }) {
         </div>
         <div>
           <label htmlFor={`${plan.id}-amount`}>Monthly amount (poisha)</label>
-          <input id={`${plan.id}-amount`} className="input" type="number" min="0" value={amountMinor} onChange={(event) => setAmountMinor(event.target.value)} />
+          <input id={`${plan.id}-amount`} className="input" type="number" min="0" max="2147483647" step="1" value={amountMinor} onChange={(event) => setAmountMinor(event.target.value)} />
         </div>
         <div>
           <label htmlFor={`${plan.id}-billing`}>Billing interval</label>

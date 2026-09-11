@@ -32,18 +32,12 @@ function dateOnly(value?: string | null) {
 }
 
 export default async function BillingPage() {
-  let invoices: InvoiceRow[] = [];
-  let attempts: AttemptRow[] = [];
-  try {
-    const [invoiceData, attemptData] = await Promise.all([
-      platformApi<{ items: InvoiceRow[] }>("/platform/billing/invoices"),
-      platformApi<{ items: AttemptRow[] }>("/platform/billing/payment-attempts"),
-    ]);
-    invoices = invoiceData.items ?? [];
-    attempts = attemptData.items ?? [];
-  } catch {
-    /* error.tsx handles control-plane outages */
-  }
+  const [invoiceData, attemptData] = await Promise.all([
+    platformApi<{ items: InvoiceRow[] }>("/platform/billing/invoices"),
+    platformApi<{ items: AttemptRow[] }>("/platform/billing/payment-attempts"),
+  ]);
+  const invoices = invoiceData.items ?? [];
+  const attempts = attemptData.items ?? [];
 
   return (
     <>
