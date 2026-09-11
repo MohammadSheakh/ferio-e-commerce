@@ -8,6 +8,7 @@ import { formatTaka } from "@/lib/catalog";
 import type {
   CourierWebhookLog,
   CourierWebhookQueueHealth,
+  CourierScorecardRow,
   Shipment,
   ShipmentPollAttempt,
   ShipmentPollingQueueHealth,
@@ -22,6 +23,7 @@ function formatEnum(value: string) {
 
 export default function ShippingPage() {
   const [providers, setProviders] = useState<ShipmentProvider[]>([]);
+  const [scorecard, setScorecard] = useState<CourierScorecardRow[]>([]);
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [webhookLogs, setWebhookLogs] = useState<CourierWebhookLog[]>([]);
   const [webhookQueue, setWebhookQueue] =
@@ -40,6 +42,7 @@ export default function ShippingPage() {
     try {
       const [
         providerResponse,
+        scorecardResponse,
         shipmentResponse,
         webhookResponse,
         webhookQueueResponse,
@@ -47,6 +50,7 @@ export default function ShippingPage() {
         pollingQueueResponse,
       ] = await Promise.all([
         fetch("/api/shipping/providers", { cache: "no-store" }),
+        fetch("/api/shipping/scorecard", { cache: "no-store" }),
         fetch("/api/shipping/shipments", { cache: "no-store" }),
         fetch("/api/shipping/webhooks", { cache: "no-store" }),
         fetch("/api/shipping/webhooks/queue-health", { cache: "no-store" }),
@@ -55,6 +59,10 @@ export default function ShippingPage() {
       ]);
       const providerPayload = (await providerResponse.json()) as {
         data?: ShipmentProvider[];
+        message?: string;
+      };
+      const scorecardPayload = (await scorecardResponse.json()) as {
+        data?: CourierScorecardRow[];
         message?: string;
       };
       const shipmentPayload = (await shipmentResponse.json()) as {
@@ -83,6 +91,13 @@ export default function ShippingPage() {
       } else {
         failures.push(
           providerPayload.message || "Unable to load courier providers.",
+        );
+      }
+      if (scorecardResponse.ok && scorecardPayload.data) {
+        setScorecard(scorecardPayload.data);
+      } else {
+        failures.push(
+          scorecardPayload.message || "Unable to load courier scorecard.",
         );
       }
       if (shipmentResponse.ok && shipmentPayload.data) {
@@ -282,6 +297,50 @@ export default function ShippingPage() {
                 No courier providers are available.
               </p>
             )}
+          </div>
+        </section>
+
+        <section>
+          <div>
+            <h2 className="text-[16px] font-medium text-ink">Courier scorecard</h2>
+            <p className="mt-1 text-[12px] text-ink2">
+              Tenant-local delivery, RTO, and pickup-SLA evidence by provider.
+            </p>
+          </div>
+          <div className="mt-5 overflow-x-auto border-y border-line">
+            <table className="w-full min-w-[760px] border-collapse text-left">
+              <thead>
+                <tr className="border-b border-line text-[11px] uppercase tracking-eyebrow text-ink2">
+                  <th className="px-5 py-3 font-normal">Courier</th>
+                  <th className="px-5 py-3 font-normal">State</th>
+                  <th className="px-5 py-3 font-normal">Parcels</th>
+                  <th className="px-5 py-3 font-normal">Delivered</th>
+                  <th className="px-5 py-3 font-normal">Delivery rate</th>
+                  <th className="px-5 py-3 font-normal">RTO rate</th>
+                  <th className="px-5 py-3 font-normal">Pickup SLA</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line">
+                {scorecard.map((row) => (
+                  <tr key={row.providerCode} className="text-[13px]">
+                    <td className="px-5 py-3.5 text-ink">{row.name}</td>
+                    <td className="px-5 py-3.5 text-ink2">{row.isActive ? "Active" : "Inactive"}</td>
+                    <td className="px-5 py-3.5 text-ink2">{row.totalParcels}</td>
+                    <td className="px-5 py-3.5 text-ink2">{row.deliveredParcels}</td>
+                    <td className="px-5 py-3.5 text-ink2">{row.deliveryRatePercent}%</td>
+                    <td className="px-5 py-3.5 text-ink2">{row.rtoPercent}%</td>
+                    <td className="px-5 py-3.5 text-ink2">{row.pickupSlaPercent}%</td>
+                  </tr>
+                ))}
+                {!loading && scorecard.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="px-5 py-10 text-center text-[13px] text-ink2">
+                      No courier scorecard data is available.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </section>
 

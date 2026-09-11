@@ -10,9 +10,10 @@ courier webhook controller (`webhooks/couriers` — provider-facing, not admin)
 | # | Method | Endpoint | Purpose |
 |---|---|---|---|
 | 1 | GET | `/admin/shipping/providers` | Configured providers + active flags (Pathao/Steadfast/RedX/eCourier/Paperfly/CarryBee) |
-| 2 | PATCH | `/admin/shipping/providers/:code` | Enable or disable a provider |
-| 3 | PUT | `/admin/shipping/providers/:code/config` | Store provider credentials/configuration |
-| 4 | DELETE | `/admin/shipping/providers/:code/config` | Revoke provider credentials/configuration |
+| 2 | GET | `/admin/shipping/scorecard` | Tenant-local delivery, RTO, and pickup-SLA scorecard |
+| 3 | PATCH | `/admin/shipping/providers/:code` | Enable or disable a provider |
+| 4 | PUT | `/admin/shipping/providers/:code/config` | Store provider credentials/configuration |
+| 5 | DELETE | `/admin/shipping/providers/:code/config` | Revoke provider credentials/configuration |
 
 ## Shipments
 | # | Method | Endpoint | Purpose |

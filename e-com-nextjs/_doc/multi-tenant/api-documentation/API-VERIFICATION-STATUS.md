@@ -175,3 +175,10 @@ order-detail screen now exposes the backend-supported admin pickup statuses
 and `CANCELLED`) through `PATCH /admin/orders/:id/store-pickup/status` instead
 of hard-coding only the ready state. OTP handover remains a separate server
 action; live transition authorization and browser evidence remain open.
+
+The tenant-admin shipping review also closed the courier scorecard read gap.
+The shipping dashboard now calls `GET /admin/shipping/scorecard` through its
+admin BFF and renders tenant-local delivery, RTO, and pickup-SLA metrics. The
+separate courier recommendation action remains a follow-up because it requires
+explicit destination, weight, COD, and urgency inputs; no guessed operational
+values are sent from the dashboard.

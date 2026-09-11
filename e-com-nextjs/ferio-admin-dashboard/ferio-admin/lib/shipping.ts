@@ -16,6 +16,18 @@ export type ShipmentProvider = {
   pollingConfigured: boolean;
 };
 
+export type CourierScorecardRow = {
+  providerCode: CourierCode;
+  name: string;
+  isActive: boolean;
+  totalParcels: number;
+  deliveredParcels: number;
+  rtoParcels: number;
+  deliveryRatePercent: number;
+  rtoPercent: number;
+  pickupSlaPercent: number;
+};
+
 export type ShipmentEvent = {
   id: string;
   rawStatus: string;
