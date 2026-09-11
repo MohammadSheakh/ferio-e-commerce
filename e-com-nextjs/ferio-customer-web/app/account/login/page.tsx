@@ -24,20 +24,24 @@ export default function LoginPage() {
     setSubmitting(true);
     setMessage("");
     const form = new FormData(event.currentTarget);
-    const response = await fetch("/api/account/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: form.get("email"),
-        password: form.get("password"),
-      }),
-    });
-    const payload = await response.json();
-    if (response.ok) {
-      window.location.assign(destination());
-      return;
+    try {
+      const response = await fetch("/api/account/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: form.get("email"),
+          password: form.get("password"),
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (response.ok) {
+        window.location.assign(destination());
+        return;
+      }
+      setMessage(payload.message || "Sign in failed.");
+    } catch {
+      setMessage("The sign-in service is unavailable. Try again shortly.");
     }
-    setMessage(payload.message || "Sign in failed.");
     setSubmitting(false);
   }
 

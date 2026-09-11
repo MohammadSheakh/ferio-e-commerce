@@ -21,25 +21,31 @@ export default function RegisterPage() {
       return;
     }
     setSubmitting(true);
-    const response = await fetch("/api/account/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: form.get("name"),
-        email: form.get("email"),
-        phoneNumber: form.get("phoneNumber") || undefined,
-        password: form.get("password"),
-      }),
-    });
-    const payload = await response.json();
-    if (response.ok) {
-      const next = new URLSearchParams(window.location.search).get("next");
-      const query = new URLSearchParams({ email: payload.data.email });
-      if (next?.startsWith("/") && !next.startsWith("//")) query.set("next", next);
-      window.location.assign(`/account/verify?${query}`);
-      return;
+    try {
+      const response = await fetch("/api/account/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: form.get("name"),
+          email: form.get("email"),
+          phoneNumber: form.get("phoneNumber") || undefined,
+          password: form.get("password"),
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (response.ok) {
+        const next = new URLSearchParams(window.location.search).get("next");
+        const query = new URLSearchParams({
+          email: payload.data?.email || String(form.get("email")),
+        });
+        if (next?.startsWith("/") && !next.startsWith("//")) query.set("next", next);
+        window.location.assign(`/account/verify?${query}`);
+        return;
+      }
+      setMessage(payload.message || "Account creation failed.");
+    } catch {
+      setMessage("The registration service is unavailable. Try again shortly.");
     }
-    setMessage(payload.message || "Account creation failed.");
     setSubmitting(false);
   }
 
