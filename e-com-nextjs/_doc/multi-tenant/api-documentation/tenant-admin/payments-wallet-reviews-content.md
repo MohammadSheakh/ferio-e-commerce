@@ -46,11 +46,16 @@ provisioning and revocation remain in the operator-controlled path.
 | 1 | GET | `/admin/transactional-messages?page=&limit=&status=&eventType=&search=` | Tenant-scoped message outbox |
 | 2 | GET | `/admin/transactional-messages/templates` | Template registry (per tenant) |
 | 3 | PATCH | `/admin/transactional-messages/templates/:key` `{ subject?, body?, enabled? }` | Update a message template |
-| 4 | GET | `/admin/transactional-messages/providers` | Configured SMS/WhatsApp/email provider state |
-| 5 | PATCH | `/admin/transactional-messages/providers/:channel` | Update a provider configuration |
+| 4 | GET | `/admin/transactional-messages/providers` | Configured SMS/WhatsApp/email provider state; secrets are never returned |
+| 5 | PATCH | `/admin/transactional-messages/providers/:channel` | Operator-controlled provider credential/configuration update; not a browser form |
 | 6 | GET/PATCH | `/admin/transactional-messages/policy` | Read/update tenant messaging policy |
 | 7 | GET | `/admin/transactional-messages/queue-health` | Outbox backlog evidence |
 | 8 | POST | `/admin/transactional-messages/:id/retry` | Retry a failed message with audit/permission checks |
+
+The messages dashboard integrates outbox, queue health, templates, provider
+readiness, policy read/update, and retry. Provider PATCH remains outside the
+browser because its DTO accepts credentials; the dashboard exposes only the
+non-secret provider state and routing policy.
 
 ## Store outlets
 | # | Method | Endpoint | Purpose |

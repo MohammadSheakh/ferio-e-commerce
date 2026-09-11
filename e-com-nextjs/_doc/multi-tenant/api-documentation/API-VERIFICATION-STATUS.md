@@ -222,3 +222,10 @@ That review-banner UI gap is now closed: the reviews screen loads banners by
 product ID and sends the documented GET, PATCH, and DELETE operations through
 the existing wildcard BFF, including active state, sort order, alt text, and
 image URL updates.
+
+The tenant-admin transactional messaging review added policy GET/PATCH and
+provider GET BFF routes. The messages dashboard now reads provider readiness,
+edits enabled state, channel priority, and fallback policy, and continues to
+integrate outbox, templates, queue health, and retry. Provider credential PATCH
+remains intentionally operator-controlled because its request accepts secrets;
+the browser receives only non-secret provider metadata.
