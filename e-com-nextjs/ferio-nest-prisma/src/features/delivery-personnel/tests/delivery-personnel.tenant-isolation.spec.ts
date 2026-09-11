@@ -138,4 +138,34 @@ describe('DeliveryPersonnelService tenant GPS isolation', () => {
       }),
     );
   });
+
+  it('persists the server-authoritative online duty state', async () => {
+    process.env.TENANCY_ENABLED = 'true';
+    const tenant = riderClient('rider-a');
+    const tenantDb = { getOrLegacy: jest.fn().mockResolvedValue(tenant) };
+    const service = new DeliveryPersonnelService(
+      {} as never,
+      { record: jest.fn() } as never,
+      tenantDb as never,
+      { emitRiderLocation: jest.fn() } as never,
+    );
+
+    await runWithTenantContext(context('org-a', 'tenant_a'), () =>
+      service.toggleOnlineStatus('same-rider-user-id', false),
+    );
+    expect(tenant.deliveryPersonnel.update).toHaveBeenCalledWith({
+      where: { id: 'rider-a' },
+      data: { isOnline: false },
+    });
+
+    await runWithTenantContext(context('org-a', 'tenant_a'), () =>
+      service.toggleOnlineStatus('same-rider-user-id', true),
+    );
+    expect(tenant.deliveryPersonnel.update).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        where: { id: 'rider-a' },
+        data: expect.objectContaining({ isOnline: true }),
+      }),
+    );
+  });
 });

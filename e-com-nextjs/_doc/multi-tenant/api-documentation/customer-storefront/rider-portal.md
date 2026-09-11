@@ -23,11 +23,12 @@ approved personnel record and its assigned orders in the resolved tenant DB.
 | # | Method | Endpoint | Purpose |
 |---|---|---|---|
 | 1 | PATCH | `/delivery-personnel/my-orders/:orderId/status` | Apply an allowed delivery transition and persist the submitted location waypoint |
-| 2 | PATCH | `/delivery-personnel/online-status` | Toggle rider duty status |
+| 2 | PATCH | `/delivery-personnel/online-status` | Persist the server-authoritative rider duty state with `{ isOnline }` |
 | 3 | POST | `/delivery-personnel/location` | Persist the current GPS location |
 
 Status transitions follow explicit rules (picked-up → in-transit →
 out-for-delivery → delivered/failed) with COD cash pending **staff**
 confirmation. GPS waypoints persist to tenant-local history with retention
-sweep support. The customer-web BFF reads the rider credential from its
-httpOnly cookie for every protected action.
+sweep support. The tenant-local `DeliveryPersonnel.isOnline` field defaults to
+`false`; enabling duty also refreshes `lastLocationAt`. The customer-web BFF
+reads the rider credential from its httpOnly cookie for every protected action.

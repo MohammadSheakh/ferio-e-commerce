@@ -49,6 +49,7 @@
   "migrations/20260908173000_tenant_payment_provider_configs/migration.sql": "84927336f0939888085216874c34e18ee3b7b807f844a9e5e95a676d591bb6ad",
   "migrations/20260908180000_tenant_courier_provider_configs/migration.sql": "38234a05e1c71b23f5c6cb9e96150efcbde8d4f0fab5dc2e676eb9b46553cc5b",
   "migrations/20260908193000_tenant_messaging_provider_configs/migration.sql": "521a33a1178bdcc37ffed013dc0a9e5f413faf76cb2ac9b779c6699dcf2c5944",
+  "migrations/20260911100000_rider_online_status/migration.sql": "553527bdc775339ad8c0a32d209891928e12dca087f40f34acebda1302538574",
   "platform-migrations/20260826000000_platform_init/migration.sql": "e2fdcadb83549604fbdaab00d1bc1bdcdf60bd6cc9b21ff8b6d91468322b982c",
   "platform-migrations/20260907000000_add_migration_canary_organization/migration.sql": "a4893595691fe7fb17622f42ea06dcaff57f264f618628bd9026feb4b10bed83",
   "platform-migrations/20260907210000_pending_tenant_domain_activation/migration.sql": "5b51d0ec32b5202e4c567c47a292b82dcb7e5e812556e9569ea68f684fdf9396",

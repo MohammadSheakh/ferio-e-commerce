@@ -1082,6 +1082,7 @@ model DeliveryPersonnel {
   emergencyPhone  String?
   notes           String?
   status          DeliveryPersonnelStatus @default(PENDING_APPROVAL)
+  isOnline        Boolean                 @default(false)
 
   currentLat     Float?
   currentLng     Float?
