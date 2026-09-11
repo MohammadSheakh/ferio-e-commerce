@@ -50,7 +50,10 @@ export async function refreshCustomerSession() {
   try {
     const upstream = await fetch(`${backendApiUrl}/auth/refresh`, {
       method: "POST",
-      headers: withCorrelationId({ Cookie: `refreshToken=${refreshToken}` }),
+      headers: withCorrelationId({
+        ...(await hostForwardHeaders()),
+        Cookie: `refreshToken=${refreshToken}`,
+      }),
       cache: "no-store",
     });
     const payload = (await upstream.json()) as {

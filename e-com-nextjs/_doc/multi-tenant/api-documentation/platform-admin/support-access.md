@@ -19,3 +19,8 @@ The platform screen now integrates grant creation and revocation through the
 httpOnly-token BFF. The scope input is sent as a JSON object and the UI only
 performs shape/TTL/reason validation; backend scope allow-listing, permission
 checks, audit events, expiry, and revocation remain authoritative.
+
+The platform session client preserves upstream status, machine error code, and
+correlation ID through the catch-all BFF. Login stores only the platform access
+token in an httpOnly cookie; logout clears the cookie locally after attempting
+the backend refresh-token blacklist call.

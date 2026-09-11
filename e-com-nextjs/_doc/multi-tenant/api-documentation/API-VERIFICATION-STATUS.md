@@ -315,6 +315,16 @@ httpOnly cookie. Platform API check, TypeScript, lint, and production build
 passed. Live identity, permission, support-scope, expiry/revocation, and
 production auth evidence remain open.
 
+Shot 69 audited customer and tenant-admin session refresh/logout integration.
+Fixed customer refresh rotation to forward the resolved tenant host alongside
+the refresh cookie, matching the backend tenant-mismatch guard already handled
+by tenant-admin refresh. Confirmed both logout BFFs call backend refresh-token
+blacklisting before clearing httpOnly cookies; 401 retry paths preserve the
+same request and retry once with the rotated access token. Customer and
+tenant-admin API checks, TypeScript, lint, and production builds passed with
+existing non-blocking lint warnings; live cookie rotation and cross-tenant
+runtime evidence remain open.
+
 The customer public-operational review also cross-checked order tracking,
 store pickup outlet listing/availability, and privacy-safe storefront analytics.
 `POST /orders/track`, `GET /store-locations`,
