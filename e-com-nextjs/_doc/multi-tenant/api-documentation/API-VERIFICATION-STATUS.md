@@ -257,6 +257,13 @@ unread badge, and session-refresh BFF paths matched their controllers. Runtime
 ownership, refresh replay, wallet credit idempotency, browser cookies, and
 cross-tenant evidence remain required.
 
+Shot 63 exercised the backend integration harness after starting only the
+PostgreSQL Docker service on host port `5433`. The disposable
+`ferio_test_runner` database applied the current 51 migrations and completed
+11 integration suites / 48 tests; one Redis-dependent suite was skipped. This
+is useful backend/database evidence, but it does not close frontend browser,
+Cloudflare host-routing, SSR/BFF, or two-tenant runtime gates.
+
 The customer public-operational review also cross-checked order tracking,
 store pickup outlet listing/availability, and privacy-safe storefront analytics.
 `POST /orders/track`, `GET /store-locations`,
