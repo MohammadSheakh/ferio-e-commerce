@@ -257,6 +257,16 @@ unread badge, and session-refresh BFF paths matched their controllers. Runtime
 ownership, refresh replay, wallet credit idempotency, browser cookies, and
 cross-tenant evidence remain required.
 
+The customer public-operational review also cross-checked order tracking,
+store pickup outlet listing/availability, and privacy-safe storefront analytics.
+`POST /orders/track`, `GET /store-locations`,
+`POST /store-locations/check-availability`, and
+`POST /storefront-analytics/events` match their active NestJS controllers,
+DTOs, BFF response handling, and browser callers; no source-level mismatch was
+verified in this slice. Rate limiting, phone privacy, stock/reservation races,
+analytics retention, browser behavior, and cross-tenant runtime evidence
+remain required.
+
 The customer authentication/saved-cart review found no source-level route or
 method gap. Corrected the registration example to use the actual optional
 `phoneNumber` field. Login, registration, email verification/resend, Google
