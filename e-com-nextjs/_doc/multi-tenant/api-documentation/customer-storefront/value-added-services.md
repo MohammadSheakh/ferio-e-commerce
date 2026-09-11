@@ -10,7 +10,7 @@
 | # | Method | Endpoint | Purpose |
 |---|---|---|---|
 | 1 | GET | `/services` / `/services/:slug` | Public catalog |
-| 2 | POST | `/services/bookings/request` `{ serviceId, preferredAt, contact… }` | Lead-time validated booking → history REQUESTED |
+| 2 | POST | `/services/bookings/request` `{ serviceId, customerName, phone, email?, preferredAt, address?, customerNote? }` | Lead-time validated booking → history REQUESTED; address max 500 and note max 1000 characters |
 
 ## Warranty claim
 | # | Method | Endpoint | Purpose |
@@ -28,7 +28,7 @@ tenant-admin only.
 ## Product requests & YouTube reviews
 | # | Method | Endpoint | Purpose |
 |---|---|---|---|
-| 1 | POST | `/product-requests` `{ productName, name?, phone? }` | Customer asks for a product; authentication is optional and the server associates an authenticated request when available |
+| 1 | POST | `/product-requests` `{ productName, name?, phone? }` | Customer asks for a product; `productName` max 500 characters; authentication is optional and the server associates an authenticated request when available |
 | 2 | GET | `/product-content/:slug` | Approved banners + reviews for PDP |
 | 3 | POST | `/product-content/:productId/reviews` `{ youtubeUrl, title?, reviewerName? }` | Authenticated customer submission (moderation queue; YouTube URL only) |
 

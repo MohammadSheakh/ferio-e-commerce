@@ -70,6 +70,11 @@ export default function ProductRequestBanner() {
     if (description.trim()) {
       formattedProductName += `\n\n[Additional Details]:\n${description.trim()}`;
     }
+    if (formattedProductName.length > 500) {
+      setErrorMsg("Please keep the product request within 500 characters.");
+      setSubmitting(false);
+      return;
+    }
 
     try {
       const res = await fetch("/api/product-requests", {
@@ -208,6 +213,7 @@ export default function ProductRequestBanner() {
                   </label>
                   <textarea
                     rows={3}
+                    maxLength={500}
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     placeholder="Provide any specifications, brand preference, quantity, target budget, or timeline..."
