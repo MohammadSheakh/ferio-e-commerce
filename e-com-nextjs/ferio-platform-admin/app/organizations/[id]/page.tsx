@@ -1,4 +1,5 @@
 import { platformApi } from "@/lib/platform-session";
+import { DomainActions } from "./domain-actions";
 import { OrgActions } from "./org-actions";
 import { UsageCard, type UsageMetricRow } from "./usage-card";
 
@@ -89,6 +90,8 @@ export default async function OrganizationDetail({ params }: { params: { id: str
           </tbody>
         </table>
       </div>
+
+      <DomainActions organizationId={org.id} domains={org.domains ?? []} />
 
       <div className="card">
         <p className="eyebrow">Tenant Database</p>

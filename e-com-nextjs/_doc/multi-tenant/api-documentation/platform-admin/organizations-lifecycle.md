@@ -28,6 +28,18 @@ permissions (`organization:read|write` etc.).
 | 4 | POST | `/platform/organizations/:id/closure/initiate` `{ reason? }` (10–1,000 chars when supplied) | CLOSURE_PENDING + disables all domains |
 | 5 | POST | `/platform/organizations/:id/closure/finalize` `{ retentionAcknowledged, exportAttested, overrideRetentionPeriod? }` | Retires registry after retention window confirm |
 
+## Screen: Domain lifecycle
+| # | Method | Endpoint | Purpose |
+|---|---|---|---|
+| 1 | POST | `/platform/organizations/:id/domains/custom` `{ hostname }` | Register a custom hostname and return its verification token |
+| 2 | POST | `/platform/organizations/:id/domains/:domainId/verify` `{ verificationToken }` | Verify ownership after DNS/TLS readiness checks |
+| 3 | POST | `/platform/organizations/:id/domains/:domainId/primary` | Make an active domain the organization's primary hostname |
+| 4 | POST | `/platform/organizations/:id/domains/:domainId/disable` | Disable a domain from receiving tenant traffic |
+
+The organization detail screen calls these mutations through the platform session BFF.
+The operator must publish the returned token and complete DNS/TLS readiness outside the
+browser before verification can succeed; this UI does not claim live DNS or routing proof.
+
 ## Screen: Usage & reconcile
 | # | Method | Endpoint | Purpose |
 |---|---|---|---|
