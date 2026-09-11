@@ -30,6 +30,7 @@ cross-checked against the actual frontend call sites in
 | tenant-admin/reports-exports.md | Overview (bounded aggregation) + orders-export cap | ✅ verified |
 | tenant-admin/chat-support.md | Socket ticket, conversations/messages REST | ✅ verified |
 | tenant-admin/staff-settings-security.md | Staff lifecycle + seats gate, settings CRUD, 2FA, audit logs | ✅ verified |
+| tenant-admin/analytics-audit-operations.md | Storefront analytics, reports, audit history, operations health | ✅ source verified |
 | platform-admin/organizations-lifecycle.md | Dashboard, orgs CRUD/provision/status/timeline, closure, per-org usage+reconcile | ✅ verified |
 | platform-admin/plans-billing-subscriptions.md | Plans, trial, subscriptions directory, invoices/attempts/callback/configured | ✅ verified |
 | platform-admin/usage-fleet-migrations.md | Migrations start/status/pause/resume, database-health drift view, retention sweep | ✅ verified |
@@ -136,3 +137,19 @@ review/inspection remains tenant-admin only.
   and is CI-enforced).
 - WebSocket event names for chat are documented at the transport level only;
   a dedicated events reference rides with the socket gateway code.
+
+## September 11 route-coverage update
+
+Static inventory of the active non-mobile Next.js applications found 52
+customer-web API route handlers, 104 tenant-admin API route handlers, and 3
+platform-admin API route handlers. The platform catch-all BFF forwards all
+five supported HTTP methods and is counted separately from its delegated
+backend endpoints. Shots 18–20 cross-checked returns/reconciliation,
+tenant-admin monitoring, and platform-admin lifecycle/billing routes against
+the NestJS controllers and DTOs. No additional source-level path or method
+mismatch was verified in those slices.
+
+This inventory is not live integration proof. Webhook signatures, browser
+cookie behavior, SSR host forwarding, WebSocket room isolation, provider
+delivery, concurrency/idempotency races, and production authorization still
+require runtime evidence.

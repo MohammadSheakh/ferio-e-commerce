@@ -1,7 +1,7 @@
 # Ferio API Documentation — Per Role, Per Screen
 
 Living documentation mapping **every UI screen to the exact API calls** that
-power it. Derived from source code on 2026-08-26 and verified against the
+power it. Derived from source code on 2026-09-11 and verified against the
 backend controller tree (`ferio-nest-prisma/src/features/**`) — 245 routes.
 
 ## Conventions
@@ -40,5 +40,5 @@ backend controller tree (`ferio-nest-prisma/src/features/**`) — 245 routes.
 ## Index
 
 - customer-storefront/: discovery-and-product · cart · checkout-and-payment · auth-and-account · account-post-purchase · value-added-services · rider-portal
-- tenant-admin/: dashboard-overview · catalog-and-inventory · orders-and-fulfillment · shipping-and-couriers · customers · payments-wallet-reviews-content · returns-rto-refunds · settlements-reconciliation · reports-exports · chat-support · staff-settings-security
+- tenant-admin/: dashboard-overview · catalog-and-inventory · orders-and-fulfillment · shipping-and-couriers · customers · payments-wallet-reviews-content · returns-rto-refunds · settlements-reconciliation · reports-exports · chat-support · staff-settings-security · analytics-audit-operations
 - platform-admin/: organizations-lifecycle · plans-billing-subscriptions · usage-fleet-migrations · support-access
