@@ -70,6 +70,13 @@ storage-finalize endpoint and `FinalizePutDto` were missing. This remains
 source-level evidence; live browser, tenant-host isolation, SSR/BFF, socket,
 provider, and production validation are still required.
 
+The customer authentication and chat BFF review also found no source-level
+route or method mismatch: verification establishes a session, refresh/logout
+rotate and clear the httpOnly session cookies, and authenticated/guest chat
+ticket plus message-history calls match the documented backend controllers.
+This is not browser cookie, live host-forwarding, WebSocket room-isolation,
+or production identity-provider proof.
+
 ## Known documentation gaps (honest)
 
 - Response bodies for endpoints whose controllers return inline literals are
