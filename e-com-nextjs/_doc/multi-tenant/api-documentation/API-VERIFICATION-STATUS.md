@@ -92,6 +92,13 @@ were corrected to match the backend PUT contracts. This remains source-level
 evidence; replay, upload/malware, provider, cookie, and live-isolation tests
 are still required.
 
+The rider portal review found and fixed a protected-action boundary defect:
+order-status updates now read the rider JWT from the httpOnly cookie instead
+of expecting browser JavaScript to send an Authorization header. Profile,
+assigned-orders, online-status, and GPS routes already used the cookie
+boundary. Live authorization, GPS retention, transition races, COD staff
+confirmation, and cross-tenant host tests remain required.
+
 ## Known documentation gaps (honest)
 
 - Response bodies for endpoints whose controllers return inline literals are
