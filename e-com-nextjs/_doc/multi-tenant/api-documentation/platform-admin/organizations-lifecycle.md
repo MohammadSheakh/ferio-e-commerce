@@ -40,6 +40,21 @@ The organization detail screen calls these mutations through the platform sessio
 The operator must publish the returned token and complete DNS/TLS readiness outside the
 browser before verification can succeed; this UI does not claim live DNS or routing proof.
 
+## Screen: Subscription and routing controls on organization detail
+| # | Method | Endpoint | Purpose |
+|---|---|---|---|
+| 1 | POST | `/platform/organizations/:id/subscription/trial` `{ planKey, trialDays? }` | Start a bounded trial when no subscription exists |
+| 2 | PATCH | `/platform/organizations/:id/subscription/status` `{ status, note? }` | Apply an audited subscription state-machine transition |
+| 3 | PUT | `/platform/organizations/:id/entitlement-overrides/:featureKey` `{ enabled?, limit?, reason, expiresAt }` | Add/update a time-boxed entitlement override |
+| 4 | DELETE | `/platform/organizations/:id/entitlement-overrides/:featureKey` | Revoke an entitlement override |
+| 5 | POST | `/platform/organizations/:id/domain-cache/invalidate` | Invalidate cached routing decisions after domain changes |
+
+The organization detail screen now calls all five routes through the platform
+session BFF. The entitlement form validates the feature key, reason, limit, and
+future expiry client-side; the backend remains authoritative. It does not expose
+provider credentials or claim that an override has been applied without a
+successful server response.
+
 ## Screen: Usage & reconcile
 | # | Method | Endpoint | Purpose |
 |---|---|---|---|

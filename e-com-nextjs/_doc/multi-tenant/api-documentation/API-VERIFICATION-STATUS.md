@@ -278,6 +278,16 @@ with a startup grace period. This proves local runtime wiring only; provisioned
 two-tenant host isolation, Cloudflare ingress, browser SSR/BFF behavior, and
 production Redis evidence remain open.
 
+Shot 65 audited platform organization lifecycle integration and fixed a real
+console gap. The organization detail screen now calls subscription trial POST,
+subscription status PATCH, entitlement override PUT and DELETE, and domain-cache
+invalidation POST through the authenticated platform BFF. Client validation is
+limited to shape and operator feedback; NestJS permissions, state transitions,
+expiry rules, audit records, and tenant routing remain authoritative. Platform
+API contract checks, TypeScript, lint, and production build passed. Live operator
+permissions, provisioned tenant domains, DNS/TLS, two-host SSR/BFF isolation,
+and production acceptance remain open.
+
 The customer public-operational review also cross-checked order tracking,
 store pickup outlet listing/availability, and privacy-safe storefront analytics.
 `POST /orders/track`, `GET /store-locations`,
