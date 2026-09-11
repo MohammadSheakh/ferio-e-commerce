@@ -105,6 +105,17 @@ export class DeliveryPersonnelController {
   }
 
   /**
+   * Admin: Assign order to rider
+   */
+  @Patch('admin/assign-order')
+  @UseGuards(AuthGuard, RolesGuard, PermissionsGuard, TenantMembershipGuard)
+  @Roles('admin')
+  @Permissions(PERMISSIONS.DELIVERY_PERSONNEL_MANAGE)
+  assignOrder(@Body() dto: AssignOrderDto) {
+    return this.service.assignOrder(dto);
+  }
+
+  /**
    * Admin: Update rider profile information (including reset password)
    */
   @Patch('admin/:id')
@@ -127,17 +138,6 @@ export class DeliveryPersonnelController {
   @Permissions(PERMISSIONS.DELIVERY_PERSONNEL_READ)
   findOne(@Param('id') id: string) {
     return this.service.findOne(id);
-  }
-
-  /**
-   * Admin: Assign order to rider
-   */
-  @Patch('admin/assign-order')
-  @UseGuards(AuthGuard, RolesGuard, PermissionsGuard, TenantMembershipGuard)
-  @Roles('admin')
-  @Permissions(PERMISSIONS.DELIVERY_PERSONNEL_MANAGE)
-  assignOrder(@Body() dto: AssignOrderDto) {
-    return this.service.assignOrder(dto);
   }
 
   /**

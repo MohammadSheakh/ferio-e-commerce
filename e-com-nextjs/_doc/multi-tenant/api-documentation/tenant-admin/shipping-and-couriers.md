@@ -36,3 +36,9 @@ out-of-order events cannot regress status (FR-SHP-007). Callbacks are
 tenant-bound via HMAC token — forgery fails closed. Provider callbacks arrive
 through the separate public `POST /webhooks/couriers/:provider` endpoint and
 are not called by the tenant-admin frontend.
+
+Provider credential PUT/DELETE routes are intentionally not exposed as browser
+forms: the tenant-admin shipping screen can inspect configuration status and
+toggle activation, while credentials are provisioned/revoked through the
+operator-controlled secret path. This keeps provider secrets out of the
+frontend request model.
