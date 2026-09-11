@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { withCorrelationId } from "@/lib/correlation";
 import { hostForwardHeadersFromRequest } from "@/lib/host-forward";
 import { getErrorMessage } from "@/lib/error-message";
+import { proxyBackendResponse } from "@/lib/bff-response";
 
 export async function POST(req: Request) {
   try {
@@ -19,9 +20,11 @@ export async function POST(req: Request) {
       body: JSON.stringify(body),
     });
 
-    if (sessionRes && sessionRes.response.ok) {
-      const payload = await sessionRes.response.json();
-      return NextResponse.json(payload);
+    if (sessionRes) {
+      return proxyBackendResponse(
+        sessionRes.response,
+        "Failed to save cart.",
+      );
     }
 
     // Guest fallback
