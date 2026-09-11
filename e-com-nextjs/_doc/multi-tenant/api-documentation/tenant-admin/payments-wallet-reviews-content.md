@@ -11,10 +11,12 @@ transactional-messages, store-locations controllers
 | # | Method | Endpoint | Purpose |
 |---|---|---|---|
 | 1 | GET | `/admin/payments/attempts?status=&provider=` | Attempt ledger incl. provider reference |
-| 2 | GET/PATCH | `/admin/payments/attempts/:id` | Detail / restricted manual status change (reason+audit) |
+| 2 | GET | `/admin/payments/attempts/:id` | Attempt detail and evidence (read-only) |
 | 3 | GET | `/admin/payments/providers` | Configured prepaid providers |
-| 4 | POST | `/admin/payments/recovery/sweep` `{ dryRun? }` | Expiry/recovery sweep now |
-| 5 | GET | `/admin/payments/recovery/queue-health` | Recovery backlog |
+| 4 | PUT | `/admin/payments/providers/:provider` | Store provider credentials/configuration |
+| 5 | DELETE | `/admin/payments/providers/:provider` | Revoke provider credentials/configuration |
+| 6 | POST | `/admin/payments/recovery/sweep` | Queue expiry/recovery sweep |
+| 7 | GET | `/admin/payments/recovery/queue-health` | Recovery backlog |
 
 ## Wallet review desk
 | # | Method | Endpoint | Purpose |

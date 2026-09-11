@@ -46,7 +46,7 @@ Idempotency-Key: <client-generated unique>
 |---|---|---|---|
 | 1 | POST | `/checkout/orders` `{ paymentMethod: "PREPAID" }` | Creates order + payment attempt; returns redirect payload |
 | 2 | POST | `/payments/initiate` `{ orderId, reference, phone, provider }` | Builds provider session after order placement (server signs tenant callback token) |
-| 3 | POST | `/payments/retry` `{ attemptId }` | Fresh attempt; never duplicates the order |
+| 3 | POST | `/payments/retry` `{ reference, phone, provider }` | Fresh attempt after customer proof; never duplicates the order |
 Provider callback is verified server-side (val_id) and idempotent — success
 flips only that attempt and confirms its order once.
 

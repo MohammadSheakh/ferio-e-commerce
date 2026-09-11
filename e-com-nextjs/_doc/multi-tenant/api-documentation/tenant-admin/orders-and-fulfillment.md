@@ -8,7 +8,7 @@
 ## Screen 1: Orders queue + filters
 | # | Method | Endpoint | Purpose |
 |---|---|---|---|
-| 1 | GET | `/admin/orders?page&status&paymentStatus&q&from&to` | Filter by reference/phone/status/payment/date |
+| 1 | GET | `/admin/orders?page=&limit=&status=&fulfillmentStatus=&paymentStatus=&search=&dateFrom=&dateTo=` | Filter by reference/phone/status/fulfillment/payment/date |
 | 2 | GET | `/admin/orders/:id` | 360 detail: customer+address snapshot, items, totals, reservation, shipment, comms, history |
 | 3 | GET | `/admin/orders/cod-policy` / PATCH same | COD verification mode ALWAYS/ABOVE_AMOUNT/NEVER |
 
@@ -21,9 +21,9 @@
 ## Screen 3: Fulfillment pipeline
 | # | Method | Endpoint | Purpose |
 |---|---|---|---|
-| 1 | POST | `/admin/orders/:id/fulfillment` `{ action: PICK\|PACK\|QC\|READY\|HANDOVER }` | Queue actions with status history |
-| 2 | POST | `/admin/orders/:id/fulfillment-exceptions` `{ itemId, type, note }` | Shortage/substitution — silent changes forbidden |
-| 3 | PATCH | `/admin/orders/:id/fulfillment-exceptions/:exceptionId/resolve` `{ resolution }` | Resolve exception |
+| 1 | POST | `/admin/orders/:id/fulfillment` `{ status, note? }` | Advance fulfillment status with history |
+| 2 | POST | `/admin/orders/:id/fulfillment-exceptions` `{ type, orderItemId?, quantity?, description }` | Shortage/substitution — silent changes forbidden |
+| 3 | POST | `/admin/orders/:id/fulfillment-exceptions/:exceptionId/resolve` `{ resolution }` | Resolve exception |
 
 ## Screen 4: Store pickup
 | # | Method | Endpoint | Purpose |
