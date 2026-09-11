@@ -49,6 +49,19 @@ addition to `GET`, `POST`, and `PATCH`, matching the platform OpenAPI surface
 for entitlement overrides and feature-flag operations. This closes a proxy
 method gap; it does not claim that every platform screen has browser E2E proof.
 
+The tenant-admin store setup checklist also now calls the implemented
+`/api/delivery-zones` BFF route instead of the nonexistent
+`/api/admin/delivery-zones` path. A static audit of the tenant-admin browser
+call sites and 104 Next.js API route files found no additional verified route
+or method mismatch in this shot. Catch-all BFF routes were included in the
+review. This is source-level integration evidence, not live browser or
+production-host proof.
+
+The tenant-admin generated `lib/api-schema.ts` was also regenerated from the
+backend OpenAPI artifact after `api:check` detected drift. The refresh adds
+the newer entitlement, payment-recovery, storage-finalize, and messaging
+provider operations plus the documented provider-config DELETE methods.
+
 ## Known documentation gaps (honest)
 
 - Response bodies for endpoints whose controllers return inline literals are

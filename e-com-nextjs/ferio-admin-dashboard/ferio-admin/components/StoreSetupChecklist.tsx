@@ -27,7 +27,7 @@ export default function StoreSetupChecklist() {
   useEffect(() => {
     Promise.all([
       fetch("/api/commerce-settings").then((r) => r.json()).catch(() => null),
-      fetch("/api/admin/delivery-zones").then((r) => r.json()).catch(() => null),
+      fetch("/api/delivery-zones").then((r) => r.json()).catch(() => null),
       fetch("/api/payments/providers").then((r) => r.json()).catch(() => null),
       fetch("/api/admin/plan-status").then((r) => r.json()).catch(() => null),
       fetch("/api/catalog/products?limit=1").then((r) => r.json()).catch(() => null),
