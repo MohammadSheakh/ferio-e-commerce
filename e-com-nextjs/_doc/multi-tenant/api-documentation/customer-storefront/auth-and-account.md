@@ -9,7 +9,7 @@
 ## Screen 1: Register / Login / Verify
 | # | Method | Endpoint | Purpose |
 |---|---|---|---|
-| 1 | POST | `/auth/register` `{ name,email,password,phone }` | Create account (+OTP flow) |
+| 1 | POST | `/auth/register` `{ name,email,password,phoneNumber? }` | Create account (+OTP flow) |
 | 2 | POST | `/auth/login` `{ email,password }` | Access+refresh tokens; rate-limited |
 | 3 | POST | `/auth/verify-email` | OTP verify |
 | 4 | POST | `/auth/resend-verification` | Resend OTP |
@@ -41,6 +41,10 @@ customer endpoints. Order detail, timeline, and fulfillment state are exposed by
 the account commerce projection and the dedicated reorder/store-pickup actions;
 the public `/orders/*` controller is reserved for tracking and store-pickup
 flows documented in `checkout-and-payment.md`.
+
+After a successful password or Google session is established, the customer BFF
+automatically calls `POST /cart/merge` when an httpOnly guest cart exists. The
+browser does not select a user ID or invoke a separate merge action.
 
 ## Screen 5: Notifications inbox
 | # | Method | Endpoint | Purpose |

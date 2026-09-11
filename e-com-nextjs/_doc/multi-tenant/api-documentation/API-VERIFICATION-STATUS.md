@@ -256,3 +256,11 @@ top-up submission. Profile, addresses, order linking/reorder, notifications,
 unread badge, and session-refresh BFF paths matched their controllers. Runtime
 ownership, refresh replay, wallet credit idempotency, browser cookies, and
 cross-tenant evidence remain required.
+
+The customer authentication/saved-cart review found no source-level route or
+method gap. Corrected the registration example to use the actual optional
+`phoneNumber` field. Login, registration, email verification/resend, Google
+OAuth, logout, refresh rotation, automatic guest-cart merge, saved-cart
+sharing/import/save-to-account/delete, and reorder match their BFF and NestJS
+contracts. Runtime cookie replay, provider identity, cart ownership, browser,
+and cross-tenant evidence remain required.

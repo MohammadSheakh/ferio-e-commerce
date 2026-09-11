@@ -24,3 +24,8 @@ cart automatically.
 
 Totals shown in UI are estimates; the server recalculates at checkout
 (FR-CHK-002).
+
+Login and OAuth session BFFs automatically call `POST /cart/merge` with the
+server-owned guest-cart token after authentication. Saved-cart sharing uses
+host-forwarded BFF routes; account-only list/delete/save-to-account operations
+use the rotated customer session.
