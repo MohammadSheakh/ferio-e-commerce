@@ -11,6 +11,7 @@
 |---|---|---|---|
 | 1 | GET | `/platform/plans` | Catalog incl. entitlements matrix |
 | 2 | POST | `/platform/plans` `{ key, displayName, pricing:{interval,amountMinor}, entitlements:[{featureKey,enabled,limit}] }` | Create/version plan (prices stay configurable per owner #11) |
+| 3 | PATCH | `/platform/plans/:id` `{ displayName?, billingInterval?, amountMinor?, isActive?, entitlements? }` | Update a plan version while preserving historical subscriptions |
 
 ## Subscriptions
 | # | Method | Endpoint | Purpose |
