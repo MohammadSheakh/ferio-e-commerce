@@ -53,11 +53,15 @@ Idempotency-Key: <client-generated unique>
 ## Screen 4: Prepaid (SSLCommerz/aamarPay)
 | # | Method | Endpoint | Purpose |
 |---|---|---|---|
-| 1 | POST | `/checkout/orders` `{ paymentMethod: "PREPAID" }` | Creates order + payment attempt; returns redirect payload |
+| 1 | POST | `/checkout/orders` `{ paymentMethod: "PREPAID" }` | Creates the prepaid order and returns order identity |
 | 2 | POST | `/payments/initiate` `{ orderId, reference, phone, provider }` | Builds provider session after order placement (server signs tenant callback token) |
 | 3 | POST | `/payments/retry` `{ reference, phone, provider }` | Fresh attempt after customer proof; never duplicates the order |
-Provider callback is verified server-side (val_id) and idempotent — success
-flips only that attempt and confirms its order once.
+The customer-web `/api/checkout/order` BFF performs the second initiate call
+after successful order placement and returns its redirect payload to the
+browser. If initiation fails, the order remains eligible for the dedicated
+payment-retry screen rather than being duplicated. Provider callback is
+verified server-side (val_id) and idempotent — success flips only that attempt
+and confirms its order once.
 
 ## Screen 5: Wallet checkout
 | # | Method | Endpoint | Purpose |

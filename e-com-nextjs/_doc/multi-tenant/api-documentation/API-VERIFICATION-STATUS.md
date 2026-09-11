@@ -238,3 +238,13 @@ the final checkout transaction remains authoritative for stock and reservation
 races. API checks, typechecks, lint, and diff validation passed. Runtime
 tenant forwarding, browser behavior, stock races, and cross-tenant isolation
 remain required evidence; Redis was not changed.
+
+The customer checkout/payment review found no source-level route or method
+mismatch. Checkout preview and placement use the httpOnly cart cookie through
+the BFF, changing any form value clears the preview, and the backend performs
+fresh cart/draft validation before the serializable order transaction. The
+prepaid BFF performs order placement followed by the documented payment
+initiation call; the retry screen calls the separate retry endpoint with order
+reference, phone, and provider. Corrected the documentation to reflect this
+two-step contract. Runtime duplicate-submit, payment callback, provider,
+stock-race, browser, live-host, and cross-tenant evidence remain required.
