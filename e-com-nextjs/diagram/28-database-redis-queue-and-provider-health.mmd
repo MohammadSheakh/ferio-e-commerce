@@ -28,6 +28,3 @@ sequenceDiagram
     Health->>Health: Aggregate HEALTHY, DEGRADED, or UNAVAILABLE
     Health-->>API: Sanitized status and launch blockers
     API-->>Console: Operator-readable health response
-
-    Note over Health,Backup: This health surface reports control-plane, tenant registry, queues, and backup evidence; it does not actively probe every external provider.
-    Note over API,Console: Responses exclude secrets, connection strings, provider credentials, and raw driver errors.
