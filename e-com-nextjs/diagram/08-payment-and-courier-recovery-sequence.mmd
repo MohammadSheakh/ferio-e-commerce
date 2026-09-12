@@ -37,6 +37,3 @@ sequenceDiagram
         Provider-->>Worker: Shipment status or timeout
         Worker->>DB: Persist event, attempt, and normalized status
     end
-
-    Note over Worker,Provider: Provider calls stay outside database transactions.
-    Note over Queue,Notify: Timeouts use bounded retries and dead-letter evidence; one provider outage must not block other tenants.
