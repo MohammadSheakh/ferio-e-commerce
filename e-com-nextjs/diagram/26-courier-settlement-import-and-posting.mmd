@@ -18,9 +18,9 @@ sequenceDiagram
     API->>Parser: Validate type, headers, row count, and money units
     Parser->>Parser: Reject duplicate provider row refs
     Parser->>Parser: Validate fees/deductions do not exceed collection
-    alt Preflight invalid
-        Parser-->>Web: Row-level diagnostics; no posting
-    else Preflight valid
+    alt Invalid preflight
+        Parser-->>Web: Row-level diagnostics and no posting
+    else Valid preflight
         Parser-->>Web: Normalized candidate rows
         Web->>API: POST settlement with idempotency key
         API->>Match: Match shipment/order identity and collection evidence
@@ -35,7 +35,3 @@ sequenceDiagram
     Admin->>Web: Retry same import command
     Web->>API: Same idempotency key
     API->>DB: Return original committed result
-
-    Note over Parser,DB: Preflight validates the file; posting is the only step that mutates tenant settlement state.
-    Note over Parser,DB: Operational row limits prevent oversized synchronous imports.
-    Note over Match,DB: COD is marked paid only when collection and shipment evidence match.
