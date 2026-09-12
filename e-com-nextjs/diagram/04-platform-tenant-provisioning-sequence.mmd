@@ -48,6 +48,3 @@ sequenceDiagram
         Run->>Audit: Record failed step and sanitized error
         Platform-->>Web: Retryable failure and run timeline
     end
-
-    Note over Run,Provisioner: Repeating the same idempotency key resumes the run; it does not create a second tenant.
-    Note over Platform,Provisioner: Plaintext credentials never return to the browser.
