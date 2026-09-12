@@ -18,6 +18,3 @@ sequenceDiagram
     Worker-->>Redis: Ack or retry with backoff
     Redis-->>Worker: Dead-letter after retry policy
     Worker->>Audit: Record terminal failure and remediation key
-
-    Note over API,Redis: Redis is a coordination layer; committed database state remains authoritative.
-    Note over Worker,Audit: Job payloads must carry tenant identity and avoid secrets or raw credentials.
