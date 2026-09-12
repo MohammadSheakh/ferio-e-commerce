@@ -43,6 +43,3 @@ sequenceDiagram
     Org->>DB: Persist transition and audit metadata
     Org->>Cache: Invalidate host resolution entries
     API-->>Web: Sanitized operation result
-
-    Note over Guard,Org: Operator organization IDs target control-plane records; they do not bypass tenant authorization.
-    Note over Cache,Audit: Every routing-affecting change invalidates cache and leaves an audit trail.
