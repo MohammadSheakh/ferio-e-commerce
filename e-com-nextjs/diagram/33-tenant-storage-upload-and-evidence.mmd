@@ -17,7 +17,8 @@ sequenceDiagram
     Guard->>Validate: Check size, type, filename, and purpose
     Validate-->>API: Validated upload contract
     API->>Store: Generate tenant-scoped object key
-    Store-->>Web: Presigned upload URL and safe public metadata
+    Store-->>API: Presigned upload URL and safe public metadata
+    API-->>Web: Presigned upload URL and safe public metadata
     Web->>Store: Upload bytes directly to object storage
     Store->>Scan: Apply malware/quarantine policy
     Scan-->>Store: Clean, pending, or quarantined result
@@ -28,7 +29,8 @@ sequenceDiagram
         API->>Feature: Attach evidence to warranty/content entity
         Feature->>DB: Save tenant-local evidence link
     else Quarantined or rejected
-        Store-->>Web: Safe failure state
+        Store-->>API: Safe failure state
+        API-->>Web: Safe failure state
         API->>DB: Persist sanitized failure/evidence state when required
     end
 

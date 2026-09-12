@@ -16,7 +16,9 @@ sequenceDiagram
     API->>Guard: Validate staff-read permission and membership
     Guard->>Staff: Load staff and invitation overview
     Staff->>DB: Read tenant-local staff/access state
-    DB-->>Web: Staff, roles, permissions, expiry state
+    DB-->>Staff: Staff, roles, permissions, expiry state
+    Staff-->>API: Staff, roles, permissions, expiry state
+    API-->>Web: Staff, roles, permissions, expiry state
 
     Owner->>Web: Invite staff member with role/permissions
     Web->>API: POST /admin/staff/invite
@@ -24,7 +26,9 @@ sequenceDiagram
     Guard->>Staff: Normalize and enforce seat/access policy
     Staff->>DB: Create expiring invitation and audit event
     Staff->>Mail: Queue invitation message
-    Mail-->>Web: Delivery accepted/status
+    Mail-->>Staff: Delivery accepted/status
+    Staff-->>API: Delivery accepted/status
+    API-->>Web: Delivery accepted/status
 
     opt Invitee accepts
         Invitee->>API: POST /staff-access/accept-invite with token/password
