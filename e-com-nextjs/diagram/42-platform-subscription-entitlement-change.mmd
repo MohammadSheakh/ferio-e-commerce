@@ -19,5 +19,3 @@ sequenceDiagram
     Usage->>Control: Read platform-owned entitlement state
     Control-->>Usage: Versioned limits and overrides
     Usage-->>Tenant: Allow, deny, or return upgrade-required response
-
-    Note over Catalog,Usage: Entitlements are enforced server-side; UI visibility is not authorization.
