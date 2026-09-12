@@ -44,6 +44,3 @@ sequenceDiagram
     Staff->>DB: Persist mutation and revoke affected sessions
     Staff->>Audit: Record actor, target, and reason
     API-->>Web: Sanitized access result
-
-    Note over Staff,DB: Access changes take effect server-side; frontend role labels are not authority.
-    Note over API,Staff: Invitation/reset tokens are one-time, expiring, and never treated as permanent access.
