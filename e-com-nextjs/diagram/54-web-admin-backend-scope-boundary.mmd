@@ -1,0 +1,16 @@
+flowchart TD
+    Scope[Current diagram scope<br/>web, tenant admin, platform admin, backend] --> Customer[ferio-customer-web]
+    Scope --> TenantAdmin[ferio-admin-dashboard/ferio-admin]
+    Scope --> PlatformAdmin[ferio-platform-admin]
+    Scope --> Backend[ferio-nest-prisma]
+
+    Customer --> CustomerFlow[Customer storefront, account,<br/>cart, checkout, delivery, support]
+    TenantAdmin --> TenantFlow[Tenant operations, catalog,<br/>orders, staff, reports, settings]
+    PlatformAdmin --> PlatformFlow[Organizations, domains, plans,<br/>migrations, health, support access]
+    Backend --> SharedFlow[Tenant resolution, auth, persistence,<br/>queues, providers, audit]
+
+    Mobile[ferio-mobile-expo54] -. intentionally excluded from this set .-> Excluded[Separate mobile audit required]
+    Excluded -. do not infer parity .-> Scope
+
+    Note1[The backend remains the authority for tenant, permission, and lifecycle rules.] -.-> SharedFlow
+    Note2[Mobile parity is not claimed by web/admin diagrams.] -.-> Excluded

@@ -1,0 +1,33 @@
+%% Platform-admin authentication and control-plane authorization
+sequenceDiagram
+    autonumber
+    participant Operator as Platform admin
+    participant Web as Platform admin web
+    participant API as Platform API
+    participant Auth as PlatformAuthService
+    participant DB as Control-plane PostgreSQL
+    participant Guard as PlatformAuthGuard
+    participant Service as Platform service
+
+    Operator->>Web: Submit platform credentials
+    Web->>API: POST /platform/auth/login
+    API->>Auth: Validate login DTO and rate limit
+    Auth->>DB: Load PlatformUser
+    DB-->>Auth: User, role, permission state
+    Auth->>Auth: Verify password and issue platform-realm JWT
+    Auth-->>Web: Access token and session response
+
+    Operator->>Web: Open protected platform operation
+    Web->>API: GET/POST /platform/* with platform token
+    API->>Guard: Validate signature, realm, expiry, role, permissions
+    alt Authorized
+        Guard->>Service: Continue control-plane operation
+        Service->>DB: Read or mutate platform metadata
+        DB-->>Service: Control-plane result
+        Service-->>Web: Sanitized result
+    else Invalid realm or permission
+        Guard-->>Web: Stable authorization error
+    end
+
+    Note over Auth,DB: Platform auth never resolves a tenant database for ordinary platform operations.
+    Note over Guard,Service: Organization IDs in platform routes are operator targets, not browser-selected tenant context.

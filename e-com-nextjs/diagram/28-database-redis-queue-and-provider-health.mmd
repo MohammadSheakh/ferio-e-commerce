@@ -1,0 +1,36 @@
+%% Platform dependency health and operational status aggregation
+sequenceDiagram
+    autonumber
+    participant Operator
+    participant Console as Operations console
+    participant API as Health API
+    participant Health as OperationsHealthService
+    participant Control as Control-plane DB
+    participant Tenant as Tenant registry/DB probes
+    participant Redis
+    participant Queue as BullMQ queues
+    participant Provider as Payment/courier providers
+    participant Backup as Backup/restore evidence
+
+    Operator->>Console: Open system, database, or domain health
+    Console->>API: GET health endpoint
+    API->>Health: Collect bounded evidence
+    par Control plane
+        Health->>Control: Probe connectivity and latency
+    and Tenant fleet
+        Health->>Tenant: Check registry state and schema readiness
+    and Redis
+        Health->>Redis: Probe connectivity and safe metrics
+    and Queues
+        Health->>Queue: Read waiting/active/failed counts
+    and Providers
+        Health->>Provider: Read readiness/configuration summary
+    and Recovery
+        Health->>Backup: Read latest backup and restore verification
+    end
+    Health->>Health: Aggregate HEALTHY, DEGRADED, or UNAVAILABLE
+    Health-->>API: Sanitized status and launch blockers
+    API-->>Console: Operator-readable health response
+
+    Note over Health,Backup: Health is a signal assembled from evidence; it is not proof of capacity or production launch readiness.
+    Note over API,Console: Responses exclude secrets, connection strings, provider credentials, and raw driver errors.

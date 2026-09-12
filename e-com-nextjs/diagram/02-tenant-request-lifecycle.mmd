@@ -1,0 +1,42 @@
+%% Trusted tenant HTTP request lifecycle
+sequenceDiagram
+    autonumber
+    participant Browser
+    participant BFF as Next.js BFF/SSR
+    participant API as NestJS API
+    participant Middleware as TenantContextMiddleware
+    participant Resolver as TenantResolverService
+    participant Redis
+    participant Control as Control-plane DB
+    participant Context as AsyncLocalStorage context
+    participant Manager as TenantDatabaseManager
+    participant Tenant as Tenant PostgreSQL
+    participant Service as Feature service
+
+    Browser->>BFF: Request on tenant.example
+    BFF->>API: Forward request and trusted original host
+    API->>Middleware: Run tenant middleware
+    Middleware->>Resolver: Resolve effective host
+    Resolver->>Resolver: Normalize host and validate proxy chain
+    Resolver->>Redis: Read positive or negative host cache
+
+    alt Cache miss
+        Resolver->>Control: Lookup active domain, organization, registry
+        Control-->>Resolver: Organization and READY database metadata
+        Resolver->>Redis: Cache bounded host result
+    else Cache hit
+        Redis-->>Resolver: Cached tenant registry result
+    end
+
+    Resolver->>Resolver: Reject unknown, inactive, suspended-write, or unavailable state
+    Resolver->>Context: Store immutable tenant context
+    Middleware->>Service: Continue request
+    Service->>Manager: Get client from resolved context
+    Manager->>Tenant: Acquire bounded tenant Prisma client
+    Tenant-->>Service: Tenant-scoped data
+    Service-->>API: Domain result or stable domain error
+    API-->>BFF: Transformed response
+    BFF-->>Browser: Tenant-safe response
+
+    Note over Resolver,Context: Browser body, query, or cookie never selects a database.
+    Note over Manager,Tenant: Missing context fails loudly; no legacy database fallback.

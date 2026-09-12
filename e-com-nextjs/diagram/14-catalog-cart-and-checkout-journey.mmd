@@ -1,0 +1,51 @@
+%% Customer catalog, cart, and checkout journey
+sequenceDiagram
+    autonumber
+    participant Customer
+    participant Web as Customer Web/BFF
+    participant Catalog as Catalog API
+    participant Cart as Cart API
+    participant Checkout as Checkout API
+    participant DB as Tenant PostgreSQL
+    participant Payment as Payment adapter
+
+    Customer->>Web: Open tenant storefront
+    Web->>Catalog: GET published catalog and product detail
+    Catalog->>DB: Read published products, variants, inventory
+    DB-->>Web: Tenant-scoped catalog projection
+
+    Customer->>Web: Add variant to cart
+    Web->>Cart: POST cart/items with x-cart-token
+    Cart->>DB: Validate publication, variant, price, and stock
+    DB-->>Cart: Updated guest cart
+    Cart-->>Web: Cart token and current totals
+
+    opt Customer signs in
+        Web->>Cart: POST cart/merge with guest token
+        Cart->>DB: Merge guest items into customer cart
+        Cart->>DB: Revalidate ownership and availability
+        DB-->>Web: Account cart result
+    end
+
+    Customer->>Web: Start checkout
+    Web->>Checkout: POST checkout/preview
+    Checkout->>DB: Re-read prices, stock, delivery, discount, and policy
+    DB-->>Checkout: Persisted server-priced draft
+    Checkout-->>Web: Authoritative totals and payment options
+
+    alt COD
+        Web->>Checkout: POST checkout/orders + idempotency key
+        Checkout->>DB: Transactionally create order and reserve inventory
+        DB-->>Web: COD order reference
+    else Prepaid
+        Web->>Checkout: Create prepaid order/payment attempt
+        Checkout->>DB: Persist order and payment attempt
+        Checkout->>Payment: Create hosted session
+        Payment-->>Web: Redirect/session
+        Payment->>Checkout: Signed callback
+        Checkout->>DB: Verify and finalize payment state
+        DB-->>Web: Updated order/payment status
+    end
+
+    Note over Cart,DB: Cart contents are not checkout truth; mutable facts are revalidated.
+    Note over Checkout,DB: Browser retries are deduplicated by idempotency key.

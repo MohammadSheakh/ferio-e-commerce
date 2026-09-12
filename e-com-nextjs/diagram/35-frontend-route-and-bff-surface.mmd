@@ -1,0 +1,70 @@
+flowchart TD
+    Browser[Browser] --> Host[Current host and cookies]
+
+    subgraph Storefront[ferio-customer-web: tenant storefront]
+        Home[Storefront pages<br/>/ and /products]
+        Product[Product detail<br/>/products/:slug]
+        Cart[Cart<br/>/cart]
+        Checkout[Checkout<br/>/checkout]
+        Account[Customer account<br/>/account/*]
+        Delivery[Delivery portal<br/>/delivery/*]
+        Support[Support and chat<br/>/support]
+    end
+
+    subgraph BFF[Next.js route handlers]
+        StoreRoutes[/api/store/config<br/>catalog and analytics]
+        CartRoutes[/api/cart/*]
+        CheckoutRoutes[/api/checkout/*]
+        AccountRoutes[/api/account/*]
+        DeliveryRoutes[/api/delivery/*]
+        SupportRoutes[/api/chat/* and socket ticket]
+    end
+
+    subgraph Backend[NestJS tenant APIs]
+        TenantContext[Tenant resolver from trusted host]
+        TenantAPI[Tenant-scoped services and database]
+        PlatformAPI[Platform/admin APIs]
+    end
+
+    subgraph PlatformAdmin[ferio-platform-admin: platform operator]
+        Login[Platform login<br/>/login]
+        Operations[Organizations, domains, plans,<br/>migrations, health, support access]
+    end
+
+    Browser --> Home
+    Browser --> Product
+    Browser --> Cart
+    Browser --> Checkout
+    Browser --> Account
+    Browser --> Delivery
+    Browser --> Support
+
+    Home --> StoreRoutes
+    Product --> StoreRoutes
+    Cart --> CartRoutes
+    Checkout --> CheckoutRoutes
+    Account --> AccountRoutes
+    Delivery --> DeliveryRoutes
+    Support --> SupportRoutes
+
+    StoreRoutes --> TenantContext
+    CartRoutes --> TenantContext
+    CheckoutRoutes --> TenantContext
+    AccountRoutes --> TenantContext
+    DeliveryRoutes --> TenantContext
+    SupportRoutes --> TenantContext
+    TenantContext --> TenantAPI
+
+    Login --> PlatformAdmin
+    Operations --> PlatformAPI
+    PlatformAPI --> ControlPlane[(Control-plane data)]
+
+    Host -. "must remain the request tenant context" .-> TenantContext
+    TenantAPI -. "never selected by browser" .-> TenantDB[(Tenant database)]
+
+    classDef boundary fill:#eef6ff,stroke:#2563eb,color:#0f172a
+    classDef security fill:#fff7ed,stroke:#ea580c,color:#0f172a
+    class Storefront,BFF,Backend,PlatformAdmin boundary
+    class Host,TenantContext security
+
+    %% This is a route/boundary map, not proof that every live integration works.

@@ -1,0 +1,45 @@
+%% Plan, subscription, entitlement, usage, and backend enforcement
+sequenceDiagram
+    autonumber
+    participant Operator as Platform admin
+    participant API as Platform API
+    participant Plans as Plan/subscription service
+    participant DB as Control-plane PostgreSQL
+    participant Usage as Usage service
+    participant Feature as Tenant feature service
+    participant Gate as EntitlementsService
+    participant Tenant as Tenant PostgreSQL
+
+    Operator->>API: Create/update plan catalog
+    API->>Plans: Validate features, limits, interval, amount
+    Plans->>DB: Persist plan and versioned entitlements
+
+    Operator->>API: Assign subscription or trial to organization
+    API->>Plans: Apply lifecycle status and effective plan
+    Plans->>DB: Persist subscription and optional override
+
+    Feature->>Gate: Evaluate organization + feature key + requested amount
+    Gate->>DB: Load subscription, plan entitlement, active override
+    DB-->>Gate: Status, enabled flag, and numeric limit
+    opt Numeric entitlement
+        Gate->>Usage: Read current period usage
+        Usage->>DB: Load usage counter
+        DB-->>Usage: Current value
+    end
+
+    alt Subscription and entitlement allow
+        Gate-->>Feature: ALLOW with effective limit
+        Feature->>Tenant: Apply tenant mutation or read
+        Feature->>Usage: Record usage after durable fact
+    else Missing, inactive, disabled, or over limit
+        Gate-->>Feature: DENY with stable reason code
+        Feature-->>API: Entitlement error
+    end
+
+    Operator->>API: Reconcile usage for organization
+    API->>Usage: Compare tenant facts with recorded counters
+    Usage->>Tenant: Read bounded authoritative facts
+    Usage->>DB: Correct counter and audit reconciliation
+
+    Note over Feature,Gate: Frontend hiding is UX only; backend evaluation is enforcement.
+    Note over DB,Tenant: Plans/usage live in the control plane; commerce facts remain tenant-owned.

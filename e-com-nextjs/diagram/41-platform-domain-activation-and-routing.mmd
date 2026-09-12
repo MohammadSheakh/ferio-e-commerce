@@ -1,0 +1,23 @@
+stateDiagram-v2
+    [*] --> Pending
+    Pending: Domain record created
+    Pending --> Verifying: Operator requests verification
+    Verifying --> Pending: DNS/TLS proof incomplete
+    Verifying --> Active: Verification succeeds
+    Active: Resolver may map host to organization
+    Active --> Primary: Operator selects primary domain
+    Primary: One active primary domain
+    Primary --> Active: Another domain becomes primary
+    Active --> Disabled: Operator disables domain
+    Disabled --> Verifying: Operator re-verifies
+    Active --> Suspended: Organization suspended
+    Primary --> Suspended: Organization suspended
+    Suspended --> Active: Organization reactivated
+    Active --> [*]: Organization closure finalizes
+    Primary --> [*]: Organization closure finalizes
+
+    note right of Active
+        Request routing must fail closed when
+        the host is unknown, unverified, disabled,
+        or no longer attached to an active organization.
+    end note

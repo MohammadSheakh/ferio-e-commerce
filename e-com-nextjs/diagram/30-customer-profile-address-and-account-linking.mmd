@@ -1,0 +1,35 @@
+%% Customer profile, address ownership, and account linking
+sequenceDiagram
+    autonumber
+    participant Customer
+    participant Web as Customer Web/BFF
+    participant API as Customer account API
+    participant Auth as Authenticated principal
+    participant Account as CustomerAccountService
+    participant DB as Tenant PostgreSQL
+
+    Customer->>Web: Open account or checkout address manager
+    Web->>API: GET profile, customer, and addresses
+    API->>Auth: Require authenticated tenant user
+    Auth->>Account: Resolve principal-owned customer
+    Account->>DB: Read tenant-local user/customer/address rows
+    DB-->>Web: Customer projection and addresses
+
+    opt First account-to-customer link
+        Customer->>Web: Submit order reference and placement phone
+        Web->>API: POST account/customer-link
+        API->>Account: Verify exact order and phone proof
+        Account->>DB: Check unlinked user/customer and attach atomically
+        DB-->>Web: Linked customer account
+    end
+
+    Customer->>Web: Create, edit, delete, or set default address
+    Web->>API: Address mutation with address ID when applicable
+    API->>Auth: Resolve authenticated customer ID
+    Auth->>Account: Apply owner-scoped mutation
+    Account->>DB: Update only matching tenant + customer address
+    Account->>DB: Clear previous default and promote selected address
+    DB-->>Web: Updated customer/address projection
+
+    Note over Auth,DB: Raw user, customer, or address IDs are never sufficient without tenant and owner predicates.
+    Note over Account,DB: Profile synchronization and default-address invariant are maintained transactionally.

@@ -1,0 +1,43 @@
+%% Durable reconciliation run, findings, retry, and remediation flow
+flowchart TD
+    operator[Admin operator or schedule]
+    start[Start reconciliation run\nperiod/scope bounded]
+    run[(Durable reconciliation run)]
+    fanout[Enqueue tenant-scoped scan jobs]
+    processor[Reconciliation processor\nvalidate organization envelope]
+    facts[(Tenant financial and operational facts)]
+    compare[Compare authoritative facts\nagainst settlement/usage records]
+    upsert[Upsert tenant-local findings\nresolve stale conditions]
+    severity[Prioritize critical/oldest alerts\nremove empty signals]
+    queue[[Retry queue with run identity]]
+    action[Operator action\nacknowledge, investigate, resolve]
+    audit[Audit and metrics]
+    fail[Failed run remains visible\nretryable state]
+
+    operator --> start
+    start --> run
+    run --> fanout
+    fanout --> processor
+    processor --> facts
+    facts --> compare
+    compare --> upsert
+    upsert --> severity
+    severity --> action
+    action --> audit
+    processor -->|transient failure| queue
+    queue --> processor
+    processor -->|permanent failure| fail
+    fail --> action
+    run -.-> audit
+
+    note1[Retrying a completed run returns its durable result; it does not create a duplicate logical run]
+    note1 -.-> run
+    note2[Worker context comes from organization identity, never a database URL]
+    note2 -.-> processor
+
+    classDef durable fill:#eefbf3,stroke:#218739,color:#123d20;
+    classDef async fill:#f2edff,stroke:#7048a8,color:#30204d;
+    classDef alert fill:#fff0f0,stroke:#b42318,color:#5f1712;
+    class run,upsert,audit durable;
+    class fanout,processor,queue async;
+    class severity,fail alert;

@@ -1,0 +1,32 @@
+%% Permission-aware report and order export flow
+sequenceDiagram
+    autonumber
+    participant Admin as Tenant admin
+    participant Web as Admin dashboard
+    participant API as Reports API
+    participant Guard as Permission and membership guards
+    participant Report as ReportsService
+    participant DB as Tenant PostgreSQL
+    participant CSV as CSV projection/stream
+    participant Audit as Audit and metrics
+
+    Admin->>Web: Select date range, filters, and report
+    Web->>API: GET bounded report or orders export
+    API->>Guard: Validate tenant membership and reports permission
+    Guard->>Report: Continue with actor permission set
+    Report->>Report: Normalize UTC period and allowed filters
+    Report->>DB: Read tenant-local orders in keyset pages
+    DB-->>Report: Bounded page of rows
+    loop Until keyset exhausted
+        Report->>DB: Read next page after last stable key
+        DB-->>Report: Next bounded page
+    end
+    Report->>Report: Project fields permitted for actor
+    Report->>Report: Sum money using integer minor units
+    Report->>CSV: Escape formula-like cells and stream output
+    CSV-->>Web: Report or downloadable export
+    Report->>Audit: Record export metadata without sensitive payload
+
+    Note over Guard,Report: Frontend-hidden fields remain protected by backend projection.
+    Note over Report,DB: Tenant database is resolved before any order/customer read.
+    Note over Report,CSV: Keyset pages prevent unbounded memory growth.

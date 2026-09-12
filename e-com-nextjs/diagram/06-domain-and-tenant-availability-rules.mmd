@@ -1,0 +1,44 @@
+%% Domain routing and tenant availability decision tree
+flowchart TD
+    request[Incoming request host]
+    proxy{Trusted proxy?}
+    normalize[Normalize hostname\nlowercase, port rules, safety checks]
+    cache{Redis host cache hit?}
+    registry[Control-plane lookup\nactive domain + organization + DB registry]
+    ready{Domain active, org routable,\nDB READY and not retired?}
+    active[Create immutable tenant context\norganization + database + host]
+    browse[Resolve tenant for browse/read policy]
+    write{Commerce mutation?}
+    allow[Continue to tenant service\nand tenant Prisma client]
+    suspended[Stable suspended response\nread policy may still browse]
+    unavailable[Stable tenant unavailable response]
+    reject[Reject request\nno tenant lookup or DB access]
+    invalidate[Invalidate positive/negative cache\nwhen operator changes domain/status]
+
+    request --> proxy
+    proxy -->|yes| normalize
+    proxy -->|no| reject
+    normalize --> cache
+    cache -->|yes| active
+    cache -->|no| registry
+    registry --> ready
+    ready -->|no| unavailable
+    ready -->|yes| active
+    active --> browse
+    browse --> write
+    write -->|no| allow
+    write -->|yes and ACTIVE| allow
+    write -->|yes and SUSPENDED| suspended
+
+    operator[Platform status/domain change] --> invalidate
+    invalidate -.-> cache
+
+    classDef fail fill:#fff0f0,stroke:#b42318,color:#5f1712;
+    classDef safe fill:#eefbf3,stroke:#218739,color:#123d20;
+    classDef control fill:#eef6ff,stroke:#2864a8,color:#17324d;
+    class reject,unavailable,suspended fail;
+    class active,allow safe;
+    class registry,invalidate control;
+
+    note1[Browser body, query, or organization ID\ndoes not select the tenant database]
+    note1 -.-> active

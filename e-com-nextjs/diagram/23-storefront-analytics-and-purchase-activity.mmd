@@ -1,0 +1,37 @@
+%% Storefront analytics and privacy-safe purchase activity
+sequenceDiagram
+    autonumber
+    participant Browser
+    participant Web as Customer Web/BFF
+    participant Analytics as Analytics API
+    participant Sanitize as Event sanitizer
+    participant DB as Tenant PostgreSQL
+    participant Report as Bounded aggregate service
+    participant Activity as Purchase activity API
+    participant Settings as Tenant settings
+
+    Browser->>Web: View product, search, filter, cart, or checkout
+    Web->>Web: Create anonymous/session event identity
+    Web->>Analytics: POST event with bounded metadata
+    Analytics->>Sanitize: Normalize path, filters, and search terms
+    Sanitize->>Sanitize: Remove unsafe scalar/PII-like values
+    Sanitize->>DB: Persist tenant-local structured event
+
+    opt Admin analytics dashboard
+        Web->>Report: Request bounded date/filter aggregation
+        Report->>DB: Aggregate daily/event facts in tenant DB
+        DB-->>Report: Measured funnel and revenue/order totals
+        Report-->>Web: Tenant-scoped dashboard projection
+    end
+
+    opt Public purchase activity
+        Browser->>Activity: Request page of recent activity
+        Activity->>Settings: Check activity enabled and policy
+        Activity->>DB: Select delivered/completed opted-in orders
+        DB-->>Activity: Masked customer/product projection
+        Activity-->>Browser: Bounded page and pagination metadata
+    end
+
+    Note over Analytics,DB: Identical event IDs and search terms remain isolated by tenant database.
+    Note over Activity,DB: Public activity excludes address/contact data and masks customer names.
+    Note over Report,DB: Missing evidence produces an honest empty/zero metric, not an inferred conversion rate.

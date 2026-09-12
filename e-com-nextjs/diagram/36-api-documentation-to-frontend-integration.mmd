@@ -1,0 +1,62 @@
+flowchart LR
+    subgraph Docs[API documentation domains]
+        CustomerDocs[customer-storefront<br/>auth, cart, checkout, discovery,<br/>rider portal, value-added services]
+        TenantDocs[tenant-admin<br/>catalog, customers, orders, returns,<br/>reports, settings, operations]
+        PlatformDocs[platform-admin<br/>organizations, plans, billing,<br/>support access, migrations, usage]
+        SocketDocs[websocket events]
+    end
+
+    subgraph Frontends[Frontend integration surfaces]
+        Storefront[ferio-customer-web<br/>app/api/* BFF handlers]
+        TenantAdmin[ferio-admin-dashboard/ferio-admin<br/>dashboard and app/api/*]
+        PlatformAdmin[ferio-platform-admin<br/>platform proxy and auth routes]
+        Realtime[chat/socket-ticket<br/>browser realtime client]
+    end
+
+    subgraph Nest[NestJS controller families]
+        Commerce[tenant commerce controllers<br/>catalog, cart, checkout, orders]
+        Operations[tenant operations controllers<br/>shipping, returns, reports, settlements]
+        Accounts[identity and account controllers<br/>auth, customers, staff, wallet]
+        Platform[platform controllers<br/>organizations, domains, plans, migrations]
+        Socket[socket-auth and gateway controllers]
+    end
+
+    CustomerDocs --> Storefront
+    TenantDocs --> TenantAdmin
+    PlatformDocs --> PlatformAdmin
+    SocketDocs --> Realtime
+
+    Storefront --> Commerce
+    Storefront --> Accounts
+    Storefront --> Socket
+    TenantAdmin --> Commerce
+    TenantAdmin --> Operations
+    TenantAdmin --> Accounts
+    TenantAdmin --> Socket
+    PlatformAdmin --> Platform
+    Realtime --> Socket
+
+    Storefront -. "trusted host forwarded by BFF" .-> TenantContext[Tenant context]
+    TenantAdmin -. "tenant host and staff session" .-> TenantContext
+    TenantContext --> TenantDB[(Tenant database)]
+    Platform --> ControlPlane[(Control-plane database)]
+
+    subgraph Review[Integration review questions]
+        Q1[Is the documented path implemented by a frontend handler?]
+        Q2[Does the handler preserve auth, host, and tenant context?]
+        Q3[Does the controller enforce permission and ownership?]
+        Q4[Is async work or provider failure visible to the UI?]
+    end
+
+    Docs -. "verify against source and runtime" .-> Review
+    Frontends -. "verify request and error behavior" .-> Review
+    Nest -. "verify authorization and persistence" .-> Review
+
+    classDef docs fill:#f0fdf4,stroke:#16a34a,color:#0f172a
+    classDef app fill:#eef6ff,stroke:#2563eb,color:#0f172a
+    classDef review fill:#fff7ed,stroke:#ea580c,color:#0f172a
+    class CustomerDocs,TenantDocs,PlatformDocs,SocketDocs docs
+    class Storefront,TenantAdmin,PlatformAdmin,Realtime,Commerce,Operations,Accounts,Platform,Socket app
+    class Q1,Q2,Q3,Q4 review
+
+    %% This cross-reference is a study aid; it is not an automated completeness proof.

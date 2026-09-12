@@ -1,0 +1,49 @@
+%% Tenant customer authentication and session lifecycle
+sequenceDiagram
+    autonumber
+    participant Customer
+    participant Web as Customer Web/BFF
+    participant API as Tenant Auth API
+    participant Context as Tenant resolver/context
+    participant Auth as AuthService and OTP service
+    participant DB as Tenant PostgreSQL
+    participant Mail as Email or OTP provider
+
+    Customer->>Web: Register or submit login on tenant host
+    Web->>API: POST /auth/register or /auth/login
+    API->>Context: Resolve tenant from trusted host
+    Context-->>API: Immutable organization context
+
+    alt Registration
+        API->>Auth: Validate input and create tenant user
+        Auth->>DB: Store user and one-time verification state
+        Auth->>Mail: Enqueue verification message
+        Mail-->>Customer: Verification code/link
+        Customer->>Web: Submit verification code
+        Web->>API: POST /auth/verify-email
+        API->>Auth: Consume one-time code
+        Auth->>DB: Mark email verified
+    else Login
+        API->>Auth: Normalize identifier and rate-limit attempt
+        Auth->>DB: Read tenant user and lock state
+        Auth->>Auth: Verify password and account policy
+    end
+
+    Auth->>DB: Create refresh session and token state
+    Auth-->>Web: Short-lived access token + HTTP-only refresh cookie
+    Web-->>Customer: Authenticated tenant session
+
+    Customer->>Web: Continue after access-token expiry
+    Web->>API: POST /auth/refresh with refresh cookie
+    API->>Auth: Validate version, rotation, and revocation state
+    Auth->>DB: Rotate refresh session state
+    Auth-->>Web: New access token and refresh cookie
+
+    Customer->>Web: Logout or reset password
+    Web->>API: Logout or OTP/password-reset request
+    API->>Auth: Revoke session or consume reset state
+    Auth->>DB: Persist revocation/reset transition
+    Web-->>Customer: Cleared or replaced session
+
+    Note over Context,DB: The browser's organization ID is never proof of tenant identity.
+    Note over Auth,Mail: OTP and recovery paths are one-time, attempt-limited, rate-limited, and enumeration-safe.

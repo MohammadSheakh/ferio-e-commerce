@@ -1,0 +1,40 @@
+%% Courier settlement import, preflight, matching, and posting
+sequenceDiagram
+    autonumber
+    participant Admin as Tenant admin
+    participant Web as Admin dashboard
+    participant API as Settlement API
+    participant Parser as Settlement parser
+    participant DB as Tenant PostgreSQL
+    participant Match as Settlement matcher
+    participant Audit as Audit/reconciliation evidence
+
+    Admin->>Web: Download canonical settlement template
+    Web->>API: GET settlement template
+    API-->>Web: Versioned headers and money-unit contract
+
+    Admin->>Web: Upload courier settlement file
+    Web->>API: POST settlement preflight
+    API->>Parser: Validate type, headers, row count, and money units
+    Parser->>Parser: Reject duplicate provider row refs
+    Parser->>Parser: Validate fees/deductions do not exceed collection
+    alt Preflight invalid
+        Parser-->>Web: Row-level diagnostics; no posting
+    else Preflight valid
+        Parser-->>Web: Normalized candidate rows
+        Web->>API: POST settlement with idempotency key
+        API->>Match: Match shipment/order identity and collection evidence
+        Match->>DB: Read eligible tenant collections
+        DB-->>Match: Order/shipment evidence
+        Match->>DB: Transactionally post settlement result
+        DB-->>Match: MATCHED, SHORTFALL, or exception state
+        Match->>Audit: Record source, row identity, actor, and outcome
+        Match-->>Web: Idempotent settlement result
+    end
+
+    Admin->>Web: Retry same import command
+    Web->>API: Same idempotency key
+    API->>DB: Return original committed result
+
+    Note over Parser,DB: Operational row limits prevent oversized synchronous imports.
+    Note over Match,DB: COD is marked paid only when collection and shipment evidence match.

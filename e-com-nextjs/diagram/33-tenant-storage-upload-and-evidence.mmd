@@ -1,0 +1,36 @@
+%% Tenant storage upload, validation, namespace, and evidence linkage
+sequenceDiagram
+    autonumber
+    participant User as Customer or admin
+    participant Web as Web/BFF
+    participant API as Storage API
+    participant Guard as Tenant auth and policy
+    participant Validate as Upload validator
+    participant Store as Object storage strategy
+    participant Scan as Malware/quarantine path
+    participant DB as Tenant PostgreSQL
+    participant Feature as Warranty/content feature
+
+    User->>Web: Select file for tenant feature
+    Web->>API: Request upload or presigned PUT
+    API->>Guard: Resolve tenant, actor, feature, and ownership
+    Guard->>Validate: Check size, type, filename, and purpose
+    Validate-->>API: Validated upload contract
+    API->>Store: Generate tenant-scoped object key
+    Store-->>Web: Presigned upload URL and safe public metadata
+    Web->>Store: Upload bytes directly to object storage
+    Store->>Scan: Apply malware/quarantine policy
+    Scan-->>Store: Clean, pending, or quarantined result
+
+    alt Accepted clean evidence
+        Web->>API: Confirm upload metadata
+        API->>DB: Persist object reference in tenant record
+        API->>Feature: Attach evidence to warranty/content entity
+        Feature->>DB: Save tenant-local evidence link
+    else Quarantined or rejected
+        Store-->>Web: Safe failure state
+        API->>DB: Persist sanitized failure/evidence state when required
+    end
+
+    Note over Store,DB: Object key namespace includes the trusted organization identity; browser-supplied cross-tenant keys are rejected.
+    Note over Validate,Scan: File acceptance is not the same as malware-clean evidence until the scan/quarantine policy completes.

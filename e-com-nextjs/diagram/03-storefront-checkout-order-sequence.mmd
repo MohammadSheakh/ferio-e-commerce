@@ -1,0 +1,53 @@
+%% Server-priced storefront checkout and order boundary
+sequenceDiagram
+    autonumber
+    participant Customer
+    participant Web as Customer Web
+    participant API as Checkout/Order API
+    participant Cart as Cart service
+    participant Checkout as Checkout service
+    participant DB as Tenant PostgreSQL
+    participant Payment as Payment gateway adapter
+    participant Queue as Transactional queue
+    participant Courier as Courier adapter
+
+    Customer->>Web: Browse published catalog
+    Web->>API: Read catalog using resolved tenant host
+    API->>DB: Read published products and variants
+    DB-->>Web: Catalog projection
+
+    Customer->>Web: Add item and open checkout
+    Web->>API: Cart token and requested item changes
+    API->>Cart: Validate publication, price, and stock
+    Cart->>DB: Read and update tenant cart
+    DB-->>Cart: Current cart state
+
+    Web->>API: POST checkout/preview
+    API->>Checkout: Re-read mutable commerce facts
+    Checkout->>DB: Price, stock, delivery, discount, and policy checks
+    DB-->>Checkout: Server-priced checkout draft
+    Checkout-->>Web: Totals and payment options
+
+    alt Cash on delivery
+        Web->>API: POST checkout/orders with idempotency key
+        API->>DB: Transactionally create COD order and reserve inventory
+        DB-->>API: Order reference
+    else Prepaid
+        Web->>API: Create prepaid order/payment attempt
+        API->>DB: Create attempt and order state
+        API->>Payment: Create hosted payment session
+        Payment-->>Web: Provider redirect/session
+        Payment->>API: Signed tenant-bound callback
+        API->>Payment: Verify signature, amount, currency, replay state
+        API->>DB: Transactionally finalize payment state
+    end
+
+    API->>Queue: Record deduplicated notification/fulfillment work
+    Queue-->>API: Accepted for asynchronous processing
+    Queue->>Courier: Poll or send shipment workflow
+    Courier-->>Queue: Normalized shipment event
+    Queue->>DB: Persist shipment and order history
+    API-->>Web: Stable order/payment status
+
+    Note over API,DB: Idempotency prevents browser retries from duplicating orders.
+    Note over Queue,Courier: Provider calls stay outside the order transaction.

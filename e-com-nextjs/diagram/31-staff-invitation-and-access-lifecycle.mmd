@@ -1,0 +1,45 @@
+%% Tenant staff invitation, access changes, reset, and deactivation
+sequenceDiagram
+    autonumber
+    participant Owner as Tenant owner/admin
+    participant Invitee as Invited staff member
+    participant Web as Admin dashboard
+    participant API as Staff access API
+    participant Guard as Role/permission/membership guards
+    participant Staff as StaffAccessService
+    participant DB as Tenant PostgreSQL
+    participant Mail as Invitation/reset delivery
+    participant Audit as Tenant audit
+
+    Owner->>Web: Open staff access management
+    Web->>API: GET /admin/staff
+    API->>Guard: Validate staff-read permission and membership
+    Guard->>Staff: Load staff and invitation overview
+    Staff->>DB: Read tenant-local staff/access state
+    DB-->>Web: Staff, roles, permissions, expiry state
+
+    Owner->>Web: Invite staff member with role/permissions
+    Web->>API: POST /admin/staff/invite
+    API->>Guard: Validate staff-write permission and entitlement
+    Guard->>Staff: Normalize and enforce seat/access policy
+    Staff->>DB: Create expiring invitation and audit event
+    Staff->>Mail: Queue invitation message
+    Mail-->>Web: Delivery accepted/status
+
+    opt Invitee accepts
+        Invitee->>API: POST /staff-access/accept-invite with token/password
+        API->>Staff: Validate one-time token and expiry
+        Staff->>DB: Create/activate tenant user and revoke token
+        Staff->>Audit: Record accepted invitation
+    end
+
+    Owner->>Web: Update access, issue reset, or deactivate
+    Web->>API: Protected staff mutation
+    API->>Guard: Recheck actor permission and target constraints
+    Guard->>Staff: Apply role/permission/status change
+    Staff->>DB: Persist mutation and revoke affected sessions
+    Staff->>Audit: Record actor, target, and reason
+    API-->>Web: Sanitized access result
+
+    Note over Staff,DB: Access changes take effect server-side; frontend role labels are not authority.
+    Note over API,Staff: Invitation/reset tokens are one-time, expiring, and never treated as permanent access.

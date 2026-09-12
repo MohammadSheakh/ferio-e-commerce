@@ -1,0 +1,39 @@
+%% Organization lifecycle transitions from platform controls
+stateDiagram-v2
+    [*] --> PROVISIONING: create organization
+
+    PROVISIONING --> ACTIVE: all provisioning steps pass
+    PROVISIONING --> PROVISIONING_FAILED: step fails
+    PROVISIONING_FAILED --> PROVISIONING: retry or resume run
+
+    ACTIVE --> SUSPENDED: operator or subscription policy
+    SUSPENDED --> ACTIVE: reactivate after resolution
+    ACTIVE --> CLOSURE_PENDING: initiate closure
+    SUSPENDED --> CLOSURE_PENDING: initiate closure
+
+    CLOSURE_PENDING --> CLOSED: retention and finalization pass
+    CLOSURE_PENDING --> ARCHIVED: archive policy
+    CLOSURE_PENDING --> SUSPENDED: closure cancelled
+    CLOSED --> ARCHIVED: archive closed tenant
+
+    ARCHIVED --> [*]
+
+    note right of PROVISIONING
+      Host resolution must not
+      serve the tenant yet.
+    end note
+
+    note right of ACTIVE
+      Domain can resolve when
+      database registry is READY.
+    end note
+
+    note right of SUSPENDED
+      Browsing may remain allowed;
+      commerce writes are blocked.
+    end note
+
+    note right of CLOSURE_PENDING
+      Restrict tenant traffic and
+      preserve retention evidence.
+    end note

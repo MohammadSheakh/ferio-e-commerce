@@ -1,0 +1,27 @@
+sequenceDiagram
+    actor Staff as Tenant staff browser
+    participant UI as Admin CRUD screen
+    participant BFF as Next.js admin API route
+    participant API as NestJS controller
+    participant Guard as Auth, role, permission, ownership
+    participant Service as Tenant service
+    participant DB as Tenant database
+    participant Audit as Audit event writer
+
+    Staff->>UI: Edit a tenant resource
+    UI->>BFF: Submit validated form
+    BFF->>BFF: Normalize payload and preserve tenant host
+    BFF->>API: Send authenticated mutation
+    API->>Guard: Authenticate and authorize action
+    Guard-->>API: Staff principal and tenant scope
+    API->>Service: Execute domain command
+    Service->>DB: Validate ownership and write transaction
+    DB-->>Service: Updated resource
+    Service->>Audit: Record actor, tenant, action, resource
+    Audit-->>Service: Evidence accepted
+    Service-->>API: Response DTO
+    API-->>BFF: Success or typed domain error
+    BFF-->>UI: Refresh/invalidate affected view
+    UI-->>Staff: Updated state or actionable error
+
+    Note over Guard,DB: Permission checks and ownership checks remain server-side.

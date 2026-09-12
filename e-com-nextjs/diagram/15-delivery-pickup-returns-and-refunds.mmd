@@ -1,0 +1,50 @@
+%% Fulfillment, delivery, pickup, return, refund, and RTO journey
+sequenceDiagram
+    autonumber
+    participant Admin as Tenant admin
+    participant Customer
+    participant API as Tenant commerce API
+    participant Order as Order/Fulfillment service
+    participant Courier as Courier adapter
+    participant Queue as Shipping queue
+    participant DB as Tenant PostgreSQL
+    participant Refund as Refund service
+
+    Admin->>API: Confirm order and request fulfillment
+    API->>Order: Validate state and tenant admin permission
+    Order->>DB: Transactionally update order history/inventory
+    Order->>Courier: Create shipment outside DB transaction
+    Courier-->>Order: Tracking/consignment result
+    Order->>DB: Persist shipment and provider event
+    Order->>Queue: Schedule polling or notification work
+
+    alt Courier webhook or polling result
+        Courier->>API: Signed provider status callback
+        API->>Queue: Enqueue normalized tenant shipment job
+        Queue->>Order: Apply allowed delivery transition
+        Order->>DB: Persist shipment/order status and history
+    else Store pickup
+        Customer->>API: Schedule or update pickup slot
+        API->>Order: Verify customer ownership and order state
+        Order->>DB: Persist pickup schedule
+        Admin->>API: Mark ready and verify handover OTP/evidence
+        API->>DB: Complete pickup transition and audit
+    end
+
+    Customer->>API: Request return for eligible order item
+    API->>Order: Check policy, window, ownership, and item state
+    Order->>DB: Create return case and evidence requirements
+    Admin->>API: Review and inspect return
+    API->>Order: Apply inspected return transition
+    Order->>DB: Persist inspection and inventory disposition
+
+    alt Refund approved
+        Admin->>Refund: Create refund with idempotency key
+        Refund->>DB: Persist refund intent/result state
+        Refund-->>Courier: Optional reverse logistics/RTO coordination
+    else Return-to-origin
+        Order->>DB: Persist RTO state and resolution evidence
+    end
+
+    Note over Order,DB: State transitions are enforced by the service, not the frontend.
+    Note over Refund,DB: Refund retries must not duplicate financial effects.

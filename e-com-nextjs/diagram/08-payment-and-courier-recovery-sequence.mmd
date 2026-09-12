@@ -1,0 +1,42 @@
+%% Payment recovery and courier integration boundaries
+sequenceDiagram
+    autonumber
+    participant Scheduler
+    participant Callback as Provider callback
+    participant API as NestJS API
+    participant Queue as Recovery/courier queue
+    participant Worker as Tenant-stamped processor
+    participant Provider as Payment or courier adapter
+    participant DB as Tenant PostgreSQL
+    participant Notify as Notification/audit work
+
+    alt Expired prepaid attempt
+        Scheduler->>Queue: Enqueue tenant organizationId + attemptId
+        Queue->>Worker: Deliver recovery job
+        Worker->>DB: Serializable claim of payment attempt
+        alt Claim already handled
+            DB-->>Worker: No-op current state
+        else Claim succeeds
+            Worker->>Provider: Reconcile or expire attempt
+            Provider-->>Worker: Verified provider state
+            Worker->>DB: Idempotently update payment/order state
+            Worker->>Notify: Record outcome and side effects
+        end
+    else Courier webhook
+        Callback->>API: Raw body + signature + tenant callback token
+        API->>API: Verify authenticity and store callback evidence
+        API->>Queue: Enqueue normalized tenant job
+        Queue->>Worker: Process callback
+        Worker->>Provider: Normalize provider status if needed
+        Worker->>DB: Update shipment/order event transactionally
+        Worker->>Notify: Schedule customer/admin notification
+    else Courier polling
+        Scheduler->>Queue: Fan out READY/ACTIVE organizations
+        Queue->>Worker: Deliver organization-scoped poll job
+        Worker->>Provider: Poll outside DB transaction
+        Provider-->>Worker: Shipment status or timeout
+        Worker->>DB: Persist event, attempt, and normalized status
+    end
+
+    Note over Worker,Provider: Provider calls stay outside database transactions.
+    Note over Queue,Notify: Timeouts use bounded retries and dead-letter evidence; one provider outage must not block other tenants.

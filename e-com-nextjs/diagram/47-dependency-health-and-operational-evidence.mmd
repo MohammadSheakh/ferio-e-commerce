@@ -1,0 +1,23 @@
+flowchart LR
+    Scheduler[Health check scheduler] --> API[Operations health API]
+    API --> Control[(Control-plane database)]
+    API --> Tenant[(Tenant database pool)]
+    API --> Redis[(Redis/BullMQ)]
+    API --> Storage[(Object storage)]
+    API --> Provider[Payment/courier/messaging providers]
+    API --> Backup[Backup evidence inventory]
+
+    Control --> Normalize[Normalize status and latency]
+    Tenant --> Normalize
+    Redis --> Normalize
+    Storage --> Normalize
+    Provider --> Normalize
+    Backup --> Normalize
+    Normalize --> Threshold{Healthy within threshold?}
+    Threshold -- yes --> Dashboard[Operator dashboard]
+    Threshold -- no --> Alert[Sanitized alert and incident record]
+    Alert --> Dashboard
+    Dashboard --> Audit[Audit evidence and follow-up]
+
+    Note1[Health checks must avoid secrets and customer data.] -.-> Normalize
+    Note2[Provider unavailable does not imply tenant database failure.] -.-> Threshold

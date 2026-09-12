@@ -1,0 +1,51 @@
+%% Platform-admin organization and tenant provisioning sequence
+sequenceDiagram
+    autonumber
+    participant Operator as Platform admin
+    participant Web as Platform admin web
+    participant API as Platform API
+    participant Org as OrganizationsService
+    participant Platform as Control-plane PostgreSQL
+    participant Run as ProvisioningService
+    participant Domain as DomainsService
+    participant Provisioner as Tenant DB provisioner
+    participant Bootstrap as Schema bootstrapper
+    participant Audit as Platform audit
+
+    Operator->>Web: Submit organization name, slug, owner email
+    Web->>API: POST /platform/organizations
+    API->>Org: Validate and normalize input
+    Org->>Platform: Create PROVISIONING organization
+    Org->>Platform: Create initial owner membership
+    Org->>Audit: Record organization-created event
+    Platform-->>Web: Organization metadata
+
+    Operator->>Web: Start provisioning with idempotency key
+    Web->>API: POST /organizations/:id/provision
+    API->>Run: Start or resume ProvisioningRun
+
+    loop Ordered provisioning steps
+        Run->>Domain: RESERVE_SUBDOMAIN
+        Run->>Platform: REGISTER_TENANT_DATABASE
+        Run->>Provisioner: PROVISION_PHYSICAL_DATABASE
+        Provisioner-->>Run: Encrypted registry material
+        Run->>Bootstrap: APPLY_MIGRATIONS
+        Run->>Bootstrap: SEED_TENANT
+        Run->>Platform: ATTACH_OWNER_MEMBERSHIP evidence
+        Run->>Bootstrap: HEALTH_CHECK
+        Run->>Bootstrap: SMOKE_TEST / verifyReady
+        Run->>Platform: Record step outcome
+    end
+
+    alt All steps succeed
+        Run->>Platform: Transition organization to ACTIVE
+        Run->>Audit: Record activation event
+        Platform-->>Web: ACTIVE and READY result
+    else Step fails
+        Run->>Platform: Mark run FAILED and org PROVISIONING_FAILED
+        Run->>Audit: Record failed step and sanitized error
+        Platform-->>Web: Retryable failure and run timeline
+    end
+
+    Note over Run,Provisioner: Repeating the same idempotency key resumes the run; it does not create a second tenant.
+    Note over Platform,Provisioner: Plaintext credentials never return to the browser.

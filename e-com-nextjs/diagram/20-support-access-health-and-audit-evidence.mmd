@@ -1,0 +1,42 @@
+%% Support access, operations health, reconciliation, and audit evidence
+sequenceDiagram
+    autonumber
+    participant Operator as Platform operator
+    participant Console as Operations console
+    participant API as Platform API
+    participant Support as SupportAccessService
+    participant Health as OperationsHealthService
+    participant Recon as Usage/reconciliation service
+    participant DB as Control and tenant databases
+    participant Audit as Platform and tenant audit
+
+    Operator->>Console: Request tenant support access
+    Console->>API: Submit organization, reason, scope, expiry
+    API->>Support: Validate permission and required reason
+    Support->>DB: Create time-bounded support grant
+    Support->>Audit: Record actor, target, scope, and expiry
+    API-->>Console: Sanitized grant status
+
+    Operator->>Console: Open tenant support session
+    Console->>API: Present active support grant
+    API->>Support: Verify scope, expiry, and revocation
+    Support-->>Console: Allowed read/support context
+    Console->>DB: Read only permitted tenant data
+    Console->>Audit: Record support action and correlation ID
+
+    Operator->>Console: Open health dashboard
+    Console->>API: GET database/domain/system health
+    API->>Health: Probe control plane, tenant readiness, Redis, queues, providers
+    Health->>DB: Run bounded dependency checks
+    DB-->>Health: Health evidence
+    Health-->>Console: HEALTHY, DEGRADED, or UNAVAILABLE signals
+
+    Operator->>Console: Reconcile usage or financial finding
+    Console->>API: Start bounded reconciliation
+    API->>Recon: Compare authoritative tenant facts to recorded counters/findings
+    Recon->>DB: Read facts and persist correction/finding
+    Recon->>Audit: Record reconciliation actor and outcome
+    API-->>Console: Evidence and next action
+
+    Note over Support,Audit: Support access is explicit, scoped, time-bounded, revocable, and audited.
+    Note over Health,DB: Health output is an operational signal, not proof of global capacity or production readiness.

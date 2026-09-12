@@ -1,0 +1,48 @@
+%% Tenant migration, recovery, export, retention, and closure operations
+flowchart TD
+    start[Operator starts controlled tenant operation]
+    select[Select eligible tenant registry rows]
+    canary[Run migration canary\nrecord digest and result]
+    verify{Canary verified?}
+    batch[Run bounded migration batches\nclaim and resume safely]
+    fleet{All tenants at target schema?}
+    backup[Create backup/export evidence\ncontrol plane, tenant DB, media]
+    restore[Restore disposable tenant\ninto isolated database]
+    verifyRestore{Schema, data, media,\nfinancial invariants verified?}
+    retain[Apply retention window\nrevoke credentials and access]
+    closure[Finalize physical tenant destruction\nregistry/domain/cache cleanup]
+    pause[Pause, retry, or escalate\nwith operator evidence]
+    audit[Record run, actor, timestamps,\nRPO/RTO and sanitized errors]
+
+    start --> select
+    select --> canary
+    canary --> verify
+    verify -->|no| pause
+    verify -->|yes| batch
+    batch --> fleet
+    fleet -->|no| batch
+    fleet -->|yes| audit
+
+    audit --> backup
+    backup --> restore
+    restore --> verifyRestore
+    verifyRestore -->|no| pause
+    verifyRestore -->|yes| audit
+
+    audit --> retain
+    retain --> closure
+    closure --> audit
+
+    pause -->|resume after remediation| select
+
+    note1[Application startup does not run uncontrolled migrations across the fleet]
+    note1 -.-> canary
+    note2[Destruction is disposable-tenant only until recovery evidence passes]
+    note2 -.-> closure
+
+    classDef safe fill:#eefbf3,stroke:#218739,color:#123d20;
+    classDef danger fill:#fff0f0,stroke:#b42318,color:#5f1712;
+    classDef ops fill:#eef6ff,stroke:#2864a8,color:#17324d;
+    class canary,verify,batch,fleet,backup,restore,verifyRestore safe;
+    class retain,closure danger;
+    class select,pause,audit ops;

@@ -1,0 +1,23 @@
+sequenceDiagram
+    actor Operator as Platform operator
+    participant UI as Billing/subscription UI
+    participant API as NestJS platform API
+    participant Catalog as Plan and subscription service
+    participant Control as Control-plane database
+    participant Usage as Usage and entitlement evaluator
+    participant Tenant as Tenant API request
+
+    Operator->>UI: Select plan, trial, status, or override
+    UI->>API: Submit platform-authenticated mutation
+    API->>Catalog: Validate plan version and transition
+    Catalog->>Control: Persist subscription/override with audit data
+    Control-->>Catalog: Effective subscription state
+    Catalog->>Usage: Invalidate or recompute entitlement snapshot
+    Usage-->>API: Effective limits and feature decisions
+    API-->>UI: Show current plan and usage
+    Tenant->>Usage: Evaluate feature or usage limit
+    Usage->>Control: Read platform-owned entitlement state
+    Control-->>Usage: Versioned limits and overrides
+    Usage-->>Tenant: Allow, deny, or return upgrade-required response
+
+    Note over Catalog,Usage: Entitlements are enforced server-side; UI visibility is not authorization.

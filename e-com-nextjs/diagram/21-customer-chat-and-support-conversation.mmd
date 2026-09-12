@@ -1,0 +1,43 @@
+%% Customer chat and tenant-scoped support conversation
+sequenceDiagram
+    autonumber
+    participant Customer
+    participant Web as Customer Web/BFF
+    participant REST as Chat REST API
+    participant Auth as Tenant membership/participant policy
+    participant DB as Tenant PostgreSQL
+    participant Queue as Chat notification queue
+    participant Gateway as Socket.IO gateway
+    participant Redis
+    participant Agent as Tenant support agent
+
+    Customer->>Web: Open support chat on tenant host
+    Web->>REST: Request guest or authenticated socket ticket
+    REST->>Auth: Validate tenant context and actor/guest policy
+    Auth-->>Web: Short-lived tenant-bound ticket
+    Web->>Gateway: Connect and authenticate ticket
+    Gateway->>Redis: Register tenant-scoped presence
+
+    Customer->>REST: Create/find conversation
+    REST->>Auth: Verify participant membership or support policy
+    Auth->>DB: Read/write conversation membership
+    DB-->>REST: Conversation identity
+    REST-->>Web: Conversation and cursor metadata
+
+    Customer->>REST: POST message
+    REST->>Auth: Verify participant and sender ownership
+    REST->>DB: Transactionally persist message and last-message state
+    DB-->>REST: Durable message
+    REST->>Queue: Enqueue participant notification after commit
+    REST->>Gateway: Emit through organization-scoped room
+    Gateway->>Redis: Fan out tenant-scoped event
+    Gateway-->>Agent: New message event
+    Queue-->>Agent: Notification delivery work
+
+    Agent->>REST: Read, update, or delete own permitted message
+    REST->>Auth: Recheck participant and sender ownership
+    REST->>DB: Apply cursor/ownership-safe mutation
+    REST->>Gateway: Emit updated tenant-scoped event
+
+    Note over DB,Queue: Notifications reference a durable message; a rolled-back message is not notified.
+    Note over Gateway,Redis: Identical conversation IDs in different tenants use different room namespaces.

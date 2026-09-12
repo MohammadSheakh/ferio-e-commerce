@@ -1,0 +1,22 @@
+sequenceDiagram
+    actor Operator as Platform operator
+    participant UI as Operations UI
+    participant API as Platform operations API
+    participant Backup as Backup provider or local dump
+    participant Restore as Disposable restore database
+    participant Verify as Verification checks
+    participant Audit as Evidence record
+
+    Operator->>UI: Start backup/restore drill
+    UI->>API: Submit scoped tenant and drill metadata
+    API->>Backup: Create or select backup artifact
+    Backup-->>API: Backup id, timestamp, integrity metadata
+    API->>Restore: Restore into isolated disposable database
+    Restore-->>API: Restore completed
+    API->>Verify: Check migrations, tenant data, indexes, and isolation
+    Verify-->>API: Verification result and measured duration
+    API->>Audit: Record backup, restore, RPO/RTO evidence, and operator
+    Audit-->>UI: Evidence summary and remediation state
+    UI-->>Operator: Pass, fail, or blocked result
+
+    Note over Backup,Restore: A restore drill must not overwrite an active tenant database.

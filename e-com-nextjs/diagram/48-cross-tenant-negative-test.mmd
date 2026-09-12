@@ -1,0 +1,22 @@
+sequenceDiagram
+    actor Tester as Security tester
+    participant A as Tenant A browser/BFF
+    participant API as NestJS API
+    participant Guard as Host, auth, tenant guards
+    participant DB as Tenant database resolver
+    participant B as Tenant B data
+
+    Tester->>A: Request Tenant A resource
+    A->>API: Send host and authenticated request
+    API->>Guard: Resolve tenant and authorize principal
+    Guard->>DB: Select only Tenant A context
+    DB-->>API: Tenant A scoped client
+    API-->>A: Tenant A response
+    Tester->>A: Attempt foreign id, host, token, or room
+    A->>API: Malicious or mismatched request
+    API->>Guard: Re-evaluate trust and ownership
+    Guard-->>API: Reject or return not-found semantics
+    API-->>A: Safe failure without Tenant B data
+    API->>B: No read/write should occur
+
+    Note over Guard,B: Negative tests must prove absence of cross-tenant reads, writes, cache, logs, and realtime delivery.

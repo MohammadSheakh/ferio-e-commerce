@@ -1,0 +1,37 @@
+%% Tenant-stamped asynchronous worker lifecycle
+sequenceDiagram
+    autonumber
+    participant Request as HTTP service
+    participant TenantDB as Tenant PostgreSQL
+    participant Queue as BullMQ queue
+    participant Worker as Worker processor
+    participant Control as Control-plane DB
+    participant Context as Worker tenant context
+    participant Manager as TenantDatabaseManager
+    participant JobDB as Tenant PostgreSQL
+    participant Ops as Metrics and audit
+
+    Request->>TenantDB: Persist durable event or job intent
+    Request->>Queue: Enqueue organizationId + entityId + idempotency key
+    Queue-->>Worker: Deliver trusted job envelope
+    Worker->>Worker: Validate required fields and lifecycle state
+    Worker->>Control: Resolve organizationId to READY registry
+    Control-->>Worker: Tenant database metadata
+    Worker->>Context: Rebuild tenant context for job scope
+    Worker->>Manager: Acquire bounded tenant Prisma client
+    Manager->>JobDB: Run tenant-scoped idempotent operation
+
+    alt Work succeeds
+        JobDB-->>Worker: Durable result
+        Worker->>Ops: Record success, latency, and tenant-safe metrics
+        Worker-->>Queue: Complete job
+    else Retryable dependency failure
+        Worker->>Ops: Record attempt and sanitized failure
+        Worker-->>Queue: Retry with bounded backoff
+    else Permanent or malformed job
+        Worker->>Ops: Record failure and dead-letter evidence
+        Worker-->>Queue: Move to failed/dead-letter state
+    end
+
+    Note over Queue,Context: HTTP AsyncLocalStorage is not reused; tenant context is reconstructed from trusted control-plane identity.
+    Note over Request,JobDB: A job payload never carries a database URL or browser-selected tenant identity.

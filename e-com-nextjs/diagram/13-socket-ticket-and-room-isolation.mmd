@@ -1,0 +1,47 @@
+%% Socket ticket authentication and tenant-scoped room lifecycle
+sequenceDiagram
+    autonumber
+    participant Client as Customer/admin client
+    participant REST as Socket-auth controller
+    participant Context as Tenant context
+    participant Ticket as SocketAuthService
+    participant Gateway as Socket.IO gateway
+    participant Redis
+    participant DB as Tenant PostgreSQL
+    participant Room as Scoped room registry
+
+    alt Authenticated tenant user
+        Client->>REST: POST /socket-auth/ticket
+        REST->>Context: Read resolved organizationId
+        REST->>Ticket: Require AuthGuard + TenantMembershipGuard
+        Ticket-->>Client: Short-lived signed chat_socket ticket
+    else Guest storefront
+        Client->>REST: POST /socket-auth/guest-ticket with guest ID
+        REST->>Context: Read resolved organizationId
+        REST->>Ticket: Validate guest identifier and tenant context
+        Ticket-->>Client: Short-lived signed guest ticket
+    end
+
+    Client->>Gateway: Connect with ticket
+    Gateway->>Ticket: Verify signature, purpose, expiry, organization
+    alt Ticket valid
+        Gateway->>Room: Derive org-scoped personal/role/chat rooms
+        Gateway->>Redis: Store tenant-scoped presence and socket ownership
+        Gateway-->>Client: Connected with principal metadata
+        Client->>Gateway: Join conversation or task room
+        Gateway->>DB: Verify tenant membership/participant access
+        Gateway->>Room: Add only authorized scoped room
+    else Ticket invalid or organization missing
+        Gateway-->>Client: Reject connection
+    end
+
+    Gateway->>Gateway: Persist chat message through tenant service
+    Gateway->>Redis: Fan out only within org-prefixed rooms
+    Gateway-->>Client: Tenant-scoped event
+
+    Client-->>Gateway: Disconnect
+    Gateway->>Redis: Remove socket/presence/page-view state
+    Gateway->>Room: Clean up rooms and safe online status
+
+    Note over Gateway,Room: Identical room names across organizations cannot share a channel.
+    Note over Gateway,DB: Socket ticket is an access assertion, not a database credential.

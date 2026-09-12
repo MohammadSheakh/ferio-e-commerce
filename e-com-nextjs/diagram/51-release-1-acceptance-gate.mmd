@@ -1,0 +1,16 @@
+flowchart TD
+    Start[Release 1 review starts] --> Product[Product journeys pass]
+    Product --> Isolation[Cross-tenant negative tests pass]
+    Isolation --> Provision[Provisioning and lifecycle evidence pass]
+    Provision --> Recovery[Backup, restore, retry, and closure evidence pass]
+    Recovery --> Runtime[DNS/TLS, SSR/BFF, queues, providers, and health evidence pass]
+    Runtime --> Security[Security findings reviewed and accepted]
+    Security --> Docs[Runbooks, API docs, diagrams, and checklist synchronized]
+    Docs --> Pilot[Pilot/internal-alpha evidence reviewed]
+    Pilot --> Decision{Release owner decision}
+    Decision -- go --> Release[Release 1 approved]
+    Decision -- no-go --> Remediate[Create blocker with owner and evidence gap]
+    Remediate --> Product
+
+    Note1[Diagrams organize the gate; they do not substitute for execution evidence.] -.-> Docs
+    Note2[Unproven production claims remain open.] -.-> Runtime

@@ -1,0 +1,40 @@
+%% Product requests and delivery-personnel operational flow
+sequenceDiagram
+    autonumber
+    participant Customer
+    participant Web as Customer Web/BFF
+    participant RequestAPI as Product request API
+    participant DB as Tenant PostgreSQL
+    participant Admin as Tenant admin
+    participant RiderWeb as Rider portal/BFF
+    participant RiderAPI as Delivery personnel API
+    participant Courier as Order/assignment service
+
+    Customer->>Web: Submit product request
+    Web->>RequestAPI: Public request with validated bounded fields
+    RequestAPI->>DB: Create tenant-local product request
+    DB-->>Web: Accepted request reference
+
+    Admin->>RequestAPI: List/filter product requests
+    RequestAPI->>DB: Apply status/page bounds
+    DB-->>Admin: Count-plus-page envelope
+    Admin->>RequestAPI: Update status or delete request
+    RequestAPI->>DB: Apply admin role/permission/membership checks
+    DB-->>Admin: Audited request transition
+
+    RiderWeb->>RiderAPI: Submit rider credentials through login BFF
+    RiderAPI->>Courier: Validate rider identity and tenant assignment
+    Courier-->>RiderWeb: HTTP-only rider session cookie
+    RiderWeb->>RiderAPI: Read assigned orders or online status
+    RiderAPI->>Courier: Verify rider token and assignment ownership
+    Courier->>DB: Read/update tenant delivery state
+    DB-->>RiderWeb: Allowed rider projection
+
+    RiderWeb->>RiderAPI: Update assigned order status/location
+    RiderAPI->>Courier: Validate status transition and assigned rider
+    Courier->>DB: Persist delivery evidence and order history
+    Courier-->>RiderWeb: Stable update result
+
+    Note over RequestAPI,DB: Public callers cannot list, mutate, or enumerate admin requests.
+    Note over RiderWeb,RiderAPI: Raw rider JWT stays in an HTTP-only cookie and is not exposed to client JavaScript.
+    Note over Courier,DB: Rider identity and order assignment are checked server-side, not trusted from the browser.
