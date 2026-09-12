@@ -16,6 +16,13 @@ import ReturnCasePanel from "@/components/returns/ReturnCasePanel";
 import OrderOperationalTimeline from "@/components/orders/OrderOperationalTimeline";
 import OrderDetailLoading from "./loading";
 
+type DeliveryPersonnelOption = {
+  id: string;
+  name: string;
+  phoneOriginal: string;
+  status: "PENDING_APPROVAL" | "APPROVED" | "REJECTED" | "SUSPENDED";
+};
+
 const nextFulfillmentStatus: Partial<
   Record<OrderFulfillmentStatus, OrderFulfillmentStatus>
 > = {
@@ -50,6 +57,14 @@ const storePickupStatusClass: Record<StorePickupStatus, string> = {
   CANCELLED: "bg-rose-50 text-rose-700",
 };
 
+const adminStorePickupStatuses: StorePickupStatus[] = [
+  "AVAILABLE_IN_STORE",
+  "TRANSFER_REQUIRED",
+  "IN_TRANSFER",
+  "READY_FOR_PICKUP",
+  "CANCELLED",
+];
+
 function formatEnum(value: string) {
   const label = value.replaceAll("_", " ").toLowerCase();
   return label.charAt(0).toUpperCase() + label.slice(1);
@@ -66,6 +81,8 @@ export default function OrderDetailPage() {
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [shipment, setShipment] = useState<Shipment | null>(null);
   const [providers, setProviders] = useState<ShipmentProvider[]>([]);
+  const [riders, setRiders] = useState<DeliveryPersonnelOption[]>([]);
+  const [selectedRiderId, setSelectedRiderId] = useState("");
   const [selectedProvider, setSelectedProvider] =
     useState<CourierCode>("STEADFAST");
   const [exceptionType, setExceptionType] = useState<
@@ -73,7 +90,10 @@ export default function OrderDetailPage() {
   >("SHORTAGE");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [assigningRider, setAssigningRider] = useState(false);
+  const [pickupStatus, setPickupStatus] = useState<StorePickupStatus | "">("");
   const [error, setError] = useState("");
+  const [assignmentMessage, setAssignmentMessage] = useState("");
 
   const loadOrder = useCallback(async () => {
     setLoading(true);
@@ -143,6 +163,68 @@ export default function OrderDetailPage() {
     }
     void loadShipping();
   }, [params.id]);
+
+  useEffect(() => {
+    async function loadApprovedRiders() {
+      try {
+        const response = await fetch(
+          "/api/delivery-personnel?status=APPROVED",
+          { cache: "no-store" },
+        );
+        const payload = (await response.json()) as {
+          data?: { items: DeliveryPersonnelOption[] };
+          message?: string;
+        };
+        if (!response.ok || !payload.data) {
+          throw new Error(payload.message || "Unable to load delivery riders.");
+        }
+        setRiders(payload.data.items);
+      } catch (riderError) {
+        setError(
+          riderError instanceof Error
+            ? riderError.message
+            : "Unable to load delivery riders.",
+        );
+      }
+    }
+    void loadApprovedRiders();
+  }, []);
+
+  async function assignRider(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedRiderId) return;
+    setAssigningRider(true);
+    setError("");
+    setAssignmentMessage("");
+    try {
+      const response = await fetch("/api/delivery-personnel/assign-order", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderId: params.id,
+          deliveryPersonnelId: selectedRiderId,
+        }),
+      });
+      const payload = (await response.json()) as { message?: string };
+      if (!response.ok) {
+        throw new Error(payload.message || "Unable to assign delivery rider.");
+      }
+      const rider = riders.find((item) => item.id === selectedRiderId);
+      setAssignmentMessage(
+        rider ? `Assigned ${rider.name} to this order.` : "Rider assigned.",
+      );
+      setSelectedRiderId("");
+      await loadOrder();
+    } catch (assignmentError) {
+      setError(
+        assignmentError instanceof Error
+          ? assignmentError.message
+          : "Unable to assign delivery rider.",
+      );
+    } finally {
+      setAssigningRider(false);
+    }
+  }
 
   async function createShipment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -363,8 +445,9 @@ export default function OrderDetailPage() {
     }
   }
 
-  async function markStorePickupReady(event: FormEvent<HTMLFormElement>) {
+  async function updateStorePickupStatus(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!order || !pickupStatus || pickupStatus === order.storePickupStatus) return;
     setSaving(true);
     setError("");
     try {
@@ -373,7 +456,7 @@ export default function OrderDetailPage() {
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ status: "READY_FOR_PICKUP" }),
+          body: JSON.stringify({ status: pickupStatus }),
         },
       );
       const payload = (await response.json()) as { message?: string };
@@ -775,17 +858,29 @@ export default function OrderDetailPage() {
               {order.storePickupStatus !== "COMPLETED" &&
                 order.storePickupStatus !== "CANCELLED" && (
                   <div className="mt-5 space-y-4 border-t border-line pt-5">
-                    <form onSubmit={markStorePickupReady}>
-                      <button
-                        disabled={
-                          saving ||
-                          order.storePickupStatus === "READY_FOR_PICKUP"
+                    <form onSubmit={updateStorePickupStatus} className="space-y-2">
+                      <label htmlFor="pickup-status" className="block text-[11px] text-ink2">
+                        Update pickup status
+                      </label>
+                      <select
+                        id="pickup-status"
+                        value={pickupStatus || order.storePickupStatus}
+                        onChange={(event) =>
+                          setPickupStatus(event.target.value as StorePickupStatus)
                         }
+                        className={`w-full ${fieldClass}`}
+                      >
+                        {adminStorePickupStatuses.map((status) => (
+                          <option key={status} value={status}>
+                            {formatEnum(status)}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        disabled={saving || !pickupStatus || pickupStatus === order.storePickupStatus}
                         className="w-full rounded-full bg-ink px-5 py-2.5 text-[12px] font-medium text-white transition hover:opacity-90 disabled:opacity-40"
                       >
-                        {order.storePickupStatus === "READY_FOR_PICKUP"
-                          ? "Customer notified — ready for pickup"
-                          : "Mark ready and notify customer"}
+                        {saving ? "Updating…" : "Update pickup status"}
                       </button>
                     </form>
 
@@ -1113,6 +1208,60 @@ export default function OrderDetailPage() {
                 </button>
               </form>
             )
+          )}
+          {order.deliveryMethod === "HOME_DELIVERY" && (
+            <section className="rounded-card border border-line p-6">
+              <h2 className="text-[13px] font-medium text-ink">
+                Assign delivery rider
+              </h2>
+              {order.assignedDeliveryPersonnel && (
+                <div className="mt-3 rounded-card bg-surface p-3 text-[12px] text-ink2">
+                  <p className="font-medium text-ink">Current rider</p>
+                  <p className="mt-1">
+                    {order.assignedDeliveryPersonnel.name} · {order.assignedDeliveryPersonnel.phoneOriginal}
+                  </p>
+                  <p className="mt-1">
+                    {order.assignedDeliveryPersonnel.isOnline ? "Online" : "Offline"} · {formatEnum(order.assignedDeliveryPersonnel.status)}
+                  </p>
+                </div>
+              )}
+              <p className="mt-1 text-[12px] leading-5 text-ink2">
+                Only approved riders from this tenant are available for
+                assignment.
+              </p>
+              <form onSubmit={assignRider} className="mt-4 flex gap-2">
+                <select
+                  required
+                  value={selectedRiderId}
+                  onChange={(event) => setSelectedRiderId(event.target.value)}
+                  className={`min-w-0 flex-1 ${fieldClass}`}
+                >
+                  <option value="">Select approved rider</option>
+                  {riders.map((rider) => (
+                    <option key={rider.id} value={rider.id}>
+                      {rider.name} · {rider.phoneOriginal}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="submit"
+                  disabled={assigningRider || riders.length === 0}
+                  className="rounded-full bg-ink px-4 py-2 text-[11px] text-white disabled:opacity-40"
+                >
+                  {assigningRider ? "Assigning…" : "Assign"}
+                </button>
+              </form>
+              {riders.length === 0 && (
+                <p className="mt-3 text-[12px] text-amber-700">
+                  No approved riders are available.
+                </p>
+              )}
+              {assignmentMessage && (
+                <p role="status" className="mt-3 text-[12px] text-emerald-700">
+                  {assignmentMessage}
+                </p>
+              )}
+            </section>
           )}
           {error && (
             <p role="alert" className="text-[13px] text-rose-700">

@@ -4,6 +4,11 @@ import {
 } from '../../../tenancy/context/tenant-context';
 import { DeliveryPersonnelService } from '../delivery-personnel.service';
 
+type ToggleOnlineUpdate = {
+  where: { id: string };
+  data: { isOnline: boolean; lastLocationAt?: Date };
+};
+
 describe('DeliveryPersonnelService tenant GPS isolation', () => {
   const originalTenancy = process.env.TENANCY_ENABLED;
 
@@ -137,5 +142,36 @@ describe('DeliveryPersonnelService tenant GPS isolation', () => {
         longitude: 90.4,
       }),
     );
+  });
+
+  it('persists the server-authoritative online duty state', async () => {
+    process.env.TENANCY_ENABLED = 'true';
+    const tenant = riderClient('rider-a');
+    const tenantDb = { getOrLegacy: jest.fn().mockResolvedValue(tenant) };
+    const service = new DeliveryPersonnelService(
+      {} as never,
+      { record: jest.fn() } as never,
+      tenantDb as never,
+      { emitRiderLocation: jest.fn() } as never,
+    );
+
+    await runWithTenantContext(context('org-a', 'tenant_a'), () =>
+      service.toggleOnlineStatus('same-rider-user-id', false),
+    );
+    expect(tenant.deliveryPersonnel.update).toHaveBeenCalledWith({
+      where: { id: 'rider-a' },
+      data: { isOnline: false },
+    });
+
+    await runWithTenantContext(context('org-a', 'tenant_a'), () =>
+      service.toggleOnlineStatus('same-rider-user-id', true),
+    );
+    const updateCalls = tenant.deliveryPersonnel.update.mock.calls as unknown as Array<
+      [ToggleOnlineUpdate]
+    >;
+    const latestUpdate = updateCalls.at(-1)?.[0];
+    expect(latestUpdate?.where).toEqual({ id: 'rider-a' });
+    expect(latestUpdate?.data.isOnline).toBe(true);
+    expect(latestUpdate?.data.lastLocationAt).toBeInstanceOf(Date);
   });
 });

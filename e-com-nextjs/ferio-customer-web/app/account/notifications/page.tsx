@@ -3,31 +3,80 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { CustomerNotificationPage } from "@/lib/customer-notifications";
+import { getErrorMessage } from "@/lib/error-message";
 
 export default function NotificationsPage() {
   const [data, setData] = useState<CustomerNotificationPage | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   async function load(page = 1) {
     setLoading(true);
-    const response = await fetch(`/api/account/notifications?page=${page}&limit=20`, { cache: "no-store" });
-    const payload = await response.json();
-    if (response.ok) setData(payload.data);
-    else setError(payload.message || "Unable to load notifications.");
-    setLoading(false);
+    setError("");
+    try {
+      const response = await fetch(`/api/account/notifications?page=${page}&limit=20`, { cache: "no-store" });
+      const payload = (await response.json().catch(() => ({}))) as { data?: CustomerNotificationPage; message?: string };
+      if (response.ok && payload.data) setData(payload.data);
+      else setError(payload.message || "Unable to load notifications.");
+    } catch (loadError) {
+      setError(getErrorMessage(loadError, "Network error loading notifications."));
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => { void load(); }, []);
 
   async function markRead(id: string) {
-    await fetch(`/api/account/notifications/${id}/read`, { method: "PATCH" });
-    setData((current) => current ? { ...current, unread: Math.max(0, current.unread - 1), items: current.items.map((item) => item.id === id ? { ...item, isRead: true } : item) } : current);
+    try {
+      const response = await fetch(`/api/account/notifications/${id}/read`, { method: "PATCH" });
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => ({}))) as { message?: string };
+        throw new Error(payload.message || "Unable to mark notification as read.");
+      }
+      setData((current) => current ? { ...current, unread: Math.max(0, current.unread - 1), items: current.items.map((item) => item.id === id ? { ...item, isRead: true } : item) } : current);
+    } catch (readError) {
+      setError(getErrorMessage(readError, "Unable to mark notification as read."));
+    }
   }
 
   async function markAllRead() {
-    await fetch("/api/account/notifications/read-all", { method: "POST" });
-    setData((current) => current ? { ...current, unread: 0, items: current.items.map((item) => ({ ...item, isRead: true })) } : current);
+    try {
+      const response = await fetch("/api/account/notifications/read-all", { method: "POST" });
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => ({}))) as { message?: string };
+        throw new Error(payload.message || "Unable to mark notifications as read.");
+      }
+      setData((current) => current ? { ...current, unread: 0, items: current.items.map((item) => ({ ...item, isRead: true })) } : current);
+    } catch (readError) {
+      setError(getErrorMessage(readError, "Unable to mark notifications as read."));
+    }
+  }
+
+  async function removeNotification(notification: CustomerNotificationPage["items"][number]) {
+    setDeletingId(notification.id);
+    setError("");
+    try {
+      const response = await fetch(`/api/account/notifications/${notification.id}`, {
+        method: "DELETE",
+      });
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => ({}))) as { message?: string };
+        throw new Error(payload.message || "Unable to delete notification.");
+      }
+      setData((current) => current ? {
+        ...current,
+        unread: notification.isRead ? current.unread : Math.max(0, current.unread - 1),
+        total: Math.max(0, current.total - 1),
+        totalPages: Math.max(1, Math.ceil(Math.max(0, current.total - 1) / current.limit)),
+        items: current.items.filter((item) => item.id !== notification.id),
+      } : current);
+    } catch (deleteError) {
+      setError(getErrorMessage(deleteError, "Unable to delete notification."));
+    } finally {
+      setDeletingId(null);
+    }
   }
 
   if (loading && !data) return <main className="mx-auto max-w-4xl px-6 py-20 text-[13px] text-ink2">Loading notifications…</main>;
@@ -60,6 +109,9 @@ export default function NotificationsPage() {
               <div className="flex shrink-0 gap-2">
                 {notification.linkFor && <Link href={notification.linkFor} onClick={() => !notification.isRead && void markRead(notification.id)} className="rounded-full border border-line px-3 py-1.5 text-[11px] text-ink">Open</Link>}
                 {!notification.isRead && <button onClick={() => void markRead(notification.id)} className="rounded-full bg-ink px-3 py-1.5 text-[11px] text-white">Mark read</button>}
+                <button disabled={deletingId === notification.id} onClick={() => void removeNotification(notification)} className="rounded-full border border-line px-3 py-1.5 text-[11px] text-ink disabled:opacity-40">
+                  {deletingId === notification.id ? "Deleting…" : "Delete"}
+                </button>
               </div>
             </div>
           </article>

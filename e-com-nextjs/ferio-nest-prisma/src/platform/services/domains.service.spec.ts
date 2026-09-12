@@ -1,4 +1,5 @@
 import { DomainsService } from './domains.service';
+import { DomainReadinessService } from './domain-readiness.service';
 
 describe('DomainsService lifecycle (MT-1)', () => {
   type PlatformMock = {
@@ -14,6 +15,7 @@ describe('DomainsService lifecycle (MT-1)', () => {
   const entitlements = {
     evaluate: jest.fn().mockResolvedValue({ allowed: true }),
   };
+  const readiness = { verify: jest.fn().mockResolvedValue(undefined) };
 
   beforeEach(() => {
     process.env.PLATFORM_PUBLIC_DOMAIN = 'ferio.test';
@@ -34,10 +36,12 @@ describe('DomainsService lifecycle (MT-1)', () => {
     audit.record.mockClear();
     entitlements.evaluate.mockClear();
     entitlements.evaluate.mockResolvedValue({ allowed: true });
+    readiness.verify.mockClear();
     service = new DomainsService(
       platform as never,
       audit as never,
       entitlements as never,
+      readiness as unknown as DomainReadinessService,
     );
   });
 
@@ -98,6 +102,7 @@ describe('DomainsService lifecycle (MT-1)', () => {
     );
     platform.client.tenantDomain.findUnique.mockResolvedValue({
       id: 'dom-2',
+      hostname: 'shop.example.com',
       status: 'PENDING_VERIFICATION',
       verificationToken: 'ferio-verify=token123',
     });
@@ -121,10 +126,29 @@ describe('DomainsService lifecycle (MT-1)', () => {
       'ferio-verify=token123',
     );
     expect(activated.status).toBe('ACTIVE');
+    expect(readiness.verify).toHaveBeenCalledWith(
+      'shop.example.com',
+      'ferio-verify=token123',
+    );
     expect(entitlements.evaluate).toHaveBeenCalledWith(
       'org-1',
       'custom_domain',
     );
+  });
+
+  it('does not activate a custom domain until DNS and TLS are ready', async () => {
+    platform.client.tenantDomain.findUnique.mockResolvedValue({
+      id: 'dom-3',
+      hostname: 'shop.example.com',
+      status: 'PENDING_VERIFICATION',
+      verificationToken: 'ferio-verify=token123',
+    });
+    readiness.verify.mockRejectedValue(new Error('DOMAIN_TLS_NOT_READY'));
+
+    await expect(
+      service.verifyOwnership('dom-3', 'ferio-verify=token123'),
+    ).rejects.toThrow('DOMAIN_TLS_NOT_READY');
+    expect(platform.client.tenantDomain.update).not.toHaveBeenCalled();
   });
 
   it('denies custom-domain registration when the plan does not include it', async () => {

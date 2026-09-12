@@ -53,6 +53,15 @@ const orderDetailInclude = {
   customer: true,
   address: true,
   pickupStore: true,
+  assignedDeliveryPersonnel: {
+    select: {
+      id: true,
+      name: true,
+      phoneOriginal: true,
+      status: true,
+      isOnline: true,
+    },
+  },
   items: {
     orderBy: { createdAt: 'asc' as const },
     include: {
@@ -91,7 +100,7 @@ export class OrderService {
    * explicitly falls back to the legacy single-tenant DB. Never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    return resolveTenantDatabase(this.tenantDb, this.prisma);
+    return resolveTenantDatabase(this.tenantDb, this.prisma, 'order-service');
   }
   private hashIdempotencyKey(value: string): string {
     return createHash('sha256').update(value).digest('hex');
@@ -164,6 +173,7 @@ export class OrderService {
         phone: order.customer.phoneNormalized,
         email: order.customer.email,
       },
+      assignedDeliveryPersonnel: order.assignedDeliveryPersonnel,
       address: order.address,
       items: order.items,
       statusHistory: order.statusHistory,

@@ -33,6 +33,11 @@ export type CommerceAccount = {
       returnStatus: string;
       refundStatus: string;
       paymentMethod: "COD" | "PREPAID";
+      deliveryMethod: "HOME_DELIVERY" | "STORE_PICKUP";
+      storePickupStatus: string;
+      preferredPickupSlot: string | null;
+      customerPickupNotes: string | null;
+      pickupScheduledAt: string | null;
       total: number;
       createdAt: string;
       address: { district: string; area: string } | null;

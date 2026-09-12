@@ -28,3 +28,18 @@ export class PresignPutDto {
   @Max(ADMIN_UPLOAD_MAX_BYTES)
   sizeBytes!: number;
 }
+
+export class FinalizePutDto {
+  @IsString()
+  @MaxLength(512)
+  key!: string;
+
+  @IsIn(ADMIN_UPLOAD_CONTENT_TYPES)
+  contentType!: (typeof ADMIN_UPLOAD_CONTENT_TYPES)[number];
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(ADMIN_UPLOAD_MAX_BYTES)
+  sizeBytes!: number;
+}

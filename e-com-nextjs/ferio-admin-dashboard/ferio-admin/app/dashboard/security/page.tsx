@@ -14,30 +14,121 @@ export default function SecurityPage() {
   const [busy, setBusy] = useState(false);
   const inputClass = "mt-1.5 w-full rounded-card border border-line px-3.5 py-2.5 text-[14px] outline-none focus:border-ink";
 
-  useEffect(() => { void fetch("/api/auth/two-factor", { cache: "no-store" }).then(async response => { const payload = await response.json() as { data?: { enabled: boolean } }; if (payload.data) setEnabled(payload.data.enabled); }); }, []);
+  useEffect(() => {
+    async function load() {
+      try {
+        const response = await fetch("/api/auth/two-factor", { cache: "no-store" });
+        const payload = (await response.json().catch(() => ({}))) as {
+          data?: { enabled: boolean };
+          message?: string;
+        };
+        if (!response.ok || !payload.data) {
+          throw new Error(payload.message || "Unable to load two-factor settings.");
+        }
+        setEnabled(payload.data.enabled);
+      } catch (loadError) {
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load two-factor settings.",
+        );
+      }
+    }
+    void load();
+  }, []);
 
   async function begin() {
-    setBusy(true); setError("");
-    const response = await fetch("/api/auth/two-factor/setup", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
-    const payload = await response.json() as { data?: { secret: string; uri: string }; message?: string };
-    if (response.ok && payload.data) { setSecret(payload.data.secret); setUri(payload.data.uri); } else setError(payload.message || "Unable to begin setup.");
-    setBusy(false);
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/auth/two-factor/setup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        data?: { secret: string; uri: string };
+        message?: string;
+      };
+      if (!response.ok || !payload.data) {
+        throw new Error(payload.message || "Unable to begin setup.");
+      }
+      setSecret(payload.data.secret);
+      setUri(payload.data.uri);
+    } catch (beginError) {
+      setError(
+        beginError instanceof Error
+          ? beginError.message
+          : "Unable to begin setup.",
+      );
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function confirm(event: FormEvent) {
-    event.preventDefault(); setBusy(true); setError("");
-    const response = await fetch("/api/auth/two-factor/confirm", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code }) });
-    const payload = await response.json() as { data?: { recoveryCodes: string[] }; message?: string };
-    if (response.ok && payload.data) { setEnabled(true); setSecret(""); setUri(""); setCode(""); setRecoveryCodes(payload.data.recoveryCodes); } else setError(payload.message || "Code was not accepted.");
-    setBusy(false);
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/auth/two-factor/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code }),
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        data?: { recoveryCodes: string[] };
+        message?: string;
+      };
+      if (!response.ok || !payload.data) {
+        throw new Error(payload.message || "Code was not accepted.");
+      }
+      setEnabled(true);
+      setSecret("");
+      setUri("");
+      setCode("");
+      setRecoveryCodes(payload.data.recoveryCodes);
+    } catch (confirmError) {
+      setError(
+        confirmError instanceof Error
+          ? confirmError.message
+          : "Code was not accepted.",
+      );
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function disable(event: FormEvent) {
-    event.preventDefault(); setBusy(true); setError("");
-    const response = await fetch("/api/auth/two-factor/disable", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password, code }) });
-    const payload = await response.json() as { message?: string };
-    if (response.ok) { setEnabled(false); setPassword(""); setCode(""); } else setError(payload.message || "Unable to disable two-factor authentication.");
-    setBusy(false);
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/auth/two-factor/disable", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password, code }),
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        message?: string;
+      };
+      if (!response.ok) {
+        throw new Error(
+          payload.message || "Unable to disable two-factor authentication.",
+        );
+      }
+      setEnabled(false);
+      setPassword("");
+      setCode("");
+    } catch (disableError) {
+      setError(
+        disableError instanceof Error
+          ? disableError.message
+          : "Unable to disable two-factor authentication.",
+      );
+    } finally {
+      setBusy(false);
+    }
   }
 
   return <><Topbar title="Security" subtitle="Protect your Admin account with an authenticator app" /><div className="max-w-3xl space-y-6 p-8">

@@ -9,15 +9,20 @@ export function OrgActions({ organizationId, status }: { organizationId: string;
   async function call(action: string, path: string, body?: unknown) {
     setWorking(action);
     setMessage("");
-    const res = await fetch(`/api/platform${path}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      ...(body ? { body: JSON.stringify(body) } : {}),
-    });
-    const data = await readJsonRecord(res);
-    setWorking(null);
-    setMessage(res.ok ? `${action} OK.` : responseMessage(data, `${action} failed.`));
-    if (res.ok) window.location.reload();
+    try {
+      const res = await fetch(`/api/platform${path}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        ...(body ? { body: JSON.stringify(body) } : {}),
+      });
+      const data = await readJsonRecord(res);
+      setMessage(res.ok ? `${action} OK.` : responseMessage(data, `${action} failed.`));
+      if (res.ok) window.location.reload();
+    } catch {
+      setMessage(`${action} failed: control plane unavailable.`);
+    } finally {
+      setWorking(null);
+    }
   }
 
   return (
@@ -67,8 +72,8 @@ export function OrgActions({ organizationId, status }: { organizationId: string;
           disabled={working !== null}
           onClick={() => {
             const reason = window.prompt("Closure reason (recorded in the audit log):");
-            if (!reason || reason.trim().length < 3) {
-              setMessage("A reason is required to start closure.");
+            if (!reason || reason.trim().length < 10) {
+              setMessage("A closure reason of at least 10 characters is required.");
               return;
             }
             void call("Start closure", `/platform/organizations/${organizationId}/closure/initiate`, { reason: reason.trim() });

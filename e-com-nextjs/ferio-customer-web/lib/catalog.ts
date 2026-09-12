@@ -83,8 +83,9 @@ export function formatTaka(amountInPaisa: number): string {
   }).format(amountInPaisa / 100);
 }
 
-export function getCategories(): Promise<CatalogCategory[]> {
+export function getCategories(init?: RequestInit): Promise<CatalogCategory[]> {
   return getPublicApi<CatalogCategory[]>("/catalog/categories", {
+    ...init,
     next: { revalidate: 60 },
   });
 }
@@ -94,6 +95,7 @@ export function getProducts(params?: {
   search?: string;
   featured?: boolean;
   condition?: "NEW" | "SECOND_HAND";
+  page?: number;
   limit?: number;
   minPrice?: number;
   maxPrice?: number;
@@ -109,6 +111,7 @@ export function getProducts(params?: {
     query.set("featured", String(params.featured));
   }
   if (params?.condition) query.set("condition", params.condition);
+  if (params?.page && params.page > 1) query.set("page", String(params.page));
   if (params?.limit) query.set("limit", String(params.limit));
   if (params?.minPrice !== undefined) {
     query.set("minPrice", String(Math.round(params.minPrice * 100)));

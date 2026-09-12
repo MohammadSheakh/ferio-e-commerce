@@ -64,6 +64,14 @@ export type CommerceMessagingPolicy = {
   }>;
 };
 
+export type CommerceMessagingProviderConfig = {
+  channel: "SMS" | "WHATSAPP" | "EMAIL";
+  provider: string;
+  enabled: boolean;
+  credentialsRotatedAt: string | null;
+  credentialKeys: string[];
+};
+
 export type TransactionalMessageQueueHealth = {
   available: boolean;
   dispatchEnabled: boolean;

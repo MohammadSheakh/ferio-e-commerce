@@ -1,0 +1,3 @@
+-- FERIO: EXPAND
+ALTER TABLE "DeliveryPersonnel"
+ADD COLUMN "isOnline" BOOLEAN NOT NULL DEFAULT false;

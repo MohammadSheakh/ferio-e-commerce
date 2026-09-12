@@ -11,6 +11,7 @@ type RiderProfile = {
   vehicleType: string;
   operatingZone?: string;
   status: string;
+  isOnline: boolean;
   currentLat?: number;
   currentLng?: number;
   lastLocationAt?: string;
@@ -53,7 +54,7 @@ export default function RiderPortalPage() {
   const [loginError, setLoginError] = useState("");
 
   const [profile, setProfile] = useState<RiderProfile | null>(null);
-  const [isOnline, setIsOnline] = useState<boolean>(true);
+  const [isOnline, setIsOnline] = useState<boolean>(false);
   const [togglingOnline, setTogglingOnline] = useState(false);
 
   const [orders, setOrders] = useState<AssignedOrder[]>([]);
@@ -95,7 +96,9 @@ export default function RiderPortalPage() {
           vehicleType: prof.vehicleType || "BIKE",
           operatingZone: prof.operatingZone || "Dhaka North",
           status: prof.status || "APPROVED",
+          isOnline: prof.isOnline === true,
         });
+        setIsOnline(prof.isOnline === true);
       }
     } catch {
       // Fallback

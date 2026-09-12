@@ -5,6 +5,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { createBrowserIdempotencyKey } from "@/lib/browser-identifiers";
 import { formatTaka } from "@/lib/catalog";
 import type { WalletSummary } from "@/lib/wallet";
+import { getErrorMessage } from "@/lib/error-message";
 
 export default function WalletPage() {
   const [summary, setSummary] = useState<WalletSummary | null>(null);
@@ -13,13 +14,18 @@ export default function WalletPage() {
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  async function load() {
-    const response = await fetch("/api/account/wallet", { cache: "no-store" });
-    const payload = await response.json();
-    if (response.status === 401) setUnauthorized(true);
-    else if (response.ok) setSummary(payload.data);
-    else setMessage({ type: "error", text: payload.message || "Unable to load your wallet." });
-    setLoading(false);
+  async function load(page = 1) {
+    try {
+      const response = await fetch(`/api/account/wallet?page=${page}&limit=20`, { cache: "no-store" });
+      const payload = (await response.json().catch(() => ({}))) as { data?: WalletSummary; message?: string };
+      if (response.status === 401) setUnauthorized(true);
+      else if (response.ok && payload.data) setSummary(payload.data);
+      else setMessage({ type: "error", text: payload.message || "Unable to load your wallet." });
+    } catch (loadError) {
+      setMessage({ type: "error", text: getErrorMessage(loadError, "Network error loading your wallet.") });
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -31,31 +37,35 @@ export default function WalletPage() {
     setSubmitting(true);
     setMessage(null);
     const form = new FormData(event.currentTarget);
-    const response = await fetch("/api/account/wallet/top-ups", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Idempotency-Key": createBrowserIdempotencyKey(),
-      },
-      body: JSON.stringify({
-        provider: form.get("provider"),
-        amount: Math.round(Number(form.get("amount")) * 100),
-        customerReference: form.get("customerReference"),
-        customerNote: form.get("customerNote") || undefined,
-      }),
-    });
-    const payload = await response.json();
-    if (response.ok) {
+    try {
+      const response = await fetch("/api/account/wallet/top-ups", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": createBrowserIdempotencyKey(),
+        },
+        body: JSON.stringify({
+          provider: form.get("provider"),
+          amount: Math.round(Number(form.get("amount")) * 100),
+          customerReference: form.get("customerReference"),
+          customerNote: form.get("customerNote") || undefined,
+        }),
+      });
+      const payload = (await response.json().catch(() => ({}))) as { message?: string };
+      if (!response.ok) {
+        throw new Error(payload.message || "Unable to submit top-up.");
+      }
       event.currentTarget.reset();
       setMessage({
         type: "success",
         text: "Top-up submitted for verification. Your balance changes only after approval.",
       });
       await load();
-    } else {
-      setMessage({ type: "error", text: payload.message || "Unable to submit top-up." });
+    } catch (submitError) {
+      setMessage({ type: "error", text: getErrorMessage(submitError, "Unable to submit top-up.") });
+    } finally {
+      setSubmitting(false);
     }
-    setSubmitting(false);
   }
 
   if (loading) {
@@ -149,6 +159,29 @@ export default function WalletPage() {
               </div>
             )) : <p className="py-8 text-[13px] text-ink2">No top-up requests yet.</p>}
           </div>
+          {summary && summary.totalPages > 1 && (
+            <div className="mt-5 flex items-center justify-between text-[12px]">
+              <button
+                type="button"
+                disabled={summary.page <= 1 || loading}
+                onClick={() => void load(summary.page - 1)}
+                className="rounded-full border border-line px-4 py-2 disabled:opacity-30"
+              >
+                Previous
+              </button>
+              <span className="text-ink2">
+                Page {summary.page} of {summary.totalPages}
+              </span>
+              <button
+                type="button"
+                disabled={summary.page >= summary.totalPages || loading}
+                onClick={() => void load(summary.page + 1)}
+                className="rounded-full border border-line px-4 py-2 disabled:opacity-30"
+              >
+                Next
+              </button>
+            </div>
+          )}
         </section>
       </div>
     </main>

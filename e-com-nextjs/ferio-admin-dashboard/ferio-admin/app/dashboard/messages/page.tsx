@@ -6,6 +6,8 @@ import type {
   CommerceMessagePage,
   CommerceMessageStatus,
   CommerceMessageTemplate,
+  CommerceMessagingPolicy,
+  CommerceMessagingProviderConfig,
   TransactionalMessageQueueHealth,
 } from "@/lib/transactional-messages";
 import { commerceMessageStatusClass } from "@/lib/transactional-messages";
@@ -42,6 +44,8 @@ export default function TransactionalMessagesPage() {
   );
   const [retryingId, setRetryingId] = useState("");
   const [templates, setTemplates] = useState<CommerceMessageTemplate[]>([]);
+  const [policy, setPolicy] = useState<CommerceMessagingPolicy>(emptyPage.policy);
+  const [providers, setProviders] = useState<CommerceMessagingProviderConfig[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -50,12 +54,14 @@ export default function TransactionalMessagesPage() {
       const query = new URLSearchParams();
       if (status !== "ALL") query.set("status", status);
       if (search) query.set("search", search);
-      const [response, healthResponse, templatesResponse] = await Promise.all([
+      const [response, healthResponse, templatesResponse, policyResponse, providersResponse] = await Promise.all([
         fetch(`/api/transactional-messages?${query}`, { cache: "no-store" }),
         fetch("/api/transactional-messages/queue-health", {
           cache: "no-store",
         }),
         fetch("/api/transactional-messages/templates", { cache: "no-store" }),
+        fetch("/api/transactional-messages/policy", { cache: "no-store" }),
+        fetch("/api/transactional-messages/providers", { cache: "no-store" }),
       ]);
       const payload = (await response.json()) as {
         data?: CommerceMessagePage;
@@ -79,6 +85,22 @@ export default function TransactionalMessagesPage() {
         );
       }
       setTemplates(templatesPayload.data);
+      const policyPayload = (await policyResponse.json()) as {
+        data?: CommerceMessagingPolicy;
+        message?: string;
+      };
+      if (!policyResponse.ok || !policyPayload.data) {
+        throw new Error(policyPayload.message || "Unable to load messaging policy.");
+      }
+      setPolicy(policyPayload.data);
+      const providersPayload = (await providersResponse.json()) as {
+        data?: CommerceMessagingProviderConfig[];
+        message?: string;
+      };
+      if (!providersResponse.ok || !providersPayload.data) {
+        throw new Error(providersPayload.message || "Unable to load messaging providers.");
+      }
+      setProviders(providersPayload.data);
     } catch (loadError) {
       setError(
         loadError instanceof Error
@@ -196,6 +218,15 @@ export default function TransactionalMessagesPage() {
               ),
             )
           }
+        />
+
+        <MessagingPolicyWorkspace
+          policy={policy}
+          providers={providers}
+          onSaved={(updated) => {
+            setPolicy(updated);
+            setMessages((current) => ({ ...current, policy: updated }));
+          }}
         />
 
         <section className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
@@ -525,6 +556,127 @@ function TemplateWorkspace({
           </div>
         </div>
       </form>
+    </section>
+  );
+}
+
+function MessagingPolicyWorkspace({
+  policy,
+  providers,
+  onSaved,
+}: {
+  policy: CommerceMessagingPolicy;
+  providers: CommerceMessagingProviderConfig[];
+  onSaved: (policy: CommerceMessagingPolicy) => void;
+}) {
+  const [enabled, setEnabled] = useState(policy.enabled);
+  const [fallbackOnDefinitiveFailure, setFallbackOnDefinitiveFailure] =
+    useState(policy.fallbackOnDefinitiveFailure);
+  const [priority, setPriority] = useState<Array<"SMS" | "WHATSAPP" | "EMAIL">>(
+    policy.channelPriority,
+  );
+  const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState("");
+
+  useEffect(() => {
+    setEnabled(policy.enabled);
+    setFallbackOnDefinitiveFailure(policy.fallbackOnDefinitiveFailure);
+    setPriority(policy.channelPriority);
+  }, [policy]);
+
+  function updatePriority(index: number, value: "SMS" | "WHATSAPP" | "EMAIL" | "") {
+    setPriority((current) => {
+      const next = [...current];
+      if (value) next[index] = value;
+      else next.splice(index, 1);
+      return next.filter((channel, position) => next.indexOf(channel) === position);
+    });
+  }
+
+  async function savePolicy(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaving(true);
+    setNotice("");
+    try {
+      const response = await fetch("/api/transactional-messages/policy", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled, channelPriority: priority, fallbackOnDefinitiveFailure }),
+      });
+      const payload = (await response.json()) as {
+        data?: CommerceMessagingPolicy;
+        message?: string;
+      };
+      if (!response.ok || !payload.data) {
+        throw new Error(payload.message || "Unable to update messaging policy.");
+      }
+      onSaved(payload.data);
+      setNotice(`Policy saved as version ${payload.data.version}.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Unable to update messaging policy.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <section className="rounded-card border border-line p-5">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-[11px] uppercase tracking-eyebrow text-ink2">Delivery policy</p>
+          <h2 className="mt-2 text-[16px] font-medium text-ink">Transactional routing</h2>
+          <p className="mt-1 text-[12px] text-ink2">
+            Credentials remain operator-controlled; this screen manages only routing policy.
+          </p>
+        </div>
+        <div className="text-right text-[11px] text-ink2">
+          <p>Version {policy.version}</p>
+          <p>{policy.activationAllowed ? "Activation allowed" : "Provider approval required"}</p>
+        </div>
+      </div>
+      <form onSubmit={savePolicy} className="mt-5 grid gap-4 lg:grid-cols-[1fr_1fr_1fr_auto] lg:items-end">
+        {[0, 1, 2].map((index) => (
+          <label key={index} className="text-[11px] text-ink2">
+            Priority {index + 1}
+            <select
+              value={priority[index] ?? ""}
+              onChange={(event) =>
+                updatePriority(index, event.target.value as "SMS" | "WHATSAPP" | "EMAIL" | "")
+              }
+              className="mt-1 w-full rounded-card border border-line px-3 py-2.5 text-[12px]"
+            >
+              <option value="">Not selected</option>
+              {(["SMS", "WHATSAPP", "EMAIL"] as const).map((channel) => (
+                <option key={channel} value={channel} disabled={priority.includes(channel) && priority[index] !== channel}>
+                  {channel}
+                </option>
+              ))}
+            </select>
+          </label>
+        ))}
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="flex items-center gap-2 text-[12px] text-ink2">
+            <input type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} />
+            Enabled
+          </label>
+          <label className="flex items-center gap-2 text-[12px] text-ink2">
+            <input type="checkbox" checked={fallbackOnDefinitiveFailure} onChange={(event) => setFallbackOnDefinitiveFailure(event.target.checked)} />
+            Fallback
+          </label>
+          <button disabled={saving} className="rounded-full bg-ink px-4 py-2.5 text-[12px] text-white disabled:opacity-40">
+            {saving ? "Saving…" : "Save policy"}
+          </button>
+        </div>
+      </form>
+      <div className="mt-5 grid gap-2 sm:grid-cols-3">
+        {providers.map((provider) => (
+          <div key={provider.channel} className="rounded-card bg-surface p-3 text-[11px] text-ink2">
+            <p className="font-medium text-ink">{provider.channel} · {provider.provider}</p>
+            <p className="mt-1">{provider.enabled ? "Enabled" : "Disabled"} · {provider.credentialKeys.length} credential fields configured</p>
+          </div>
+        ))}
+      </div>
+      {notice && <p role="status" className="mt-3 text-[12px] text-ink2">{notice}</p>}
     </section>
   );
 }

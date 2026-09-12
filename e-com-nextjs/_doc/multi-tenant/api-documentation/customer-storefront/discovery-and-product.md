@@ -10,16 +10,24 @@
 
 | # | Method | Endpoint | Purpose |
 |---|---|---|---|
-| 1 | GET | `/settings?type=hero_showcase` | Hero slides for this tenant (public, rate-limited) |
+| 1 | GET | `/settings?type=heroShowcase` | Hero slides for this tenant (public, rate-limited) |
 | 2 | GET | `/catalog/categories` | Active category tree |
 | 3 | GET | `/store/config` | Public store identity/contacts/policies |
 
 ## Screen 2: Product Listing + Search + Filters
 | # | Method | Endpoint | Purpose |
 |---|---|---|---|
-| 1 | GET | `/catalog/products?page=&limit=&search=&category=&brand=&minPrice=&maxPrice=&sort=` | Paginated published products; search covers name/sku (trigram-indexed) |
+| 1 | GET | `/catalog/products?page=&limit=&search=&category=&featured=&condition=&minPrice=&maxPrice=&inStock=&sort=&attributeKey=&attributeValue=` | Paginated published products; search covers name/brand/category/SKU |
 | 2 | GET | `/catalog/categories` | Filter rail |
-| 3 | GET | `/catalog/brands` | Brand filter |
+| 3 | GET | `/catalog/brands` | Optional brand directory for a future/alternate storefront filter |
+
+The currently shipped `/products` page does not call `/catalog/brands`; its
+active filters are search, category, price range, stock, condition, sort, and
+variant attribute. Do not treat the brand directory as a completed browser
+integration until a storefront surface consumes it.
+
+The listing forwards the backend `page` and `limit` values and renders
+previous/next controls while preserving all active filters.
 
 Unpublished/out-of-stock handling is server-side: listing never returns
 drafts or hidden variants regardless of direct URL.
@@ -30,7 +38,11 @@ drafts or hidden variants regardless of direct URL.
 | # | Method | Endpoint | Purpose |
 |---|---|---|---|
 | 1 | GET | `/catalog/products/:slug` | Full product: variants+stock messaging, media order, reviews(banners), youtube reviews, Q&A if enabled |
-| 2 | GET | `/purchase-activity?productId=` | Consented social-proof ticker (configurable visibility) |
+| 2 | GET | `/purchase-activity?surface=toast&limit=` | Consented social-proof ticker (configurable visibility) |
 
 Variant add-to-cart uses `variant.id`; stock messaging reflects
 on-hand − reserved − damaged per FR-INV-002.
+
+The public purchase-activity contract supports `surface`, `page`, and `limit`
+query parameters. It does not expose a product-specific `productId` filter;
+the customer-web product surfaces use the bounded tenant-wide activity feed.

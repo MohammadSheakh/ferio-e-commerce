@@ -50,7 +50,10 @@ export async function refreshCustomerSession() {
   try {
     const upstream = await fetch(`${backendApiUrl}/auth/refresh`, {
       method: "POST",
-      headers: withCorrelationId({ Cookie: `refreshToken=${refreshToken}` }),
+      headers: withCorrelationId({
+        ...(await hostForwardHeaders()),
+        Cookie: `refreshToken=${refreshToken}`,
+      }),
       cache: "no-store",
     });
     const payload = (await upstream.json()) as {
@@ -80,11 +83,7 @@ export async function customerSessionFetch(
   const call = async (token: string) =>
     fetch(`${backendApiUrl}${path.startsWith("/") ? path : `/${path}`}`, {
       ...init,
-      headers: withCorrelationId({
-        Authorization: `Bearer ${token}`,
-        ...(await hostForwardHeaders()),
-        ...init?.headers,
-      }),
+      headers: await sessionHeaders(token, init?.headers),
       cache: "no-store",
     });
   let response = await call(accessToken);
@@ -96,3 +95,12 @@ export async function customerSessionFetch(
 }
 
 export { backendApiUrl, extractRefreshToken };
+
+async function sessionHeaders(token: string, initHeaders?: HeadersInit) {
+  const headers = new Headers(initHeaders);
+  headers.set("Authorization", `Bearer ${token}`);
+  for (const [name, value] of Object.entries(await hostForwardHeaders())) {
+    headers.set(name, value);
+  }
+  return withCorrelationId(headers);
+}

@@ -9,17 +9,22 @@
 ## Returns lifecycle
 | # | Method | Endpoint | Purpose |
 |---|---|---|---|
-| 1 | GET | `/admin/returns?page&status=` | Case queue (aged-first) |
+| 1 | GET | `/admin/returns?page&limit&status=` | Case queue (aged-first) |
 | 2 | GET | `/admin/orders/:orderId/returns/eligibility` | Policy evaluation before accept |
-| 3 | POST | `/admin/orders/:orderId/returns` `{ items:[{itemId,qty,reason}], resolution }` | Open case (status RECEIVED→…) |
-| 4 | POST | `/admin/returns/:id/review` `{ decision, note }` | Approve/partial/reject with reason |
-| 5 | POST | `/admin/returns/:id/inspect` `{ receivedQty, condition, disposition }` | Explicit inventory disposition |
-| 6 | GET/POST | `/admin/returns/:id/refund-eligibility` · `/refunds` | Refund creation referencing return+payment |
+| 3 | POST | `/admin/orders/:orderId/returns` `{ reason, description, requestedResolution, requestChannel, items:[{orderItemId,quantity}], evidenceUrls? }` | Open case |
+| 4 | POST | `/admin/returns/:id/review` `{ decision, reason, items?:[{returnItemId,approvedQuantity}] }` | Approve/partial/reject with reason |
+| 5 | POST | `/admin/returns/:id/inspect` `{ decision, finalResolution, note, items:[{returnItemId,receivedQuantity,acceptedQuantity,condition,inventoryDisposition,note?}] }` | Explicit inventory disposition |
+| 6 | GET | `/admin/returns/:id/refund-eligibility` | Calculate the remaining refundable amount |
+| 7 | GET/POST | `/admin/returns/:id/refunds` | List or create a refund referencing the return and payment |
+
+Refund creation uses minor currency units and accepts `amount`, `method`,
+`reason`, and optional `sourcePaymentReference`. Send the idempotency key in
+the `Idempotency-Key` header, not in the JSON body.
 
 Refund status is tracked independently from return status (FR-RET-005).
 
 ## RTO
 | # | Method | Endpoint | Purpose |
 |---|---|---|---|
-| 1 | GET | `/admin/rto?from&to` | RTO queue with cost aggregation |
-| 2 | POST | `/admin/rto/:id/inspect` `{ reason, costMinor }` | Record outcome for contribution reporting |
+| 1 | GET | `/admin/rto` | RTO queue (the controller currently returns the latest 100 cases) |
+| 2 | POST | `/admin/rto/:id/inspect` `{ reason, reasonNote, outboundCourierCost, returnCourierCost, otherCost, items:[{rtoItemId,receivedQuantity,sellableQuantity,damagedQuantity,lostQuantity,note?}] }` | Record item outcome and cost attribution in minor currency units |

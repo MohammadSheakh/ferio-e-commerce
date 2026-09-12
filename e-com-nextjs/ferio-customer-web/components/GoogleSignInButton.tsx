@@ -44,17 +44,21 @@ export default function GoogleSignInButton() {
           return;
         }
         setMessage("Signing you in…");
-        const response = await fetch("/api/account/oauth", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ idToken: credential }),
-        });
-        const payload = await response.json();
-        if (response.ok) {
-          window.location.assign(destination());
-          return;
+        try {
+          const response = await fetch("/api/account/oauth", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ idToken: credential }),
+          });
+          const payload = await response.json().catch(() => ({}));
+          if (response.ok) {
+            window.location.assign(destination());
+            return;
+          }
+          setMessage(payload.message || "Google sign-in failed.");
+        } catch {
+          setMessage("The sign-in service is unavailable. Try again shortly.");
         }
-        setMessage(payload.message || "Google sign-in failed.");
       },
     });
     container.current.replaceChildren();

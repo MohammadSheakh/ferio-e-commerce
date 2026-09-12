@@ -51,7 +51,7 @@ export class RtoService {
    * database client; outside one it explicitly falls back to the legacy DB.
    */
   private async db(): Promise<PrismaClient> {
-    return resolveTenantDatabase(this.tenantDb, this.prisma);
+    return resolveTenantDatabase(this.tenantDb, this.prisma, 'rto-service');
   }
   async list() {
     const db = await this.db();

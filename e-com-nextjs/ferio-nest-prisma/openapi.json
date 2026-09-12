@@ -1145,6 +1145,30 @@
         ]
       }
     },
+    "/api/v1/platform/operations/backup-evidence": {
+      "post": {
+        "operationId": "BackupEvidenceController_record",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordBackupEvidenceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "BackupEvidence"
+        ]
+      }
+    },
     "/api/v1/tenancy/status": {
       "get": {
         "operationId": "TenancyController_status",
@@ -4055,6 +4079,30 @@
         ]
       }
     },
+    "/api/v1/admin/storage/finalize-put": {
+      "post": {
+        "operationId": "StorageController_finalizePut",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FinalizePutDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Storage"
+        ]
+      }
+    },
     "/api/v1/checkout/delivery-options": {
       "get": {
         "operationId": "PublicCheckoutController_getDeliveryOptions",
@@ -5888,6 +5936,30 @@
         ]
       }
     },
+    "/api/v1/delivery-personnel/admin/assign-order": {
+      "patch": {
+        "operationId": "DeliveryPersonnelController_assignOrder",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignOrderDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "DeliveryPersonnel"
+        ]
+      }
+    },
     "/api/v1/delivery-personnel/admin/{id}": {
       "patch": {
         "operationId": "DeliveryPersonnelController_updateRiderByAdmin",
@@ -5932,30 +6004,6 @@
             }
           }
         ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "DeliveryPersonnel"
-        ]
-      }
-    },
-    "/api/v1/delivery-personnel/admin/assign-order": {
-      "patch": {
-        "operationId": "DeliveryPersonnelController_assignOrder",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AssignOrderDto"
-              }
-            }
-          }
-        },
         "responses": {
           "200": {
             "description": ""
@@ -8371,6 +8419,10 @@
         "type": "object",
         "properties": {}
       },
+      "RecordBackupEvidenceDto": {
+        "type": "object",
+        "properties": {}
+      },
       "GuestSocketTicketDto": {
         "type": "object",
         "properties": {}
@@ -9069,6 +9121,10 @@
         "type": "object",
         "properties": {}
       },
+      "FinalizePutDto": {
+        "type": "object",
+        "properties": {}
+      },
       "CheckoutPreviewDto": {
         "type": "object",
         "properties": {}
@@ -9293,11 +9349,11 @@
         "type": "object",
         "properties": {}
       },
-      "UpdateDeliveryPersonnelDto": {
+      "AssignOrderDto": {
         "type": "object",
         "properties": {}
       },
-      "AssignOrderDto": {
+      "UpdateDeliveryPersonnelDto": {
         "type": "object",
         "properties": {}
       },

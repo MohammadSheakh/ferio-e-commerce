@@ -14,6 +14,29 @@ export interface TenantStatus {
   storeName?: string;
 }
 
+type TenantStatusPayload = {
+  data?: TenantStatus;
+  code?: TenantStateCode;
+  storeName?: string;
+};
+
+/** Accept the backend response envelope while remaining compatible with older staging responses. */
+export function parseTenantStatusPayload(payload: unknown): TenantStatus {
+  if (!payload || typeof payload !== "object") {
+    return { code: "TENANT_UNAVAILABLE" };
+  }
+
+  const candidate = payload as TenantStatusPayload;
+  if (candidate.data?.code) return candidate.data;
+  if (candidate.code) {
+    return {
+      code: candidate.code,
+      ...(candidate.storeName ? { storeName: candidate.storeName } : {}),
+    };
+  }
+  return { code: "TENANT_UNAVAILABLE" };
+}
+
 /**
  * Server-side tenancy status for this storefront host (MT-5).
  * The backend is the single authority for host → tenant mapping; the
@@ -27,7 +50,9 @@ export async function getTenantStatus(): Promise<TenantStatus> {
   if (!forwardedHost) return { code: "LEGACY" };
 
   const backendUrl =
-    process.env.NEXT_PUBLIC_FERIO_API_URL ?? "http://localhost:6733/api/v1";
+    process.env.FERIO_API_URL ??
+    process.env.NEXT_PUBLIC_FERIO_API_URL ??
+    "http://localhost:6733/api/v1";
   try {
     const response = await fetch(`${backendUrl}/tenancy/status`, {
       headers: {
@@ -40,7 +65,7 @@ export async function getTenantStatus(): Promise<TenantStatus> {
     if (!response.ok) {
       return { code: "TENANT_UNAVAILABLE" };
     }
-    return (await response.json()) as TenantStatus;
+    return parseTenantStatusPayload(await response.json());
   } catch {
     // Backend unreachable: fail closed only makes sense when we know tenancy
     // is on. A legacy deployment must keep rendering; the backend decides —

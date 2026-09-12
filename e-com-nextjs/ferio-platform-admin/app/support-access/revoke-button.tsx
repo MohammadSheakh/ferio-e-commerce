@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { readJsonRecord, responseMessage } from "@/lib/client-response";
 
 export function RevokeButton({ grantId }: { grantId: string }) {
   const [working, setWorking] = useState(false);
@@ -10,8 +11,17 @@ export function RevokeButton({ grantId }: { grantId: string }) {
       disabled={working}
       onClick={async () => {
         setWorking(true);
-        await fetch(`/api/platform/support-access/${grantId}/revoke`, { method: "POST" });
-        window.location.reload();
+        try {
+          const response = await fetch(`/api/platform/support-access/${grantId}/revoke`, { method: "POST" });
+          if (!response.ok) {
+            const data = await readJsonRecord(response);
+            throw new Error(responseMessage(data, "Unable to revoke support access."));
+          }
+          window.location.reload();
+        } catch (error) {
+          window.alert(error instanceof Error ? error.message : "Unable to revoke support access.");
+          setWorking(false);
+        }
       }}
     >
       {working ? "Revoking…" : "Revoke"}

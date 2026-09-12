@@ -1,13 +1,13 @@
 import type { ConfigService } from '@nestjs/config';
 import { Queue, QueueEvents, Worker } from 'bullmq';
-import { ReconciliationProcessor } from '../src/features/reconciliation/reconciliation.processor';
+import { ReconciliationProcessor } from '../src/features/reconciliation/processors/reconciliation.processor';
 import {
   RECONCILIATION_SCAN_JOB,
   RECONCILIATION_SCHEDULER_ID,
   ReconciliationJobData,
   ReconciliationQueue,
-} from '../src/features/reconciliation/reconciliation.queue';
-import type { ReconciliationService } from '../src/features/reconciliation/reconciliation.service';
+} from '../src/features/reconciliation/queues/reconciliation.queue';
+import type { ReconciliationService } from '../src/features/reconciliation/services/reconciliation.service';
 
 const redisPort = Number(process.env.TEST_REDIS_PORT);
 const queuePrefix = process.env.TEST_QUEUE_PREFIX;

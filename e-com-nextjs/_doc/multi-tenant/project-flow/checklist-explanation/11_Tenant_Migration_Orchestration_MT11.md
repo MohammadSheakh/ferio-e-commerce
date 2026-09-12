@@ -1054,13 +1054,14 @@ Expand/migrate/contract creates the overlap needed for rolling changes.
 
 ---
 
-# 30. The important MT-11 item still open
+# 30. The important MT-11 compatibility boundary
 
-The current checklist has one unchecked migration-safety item:
+The current checklist marks the migration-safety item checked for the
+present Release 1 artifact set:
 
 > Test old app/new schema and new app/transition schema compatibility where rollout requires it.
 
-This matters because two different questions exist:
+This matters because two different questions still exist:
 
 ```text
 Does the migration orchestrator work?
@@ -1906,7 +1907,9 @@ with an intentionally failing database.
 
 It also proves that production deployment no longer depends on an engineer manually migrating each tenant database one by one.
 
-One migration-safety test remains open:
+For the current additive Release 1 migration, no mixed-version matrix is
+required. A rolling compatibility matrix remains mandatory before any future
+breaking rollout:
 
 ```text
 old app / new schema compatibility
@@ -1917,7 +1920,9 @@ where a rollout requires that overlap.
 
 So the correct conclusion is:
 
-> **The MT-11 fleet orchestration gate is complete, while explicit rolling app/schema compatibility coverage still has an open checklist item.**
+> **The MT-11 fleet orchestration gate and current migration-safety gate are
+> checked; explicit rolling app/schema compatibility coverage is a required
+> future-rollout control whenever a breaking migration needs overlap.**
 
 ---
 

@@ -24,7 +24,7 @@ pg_restore --list "$FILE" >/dev/null
 CHECKSUM="$(sha256sum -- "$FILE" | awk '{print $1}')"
 SCHEMA_VERSION="$(psql --dbname="$DB" --tuples-only --no-align \
   --command='SELECT migration_name FROM "_prisma_migrations" WHERE finished_at IS NOT NULL ORDER BY finished_at DESC LIMIT 1' | xargs)"
-if [[ -z "$SCHEMA_VERSION" ]]; then
+if [[ ! "$SCHEMA_VERSION" =~ ^[0-9]{14}_[A-Za-z0-9_-]+$ ]]; then
   echo "backup verification failed: no completed Prisma migration found" >&2
   exit 74
 fi

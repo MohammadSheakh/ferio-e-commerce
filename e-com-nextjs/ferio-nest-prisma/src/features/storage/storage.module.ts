@@ -3,6 +3,7 @@ import { AuthModule } from '../authentication/auth.module';
 import { TenancyModule } from '../../tenancy/tenancy.module';
 import { R2Strategy } from './strategies/r2.strategy';
 import { StorageController } from './storage.controller';
+import { createMalwareScanner, MALWARE_SCANNER } from './malware-scanner';
 
 /**
  * MT-10 storage surface (owner decision #6): Cloudflare R2 via the
@@ -13,7 +14,10 @@ import { StorageController } from './storage.controller';
 @Module({
   imports: [AuthModule, TenancyModule],
   controllers: [StorageController],
-  providers: [{ provide: 'STORAGE_STRATEGY', useClass: R2Strategy }],
+  providers: [
+    { provide: MALWARE_SCANNER, useFactory: createMalwareScanner },
+    { provide: 'STORAGE_STRATEGY', useClass: R2Strategy },
+  ],
   exports: ['STORAGE_STRATEGY'],
 })
 export class StorageModule {}

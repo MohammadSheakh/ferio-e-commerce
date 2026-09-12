@@ -51,7 +51,11 @@ export class SocketRoomService {
    * fallback outside resolved requests. Never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    return resolveTenantDatabase(this.tenantDb, this.prisma);
+    return resolveTenantDatabase(
+      this.tenantDb,
+      this.prisma,
+      'socket-room-service',
+    );
   }
 
   // =============================================

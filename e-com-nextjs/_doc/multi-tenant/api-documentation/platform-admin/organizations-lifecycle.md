@@ -22,11 +22,38 @@ permissions (`organization:read|write` etc.).
 ## Screen: Lifecycle actions
 | # | Method | Endpoint | Purpose |
 |---|---|---|---|
-| 1 | POST | `/platform/organizations/:id/provision` | Idempotent resumable provisioning (DB→migrate→seed→READY) |
+| 1 | POST | `/platform/organizations/:id/provision` `{ idempotencyKey? }` | Idempotent resumable provisioning (DB→migrate→seed→READY) |
 | 2 | PATCH | `/platform/organizations/:id/status` `{ status:SUSPENDED\|ACTIVE, reason }` | Suspend/reactivate (audited) |
 | 3 | GET | `/platform/organizations/:id/provisioning-runs` | Step-by-step timeline |
-| 4 | POST | `/platform/organizations/:id/closure/initiate` `{ reason }` | CLOSURE_PENDING + disables all domains |
-| 5 | POST | `/platform/organizations/:id/closure/finalize` | Retires registry after retention window confirm |
+| 4 | POST | `/platform/organizations/:id/closure/initiate` `{ reason? }` (10–1,000 chars when supplied) | CLOSURE_PENDING + disables all domains |
+| 5 | POST | `/platform/organizations/:id/closure/finalize` `{ retentionAcknowledged, exportAttested, overrideRetentionPeriod? }` | Retires registry after retention window confirm |
+
+## Screen: Domain lifecycle
+| # | Method | Endpoint | Purpose |
+|---|---|---|---|
+| 1 | POST | `/platform/organizations/:id/domains/custom` `{ hostname }` | Register a custom hostname and return its verification token |
+| 2 | POST | `/platform/organizations/:id/domains/:domainId/verify` `{ verificationToken }` | Verify ownership after DNS/TLS readiness checks |
+| 3 | POST | `/platform/organizations/:id/domains/:domainId/primary` | Make an active domain the organization's primary hostname |
+| 4 | POST | `/platform/organizations/:id/domains/:domainId/disable` | Disable a domain from receiving tenant traffic |
+
+The organization detail screen calls these mutations through the platform session BFF.
+The operator must publish the returned token and complete DNS/TLS readiness outside the
+browser before verification can succeed; this UI does not claim live DNS or routing proof.
+
+## Screen: Subscription and routing controls on organization detail
+| # | Method | Endpoint | Purpose |
+|---|---|---|---|
+| 1 | POST | `/platform/organizations/:id/subscription/trial` `{ planKey, trialDays? }` | Start a bounded trial when no subscription exists |
+| 2 | PATCH | `/platform/organizations/:id/subscription/status` `{ status, note? }` | Apply an audited subscription state-machine transition |
+| 3 | PUT | `/platform/organizations/:id/entitlement-overrides/:featureKey` `{ enabled?, limit?, reason, expiresAt }` | Add/update a time-boxed entitlement override |
+| 4 | DELETE | `/platform/organizations/:id/entitlement-overrides/:featureKey` | Revoke an entitlement override |
+| 5 | POST | `/platform/organizations/:id/domain-cache/invalidate` | Invalidate cached routing decisions after domain changes |
+
+The organization detail screen now calls all five routes through the platform
+session BFF. The entitlement form validates the feature key, reason, limit, and
+future expiry client-side; the backend remains authoritative. It does not expose
+provider credentials or claim that an override has been applied without a
+successful server response.
 
 ## Screen: Usage & reconcile
 | # | Method | Endpoint | Purpose |

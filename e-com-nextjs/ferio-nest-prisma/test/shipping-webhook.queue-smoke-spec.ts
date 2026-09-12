@@ -3,14 +3,14 @@ import { Queue, QueueEvents, Worker } from 'bullmq';
 import type { PrismaService } from '@app/database';
 import type { AuditService } from '../src/features/audit/services/audit.service';
 import type { ShippingService } from '../src/features/shipping/services/shipping.service';
-import { ShippingWebhookProcessor } from '../src/features/shipping/shipping-webhook.processor';
+import { ShippingWebhookProcessor } from '../src/features/shipping/processors/shipping-webhook.processor';
 import {
   COURIER_CALLBACK_RETRY_JOB,
   COURIER_CALLBACK_SCHEDULER_ID,
   COURIER_CALLBACK_SWEEP_JOB,
   CourierCallbackJobData,
   ShippingWebhookQueue,
-} from '../src/features/shipping/shipping-webhook.queue';
+} from '../src/features/shipping/queues/shipping-webhook.queue';
 
 const redisPort = Number(process.env.TEST_REDIS_PORT);
 const queuePrefix = process.env.TEST_QUEUE_PREFIX;

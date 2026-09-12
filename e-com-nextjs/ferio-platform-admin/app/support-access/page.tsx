@@ -1,4 +1,5 @@
 import { platformApi } from "@/lib/platform-session";
+import { SupportGrantForm } from "./support-grant-form";
 import { RevokeButton } from "./revoke-button";
 
 interface GrantRow {
@@ -9,12 +10,7 @@ interface GrantRow {
 }
 
 export default async function SupportAccessPage() {
-  let rows: GrantRow[] = [];
-  try {
-    rows = await platformApi<GrantRow[]>("/platform/support-access");
-  } catch {
-    /* error boundary */
-  }
+  const rows = await platformApi<GrantRow[]>("/platform/support-access");
   return (
     <>
       <p className="eyebrow">Security</p>
@@ -23,6 +19,8 @@ export default async function SupportAccessPage() {
         Every grant is reason-bound and time-bound. Operators have zero tenant-data access without one.
       </p>
       <div style={{ height: 20 }} />
+      <SupportGrantForm />
+      <div style={{ height: 24 }} />
       <table>
         <thead><tr><th>Organization</th><th>Reason</th><th>Expires</th><th /></tr></thead>
         <tbody>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import Topbar from "@/components/Topbar";
 import RtoQueue from "@/components/shipping/RtoQueue";
@@ -8,6 +8,8 @@ import { formatTaka } from "@/lib/catalog";
 import type {
   CourierWebhookLog,
   CourierWebhookQueueHealth,
+  CourierScorecardRow,
+  CourierRouteRecommendation,
   Shipment,
   ShipmentPollAttempt,
   ShipmentPollingQueueHealth,
@@ -22,6 +24,9 @@ function formatEnum(value: string) {
 
 export default function ShippingPage() {
   const [providers, setProviders] = useState<ShipmentProvider[]>([]);
+  const [scorecard, setScorecard] = useState<CourierScorecardRow[]>([]);
+  const [recommendation, setRecommendation] =
+    useState<CourierRouteRecommendation | null>(null);
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [webhookLogs, setWebhookLogs] = useState<CourierWebhookLog[]>([]);
   const [webhookQueue, setWebhookQueue] =
@@ -40,6 +45,7 @@ export default function ShippingPage() {
     try {
       const [
         providerResponse,
+        scorecardResponse,
         shipmentResponse,
         webhookResponse,
         webhookQueueResponse,
@@ -47,6 +53,7 @@ export default function ShippingPage() {
         pollingQueueResponse,
       ] = await Promise.all([
         fetch("/api/shipping/providers", { cache: "no-store" }),
+        fetch("/api/shipping/scorecard", { cache: "no-store" }),
         fetch("/api/shipping/shipments", { cache: "no-store" }),
         fetch("/api/shipping/webhooks", { cache: "no-store" }),
         fetch("/api/shipping/webhooks/queue-health", { cache: "no-store" }),
@@ -55,6 +62,10 @@ export default function ShippingPage() {
       ]);
       const providerPayload = (await providerResponse.json()) as {
         data?: ShipmentProvider[];
+        message?: string;
+      };
+      const scorecardPayload = (await scorecardResponse.json()) as {
+        data?: CourierScorecardRow[];
         message?: string;
       };
       const shipmentPayload = (await shipmentResponse.json()) as {
@@ -83,6 +94,13 @@ export default function ShippingPage() {
       } else {
         failures.push(
           providerPayload.message || "Unable to load courier providers.",
+        );
+      }
+      if (scorecardResponse.ok && scorecardPayload.data) {
+        setScorecard(scorecardPayload.data);
+      } else {
+        failures.push(
+          scorecardPayload.message || "Unable to load courier scorecard.",
         );
       }
       if (shipmentResponse.ok && shipmentPayload.data) {
@@ -216,6 +234,52 @@ export default function ShippingPage() {
     }
   }
 
+  async function recommendCourier(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const district = String(form.get("district") || "").trim();
+    const weightGrams = Number(form.get("weightGrams"));
+    const codAmount = Number(form.get("codAmount"));
+    if (!district || !Number.isInteger(weightGrams) || weightGrams < 1 || !Number.isInteger(codAmount) || codAmount < 0) {
+      setError("Enter a district, whole-gram weight, and non-negative whole-unit COD amount.");
+      return;
+    }
+
+    setPendingAction("recommend");
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch("/api/shipping/router/recommend", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          district,
+          upazila: String(form.get("upazila") || "").trim() || undefined,
+          weightGrams,
+          codAmount,
+          urgent: form.get("urgent") === "on",
+        }),
+      });
+      const payload = (await response.json()) as {
+        data?: CourierRouteRecommendation;
+        message?: string;
+      };
+      if (!response.ok || !payload.data) {
+        throw new Error(payload.message || "Unable to recommend a courier.");
+      }
+      setRecommendation(payload.data);
+      setNotice(`Recommended ${payload.data.selectedProvider}.`);
+    } catch (recommendationError) {
+      setError(
+        recommendationError instanceof Error
+          ? recommendationError.message
+          : "Unable to recommend a courier.",
+      );
+    } finally {
+      setPendingAction(null);
+    }
+  }
+
   return (
     <>
       <Topbar
@@ -230,8 +294,8 @@ export default function ShippingPage() {
                 Courier providers
               </h2>
               <p className="mt-1 text-[12px] text-ink2">
-                Credentials stay in environment secrets. Activation is blocked
-                until configuration is complete.
+                Credentials are provisioned through the operator-controlled
+                secret path. Activation is blocked until configuration is complete.
               </p>
             </div>
           </div>
@@ -283,6 +347,103 @@ export default function ShippingPage() {
               </p>
             )}
           </div>
+        </section>
+
+        <section>
+          <div>
+            <h2 className="text-[16px] font-medium text-ink">Courier scorecard</h2>
+            <p className="mt-1 text-[12px] text-ink2">
+              Tenant-local delivery, RTO, and pickup-SLA evidence by provider.
+            </p>
+          </div>
+          <div className="mt-5 overflow-x-auto border-y border-line">
+            <table className="w-full min-w-[760px] border-collapse text-left">
+              <thead>
+                <tr className="border-b border-line text-[11px] uppercase tracking-eyebrow text-ink2">
+                  <th className="px-5 py-3 font-normal">Courier</th>
+                  <th className="px-5 py-3 font-normal">State</th>
+                  <th className="px-5 py-3 font-normal">Parcels</th>
+                  <th className="px-5 py-3 font-normal">Delivered</th>
+                  <th className="px-5 py-3 font-normal">Delivery rate</th>
+                  <th className="px-5 py-3 font-normal">RTO rate</th>
+                  <th className="px-5 py-3 font-normal">Pickup SLA</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line">
+                {scorecard.map((row) => (
+                  <tr key={row.providerCode} className="text-[13px]">
+                    <td className="px-5 py-3.5 text-ink">{row.name}</td>
+                    <td className="px-5 py-3.5 text-ink2">{row.isActive ? "Active" : "Inactive"}</td>
+                    <td className="px-5 py-3.5 text-ink2">{row.totalParcels}</td>
+                    <td className="px-5 py-3.5 text-ink2">{row.deliveredParcels}</td>
+                    <td className="px-5 py-3.5 text-ink2">{row.deliveryRatePercent}%</td>
+                    <td className="px-5 py-3.5 text-ink2">{row.rtoPercent}%</td>
+                    <td className="px-5 py-3.5 text-ink2">{row.pickupSlaPercent}%</td>
+                  </tr>
+                ))}
+                {!loading && scorecard.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="px-5 py-10 text-center text-[13px] text-ink2">
+                      No courier scorecard data is available.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section>
+          <div>
+            <h2 className="text-[16px] font-medium text-ink">Courier recommendation</h2>
+            <p className="mt-1 text-[12px] text-ink2">
+              Compare tenant-local provider readiness and routing scores before creating a shipment.
+            </p>
+          </div>
+          <form onSubmit={recommendCourier} className="mt-5 grid gap-3 rounded-card border border-line p-5 sm:grid-cols-2 lg:grid-cols-5">
+            <label className="text-[11px] text-ink2">
+              District
+              <input name="district" required defaultValue="Dhaka" className="mt-1 w-full rounded-card border border-line px-3 py-2.5 text-[13px]" />
+            </label>
+            <label className="text-[11px] text-ink2">
+              Upazila (optional)
+              <input name="upazila" className="mt-1 w-full rounded-card border border-line px-3 py-2.5 text-[13px]" />
+            </label>
+            <label className="text-[11px] text-ink2">
+              Weight (grams)
+              <input name="weightGrams" type="number" min={1} step={1} required defaultValue={1000} className="mt-1 w-full rounded-card border border-line px-3 py-2.5 text-[13px]" />
+            </label>
+            <label className="text-[11px] text-ink2">
+              COD amount
+              <input name="codAmount" type="number" min={0} step={1} required defaultValue={0} className="mt-1 w-full rounded-card border border-line px-3 py-2.5 text-[13px]" />
+            </label>
+            <div className="flex items-end gap-3">
+              <label className="flex items-center gap-2 pb-2.5 text-[12px] text-ink2">
+                <input name="urgent" type="checkbox" /> Urgent
+              </label>
+              <button type="submit" disabled={pendingAction !== null} className="rounded-full bg-ink px-4 py-2.5 text-[12px] text-white disabled:opacity-40">
+                {pendingAction === "recommend" ? "Scoring…" : "Recommend"}
+              </button>
+            </div>
+          </form>
+          {recommendation && (
+            <div className="mt-4 rounded-card border border-line p-5">
+              <p className="text-[13px] text-ink">
+                Recommended <strong>{recommendation.selectedProvider}</strong> · score {recommendation.score}
+              </p>
+              <p className="mt-1 text-[12px] text-ink2">{recommendation.reason}</p>
+              <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {recommendation.availableProviders.map((provider) => (
+                  <div key={provider.code} className="rounded-card bg-surface p-3 text-[12px]">
+                    <p className="font-medium text-ink">{provider.name} · {provider.score}</p>
+                    <p className="mt-1 text-ink2">
+                      {provider.isActive ? "Active" : "Inactive"} · {provider.isConfigured ? "Configured" : "Not configured"}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </section>
 
         {error && (

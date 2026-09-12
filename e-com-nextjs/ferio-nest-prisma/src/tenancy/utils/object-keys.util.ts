@@ -24,6 +24,15 @@ export function tenantObjectKey(...parts: Array<string>): string {
 
 /** Validate a client- or persistence-supplied key against ambient tenancy. */
 export function assertTenantObjectKey(key: string): void {
+  if (
+    typeof key !== 'string' ||
+    key.length === 0 ||
+    key.includes('\\') ||
+    key.split('/').some((segment) => segment === '.' || segment === '..')
+  ) {
+    throw new ForbiddenException('STORAGE_KEY_FORBIDDEN');
+  }
+
   const context = tryGetTenantContext();
   if (!context && process.env.TENANCY_ENABLED === 'true') {
     throw new ServiceUnavailableException(

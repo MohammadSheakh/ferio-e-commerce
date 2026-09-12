@@ -311,6 +311,7 @@ conditionalDescribe(
 
     it('never exceeds TENANT_DB_MAX_CLIENTS under churn (LRU eviction)', async () => {
       process.env.TENANT_DB_MAX_CLIENTS = '2';
+      process.env.TENANT_DB_EVICTION_GRACE_MS = '0';
       const manager = new TenantDatabaseManager();
       const dbs: string[] = [];
       try {
@@ -333,6 +334,7 @@ conditionalDescribe(
         });
       } finally {
         process.env.TENANT_DB_MAX_CLIENTS = '25';
+        delete process.env.TENANT_DB_EVICTION_GRACE_MS;
         await manager.onModuleDestroy();
       }
     }, 60_000);
@@ -348,6 +350,7 @@ conditionalDescribe(
         database: 'postgres',
         max: 1,
       });
+      let sampler: Promise<void> | undefined;
 
       try {
         const material = materialFor(dbName);
@@ -372,11 +375,11 @@ conditionalDescribe(
           }
         };
 
-        const sampler = sampleConnections();
+        sampler = sampleConnections();
         await Promise.all(
           Array.from(
             { length: queryCount },
-            () => client.$queryRaw`SELECT pg_sleep(0.03)`,
+            () => client.$executeRaw`SELECT pg_sleep(0.03)`,
           ),
         );
         polling = false;
@@ -391,6 +394,7 @@ conditionalDescribe(
         });
       } finally {
         polling = false;
+        await sampler;
         await inspector.end().catch(() => undefined);
         await manager.onModuleDestroy();
         if (previousPoolMax === undefined)

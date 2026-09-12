@@ -11,12 +11,7 @@ interface RunRow {
 }
 
 export default async function MigrationsPage() {
-  let runs: RunRow[] = [];
-  try {
-    runs = await platformApi<RunRow[]>("/platform/migrations");
-  } catch {
-    /* error boundary */
-  }
+  const runs = await platformApi<RunRow[]>("/platform/migrations");
   return (
     <>
       <p className="eyebrow">Tenant Operations</p>

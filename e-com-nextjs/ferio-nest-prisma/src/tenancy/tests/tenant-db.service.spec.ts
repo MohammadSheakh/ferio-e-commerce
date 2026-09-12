@@ -24,7 +24,9 @@ describe('TenantDbService database selection', () => {
   it('uses the explicit legacy client when tenancy is disabled', async () => {
     process.env.TENANCY_ENABLED = 'false';
 
-    await expect(createService().getOrLegacy(legacyClient)).resolves.toBe(
+    await expect(
+      createService().getOrLegacy(legacyClient, 'test-legacy-mode'),
+    ).resolves.toBe(
       legacyClient,
     );
   });
@@ -32,7 +34,9 @@ describe('TenantDbService database selection', () => {
   it('fails closed when tenancy is enabled without a tenant context', async () => {
     process.env.TENANCY_ENABLED = 'true';
 
-    await expect(createService().getOrLegacy(legacyClient)).rejects.toThrow(
+      await expect(
+        createService().getOrLegacy(legacyClient, 'test-tenant-required'),
+      ).rejects.toThrow(
       'TENANT_IDENTITY_CONTEXT_REQUIRED',
     );
   });
@@ -57,7 +61,9 @@ describe('TenantDbService database selection', () => {
     };
 
     await runWithTenantContext(context, async () => {
-      await expect(createService().getOrLegacy(legacyClient)).resolves.toBe(
+      await expect(
+        createService().getOrLegacy(legacyClient, 'test-tenant-context'),
+      ).resolves.toBe(
         tenantClient,
       );
     });
@@ -115,14 +121,16 @@ describe('TenantDbService database selection', () => {
     process.env.TENANCY_ENABLED = 'true';
 
     await expect(
-      resolveTenantDatabase(undefined, legacyClient),
+      resolveTenantDatabase(undefined, legacyClient, 'test-tenant-required'),
     ).rejects.toThrow('TENANT_DATABASE_SERVICE_REQUIRED');
   });
 
   it('allows the legacy client when the provider is missing in legacy mode', async () => {
     process.env.TENANCY_ENABLED = 'false';
 
-    await expect(resolveTenantDatabase(undefined, legacyClient)).resolves.toBe(
+    await expect(
+      resolveTenantDatabase(undefined, legacyClient, 'test-legacy-mode'),
+    ).resolves.toBe(
       legacyClient,
     );
   });

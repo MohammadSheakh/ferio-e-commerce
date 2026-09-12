@@ -8,6 +8,10 @@ import { PlatformAuditService } from './platform-audit.service';
 import { invalidateDomainCache } from '../utils/domain-cache-invalidation';
 import { PlatformPrismaService } from '../platform-prisma.service';
 import { EntitlementsService } from './entitlements.service';
+import {
+  DomainReadinessError,
+  DomainReadinessService,
+} from './domain-readiness.service';
 
 /** Hosts that can never be tenant subdomains. */
 export const RESERVED_SUBDOMAINS = new Set([
@@ -32,6 +36,7 @@ export class DomainsService {
     private readonly platform: PlatformPrismaService,
     private readonly audit: PlatformAuditService,
     private readonly entitlements: EntitlementsService,
+    private readonly readiness: DomainReadinessService,
   ) {}
 
   /**
@@ -190,6 +195,14 @@ export class DomainsService {
         data: { status: 'VERIFICATION_FAILED' },
       });
       throw new ConflictException('DOMAIN_VERIFICATION_MISMATCH');
+    }
+    try {
+      await this.readiness.verify(domain.hostname, presentedToken.trim());
+    } catch (error: unknown) {
+      if (error instanceof DomainReadinessError) {
+        throw new ConflictException(error.message);
+      }
+      throw error;
     }
     const updated = await this.platform.client.tenantDomain.update({
       where: { id: domainId },

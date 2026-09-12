@@ -32,6 +32,7 @@ import { CartService } from '../src/features/cart/cart.service';
 import { CheckoutService } from '../src/features/checkout/checkout.service';
 import { OrderService } from '../src/features/order/order.service';
 import { DeliveryPersonnelService } from '../src/features/delivery-personnel/delivery-personnel.service';
+import { CommerceSettingsService } from '../src/features/settings/services/commerce-settings.service';
 
 const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL;
 const conditionalDescribe = TEST_DATABASE_URL ? describe : describe.skip;
@@ -211,6 +212,13 @@ conditionalDescribe('Two-Tenant End-to-End Vertical Proof', () => {
     const catalog = new CatalogService(
       {} as never,
       auditStub as never,
+      { evaluate: jest.fn().mockResolvedValue({ allowed: true }) } as never,
+      tenantDb,
+    );
+    const settings = new CommerceSettingsService(
+      {} as never,
+      auditStub as never,
+      configStub as never,
       tenantDb,
     );
     const carts = new CartService({} as never, configStub as never, tenantDb);
@@ -228,6 +236,8 @@ conditionalDescribe('Two-Tenant End-to-End Vertical Proof', () => {
       auditStub as never,
       configStub as never,
       autoStub() as never,
+      autoStub() as never,
+      { evaluate: jest.fn().mockResolvedValue({ allowed: true }) } as never,
       autoStub() as never,
       tenantDb,
     );
@@ -272,6 +282,21 @@ conditionalDescribe('Two-Tenant End-to-End Vertical Proof', () => {
         }),
       ),
     );
+
+    // ── Storefront reads keep branding and catalog inside the same tenant ──
+    const storefrontA = await inTenant(tA, async () => ({
+      settings: await settings.getPublic(),
+      categories: await catalog.getCategories(true),
+    }));
+    const storefrontB = await inTenant(tB, async () => ({
+      settings: await settings.getPublic(),
+      categories: await catalog.getCategories(true),
+    }));
+    expect(storefrontA.settings.storeName).toBe('Tenant A');
+    expect(storefrontB.settings.storeName).toBe('Tenant B');
+    expect(storefrontA.categories).toHaveLength(1);
+    expect(storefrontB.categories).toHaveLength(1);
+    expect(storefrontA.categories[0].id).not.toBe(storefrontB.categories[0].id);
 
     // ── Guest carts: independent tokens per tenant ──
     await Promise.all(
@@ -351,6 +376,26 @@ conditionalDescribe('Two-Tenant End-to-End Vertical Proof', () => {
       await inTenant(tA, () =>
         orders.confirmOrder(tA.orderId, {} as never, adminActor as never),
       );
+
+      // The courier handover remains provider-gated, but the warehouse
+      // lifecycle is exercised through the real tenant-scoped OrderService.
+      for (const status of ['PICKING', 'PACKED', 'QUALITY_CHECKED'] as const) {
+        await inTenant(tA, () =>
+          orders.updateFulfillment(
+            tA.orderId,
+            { status } as never,
+            adminActor as never,
+          ),
+        );
+      }
+      const fulfillmentState = await inTenant(tA, () =>
+        orders.getOrder(tA.orderId),
+      );
+      expect(fulfillmentState.fulfillmentStatus).toBe('QUALITY_CHECKED');
+      const foreignFulfillmentState = await inTenant(tB, () =>
+        orders.getOrder(tA.orderId).catch(() => null),
+      );
+      expect(foreignFulfillmentState).toBeNull();
 
       const reservedAfter = await poolA.query(
         `SELECT COALESCE(SUM("reserved"),0)::int AS r FROM "InventoryStock"`,

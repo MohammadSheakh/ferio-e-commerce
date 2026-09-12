@@ -68,7 +68,11 @@ export class OperationsHealthService {
   }
 
   private async db(): Promise<PrismaClient> {
-    return resolveTenantDatabase(this.tenantDb, this.prisma);
+    return resolveTenantDatabase(
+      this.tenantDb,
+      this.prisma,
+      'operations-health-service',
+    );
   }
 
   async getHealth() {

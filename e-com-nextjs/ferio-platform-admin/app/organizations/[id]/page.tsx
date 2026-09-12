@@ -1,5 +1,7 @@
 import { platformApi } from "@/lib/platform-session";
+import { DomainActions } from "./domain-actions";
 import { OrgActions } from "./org-actions";
+import { SubscriptionActions } from "./subscription-actions";
 import { UsageCard, type UsageMetricRow } from "./usage-card";
 
 // TODO(brutal-audit #8 follow-up): replace with contract-derived type once
@@ -55,6 +57,12 @@ export default async function OrganizationDetail({ params }: { params: { id: str
       <OrgActions organizationId={org.id} status={org.status} />
 
       <div style={{ height: 28 }} />
+      <SubscriptionActions
+        organizationId={org.id}
+        status={org.subscription?.status ?? null}
+      />
+
+      <div style={{ height: 28 }} />
       <UsageCard
         organizationId={org.id}
         periodKey={usage.periodKey}
@@ -89,6 +97,8 @@ export default async function OrganizationDetail({ params }: { params: { id: str
           </tbody>
         </table>
       </div>
+
+      <DomainActions organizationId={org.id} domains={org.domains ?? []} />
 
       <div className="card">
         <p className="eyebrow">Tenant Database</p>

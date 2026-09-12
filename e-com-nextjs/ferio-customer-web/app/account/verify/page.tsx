@@ -32,17 +32,21 @@ export default function VerifyAccountPage() {
     event.preventDefault();
     setStatus("working");
     setMessage("");
-    const response = await fetch("/api/account/verify-email", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, otp }),
-    });
-    const payload = await response.json();
-    if (response.ok) {
-      window.location.assign(destination());
-      return;
+    try {
+      const response = await fetch("/api/account/verify-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, otp }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (response.ok) {
+        window.location.assign(destination());
+        return;
+      }
+      setMessage(payload.message || "Verification failed.");
+    } catch {
+      setMessage("The verification service is unavailable. Try again shortly.");
     }
-    setMessage(payload.message || "Verification failed.");
     setStatus("idle");
   }
 
@@ -52,14 +56,19 @@ export default function VerifyAccountPage() {
       return;
     }
     setStatus("working");
-    const response = await fetch("/api/account/resend-verification", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
-    });
-    const payload = await response.json();
-    setMessage(payload.message || "Unable to resend the code.");
-    setStatus(response.ok ? "sent" : "idle");
+    try {
+      const response = await fetch("/api/account/resend-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      setMessage(payload.message || "Unable to resend the code.");
+      setStatus(response.ok ? "sent" : "idle");
+    } catch {
+      setMessage("The verification service is unavailable. Try again shortly.");
+      setStatus("idle");
+    }
   }
 
   return (

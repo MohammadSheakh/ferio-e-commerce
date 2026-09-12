@@ -21,7 +21,11 @@ export class UserDevicesService {
   ) {}
 
   private async db(): Promise<PrismaClient> {
-    return resolveTenantDatabase(this.tenantDb, this.prisma);
+    return resolveTenantDatabase(
+      this.tenantDb,
+      this.prisma,
+      'user-devices-service',
+    );
   }
 
   /**

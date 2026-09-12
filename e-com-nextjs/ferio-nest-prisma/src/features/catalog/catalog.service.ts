@@ -73,7 +73,7 @@ export class CatalogService {
    * The fallback is EXPLICIT here — TenantDbService.tryGet() never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    return resolveTenantDatabase(this.tenantDb, this.prisma);
+    return resolveTenantDatabase(this.tenantDb, this.prisma, 'catalog-service');
   }
 
   private slugify(value: string): string {

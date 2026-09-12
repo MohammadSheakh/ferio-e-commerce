@@ -15,6 +15,14 @@ type ReorderUnavailableItem = {
   reason: string;
 };
 
+function pickupDateTimeValue(value: string | null) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const pad = (part: number) => String(part).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 export default function AccountOrdersPage() {
   const router = useRouter();
   const { revalidate } = useCart();
@@ -24,6 +32,7 @@ export default function AccountOrdersPage() {
   const [message, setMessage] = useState("");
   const [unauthorized, setUnauthorized] = useState(false);
   const [reorderingId, setReorderingId] = useState<string | null>(null);
+  const [pickupSavingId, setPickupSavingId] = useState<string | null>(null);
   const [reorderResult, setReorderResult] = useState<{
     summary: string;
     addedItems: unknown[];
@@ -31,12 +40,17 @@ export default function AccountOrdersPage() {
   } | null>(null);
 
   async function load() {
-    const response = await fetch("/api/account/commerce", { cache: "no-store" });
-    const payload = await response.json();
-    if (response.status === 401) setUnauthorized(true);
-    else if (response.ok) setAccount(payload.data);
-    else setMessage(payload.message || "Unable to load your account.");
-    setLoading(false);
+    try {
+      const response = await fetch("/api/account/commerce", { cache: "no-store" });
+      const payload = (await response.json().catch(() => ({}))) as { data?: CommerceAccount; message?: string };
+      if (response.status === 401) setUnauthorized(true);
+      else if (response.ok && payload.data) setAccount(payload.data);
+      else setMessage(payload.message || "Unable to load your account.");
+    } catch (loadError) {
+      setMessage(getErrorMessage(loadError, "Network error loading your account."));
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -90,6 +104,46 @@ export default function AccountOrdersPage() {
       event.currentTarget.reset();
     } else setMessage(payload.message || "Unable to verify that order.");
     setLinking(false);
+  }
+
+  async function schedulePickup(
+    orderId: string,
+    event: FormEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault();
+    setPickupSavingId(orderId);
+    setMessage("");
+    const form = new FormData(event.currentTarget);
+    try {
+      const response = await fetch(
+        `/api/orders/${orderId}/store-pickup/schedule`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            pickupScheduledAt: form.get("pickupScheduledAt")
+              ? new Date(String(form.get("pickupScheduledAt"))).toISOString()
+              : undefined,
+            preferredPickupSlot:
+              String(form.get("preferredPickupSlot") || "").trim() || undefined,
+            customerPickupNotes:
+              String(form.get("customerPickupNotes") || "").trim() || undefined,
+          }),
+        },
+      );
+      const payload = (await response.json()) as { message?: string };
+      if (!response.ok) {
+        throw new Error(payload.message || "Unable to schedule pickup.");
+      }
+      setMessage("Store pickup details updated.");
+      await load();
+    } catch (scheduleError) {
+      setMessage(
+        getErrorMessage(scheduleError, "Unable to schedule store pickup."),
+      );
+    } finally {
+      setPickupSavingId(null);
+    }
   }
 
   const inputClass =
@@ -349,6 +403,67 @@ export default function AccountOrdersPage() {
                       {order.shipment?.trackingNumber || "Not available"}
                     </p>
                   </div>
+
+                  {order.deliveryMethod === "STORE_PICKUP" && (
+                    <form
+                      onSubmit={(event) => schedulePickup(order.id, event)}
+                      className="mt-5 rounded-xl border border-line bg-surface/40 p-4"
+                    >
+                      <div className="flex flex-wrap items-baseline justify-between gap-2">
+                        <div>
+                          <h3 className="text-[13px] font-medium text-ink">
+                            Store pickup
+                          </h3>
+                          <p className="mt-1 text-[11px] text-ink2">
+                            Status: {order.storePickupStatus.replaceAll("_", " ").toLowerCase()}
+                          </p>
+                        </div>
+                        {order.pickupScheduledAt && (
+                          <p className="text-[11px] text-ink2">
+                            Scheduled {new Date(order.pickupScheduledAt).toLocaleString("en-BD")}
+                          </p>
+                        )}
+                      </div>
+                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                        <label className="text-[11px] text-ink2">
+                          Pickup date and time
+                          <input
+                            type="datetime-local"
+                            name="pickupScheduledAt"
+                            defaultValue={pickupDateTimeValue(order.pickupScheduledAt)}
+                            className={inputClass}
+                          />
+                        </label>
+                        <label className="text-[11px] text-ink2">
+                          Preferred time slot
+                          <input
+                            name="preferredPickupSlot"
+                            maxLength={100}
+                            defaultValue={order.preferredPickupSlot || ""}
+                            placeholder="e.g. 5:00 PM - 7:00 PM"
+                            className={inputClass}
+                          />
+                        </label>
+                      </div>
+                      <label className="mt-3 block text-[11px] text-ink2">
+                        Notes for the store
+                        <textarea
+                          name="customerPickupNotes"
+                          maxLength={500}
+                          rows={2}
+                          defaultValue={order.customerPickupNotes || ""}
+                          className={inputClass}
+                        />
+                      </label>
+                      <button
+                        type="submit"
+                        disabled={pickupSavingId === order.id}
+                        className="mt-3 rounded-full bg-ink px-4 py-2 text-[11px] text-white disabled:opacity-40"
+                      >
+                        {pickupSavingId === order.id ? "Saving…" : "Save pickup details"}
+                      </button>
+                    </form>
+                  )}
                 </article>
               ))}
             </div>

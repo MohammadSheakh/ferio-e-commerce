@@ -1,8 +1,15 @@
-import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import {
   S3Client,
   PutObjectCommand,
   GetObjectCommand,
+  HeadObjectCommand,
   DeleteObjectCommand,
   DeleteObjectsCommand,
   ListObjectsV2Command,
@@ -34,6 +41,11 @@ export interface StorageStrategy {
     contentType: string,
     sizeBytes: number,
   ): Promise<{ key: string; url: string }>;
+  inspectUploadedObject(
+    key: string,
+    contentType: string,
+    sizeBytes: number,
+  ): Promise<{ key: string; contentType: string; sizeBytes: number }>;
   listTenantObjectKeys(): Promise<readonly string[]>;
   deleteTenantObjects(): Promise<{ deleted: number }>;
 }
@@ -58,6 +70,9 @@ import {
   tenantObjectKey,
 } from '../../../tenancy/utils/object-keys.util';
 import { tryGetTenantContext } from '../../../tenancy/context/tenant-context';
+import { assertUploadContent } from '../storage-validation.util';
+import { createMalwareScanner, MALWARE_SCANNER } from '../malware-scanner';
+import type { MalwareScanner } from '../malware-scanner';
 
 export function sanitizeStoragePath(value: string, fallback = 'misc'): string {
   const segments = value
@@ -72,6 +87,7 @@ function sanitizeStorageSegment(value: string): string {
   return value
     .replace(/\.+/g, '.')
     .replace(/[^A-Za-z0-9._-]+/g, '-')
+    .replace(/^\.+/, '')
     .replace(/^-+|-+$/g, '')
     .slice(0, 120);
 }
@@ -96,8 +112,13 @@ export class R2Strategy implements StorageStrategy {
   private readonly s3Client: S3Client;
   private readonly bucket: string;
   private readonly presignExpiresSeconds: number;
+  private readonly malwareScanner: MalwareScanner;
 
-  constructor() {
+  constructor(
+    @Inject(MALWARE_SCANNER)
+    malwareScanner: MalwareScanner = createMalwareScanner(),
+  ) {
+    this.malwareScanner = malwareScanner;
     const accountId = process.env.R2_ACCOUNT_ID;
     this.bucket = process.env.R2_BUCKET ?? '';
     this.presignExpiresSeconds = Number(
@@ -157,10 +178,15 @@ export class R2Strategy implements StorageStrategy {
     },
     folder: string,
   ): Promise<StorageUploadResult> {
-    const key = tenantObjectKey(
-      folder,
-      `${Date.now()}-${file.originalname.replace(/\s+/g, '-')}`,
-    );
+    // Keep content validation at the provider boundary as well as at
+    // controller boundaries so every multipart caller receives the same
+    // fail-closed protection.
+    assertUploadContent(file);
+    const safeFolder = sanitizeStoragePath(folder);
+    const safeName =
+      sanitizeStorageSegment(file.originalname.replace(/[\\/]+/g, '-')) ||
+      'upload.bin';
+    const key = tenantObjectKey(safeFolder, `${Date.now()}-${safeName}`);
 
     await this.s3Client.send(
       new PutObjectCommand({
@@ -254,6 +280,87 @@ export class R2Strategy implements StorageStrategy {
       { expiresIn: this.presignExpiresSeconds },
     );
     return { key, url };
+  }
+
+  /**
+   * Verify the object that arrived through a direct PUT before it is used by
+   * the application. Presigning validates client intent; this validates the
+   * stored object's metadata and magic bytes under the tenant namespace.
+   */
+  async inspectUploadedObject(
+    key: string,
+    contentType: string,
+    sizeBytes: number,
+  ): Promise<{ key: string; contentType: string; sizeBytes: number }> {
+    assertTenantObjectKey(key);
+    const head = await this.s3Client.send(
+      new HeadObjectCommand({ Bucket: this.bucket, Key: key }),
+    );
+    const actualContentType = head.ContentType;
+    const actualSize = head.ContentLength;
+    if (
+      actualContentType !== contentType ||
+      actualSize !== sizeBytes ||
+      actualSize === undefined
+    ) {
+      throw new BadRequestException('STORAGE_OBJECT_METADATA_MISMATCH');
+    }
+
+    const object = await this.s3Client.send(
+      new GetObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+        ...(this.malwareScanner.required ? {} : { Range: 'bytes=0-15' }),
+      }),
+    );
+    if (!object.Body) {
+      throw new ServiceUnavailableException('STORAGE_OBJECT_BODY_MISSING');
+    }
+    const downloaded = Buffer.from(await object.Body.transformToByteArray());
+    const prefix = this.malwareScanner.required
+      ? downloaded.subarray(0, 16)
+      : downloaded;
+    const signatureMatches =
+      (contentType === 'image/jpeg' &&
+        prefix.length >= 3 &&
+        prefix.subarray(0, 3).equals(Buffer.from([0xff, 0xd8, 0xff]))) ||
+      (contentType === 'image/png' &&
+        prefix.length >= 8 &&
+        prefix
+          .subarray(0, 8)
+          .equals(
+            Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+          )) ||
+      (contentType === 'image/webp' &&
+        prefix.length >= 12 &&
+        prefix.subarray(0, 4).toString('ascii') === 'RIFF' &&
+        prefix.subarray(8, 12).toString('ascii') === 'WEBP') ||
+      (contentType === 'application/pdf' &&
+        prefix.subarray(0, 5).toString('ascii') === '%PDF-');
+    if (!signatureMatches) {
+      throw new BadRequestException('STORAGE_OBJECT_CONTENT_MISMATCH');
+    }
+    try {
+      await this.malwareScanner.scan({
+        key,
+        contentType,
+        body: downloaded,
+      });
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        try {
+          await this.s3Client.send(
+            new DeleteObjectCommand({ Bucket: this.bucket, Key: key }),
+          );
+        } catch {
+          throw new ServiceUnavailableException(
+            'STORAGE_QUARANTINE_UNAVAILABLE',
+          );
+        }
+      }
+      throw error;
+    }
+    return { key, contentType, sizeBytes: actualSize };
   }
 
   /**

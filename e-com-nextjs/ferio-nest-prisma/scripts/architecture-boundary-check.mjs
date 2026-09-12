@@ -15,6 +15,14 @@ const dataClassification = await readFile(
   resolve(root, '../_doc/multi-tenant/data-classification.md'),
   'utf8',
 );
+const productionCompose = await readFile(
+  resolve(root, '../docker-compose.production.yml'),
+  'utf8',
+);
+const tenantContextManifest = await readFile(
+  resolve(root, 'scripts/tenant-context-boundaries.json'),
+  'utf8',
+);
 let mongoModule = '';
 try {
   mongoModule = await readFile(
@@ -125,6 +133,46 @@ async function checkTenantServiceDatabaseBoundaries() {
         `${relative} performs a direct PrismaService query instead of using its resolved db client`,
       );
     }
+
+    if (
+      /resolveTenantDatabase\s*\(\s*this\.tenantDb\s*,\s*this\.prisma\s*\)/s.test(
+        source,
+      )
+    ) {
+      violations.push(
+        `${relative} uses a legacy database fallback without an explicit reason`,
+      );
+    }
+  }
+}
+
+async function checkWorkerDatabaseBoundaries() {
+  const featureRoot = resolve(root, 'src/features');
+  const files = [];
+
+  async function walk(directory) {
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      const path = resolve(directory, entry.name);
+      if (entry.isDirectory()) {
+        await walk(path);
+      } else if (
+        entry.isFile() &&
+        (entry.name.endsWith('.queue.ts') || entry.name.endsWith('.processor.ts')) &&
+        !entry.name.endsWith('.spec.ts')
+      ) {
+        files.push(path);
+      }
+    }
+  }
+
+  await walk(featureRoot);
+  for (const file of files) {
+    const source = withoutComments(await readFile(file, 'utf8'));
+    if (/this\.prisma\.(?!poolMetrics\b)[A-Za-z_$][\w$]*/.test(source)) {
+      violations.push(
+        `${file.replace(`${root}/`, '')} performs a direct PrismaService query from a queue/processor`,
+      );
+    }
   }
 }
 
@@ -151,6 +199,36 @@ async function checkTenantAdminControllerGuards() {
         );
       }
     }
+  }
+}
+
+function checkProductionTenantEdgeContract() {
+  const requiredEntries = [
+    'PLATFORM_PUBLIC_DOMAIN: ${PLATFORM_PUBLIC_DOMAIN:?',
+    'TENANT_TRUSTED_PROXY_CIDRS: ${TENANT_TRUSTED_PROXY_CIDRS:?',
+    'CUSTOMER_WEB_TRUSTED_PROXY: ${CUSTOMER_WEB_TRUSTED_PROXY:?',
+  ];
+  for (const entry of requiredEntries) {
+    if (!productionCompose.includes(entry)) {
+      violations.push(
+        `docker-compose.production.yml must require ${entry.split(':', 1)[0]} explicitly`,
+      );
+    }
+  }
+}
+
+function checkTenantContextManifest() {
+  try {
+    const manifest = JSON.parse(tenantContextManifest);
+    const entryCount = Object.values(manifest).reduce(
+      (count, entries) => count + (Array.isArray(entries) ? entries.length : 0),
+      0,
+    );
+    if (entryCount < 10) {
+      violations.push('tenant context manifest must inventory at least 10 entry points');
+    }
+  } catch {
+    violations.push('tenant context boundary manifest must be valid JSON');
   }
 }
 
@@ -198,7 +276,10 @@ if (
 checkPlatformModelClassification();
 await checkTenantTransactionEntryPoints();
 await checkTenantServiceDatabaseBoundaries();
+await checkWorkerDatabaseBoundaries();
 await checkTenantAdminControllerGuards();
+checkProductionTenantEdgeContract();
+checkTenantContextManifest();
 
 try {
   await access(resolve(root, '..', 'docker-compose.production.yml'));

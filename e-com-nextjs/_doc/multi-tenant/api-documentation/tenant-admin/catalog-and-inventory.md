@@ -20,15 +20,22 @@ settings controller (hero showcase type)
 |---|---|---|---|
 | 1 | GET/POST | `/admin/catalog/categories` | List/create |
 | 2 | PATCH/DELETE | `/admin/catalog/categories/:id` | Update/remove |
-| 3 | GET/POST | `/admin/catalog/brands` · `/admin/catalog/brands/:id` | Brand CRUD (slug uniqueness is tenant-local) |
+| 3 | GET/POST | `/admin/catalog/brands` | List/create brands (slug uniqueness is tenant-local) |
+| 4 | PATCH/DELETE | `/admin/catalog/brands/:id` | Update/remove a brand |
 
 ## Inventory (single warehouse)
 | # | Method | Endpoint | Purpose |
 |---|---|---|---|
-| 1 | GET | `/admin/catalog/inventory?lowStock=` | On-hand/reserved/damaged per variant + low-stock flags |
+| 1 | GET | `/admin/catalog/inventory?page=&limit=&search=&lowStock=` | Paginated on-hand/reserved/damaged per variant + low-stock flags |
 | 2 | PATCH | `/admin/catalog/inventory/:variantId` `{ quantityDelta, adjustmentReason, reason }` | Manual adjustment; every change writes an immutable movement (FR-INV-004) |
 
 ## Hero Showcase
 | # | Method | Endpoint | Purpose |
 |---|---|---|---|
-| 1 | GET `/settings?type=…` (public read) · admin CRUD via `/settings` POST + `/settings/all` + `/settings/paginate[v2]` | Tenant-local settings documents incl. hero showcase type; Redis cache keys are org-scoped |
+| 1 | GET | `/settings?type=heroShowcase` | Public tenant-local hero settings read |
+| 2 | POST | `/settings?type=heroShowcase` `{ type, details }` | Admin create/update of the hero settings document |
+| 3 | GET | `/settings/all` or `/settings/paginate[v2]` | Admin settings inventory with offset/cursor pagination |
+| 4 | DELETE | `/settings?type=heroShowcase` | Admin remove the hero settings document |
+
+Settings are tenant-local and cache keys are organization-scoped. The
+customer storefront uses the public `GET /settings?type=heroShowcase` contract.

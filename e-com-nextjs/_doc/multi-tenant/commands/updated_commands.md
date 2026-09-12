@@ -7,6 +7,7 @@ Important:
 - This repo does **not** expose a single pnpm workspace root.
 - Run commands from the app directory you are working in.
 - Do **not** modify `_doc/commands/_.md`; this file is the replacement runbook for the multi-tenant stack.
+- For the complete senior development, database, Docker, and test command reference, see [senior-development-and-operations-commands.md](senior-development-and-operations-commands.md).
 
 ---
 

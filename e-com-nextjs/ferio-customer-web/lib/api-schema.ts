@@ -2268,6 +2268,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/storage/finalize-put": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["StorageController_finalizePut"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/checkout/delivery-options": {
         parameters: {
             query?: never;
@@ -4865,6 +4881,7 @@ export interface components {
         SaveCartDto: Record<string, never>;
         ReorderDto: Record<string, never>;
         PresignPutDto: Record<string, never>;
+        FinalizePutDto: Record<string, never>;
         CheckoutPreviewDto: Record<string, never>;
         CreateDeliveryZoneDto: Record<string, never>;
         UpdateDeliveryZoneDto: Record<string, never>;
@@ -8160,6 +8177,27 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["PresignPutDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    StorageController_finalizePut: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FinalizePutDto"];
             };
         };
         responses: {

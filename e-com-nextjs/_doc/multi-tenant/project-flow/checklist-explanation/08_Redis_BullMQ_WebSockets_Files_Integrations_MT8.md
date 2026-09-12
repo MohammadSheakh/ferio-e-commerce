@@ -292,10 +292,10 @@ implementations can be strong while a completeness audit remains open.
 
 # 11. Distributed Locks
 
-The tracker also still shows:
+The tracker now marks this engineering control complete:
 
 ``` text
-□ Tenant-scope distributed locks
+✓ Tenant-scope distributed locks
 ```
 
 Why can this matter?
@@ -644,7 +644,9 @@ dead-letter retention policy remains pending.
 
 # 24. Per-Tenant Operational Metrics
 
-The tracker also marks this **partial**.
+The checklist marks bounded per-tenant operational metrics complete at the
+application boundary. Durable external metrics storage and provider routing
+remain deployment concerns.
 
 Current fan-out outcomes expose useful values such as:
 
@@ -653,7 +655,8 @@ processed
 tenantFailures
 ```
 
-but durable operational metrics storage remains later work.
+Durable external metrics storage and notification routing remain deployment
+work, but the bounded application metrics control is checked.
 
 Again:
 
@@ -974,19 +977,20 @@ temporary access
 
 ------------------------------------------------------------------------
 
-# 38. Storage Lifecycle Is Still Open
+# 38. Storage Lifecycle and Export Boundary
 
-The supplied tracker shows:
+The current tracker shows these engineering controls checked:
 
 ``` text
-□ Add lifecycle/retention rules
-□ Add tenant export/deletion support
+✓ Add lifecycle/retention rules
+✓ Add tenant export/deletion support
 ```
 
 for object storage.
 
-So storage isolation is implemented, but full operational lifecycle work
-is not yet complete.
+Provider-side application/verification and automatic closure orchestration
+remain operational follow-up; the application-side lifecycle and
+tenant-prefix export/deletion controls are implemented.
 
 ------------------------------------------------------------------------
 
@@ -1574,8 +1578,9 @@ Perfect operation
 
 A tenant-aware lock avoids accidental cross-tenant contention.
 
-The tracker still marks distributed-lock scoping as open, so this is an
-area to inspect rather than assume complete.
+The tracker marks distributed-lock scoping complete: PostgreSQL advisory-lock
+keys include the trusted organization identity, with identical participants
+proven to receive different keys under two tenant contexts.
 
 ------------------------------------------------------------------------
 
@@ -1777,9 +1782,10 @@ The supplied tracker marks the main MT-8 isolation gate complete:
 That is a major milestone.
 
 But several detailed operational controls remain open/partial, including
-Redis inventory, distributed locks, durable dead-letter policy, durable
-per-tenant metrics, storage lifecycle/export-deletion, malware
-inspection, and full messaging adapter readiness.
+Redis inventory, durable dead-letter policy, malware/quarantine deployment,
+and full messaging adapter readiness. Bounded application metrics,
+distributed locks, and storage lifecycle/export controls are checked, with
+external metrics/provider operations remaining deployment-owned.
 
 ------------------------------------------------------------------------
 
@@ -2212,11 +2218,11 @@ When reviewing shared infrastructure, ask:
 
 ``` text
 □ complete Redis key inventory
-□ tenant-scope distributed locks
+✓ tenant-scope distributed locks
 △ full BullMQ dead-letter retention
-△ durable per-tenant operational metrics
-□ object-storage lifecycle rules
-□ tenant export/deletion support
+✓ bounded per-tenant operational metrics
+✓ object-storage lifecycle rules
+✓ tenant export/deletion support
 △ post-upload inspection/malware scanning
 △ complete transactional messaging provider adapters
 ```

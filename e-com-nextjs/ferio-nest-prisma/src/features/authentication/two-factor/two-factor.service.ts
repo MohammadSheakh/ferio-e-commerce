@@ -31,7 +31,7 @@ export class TwoFactorService {
   ) {}
 
   private async db(): Promise<PrismaClient> {
-    return resolveTenantDatabase(this.tenantDb, this.prisma);
+    return resolveTenantDatabase(this.tenantDb, this.prisma, 'two-factor-service');
   }
 
   async status(userId: string) {

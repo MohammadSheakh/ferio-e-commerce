@@ -52,6 +52,7 @@ interface FakeSubscription {
     displayName: string;
     entitlements: FakeEntitlement[];
   };
+  entitlementOverrides: [];
 }
 
 function serverConfig() {
@@ -98,6 +99,7 @@ function fakePlatform() {
         { featureKey: 'products_max', enabled: true, limit: 500 },
       ],
     },
+    entitlementOverrides: [],
   };
   const counters = new Map<string, bigint>();
   const keyOf = (w: {
@@ -115,6 +117,7 @@ function fakePlatform() {
                 (entitlement) => ({ ...entitlement }),
               ),
             },
+            entitlementOverrides: [...subscription.entitlementOverrides],
           }),
         ),
       },
@@ -246,9 +249,9 @@ conditionalDescribe(
           configStub as never,
           {} as never,
           notificationsStub as never,
-          tenantDb,
           entitlements,
           usage,
+          tenantDb,
         );
 
         // Published product + finite stock + Dhaka delivery zone.

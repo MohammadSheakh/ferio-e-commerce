@@ -56,8 +56,9 @@ export const fallbackStoreConfig: PublicStoreConfig = {
   categorySideNavEnabled: true,
 };
 
-export function getStoreConfig() {
+export function getStoreConfig(init?: RequestInit) {
   return getPublicApi<PublicStoreConfig>("/store/config", {
+    ...init,
     cache: "no-store",
   });
 }

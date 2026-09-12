@@ -2,9 +2,11 @@ import { NextResponse } from "next/server";
 import { adminApi } from "@/lib/admin-api";
 import { adminApiErrorResponse } from "@/lib/bff-response";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const stores = await adminApi("/admin/store-locations");
+    const stores = await adminApi(
+      `/admin/store-locations${new URL(request.url).search}`,
+    );
     return NextResponse.json(stores);
   } catch (error) {
     return adminApiErrorResponse(error, "Unable to load store locations.");

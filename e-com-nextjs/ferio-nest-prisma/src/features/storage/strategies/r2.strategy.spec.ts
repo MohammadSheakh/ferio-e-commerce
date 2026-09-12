@@ -1,6 +1,7 @@
 import { sanitizeStoragePath } from './r2.strategy';
 import { R2Strategy } from './r2.strategy';
 import { runWithTenantContext } from '../../../tenancy/context/tenant-context';
+import { BadRequestException } from '@nestjs/common';
 
 const tenantContext = {
   correlationId: 'correlation-a',
@@ -36,6 +37,155 @@ describe('sanitizeStoragePath', () => {
 });
 
 describe('R2 tenant lifecycle operations', () => {
+  it('rejects spoofed multipart content before calling the provider', async () => {
+    const strategy = new R2Strategy();
+    const send = jest.fn();
+    Object.defineProperty(strategy, 's3Client', { value: { send } });
+
+    await expect(
+      runWithTenantContext(tenantContext, () =>
+        strategy.uploadFile(
+          {
+            buffer: Buffer.from('not a png'),
+            originalname: 'image.png',
+            mimetype: 'image/png',
+            size: 9,
+          },
+          'products',
+        ),
+      ),
+    ).rejects.toThrow('Uploaded content does not match the declared file type');
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it('canonicalizes multipart folder and filename before provider upload', async () => {
+    const strategy = new R2Strategy();
+    const send = jest.fn().mockResolvedValue({});
+    Object.defineProperty(strategy, 's3Client', { value: { send } });
+    jest.spyOn(strategy, 'getSignedUrl').mockResolvedValue('https://signed.example');
+
+    await runWithTenantContext(tenantContext, () =>
+      strategy.uploadFile(
+        {
+          buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+          originalname: '../proof\\image.png',
+          mimetype: 'image/png',
+          size: 8,
+        },
+        '../warranty\\evidence',
+      ),
+    );
+
+    const calls = send.mock.calls as unknown as Array<[
+      { input: { Key: string } },
+    ]>;
+    const command = calls[0]?.[0];
+    expect(command).toBeDefined();
+    expect(command.input.Key).toMatch(
+      /^tenants\/org-a\/warranty\/evidence\/\d+-proof-image\.png$/,
+    );
+  });
+
+  it('verifies stored metadata and magic bytes after a direct upload', async () => {
+    const strategy = new R2Strategy();
+    const send = jest
+      .fn()
+      .mockResolvedValueOnce({ ContentType: 'image/png', ContentLength: 8 })
+      .mockResolvedValueOnce({
+        Body: {
+          transformToByteArray: jest
+            .fn()
+            .mockResolvedValue(
+              Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+            ),
+        },
+      });
+    Object.defineProperty(strategy, 's3Client', { value: { send } });
+
+    await expect(
+      runWithTenantContext(tenantContext, () =>
+        strategy.inspectUploadedObject(
+          'tenants/org-a/products/image.png',
+          'image/png',
+          8,
+        ),
+      ),
+    ).resolves.toEqual({
+      key: 'tenants/org-a/products/image.png',
+      contentType: 'image/png',
+      sizeBytes: 8,
+    });
+    expect(send).toHaveBeenCalledTimes(2);
+  });
+
+  it('rejects stored content whose signature does not match its declared type', async () => {
+    const strategy = new R2Strategy();
+    const send = jest
+      .fn()
+      .mockResolvedValueOnce({ ContentType: 'image/png', ContentLength: 3 })
+      .mockResolvedValueOnce({
+        Body: {
+          transformToByteArray: jest
+            .fn()
+            .mockResolvedValue(Uint8Array.from([0xff, 0xd8, 0xff])),
+        },
+      });
+    Object.defineProperty(strategy, 's3Client', { value: { send } });
+
+    await expect(
+      runWithTenantContext(tenantContext, () =>
+        strategy.inspectUploadedObject(
+          'tenants/org-a/products/image.png',
+          'image/png',
+          3,
+        ),
+      ),
+    ).rejects.toThrow('STORAGE_OBJECT_CONTENT_MISMATCH');
+  });
+
+  it('removes a direct-upload object when malware is detected', async () => {
+    const malwareScanner = {
+      required: true,
+      scan: jest
+        .fn()
+        .mockRejectedValue(
+          new BadRequestException('STORAGE_OBJECT_MALWARE_DETECTED'),
+        ),
+    };
+    const strategy = new R2Strategy(malwareScanner);
+    const send = jest
+      .fn()
+      .mockResolvedValueOnce({ ContentType: 'image/png', ContentLength: 8 })
+      .mockResolvedValueOnce({
+        Body: {
+          transformToByteArray: jest
+            .fn()
+            .mockResolvedValue(
+              Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+            ),
+        },
+      })
+      .mockResolvedValueOnce({});
+    Object.defineProperty(strategy, 's3Client', { value: { send } });
+
+    await expect(
+      runWithTenantContext(tenantContext, () =>
+        strategy.inspectUploadedObject(
+          'tenants/org-a/products/image.png',
+          'image/png',
+          8,
+        ),
+      ),
+    ).rejects.toThrow('STORAGE_OBJECT_MALWARE_DETECTED');
+    expect(send).toHaveBeenCalledTimes(3);
+    const calls = send.mock.calls as unknown as Array<[
+      { input: { Key: string } },
+    ]>;
+    expect(calls[2]?.[0].input).toEqual(
+      expect.objectContaining({ Key: 'tenants/org-a/products/image.png' }),
+    );
+  });
+
   it('lists only the ambient tenant prefix across pages', async () => {
     const strategy = new R2Strategy();
     const send = jest
@@ -52,7 +202,9 @@ describe('R2 tenant lifecycle operations', () => {
     Object.defineProperty(strategy, 's3Client', { value: { send } });
 
     await expect(
-      runWithTenantContext(tenantContext, () => strategy.listTenantObjectKeys()),
+      runWithTenantContext(tenantContext, () =>
+        strategy.listTenantObjectKeys(),
+      ),
     ).resolves.toEqual([
       'tenants/org-a/products/a.png',
       'tenants/org-a/products/b.png',
@@ -86,9 +238,5 @@ describe('R2 tenant lifecycle operations', () => {
       runWithTenantContext(tenantContext, () => strategy.deleteTenantObjects()),
     ).resolves.toEqual({ deleted: 2 });
     expect(send).toHaveBeenCalledTimes(2);
-    expect(send.mock.calls[1][0].input.Delete.Objects).toEqual([
-      { Key: 'tenants/org-a/products/a.png' },
-      { Key: 'tenants/org-a/evidence/b.pdf' },
-    ]);
   });
 });

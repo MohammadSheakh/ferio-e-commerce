@@ -15,22 +15,27 @@ export function CreateOrganizationForm() {
     setWorking(true);
     setMessage("");
     const form = new FormData(event.currentTarget);
-    const response = await fetch("/api/platform/organizations", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name: form.get("name"),
-        slug: form.get("slug"),
-        ownerEmail: form.get("ownerEmail"),
-      }),
-    });
-    const data = await readJsonRecord(response);
-    setWorking(false);
-    if (response.ok) {
-      setMessage(`Created. Next: run provisioning for ${responseDataString(data, "slug")}.`);
-      window.location.reload();
-    } else {
-      setMessage(responseMessage(data, "Creation failed."));
+    try {
+      const response = await fetch("/api/platform/organizations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: form.get("name"),
+          slug: form.get("slug"),
+          ownerEmail: form.get("ownerEmail"),
+        }),
+      });
+      const data = await readJsonRecord(response);
+      if (response.ok) {
+        setMessage(`Created. Next: run provisioning for ${responseDataString(data, "slug")}.`);
+        window.location.reload();
+      } else {
+        setMessage(responseMessage(data, "Creation failed."));
+      }
+    } catch {
+      setMessage("Creation failed: control plane unavailable.");
+    } finally {
+      setWorking(false);
     }
   }
 

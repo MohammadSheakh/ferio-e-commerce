@@ -48,3 +48,17 @@ export async function POST(request: Request) {
     );
   }
 }
+
+export async function DELETE() {
+  try {
+    await adminApi<void>("/settings?type=heroShowcase", {
+      method: "DELETE",
+    });
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    return adminApiErrorResponse(
+      error,
+      "Unable to remove hero showcase settings.",
+    );
+  }
+}

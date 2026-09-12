@@ -34,7 +34,11 @@ export class ProductContentService {
    * fallback outside resolved requests. Never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    return resolveTenantDatabase(this.tenantDb, this.prisma);
+    return resolveTenantDatabase(
+      this.tenantDb,
+      this.prisma,
+      'product-content-service',
+    );
   }
   private videoId(url: string) {
     const parsed = new URL(url);

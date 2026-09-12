@@ -1,15 +1,15 @@
 import type { ConfigService } from '@nestjs/config';
 import { Queue, QueueEvents, Worker } from 'bullmq';
 import type { AuditService } from '../src/features/audit/services/audit.service';
-import type { ShippingPollingService } from '../src/features/shipping/shipping-polling.service';
-import { ShippingPollingProcessor } from '../src/features/shipping/shipping-polling.processor';
+import type { ShippingPollingService } from '../src/features/shipping/services/shipping-polling.service';
+import { ShippingPollingProcessor } from '../src/features/shipping/processors/shipping-polling.processor';
 import {
   COURIER_POLL_JOB,
   COURIER_POLL_SCHEDULER_ID,
   COURIER_POLL_SWEEP_JOB,
   CourierPollJobData,
   ShippingPollingQueue,
-} from '../src/features/shipping/shipping-polling.queue';
+} from '../src/features/shipping/queues/shipping-polling.queue';
 
 const redisPort = Number(process.env.TEST_REDIS_PORT);
 const queuePrefix = process.env.TEST_QUEUE_PREFIX;

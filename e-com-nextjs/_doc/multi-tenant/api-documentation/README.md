@@ -1,7 +1,7 @@
 # Ferio API Documentation — Per Role, Per Screen
 
 Living documentation mapping **every UI screen to the exact API calls** that
-power it. Derived from source code on 2026-08-26 and verified against the
+power it. Derived from source code on 2026-09-11 and verified against the
 backend controller tree (`ferio-nest-prisma/src/features/**`) — 245 routes.
 
 ## Conventions
@@ -13,7 +13,8 @@ backend controller tree (`ferio-nest-prisma/src/features/**`) — 245 routes.
 | Error envelope | `{ "success": false, "message": string \| string[], "code": string, "correlationId": string }` with proper HTTP status |
 | Correlation | Send `x-correlation-id`; it is echoed back and stamped in logs |
 | Auth (storefront/admin) | `Authorization: Bearer <accessJWT>`; refresh via `POST /auth/refresh` cookie flow |
-| Auth (platform) | Separate realm token (`PLATFORM_JWT_SECRET`); staff tokens are rejected by design |
+| Auth (platform) | `POST /platform/auth/login` issues an 8-hour token from the separate `PLATFORM_JWT_SECRET` realm; the Platform Admin BFF stores it in an httpOnly cookie, local sign-out clears that cookie, and tenant staff tokens are rejected by design |
+| Platform BFF errors | Backend status, machine `code`, and `correlationId` are preserved by `/api/platform/[...path]`; platform tokens remain server-side and are never returned to browser JavaScript |
 | Tenant resolution | Server-side only, from the storefront Host (`x-forwarded-host` on server-side fetches). No body/query/header may choose a database. |
 | Admin tenancy gate | Tenant-admin controllers add `TenantMembershipGuard` — session email must be an active OWNER/STAFF of the resolved org |
 | Pagination (admin lists) | `{ docs, page, limit, total, totalPages }` |
@@ -40,5 +41,5 @@ backend controller tree (`ferio-nest-prisma/src/features/**`) — 245 routes.
 ## Index
 
 - customer-storefront/: discovery-and-product · cart · checkout-and-payment · auth-and-account · account-post-purchase · value-added-services · rider-portal
-- tenant-admin/: dashboard-overview · catalog-and-inventory · orders-and-fulfillment · shipping-and-couriers · customers · payments-wallet-reviews-content · returns-rto-refunds · settlements-reconciliation · reports-exports · chat-support · staff-settings-security
+- tenant-admin/: dashboard-overview · catalog-and-inventory · orders-and-fulfillment · shipping-and-couriers · customers · payments-wallet-reviews-content · returns-rto-refunds · settlements-reconciliation · reports-exports · chat-support · staff-settings-security · analytics-audit-operations
 - platform-admin/: organizations-lifecycle · plans-billing-subscriptions · usage-fleet-migrations · support-access

@@ -66,7 +66,11 @@ export class TransactionalMessagingService {
    * explicitly falls back to the legacy single-tenant DB. Never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    return resolveTenantDatabase(this.tenantDb, this.prisma);
+    return resolveTenantDatabase(
+      this.tenantDb,
+      this.prisma,
+      'transactional-messaging-service',
+    );
   }
   async enqueueAfterCommit(input: EnqueueCommerceMessageInput): Promise<void> {
     const db = await this.db();

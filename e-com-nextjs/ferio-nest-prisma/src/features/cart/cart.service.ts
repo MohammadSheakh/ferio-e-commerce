@@ -116,7 +116,7 @@ export class CartService {
    * requests the legacy single-tenant DB applies, unchanged.
    */
   private async db(): Promise<PrismaClient> {
-    return resolveTenantDatabase(this.tenantDb, this.prisma);
+    return resolveTenantDatabase(this.tenantDb, this.prisma, 'cart-service');
   }
 
   private tokenHash(token: string): string {

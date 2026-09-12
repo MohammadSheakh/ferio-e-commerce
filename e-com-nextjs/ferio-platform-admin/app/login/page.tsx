@@ -11,21 +11,26 @@ export default function LoginPage() {
     setWorking(true);
     setError("");
     const form = new FormData(event.currentTarget);
-    const response = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: form.get("email"),
-        password: form.get("password"),
-      }),
-    });
-    if (response.ok) {
-      window.location.assign("/");
-      return;
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: form.get("email"),
+          password: form.get("password"),
+        }),
+      });
+      if (response.ok) {
+        window.location.assign("/");
+        return;
+      }
+      const data = await readJsonRecord(response);
+      setError(responseMessage(data, "Platform sign-in failed."));
+    } catch {
+      setError("Platform sign-in failed: control plane unavailable.");
+    } finally {
+      setWorking(false);
     }
-    const data = await readJsonRecord(response);
-    setError(responseMessage(data, "Platform sign-in failed."));
-    setWorking(false);
   }
 
   return (

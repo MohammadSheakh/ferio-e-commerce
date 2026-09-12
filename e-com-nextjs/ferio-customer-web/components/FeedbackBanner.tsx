@@ -57,6 +57,11 @@ export default function FeedbackBanner() {
     const finalPhone = isAnonymous ? undefined : phone.trim() || undefined;
 
     const formattedProductName = `[FEEDBACK: ${typeLabelMap[type]}]\n\n[Additional Details]:\n${message.trim()}`;
+    if (formattedProductName.length > 500) {
+      setErrorMsg("Please keep feedback within 500 characters.");
+      setSubmitting(false);
+      return;
+    }
 
     try {
       const res = await fetch("/api/product-requests", {
@@ -213,6 +218,7 @@ export default function FeedbackBanner() {
                   <textarea
                     required
                     rows={4}
+                    maxLength={500}
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
                     placeholder="Write your suggestions, feedback, or well wishes here... (আপনার পরামর্শ, মতামত বা বার্তা লিখুন)"

@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { randomBytes } from 'crypto';
-import { PlatformPrismaService } from '../platform-prisma.service';
+import { createHash, randomBytes } from 'crypto';
 import { Pool } from 'pg';
 import {
   TenantDatabaseProvisioner,
@@ -16,11 +15,6 @@ import {
  */
 @Injectable()
 export class LocalPostgresProvisioner extends TenantDatabaseProvisioner {
-  constructor(platform: PlatformPrismaService) {
-    super();
-    void platform;
-  }
-
   async createTenantDatabase(params: {
     organizationId: string;
     slug: string;
@@ -32,7 +26,7 @@ export class LocalPostgresProvisioner extends TenantDatabaseProvisioner {
       2,
     ).toString('hex')}`;
     const dbPassword = randomBytes(18).toString('base64url');
-    const roleName = `tenant_${params.organizationId.slice(-8)}`;
+    const roleName = tenantRoleName(params.organizationId);
 
     const adminUrl = new URL(url);
     adminUrl.pathname = '/postgres';
@@ -41,21 +35,40 @@ export class LocalPostgresProvisioner extends TenantDatabaseProvisioner {
       max: 1,
     });
     try {
-      const quotedName = `"${dbName.replace(/"/g, '')}"`;
+      const quotedName = quoteIdentifier(dbName);
+      const quotedRole = quoteIdentifier(roleName);
+      const passwordLiteral = quoteLiteral(dbPassword);
       await pool.query(`CREATE DATABASE ${quotedName}`);
-      await pool
-        .query(
-          `CREATE ROLE "${roleName}" LOGIN PASSWORD '${dbPassword.replace(/'/g, "''")}'`,
-        )
-        .catch(async () => {
-          // Role may already exist from a prior partial run — grant instead.
-          await pool.query(
-            `GRANT ALL PRIVILEGES ON DATABASE ${quotedName} TO "${roleName}"`,
-          );
-        });
+      try {
+        await pool.query(
+          `CREATE ROLE ${quotedRole} LOGIN PASSWORD ${passwordLiteral}`,
+        );
+      } catch (error: unknown) {
+        if (!isDuplicateObjectError(error)) throw error;
+        // A prior partial run may have created the role. Reconcile its
+        // password instead of returning credentials that do not work.
+      }
+      await pool.query(`ALTER ROLE ${quotedRole} PASSWORD ${passwordLiteral}`);
       await pool.query(
-        `GRANT ALL PRIVILEGES ON DATABASE ${quotedName} TO "${roleName}"`,
+        `GRANT ALL PRIVILEGES ON DATABASE ${quotedName} TO ${quotedRole}`,
       );
+
+      // PostgreSQL 15+ may revoke CREATE on the public schema from ordinary
+      // database roles. Migrations run as the tenant role, so grant only the
+      // schema privileges required to bootstrap that tenant database.
+      const tenantUrl = new URL(url);
+      tenantUrl.pathname = `/${dbName}`;
+      const tenantPool = new Pool({
+        connectionString: tenantUrl.toString(),
+        max: 1,
+      });
+      try {
+        await tenantPool.query(
+          `GRANT USAGE, CREATE ON SCHEMA public TO ${quotedRole}`,
+        );
+      } finally {
+        await tenantPool.end().catch(() => undefined);
+      }
     } finally {
       await pool.end().catch(() => undefined);
     }
@@ -68,4 +81,29 @@ export class LocalPostgresProvisioner extends TenantDatabaseProvisioner {
       password: dbPassword,
     };
   }
+}
+
+function quoteIdentifier(identifier: string): string {
+  return `"${identifier.replace(/"/g, '""')}"`;
+}
+
+function quoteLiteral(value: string): string {
+  return `'${value.replace(/'/g, "''")}'`;
+}
+
+function isDuplicateObjectError(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    error.code === '42710'
+  );
+}
+
+function tenantRoleName(organizationId: string): string {
+  const suffix = createHash('sha256')
+    .update(organizationId)
+    .digest('hex')
+    .slice(0, 24);
+  return `tenant_${suffix}`;
 }

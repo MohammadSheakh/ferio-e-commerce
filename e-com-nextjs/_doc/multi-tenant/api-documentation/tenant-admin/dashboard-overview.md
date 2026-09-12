@@ -11,7 +11,7 @@ under `AuthGuard → RolesGuard(admin) → PermissionsGuard → TenantMembership
 
 | # | Method | Endpoint | Purpose |
 |---|---|---|---|
-| 1 | GET | `/admin/reports/overview?from&to&source&provider` | Placed→delivered funnel, revenue, finance/COD variance, ops counters |
+| 1 | GET | `/admin/reports/overview?dateFrom&dateTo&source&provider` | Placed→delivered funnel, revenue, finance/COD variance, ops counters |
 | 2 | GET | `/admin/operations/health` | Queue/system health tiles |
 | 3 | GET | `/admin/reconciliation/queue-health` | Reconciliation sweep backlog |
 | 4 | GET | `/admin/payments/recovery/queue-health` | Prepaid recovery backlog |

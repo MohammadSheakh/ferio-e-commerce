@@ -1,7 +1,8 @@
 # Tenant Admin — Payments, Wallet, Reviews & Messaging
 
-**Frontend:** `app/payments`, `app/wallet`, `app/reviews`, `app/messages`,
-`app/requested-products`, `app/feedback`, `app/stores`
+**Frontend:** `app/dashboard/payments/page.tsx`, `app/dashboard/wallet/page.tsx`,
+`app/dashboard/reviews/page.tsx`, `app/dashboard/messages/page.tsx`,
+`app/dashboard/stores/page.tsx`, and the corresponding `components/*`/BFF routes
 **Verified against:** commerce-payments, admin/wallet, product-content,
 transactional-messages, store-locations controllers
 
@@ -11,32 +12,60 @@ transactional-messages, store-locations controllers
 | # | Method | Endpoint | Purpose |
 |---|---|---|---|
 | 1 | GET | `/admin/payments/attempts?status=&provider=` | Attempt ledger incl. provider reference |
-| 2 | GET/PATCH | `/admin/payments/attempts/:id` | Detail / restricted manual status change (reason+audit) |
+| 2 | GET | `/admin/payments/attempts/:id` | Attempt detail and evidence (read-only) |
 | 3 | GET | `/admin/payments/providers` | Configured prepaid providers |
-| 4 | POST | `/admin/payments/recovery/sweep` `{ dryRun? }` | Expiry/recovery sweep now |
-| 5 | GET | `/admin/payments/recovery/queue-health` | Recovery backlog |
+| 4 | PUT | `/admin/payments/providers/:provider` | Store provider credentials/configuration |
+| 5 | DELETE | `/admin/payments/providers/:provider` | Revoke provider credentials/configuration |
+| 6 | POST | `/admin/payments/recovery/sweep` | Queue expiry/recovery sweep |
+| 7 | GET | `/admin/payments/recovery/queue-health` | Recovery backlog |
+
+Payment provider credential PUT/DELETE routes are intentionally not exposed as
+browser forms. Provider readiness is read by the dashboard, while secret
+provisioning and revocation remain in the operator-controlled path.
 
 ## Wallet review desk
 | # | Method | Endpoint | Purpose |
 |---|---|---|---|
 | 1 | GET | `/admin/wallet/top-ups?status=PENDING_REVIEW` | Evidence queue |
-| 2 | POST | `/admin/wallet/top-ups/:id/review` `{ status: COMPLETED\|REJECTED, reviewNote }` | Atomic credit + immutable ledger entry; replay-safe |
+| 2 | PATCH | `/admin/wallet/top-ups/:id` `{ status: COMPLETED\|REJECTED, reviewNote }` | Atomic credit + immutable ledger entry; replay-safe |
 
 ## Reviews / banners moderation + requests + feedback
 | # | Method | Endpoint | Purpose |
 |---|---|---|---|
-| 1 | GET | `/admin/product-content/reviews?status=PENDING` | YouTube review moderation queue |
+| 1 | GET | `/admin/product-content/reviews` | YouTube review moderation queue; the current controller returns the full tenant-scoped queue and does not accept a `status` filter |
 | 2 | PATCH | `/admin/product-content/reviews/:id` `{ status }` | Approve/reject (feeds PDP) |
-| 3 | GET/POST/PATCH/DELETE | `/admin/product-content/products/:productId/banners[/:id]` | Review banner CRUD (sort order) |
-| 4 | GET | `/admin/requested-products` … (product-request admin) | Requested products queue |
+| 3 | GET/POST | `/admin/product-content/products/:productId/banners` | Read/create review banners (sort order) |
+| 4 | PATCH/DELETE | `/admin/product-content/banners/:id` | Update/delete a review banner |
+| 5 | GET | `/product-requests?status=&search=&page=&limit=` | Tenant-admin requested-products queue; the backend controller is guarded admin access but is not mounted under `/admin` |
+| 6 | PATCH | `/product-requests/:id/status` `{ status?, notes? }` | Update requested-product status |
+| 7 | DELETE | `/product-requests/:id` | Delete a requested-product record |
 
 ## Transactional messaging ops
 | # | Method | Endpoint | Purpose |
 |---|---|---|---|
-| 1 | GET | `/admin/transactional-messages/templates` | Template registry (per tenant) |
-| 2 | GET | `/admin/transactional-messages/queue-health` | Outbox backlog evidence |
+| 1 | GET | `/admin/transactional-messages?page=&limit=&status=&eventType=&search=` | Tenant-scoped message outbox |
+| 2 | GET | `/admin/transactional-messages/templates` | Template registry (per tenant) |
+| 3 | PATCH | `/admin/transactional-messages/templates/:key` `{ subject?, body?, enabled? }` | Update a message template |
+| 4 | GET | `/admin/transactional-messages/providers` | Configured SMS/WhatsApp/email provider state; secrets are never returned |
+| 5 | PATCH | `/admin/transactional-messages/providers/:channel` | Operator-controlled provider credential/configuration update; not a browser form |
+| 6 | GET/PATCH | `/admin/transactional-messages/policy` | Read/update tenant messaging policy |
+| 7 | GET | `/admin/transactional-messages/queue-health` | Outbox backlog evidence |
+| 8 | POST | `/admin/transactional-messages/:id/retry` | Retry a failed message with audit/permission checks |
+
+The messages dashboard integrates outbox, queue health, templates, provider
+readiness, policy read/update, and retry. Provider PATCH remains outside the
+browser because its DTO accepts credentials; the dashboard exposes only the
+non-secret provider state and routing policy.
 
 ## Store outlets
 | # | Method | Endpoint | Purpose |
 |---|---|---|---|
-| 1 | GET/POST/PATCH/DELETE | `/admin/store-locations[...]` | Outlet CRUD feeding pickup availability |
+| 1 | GET | `/admin/store-locations?page=&limit=&search=` | Paginated tenant-scoped outlet/warehouse list |
+| 2 | POST | `/admin/store-locations` | Create an outlet |
+| 3 | PATCH | `/admin/store-locations/:id` | Update outlet details or active state |
+| 4 | DELETE | `/admin/store-locations/:id` | Delete an outlet |
+
+The stores dashboard forwards the pagination/search query to the admin API.
+Customer checkout separately calls `GET /store-locations` and
+`POST /store-locations/check-availability` through its BFF; the latter checks
+the selected outlet against the cart variant IDs before pickup placement.

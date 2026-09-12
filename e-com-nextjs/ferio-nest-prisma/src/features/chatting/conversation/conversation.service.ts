@@ -50,7 +50,11 @@ export class ConversationService {
    * database client; outside one it explicitly falls back to the legacy DB.
    */
   private async db(): Promise<PrismaClient> {
-    return resolveTenantDatabase(this.tenantDb, this.prisma);
+    return resolveTenantDatabase(
+      this.tenantDb,
+      this.prisma,
+      'chat-conversation-service',
+    );
   }
   /**
    * Create Conversation

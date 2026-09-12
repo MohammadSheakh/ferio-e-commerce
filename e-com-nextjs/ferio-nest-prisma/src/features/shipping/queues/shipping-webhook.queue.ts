@@ -65,7 +65,8 @@ export class ShippingWebhookQueue implements OnModuleInit {
   }
 
   async health() {
-    const recoverableCount = await this.prisma.shipmentWebhookLog.count({
+    const client = await this.databaseForRequest();
+    const recoverableCount = await client.shipmentWebhookLog.count({
       where: this.recoverableWhere(),
     });
     try {

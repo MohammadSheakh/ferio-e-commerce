@@ -194,7 +194,10 @@ async function bootstrap() {
       writeFileSync(outputPath, JSON.stringify(document, null, 2));
       logger.log(`📦 ${outputPath} exported (no server started)`);
       await app.close();
-      return;
+      // This is a one-shot CLI process. Some queue-owned Redis sockets are
+      // outside Nest's lifecycle graph, so exit only after app.close() has
+      // completed instead of leaving contract checks hanging indefinitely.
+      process.exit(0);
     }
   }
 

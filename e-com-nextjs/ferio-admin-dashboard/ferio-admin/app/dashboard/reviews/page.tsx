@@ -17,11 +17,24 @@ type Review = {
   createdAt?: string;
 };
 
+type ReviewBanner = {
+  id: string;
+  imageUrl: string;
+  altText: string | null;
+  sortOrder: number;
+  isActive: boolean;
+};
+
 export default function ReviewsPage() {
   const [items, setItems] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState("");
   const [actionId, setActionId] = useState("");
+  const [bannerProductId, setBannerProductId] = useState("");
+  const [loadedBannerProductId, setLoadedBannerProductId] = useState("");
+  const [banners, setBanners] = useState<ReviewBanner[]>([]);
+  const [bannerLoading, setBannerLoading] = useState(false);
+  const [bannerActionId, setBannerActionId] = useState("");
 
   async function load() {
     setLoading(true);
@@ -113,9 +126,87 @@ export default function ReviewsPage() {
       });
       const p = (await r.json()) as { message?: string };
       setMsg(r.ok ? "Banner added successfully." : p.message || "Unable to add banner.");
-      if (r.ok) e.currentTarget.reset();
+      if (r.ok) {
+        e.currentTarget.reset();
+        if (loadedBannerProductId === productId) await loadBanners(productId);
+      }
     } catch {
       setMsg("Unable to add banner.");
+    }
+  }
+
+  async function loadBanners(productId = bannerProductId) {
+    const normalizedProductId = productId.trim();
+    if (!normalizedProductId) {
+      setMsg("Enter a product ID to load banners.");
+      return;
+    }
+    setBannerLoading(true);
+    setMsg("");
+    try {
+      const response = await fetch(
+        `/api/product-content/products/${encodeURIComponent(normalizedProductId)}/banners`,
+        { cache: "no-store" },
+      );
+      const payload = (await response.json()) as {
+        data?: ReviewBanner[];
+        message?: string;
+      };
+      if (!response.ok || !payload.data) {
+        throw new Error(payload.message || "Unable to load banners.");
+      }
+      setBanners(payload.data);
+      setLoadedBannerProductId(normalizedProductId);
+    } catch (error) {
+      setBanners([]);
+      setLoadedBannerProductId("");
+      setMsg(error instanceof Error ? error.message : "Unable to load banners.");
+    } finally {
+      setBannerLoading(false);
+    }
+  }
+
+  async function updateBanner(banner: ReviewBanner) {
+    setBannerActionId(banner.id);
+    setMsg("");
+    try {
+      const response = await fetch(`/api/product-content/banners/${banner.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imageUrl: banner.imageUrl,
+          altText: banner.altText || undefined,
+          sortOrder: banner.sortOrder,
+          isActive: banner.isActive,
+        }),
+      });
+      const payload = (await response.json()) as { message?: string };
+      if (!response.ok) throw new Error(payload.message || "Unable to update banner.");
+      setMsg("Banner updated successfully.");
+      await loadBanners(loadedBannerProductId);
+    } catch (error) {
+      setMsg(error instanceof Error ? error.message : "Unable to update banner.");
+    } finally {
+      setBannerActionId("");
+    }
+  }
+
+  async function deleteBanner(id: string) {
+    if (!window.confirm("Delete this review banner permanently?")) return;
+    setBannerActionId(id);
+    setMsg("");
+    try {
+      const response = await fetch(`/api/product-content/banners/${id}`, {
+        method: "DELETE",
+      });
+      const payload = (await response.json()) as { message?: string };
+      if (!response.ok) throw new Error(payload.message || "Unable to delete banner.");
+      setMsg("Banner deleted.");
+      await loadBanners(loadedBannerProductId);
+    } catch (error) {
+      setMsg(error instanceof Error ? error.message : "Unable to delete banner.");
+    } finally {
+      setBannerActionId("");
     }
   }
 
@@ -137,6 +228,125 @@ export default function ReviewsPage() {
               Add banner
             </button>
           </form>
+        </div>
+
+        <div className="rounded-card border border-line bg-white p-5 shadow-sm space-y-4">
+          <div>
+            <h2 className="text-[15px] font-semibold text-ink">Manage product review banners</h2>
+            <p className="text-[12px] text-ink2">
+              Load one product&apos;s banners to edit activation, ordering, alt text, or remove stale creative.
+            </p>
+          </div>
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              void loadBanners();
+            }}
+            className="flex flex-wrap gap-3"
+          >
+            <input
+              value={bannerProductId}
+              onChange={(event) => setBannerProductId(event.target.value)}
+              required
+              placeholder="Product ID"
+              className="min-w-64 flex-1 rounded-card border border-line px-3 py-2 text-[13px] outline-none focus:border-ink"
+            />
+            <button
+              type="submit"
+              disabled={bannerLoading}
+              className="rounded-full border border-line px-5 py-2 text-[13px] font-medium text-ink disabled:opacity-40"
+            >
+              {bannerLoading ? "Loading…" : "Load banners"}
+            </button>
+          </form>
+          {loadedBannerProductId && !bannerLoading && banners.length === 0 && (
+            <p className="text-[12px] text-ink2">No banners found for this product.</p>
+          )}
+          <div className="space-y-3">
+            {banners.map((banner) => (
+              <div key={banner.id} className="grid gap-3 rounded-card border border-line p-4 md:grid-cols-[1fr_1fr_110px_120px_auto] md:items-end">
+                <label className="text-[10px] text-ink2">
+                  Image URL
+                  <input
+                    value={banner.imageUrl}
+                    onChange={(event) =>
+                      setBanners((current) =>
+                        current.map((item) =>
+                          item.id === banner.id ? { ...item, imageUrl: event.target.value } : item,
+                        ),
+                      )
+                    }
+                    className="mt-1 w-full rounded-card border border-line px-3 py-2 text-[12px]"
+                  />
+                </label>
+                <label className="text-[10px] text-ink2">
+                  Alt text
+                  <input
+                    value={banner.altText ?? ""}
+                    onChange={(event) =>
+                      setBanners((current) =>
+                        current.map((item) =>
+                          item.id === banner.id ? { ...item, altText: event.target.value } : item,
+                        ),
+                      )
+                    }
+                    className="mt-1 w-full rounded-card border border-line px-3 py-2 text-[12px]"
+                  />
+                </label>
+                <label className="text-[10px] text-ink2">
+                  Sort order
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={banner.sortOrder}
+                    onChange={(event) =>
+                      setBanners((current) =>
+                        current.map((item) =>
+                          item.id === banner.id
+                            ? { ...item, sortOrder: Number(event.target.value) }
+                            : item,
+                        ),
+                      )
+                    }
+                    className="mt-1 w-full rounded-card border border-line px-3 py-2 text-[12px]"
+                  />
+                </label>
+                <label className="flex items-center gap-2 pb-2 text-[12px] text-ink2">
+                  <input
+                    type="checkbox"
+                    checked={banner.isActive}
+                    onChange={(event) =>
+                      setBanners((current) =>
+                        current.map((item) =>
+                          item.id === banner.id ? { ...item, isActive: event.target.checked } : item,
+                        ),
+                      )
+                    }
+                  />
+                  Active
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={bannerActionId !== ""}
+                    onClick={() => void updateBanner(banner)}
+                    className="rounded-full bg-ink px-3 py-2 text-[11px] text-white disabled:opacity-40"
+                  >
+                    {bannerActionId === banner.id ? "Saving…" : "Save"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={bannerActionId !== ""}
+                    onClick={() => void deleteBanner(banner.id)}
+                    className="rounded-full border border-line px-3 py-2 text-[11px] text-rose-700 disabled:opacity-40"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
         {msg && (

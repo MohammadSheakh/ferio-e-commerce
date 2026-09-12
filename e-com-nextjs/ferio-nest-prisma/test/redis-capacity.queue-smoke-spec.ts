@@ -24,13 +24,27 @@ function boundedEnv(name: string, fallback: number, min: number, max: number) {
 describe('Redis capacity and recovery smoke', () => {
   let redis: Redis;
 
-  beforeAll(async () => {
-    redis = new Redis({
+  const connectRedis = async () => {
+    const client = new Redis({
       host: '127.0.0.1',
       port: redisPort,
       keyPrefix: `${keyPrefix}:`,
       maxRetriesPerRequest: 3,
       enableOfflineQueue: false,
+    });
+    await new Promise<void>((resolve, reject) => {
+      client.once('ready', resolve);
+      client.once('error', reject);
+    });
+    return client;
+  };
+
+  beforeAll(async () => {
+    redis = await connectRedis();
+    await new Promise<void>((resolve, reject) => {
+      if (redis.status === 'ready') return resolve();
+      redis.once('ready', resolve);
+      redis.once('error', reject);
     });
     await redis.ping();
   });
@@ -63,7 +77,7 @@ describe('Redis capacity and recovery smoke', () => {
     expect(sample).toEqual(['0', String(commandCount - 1)]);
 
     redis.disconnect();
-    await redis.connect();
+    redis = await connectRedis();
     expect(await redis.ping()).toBe('PONG');
     await redis.set('recovery-check', 'ok', 'EX', 60);
     expect(await redis.get('recovery-check')).toBe('ok');

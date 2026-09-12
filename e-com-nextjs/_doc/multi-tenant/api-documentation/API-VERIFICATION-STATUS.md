@@ -1,6 +1,6 @@
 # API Verification Status
 
-**Date of verification:** August 26, 2026
+**Date of verification:** September 11, 2026
 **Method:** Every endpoint table in this folder was derived from the NestJS
 controller tree (`src/features/**/*.controller.ts`, 245 routes) and
 cross-checked against the actual frontend call sites in
@@ -16,12 +16,13 @@ cross-checked against the actual frontend call sites in
 | customer-storefront/cart.md | Add/edit/remove, validate, save/share/reorder/merge | ✅ verified |
 | customer-storefront/checkout-and-payment.md | Delivery/payment options, preview, COD place (idempotent), prepaid initiate/retry, wallet order, public tracking | ✅ verified |
 | customer-storefront/auth-and-account.md | Register/login/OAuth/refresh, profile link, addresses, history/reorder, notifications, wallet | ✅ verified |
-| customer-storefront/value-added-services.md | Services booking, warranty, product requests, reviews submission, outlets, chat ticket | ✅ verified |
+| customer-storefront/value-added-services.md | Services booking, warranty, product requests, reviews submission, outlets, pickup scheduling, chat ticket | ✅ source verified |
 | customer-storefront/rider-portal.md | Apply, portal home, assigned orders, delivery lifecycle | ✅ verified |
 | tenant-admin/dashboard-overview.md | Reports overview + queue-health tiles + plan usage | ✅ verified |
 | tenant-admin/catalog-and-inventory.md | Products CRUD/status, categories, brands, inventory adjust, hero settings | ✅ verified |
 | tenant-admin/orders-and-fulfillment.md | Queue/filters/detail, COD confirm/cancel, fulfillment pipeline + exceptions, store pickup OTP | ✅ verified |
 | tenant-admin/shipping-and-couriers.md | Providers, shipments create/list, webhooks evidence+retry, polls+backlog, router scorecard | ✅ verified |
+| tenant-admin/delivery-personnel.md | Rider list/create/edit/approval, map, location-history cleanup, and order-detail assignment | ✅ source verified |
 | tenant-admin/customers.md | Search/detail scoped to tenant | ✅ verified |
 | tenant-admin/payments-wallet-reviews-content.md | Attempts+recovery, wallet review desk, review/banner moderation, messaging ops, outlets | ✅ verified |
 | tenant-admin/returns-rto-refunds.md | Eligibility→case→review→inspect→refund; RTO inspect | ✅ verified |
@@ -29,10 +30,104 @@ cross-checked against the actual frontend call sites in
 | tenant-admin/reports-exports.md | Overview (bounded aggregation) + orders-export cap | ✅ verified |
 | tenant-admin/chat-support.md | Socket ticket, conversations/messages REST | ✅ verified |
 | tenant-admin/staff-settings-security.md | Staff lifecycle + seats gate, settings CRUD, 2FA, audit logs | ✅ verified |
+| tenant-admin/analytics-audit-operations.md | Storefront analytics, reports, audit history, operations health | ✅ source verified |
 | platform-admin/organizations-lifecycle.md | Dashboard, orgs CRUD/provision/status/timeline, closure, per-org usage+reconcile | ✅ verified |
 | platform-admin/plans-billing-subscriptions.md | Plans, trial, subscriptions directory, invoices/attempts/callback/configured | ✅ verified |
 | platform-admin/usage-fleet-migrations.md | Migrations start/status/pause/resume, database-health drift view, retention sweep | ✅ verified |
 | platform-admin/support-access.md | List/request(5min–8h)/revoke | ✅ verified |
+
+## September 11 integration correction
+
+The customer storefront tenancy status client now unwraps the backend success
+envelope for `GET /tenancy/status` before reading `code` and `storeName`.
+NestJS applies the global response contract `{ success, data, message }`, so a
+top-level `ACTIVE` read was incorrect and could render a healthy tenant as
+unavailable. The client retains a compatibility path for older unwrapped
+staging responses while treating malformed payloads as
+`TENANT_UNAVAILABLE`.
+
+The platform-admin catch-all BFF also now forwards `PUT` and `DELETE` in
+addition to `GET`, `POST`, and `PATCH`, matching the platform OpenAPI surface
+for entitlement overrides and feature-flag operations. This closes a proxy
+method gap; it does not claim that every platform screen has browser E2E proof.
+
+The tenant-admin store setup checklist also now calls the implemented
+`/api/delivery-zones` BFF route instead of the nonexistent
+`/api/admin/delivery-zones` path. A static audit of the tenant-admin browser
+call sites and 104 Next.js API route files found no additional verified route
+or method mismatch in this shot. Catch-all BFF routes were included in the
+review. This is source-level integration evidence, not live browser or
+production-host proof.
+
+The tenant-admin generated `lib/api-schema.ts` was also regenerated from the
+backend OpenAPI artifact after `api:check` detected drift. The refresh adds
+the newer entitlement, payment-recovery, storage-finalize, and messaging
+provider operations plus the documented provider-config DELETE methods.
+
+The customer storefront source audit also mapped 102 browser/shared-library
+files to 51 Next.js BFF routes, including dynamic and catch-all routes, with
+no unresolved path or method mismatch in the shot. Its generated
+`lib/api-schema.ts` was regenerated after `api:check` detected the backend
+storage-finalize endpoint and `FinalizePutDto` were missing. This remains
+source-level evidence; live browser, tenant-host isolation, SSR/BFF, socket,
+provider, and production validation are still required.
+
+The customer authentication and chat BFF review also found no source-level
+route or method mismatch: verification establishes a session, refresh/logout
+rotate and clear the httpOnly session cookies, and authenticated/guest chat
+ticket plus message-history calls match the documented backend controllers.
+This is not browser cookie, live host-forwarding, WebSocket room-isolation,
+or production identity-provider proof.
+
+The customer cart/checkout review corrected two documentation contracts:
+`/cart/validate` is POST, and `/payments/initiate` is POST with the order
+identity, phone proof, and provider in the body. The customer BFF performs
+payment initiation after prepaid order placement. Source-level route coverage
+was clean; duplicate-submit, payment callback, stock/price race, live-host,
+and provider-credential behavior still require runtime evidence.
+
+The account/value-added API review also fixed a shared transport edge case:
+customer-session BFF calls now normalize `HeadersInit` before adding the
+server-owned Authorization and tenant-forwarding headers, preserving wallet
+top-up idempotency and correlation headers. Account profile and address docs
+were corrected to match the backend PUT contracts. This remains source-level
+evidence; replay, upload/malware, provider, cookie, and live-isolation tests
+are still required.
+
+The rider portal review found and fixed a protected-action boundary defect:
+order-status updates now read the rider JWT from the httpOnly cookie instead
+of expecting browser JavaScript to send an Authorization header. Profile,
+assigned-orders, online-status, and GPS routes already used the cookie
+boundary. Live authorization, GPS retention, transition races, COD staff
+confirmation, and cross-tenant host tests remain required.
+
+The tenant-admin operations review corrected the shipping documentation to
+match the actual BFF and NestJS routes: shipment creation is
+`POST /admin/shipping/orders/:orderId`, polling is
+`POST /admin/shipping/shipments/:id/poll`, and callback retry is
+`POST /admin/shipping/webhooks/:id/retry`. Provider configuration uses the
+separate PUT/DELETE config endpoints. Delivery personnel CRUD, approval, map,
+location-history, and order-detail assignment flows are wired through the
+tenant-admin BFF. This is source-level evidence; current-assignment display,
+live authorization, cross-tenant denial, concurrent assignment behavior, and
+browser E2E remain required.
+
+The tenant-admin pickup review corrected the documentation boundary: pickup
+scheduling is the authenticated customer route
+`PATCH /orders/:id/store-pickup/schedule`, while tenant-admin only owns pickup
+status and OTP handover. The customer account order history now exposes the
+scheduling action for store-pickup orders, and the BFF forwards the session and
+tenant host context server-side. Runtime ownership, schedule-conflict, OTP,
+and live-host evidence remain required.
+
+The customer after-sales review corrected warranty contracts to the actual
+controller surface: claims history GET, delivered-order item verification POST,
+multipart evidence upload POST, and claim creation POST. The customer-web
+warranty screen already calls these through its authenticated BFF. Purchase
+activity documentation now matches the supported `surface/page/limit` query
+contract; `productId` filtering is not implemented. Customer returns are not
+presented as a customer API in the current NestJS controller, so return
+review/inspection remains tenant-admin only.
 
 ## Known documentation gaps (honest)
 
@@ -42,3 +137,267 @@ cross-checked against the actual frontend call sites in
   and is CI-enforced).
 - WebSocket event names for chat are documented at the transport level only;
   a dedicated events reference rides with the socket gateway code.
+
+## September 11 route-coverage update
+
+Static inventory of the active non-mobile Next.js applications found 52
+customer-web API route handlers, 104 tenant-admin API route handlers, and 3
+platform-admin API route handlers. The platform catch-all BFF forwards all
+five supported HTTP methods and is counted separately from its delegated
+backend endpoints. Shots 18–20 cross-checked returns/reconciliation,
+tenant-admin monitoring, and platform-admin lifecycle/billing routes against
+the NestJS controllers and DTOs. No additional source-level path or method
+mismatch was verified in those slices.
+
+This inventory is not live integration proof. Webhook signatures, browser
+cookie behavior, SSR host forwarding, WebSocket room isolation, provider
+delivery, concurrency/idempotency races, and production authorization still
+require runtime evidence.
+
+The platform operations backup-evidence write is intentionally automation-only,
+not a browser UI feature: the platform catch-all can forward
+`POST /platform/operations/backup-evidence`, while trusted backup jobs are the
+caller that supplies checksums and restore/protection evidence. It is documented
+in `platform-admin/usage-fleet-migrations.md`; no dashboard form was added that
+could let an operator manufacture recovery evidence. Live backup-provider,
+restore, and permission evidence remain operational gates.
+
+The tenant-admin hero-showcase review also closed the documented settings-delete
+gap. The admin BFF now forwards `DELETE /settings?type=heroShowcase`, and the
+hero-showcase screen exposes a confirmed removal action that restores the
+storefront's built-in defaults after server success. The mutation remains
+tenant-scoped and audited by the Nest settings controller; live authorization,
+cache invalidation, and browser evidence remain runtime gates.
+
+The tenant-admin orders review also closed the pickup lifecycle UI gap. The
+order-detail screen now exposes the backend-supported admin pickup statuses
+(`AVAILABLE_IN_STORE`, `TRANSFER_REQUIRED`, `IN_TRANSFER`, `READY_FOR_PICKUP`,
+and `CANCELLED`) through `PATCH /admin/orders/:id/store-pickup/status` instead
+of hard-coding only the ready state. OTP handover remains a separate server
+action; live transition authorization and browser evidence remain open.
+
+The tenant-admin shipping review also closed the courier scorecard read gap.
+The shipping dashboard now calls `GET /admin/shipping/scorecard` through its
+admin BFF and renders tenant-local delivery, RTO, and pickup-SLA metrics. The
+separate courier recommendation action remains a follow-up because it requires
+explicit destination, weight, COD, and urgency inputs; no guessed operational
+values are sent from the dashboard.
+
+The same shipping review now also integrates the documented courier routing
+operation: `POST /admin/shipping/router/recommend` is forwarded by the admin
+BFF and called from an explicit district/upazila/weight/COD/urgency form. The
+recommendation is advisory only; shipment creation still requires a separate
+provider choice and `parcelReady` contract.
+
+The provider configuration boundary was also audited: provider listing and
+activation are integrated through the tenant-admin BFF and dashboard, while
+credential PUT/DELETE remain intentionally automation/operator-only because
+they accept or revoke secrets. The shipping documentation now points to the
+actual dashboard paths, and the UI no longer describes tenant credentials as
+environment-only values.
+
+The tenant-admin settlements/reconciliation review also corrected the API
+contract documentation. The dashboard already integrates settlement imports,
+CSV preflight/template, settlement recording, findings, scan, queue health,
+alerts, finding actions, and failed-run retry. Run evidence is supplied by
+`GET /admin/reconciliation/queue-health` as `recentRuns`; the nonexistent
+standalone run-detail route was removed from the documented surface.
+
+The tenant-admin payments/wallet review corrected two stale contracts. Wallet
+review is `PATCH /admin/wallet/top-ups/:id`, not a nonexistent `/review` action
+path, and the documentation now points to the real dashboard pages. Payment
+attempts, provider readiness, recovery sweep/health, wallet top-up listing, and
+wallet review are already wired through the admin BFF. Payment credential
+PUT/DELETE remain intentionally operator-controlled secret operations rather
+than browser forms.
+
+The tenant-admin product-content/request/store review found one real BFF gap:
+requested-products client refreshes now have a GET `/api/admin/product-requests`
+route forwarding the documented `/product-requests` backend endpoint. Review
+moderation and store CRUD already have browser callers. Review-banner
+GET/PATCH/DELETE remain explicitly open for a dedicated banner-management UI;
+the existing screen currently integrates banner creation only.
+
+That review-banner UI gap is now closed: the reviews screen loads banners by
+product ID and sends the documented GET, PATCH, and DELETE operations through
+the existing wildcard BFF, including active state, sort order, alt text, and
+image URL updates.
+
+The tenant-admin transactional messaging review added policy GET/PATCH and
+provider GET BFF routes. The messages dashboard now reads provider readiness,
+edits enabled state, channel priority, and fallback policy, and continues to
+integrate outbox, templates, queue health, and retry. Provider credential PATCH
+remains intentionally operator-controlled because its request accepts secrets;
+the browser receives only non-secret provider metadata.
+
+The store-outlet/pickup review fixed two integration gaps. The tenant-admin
+store BFF now forwards page, limit, and search to the paginated NestJS outlet
+list. Customer checkout now calls the existing availability BFF for the
+selected outlet and cart variant IDs and renders ready-versus-transfer status;
+the final checkout transaction remains authoritative for stock and reservation
+races. API checks, typechecks, lint, and diff validation passed. Runtime
+tenant forwarding, browser behavior, stock races, and cross-tenant isolation
+remain required evidence; Redis was not changed.
+
+The customer checkout/payment review found no source-level route or method
+mismatch. Checkout preview and placement use the httpOnly cart cookie through
+the BFF, changing any form value clears the preview, and the backend performs
+fresh cart/draft validation before the serializable order transaction. The
+prepaid BFF performs order placement followed by the documented payment
+initiation call; the retry screen calls the separate retry endpoint with order
+reference, phone, and provider. Corrected the documentation to reflect this
+two-step contract. Runtime duplicate-submit, payment callback, provider,
+stock-race, browser, live-host, and cross-tenant evidence remain required.
+
+The customer account review fixed the wallet pagination integration. The wallet
+screen now forwards `page` and `limit` to `GET /account/wallet` and exposes
+navigation from the backend `totalPages`, while preserving the idempotent
+top-up submission. Profile, addresses, order linking/reorder, notifications,
+unread badge, and session-refresh BFF paths matched their controllers. Runtime
+ownership, refresh replay, wallet credit idempotency, browser cookies, and
+cross-tenant evidence remain required.
+
+Shot 63 exercised the backend integration harness after starting only the
+PostgreSQL Docker service on host port `5433`. The disposable
+`ferio_test_runner` database applied the current 51 migrations and completed
+11 integration suites / 48 tests; one Redis-dependent suite was skipped. This
+is useful backend/database evidence, but it does not close frontend browser,
+Cloudflare host-routing, SSR/BFF, or two-tenant runtime gates.
+
+Shot 64 exercised the full local Compose runtime. Backend, customer web,
+tenant-admin web, platform-admin web, PostgreSQL, MinIO, and the project Redis
+container started successfully; the project Redis container used temporary host
+port `6380` because an existing host Redis already owns `6379`, and that host
+process was not replaced. Backend `/api/v1/health` returned 200, customer and
+tenant-admin SSR roots returned 200, platform-admin correctly redirected to
+login, and the customer BFF returned the expected `TENANT_RESOLUTION_FAILED`
+response for an unprovisioned host rather than serving ambiguous tenant data.
+The Compose backend healthcheck was corrected from nonexistent `/api/v1/ready`
+to the active `/api/v1/health` endpoint and from `localhost` to IPv4 loopback,
+with a startup grace period. This proves local runtime wiring only; provisioned
+two-tenant host isolation, Cloudflare ingress, browser SSR/BFF behavior, and
+production Redis evidence remain open.
+
+Shot 65 audited platform organization lifecycle integration and fixed a real
+console gap. The organization detail screen now calls subscription trial POST,
+subscription status PATCH, entitlement override PUT and DELETE, and domain-cache
+invalidation POST through the authenticated platform BFF. Client validation is
+limited to shape and operator feedback; NestJS permissions, state transitions,
+expiry rules, audit records, and tenant routing remain authoritative. Platform
+API contract checks, TypeScript, lint, and production build passed. Live operator
+permissions, provisioned tenant domains, DNS/TLS, two-host SSR/BFF isolation,
+and production acceptance remain open.
+
+Shot 66 audited platform billing and operations integration. The billing screen
+now calls provider-readiness GET, invoice-create POST, invoice-pay POST,
+stale-payment-recovery POST, and receipt GET through the authenticated BFF, with
+operator feedback and no credential/payment-success fabrication. Gateway
+callbacks, retention-sweep writes, and backup-evidence writes remain
+automation-owned by design. Platform API check, TypeScript, lint, and
+production build passed; provider credentials, gateway delivery, recovery
+correctness, backup/restore, permissions, and production evidence remain open.
+
+Shot 67 audited platform system-health, feature-flag, and fleet-operation
+integration. Added `app/system-health` for the credential-free operational
+health projection and `app/feature-flags` for audited GET/PUT flag management;
+database health and migration list/start/pause/resume callers were already
+present. Retention sweep and backup-evidence writes remain scheduler/trusted
+automation boundaries. Platform API check, TypeScript, lint, and production
+build passed; live permissions, queue/Redis behavior, backup/restore, and
+production evidence remain open.
+
+Shot 68 audited platform authentication, support access, and BFF forwarding.
+Added the missing support-grant POST form with JSON-object scope validation and
+kept the existing revoke POST caller. Hardened the platform catch-all BFF to
+preserve backend HTTP status, machine error code, and correlation ID rather
+than reducing failures to message-only payloads; the operator token remains an
+httpOnly cookie. Platform API check, TypeScript, lint, and production build
+passed. Live identity, permission, support-scope, expiry/revocation, and
+production auth evidence remain open.
+
+Shot 69 audited customer and tenant-admin session refresh/logout integration.
+Fixed customer refresh rotation to forward the resolved tenant host alongside
+the refresh cookie, matching the backend tenant-mismatch guard already handled
+by tenant-admin refresh. Confirmed both logout BFFs call backend refresh-token
+blacklisting before clearing httpOnly cookies; 401 retry paths preserve the
+same request and retry once with the rotated access token. Customer and
+tenant-admin API checks, TypeScript, lint, and production builds passed with
+existing non-blocking lint warnings; live cookie rotation and cross-tenant
+runtime evidence remain open.
+
+The customer public-operational review also cross-checked order tracking,
+store pickup outlet listing/availability, and privacy-safe storefront analytics.
+`POST /orders/track`, `GET /store-locations`,
+`POST /store-locations/check-availability`, and
+`POST /storefront-analytics/events` match their active NestJS controllers,
+DTOs, BFF response handling, and browser callers; no source-level mismatch was
+verified in this slice. Rate limiting, phone privacy, stock/reservation races,
+analytics retention, browser behavior, and cross-tenant runtime evidence
+remain required.
+
+The customer authentication/saved-cart review found no source-level route or
+method gap. Corrected the registration example to use the actual optional
+`phoneNumber` field. Login, registration, email verification/resend, Google
+OAuth, logout, refresh rotation, automatic guest-cart merge, saved-cart
+sharing/import/save-to-account/delete, and reorder match their BFF and NestJS
+contracts. Runtime cookie replay, provider identity, cart ownership, browser,
+and cross-tenant evidence remain required.
+
+The customer value-added review confirmed warranty multipart evidence, claim
+history/order-item verification, public service booking, product-content reads,
+and authenticated review submission against the active controllers. It also
+fixed the optional-auth product-request BFF: authenticated callers now use the
+shared customer session client for access-token refresh and tenant-host
+forwarding, while guests retain the public submission path. Runtime multipart
+content checks, booking races, moderation authorization, browser behavior, and
+cross-tenant evidence remain required.
+
+Shot 70 verified the Redis-backed refresh-token revocation path. The focused
+NestJS auth suite passed 2 suites / 9 tests, including tenant-mismatch refresh
+rejection and blacklisted-token rejection. A disposable key round trip against
+the project Redis instance on host port `6380` returned `SET=OK`, the expected
+`blacklisted` value, a 30-second TTL, successful deletion, and `PONG`. Live
+cookie rotation, provisioned two-tenant browser isolation, tunnel forwarding,
+queue/retention operations, and production Redis recovery/monitoring remain
+open. Evidence is recorded in
+`project-progress/2026-09-11-redis-session-revocation-api-integration-shot-70.md`.
+
+Shot 71 exercised the live local SSR/tenant-resolution negative path with
+`alpha-a.ferio.sheakh.qzz.io` and `alpha-b.ferio.sheakh.qzz.io`. Backend health
+returned 200, but the platform database has no `TenantDomain` rows, so both
+candidate hosts correctly returned `TENANT_RESOLUTION_FAILED`; customer SSR
+rendered the fail-closed Store unavailable page when forwarded host and HTTPS
+headers were supplied. Direct requests without forwarded protocol redirected to
+the internal container hostname, confirming that the tunnel/reverse proxy must
+preserve those headers. Positive two-tenant browser/BFF isolation, cookie
+refresh, and public wildcard DNS remain blocked on real tenant provisioning.
+Evidence is recorded in
+`project-progress/2026-09-11-live-tenant-host-forwarding-api-integration-shot-71.md`.
+
+Shot 72 ran the cross-app contract gates without changing source snapshots.
+Customer web, tenant-admin web, and platform-admin web all passed
+`pnpm api:check`, confirming their generated `lib/api-schema.ts` files match
+the active backend `openapi.json`. All three apps also passed
+`pnpm exec tsc --noEmit`. These static checks do not close runtime
+authorization, cookie, provider, queue, browser-forwarding, or positive
+cross-tenant isolation evidence. Evidence is recorded in
+`project-progress/2026-09-11-cross-app-openapi-typecheck-api-integration-shot-72.md`.
+
+Shot 73 fixed and ran the Redis/BullMQ runtime smoke gate with isolated prefix
+`ferio:test:shot73:` on project Redis port `6380`. The queue suite passed 6
+suites / 11 tests, covering payment recovery, courier webhook and polling
+retries, reconciliation retry, bounded capacity, scheduler idempotence, Redis
+pipelining, and reconnect recovery. The backend application typecheck and lint
+for all five changed smoke tests also passed. A non-failing BullMQ teardown
+listener warning remains documented; production Redis failover, queue fairness
+under real tenant load, and positive browser tenant isolation remain open.
+Evidence is recorded in
+`project-progress/2026-09-11-redis-bullmq-api-integration-shot-73.md`.
+
+Shot 74 isolated the remaining non-failing BullMQ listener warning. Queue
+capacity, payment recovery, shipping webhook, shipping polling,
+reconciliation, and Redis reconnect smoke suites each passed independently
+under `NODE_OPTIONS=--trace-warnings`; the warning appears only when all six
+suites share one Jest process. It is recorded as a test-runner listener-budget
+cleanup item, not an API or Redis failure. Evidence is recorded in
+`project-progress/2026-09-11-bullmq-listener-warning-api-integration-shot-74.md`.

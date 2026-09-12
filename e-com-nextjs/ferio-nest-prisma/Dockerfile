@@ -33,6 +33,7 @@ FROM node:20-alpine AS runtime
 WORKDIR /app
 # openssl is required by the entrypoint's secret generation.
 RUN apk add --no-cache openssl && addgroup -S ferio && adduser -S ferio -G ferio
+RUN mkdir -p /app/.secrets && chown -R ferio:ferio /app/.secrets
 
 COPY --from=deps-prod /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist

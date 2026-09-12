@@ -11,13 +11,8 @@ interface OrgRow {
 }
 
 export default async function OrganizationsPage() {
-  let rows: OrgRow[] = [];
-  try {
-    const data = await platformApi<{ items: OrgRow[] }>("/platform/organizations");
-    rows = data.items ?? [];
-  } catch {
-    /* error.tsx handles */
-  }
+  const data = await platformApi<{ items: OrgRow[] }>("/platform/organizations");
+  const rows = data.items ?? [];
   return (
     <>
       <p className="eyebrow">SaaS Operations</p>

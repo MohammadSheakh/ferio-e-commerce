@@ -25,21 +25,26 @@ export function CreatePlanForm() {
           ...(limit ? { limit: Number(limit) } : {}),
         };
       });
-    const response = await fetch("/api/platform/plans", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        key: form.get("key"),
-        displayName: form.get("displayName"),
-        billingInterval: form.get("billingInterval"),
-        amountMinor: Number(form.get("amountMinor") || 0),
-        entitlements,
-      }),
-    });
-    const data = await readJsonRecord(response);
-    setWorking(false);
-    if (response.ok) window.location.reload();
-    else setMessage(responseMessage(data, "Plan creation failed."));
+    try {
+      const response = await fetch("/api/platform/plans", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          key: form.get("key"),
+          displayName: form.get("displayName"),
+          billingInterval: form.get("billingInterval"),
+          amountMinor: Number(form.get("amountMinor") || 0),
+          entitlements,
+        }),
+      });
+      const data = await readJsonRecord(response);
+      if (response.ok) window.location.reload();
+      else setMessage(responseMessage(data, "Plan creation failed."));
+    } catch {
+      setMessage("Plan creation failed: control plane unavailable.");
+    } finally {
+      setWorking(false);
+    }
   }
 
   return (
@@ -55,7 +60,7 @@ export function CreatePlanForm() {
         </div>
         <div>
           <label htmlFor="amountMinor">Monthly amount (poisha)</label>
-          <input id="amountMinor" name="amountMinor" type="number" min="0" defaultValue={0} className="input" />
+          <input id="amountMinor" name="amountMinor" type="number" min="0" max="2147483647" step="1" defaultValue={0} className="input" />
         </div>
       </div>
       <div style={{ height: 14 }} />

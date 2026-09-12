@@ -7,9 +7,8 @@
 
 | # | Method | Endpoint | Purpose |
 |---|---|---|---|
-| 1 | GET | `/admin/customers?page&search&hasWallet&source` | Paginated search across THIS tenant only (cross-DB impossible) |
+| 1 | GET | `/admin/customers?page&limit&search&sort&filter&month` | Paginated search/filter across THIS tenant only (cross-DB impossible) |
 | 2 | GET | `/admin/customers/:id` | Profile: delivered/cancelled/returned counters, spend, addresses, orders |
-| 3 | GET | `/admin/customers/:id/orders` | That customer's order list |
 
 Customer identity is tenant-local (PO-015): the same human at another store
 is a different record by design. Search cannot cross databases.

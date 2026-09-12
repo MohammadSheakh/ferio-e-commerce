@@ -25,7 +25,11 @@ export class OAuthAccountService {
   ) {}
 
   private async db(): Promise<PrismaClient> {
-    return resolveTenantDatabase(this.tenantDb, this.prisma);
+    return resolveTenantDatabase(
+      this.tenantDb,
+      this.prisma,
+      'oauth-account-service',
+    );
   }
 
   /**

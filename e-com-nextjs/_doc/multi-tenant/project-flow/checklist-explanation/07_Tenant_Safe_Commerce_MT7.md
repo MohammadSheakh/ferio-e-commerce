@@ -1595,16 +1595,11 @@ realtime
 
 modules.
 
-At the point represented by the supplied tracker, this gate item is
-still unchecked.
-
-That is important.
-
-Many individual isolation tests are complete, but the tracker does
-**not** yet claim exhaustive two-tenant automated coverage for every
-high-risk financial/identity/realtime module.
-
-Do not overstate completion.
+The current checklist and evidence matrix mark this gate complete for
+the covered high-risk financial, identity and realtime modules. The
+remaining release risk is runtime and pilot evidence beyond automated
+coverage, plus the explicitly documented identity/platform-plane
+exceptions.
 
 ------------------------------------------------------------------------
 
@@ -1616,15 +1611,15 @@ The supplied tracker says:
 ✓ Every existing protected commerce controller/service
   has a documented tenant boundary.
 
-□ Automated tests cover at least two tenants for every
+✓ Automated tests cover at least two tenants for every
   high-risk financial/identity/real-time module.
 
 ✓ No legacy single-store global setting or default tenant DB
   remains on production request paths.
 ```
 
-So MT-7 is highly advanced, but one broad test-coverage gate remains
-open.
+MT-7's engineering gate is checked. Do not confuse that result with
+the separate MT-14 live pilot and production-launch gates.
 
 ------------------------------------------------------------------------
 
@@ -2317,9 +2312,9 @@ Every branch must agree on the same tenant.
 > identifiers and concurrent tenants rather than inferred from unique
 > test data. Explicit identity/platform-plane exceptions prevent
 > indiscriminate tenantization, while production paths fail closed when
-> tenant context is unavailable. The remaining broad risk is ensuring
-> exhaustive automated two-tenant coverage across every high-risk
-> financial, identity and realtime module.
+> tenant context is unavailable. The remaining release risk is
+> runtime/pilot evidence beyond automated coverage, plus the explicitly
+> documented identity/platform-plane exceptions.
 
 ------------------------------------------------------------------------
 
@@ -2346,14 +2341,15 @@ The tracker shows extensive completion across:
 ✓ production default-DB fallback removal
 ```
 
-But the MT-7 release gate still shows:
+The current MT-7 release gate now shows:
 
 ``` text
-□ Automated tests cover at least two tenants
+✓ Automated tests cover at least two tenants
   for every high-risk financial/identity/real-time module.
 ```
 
-So do not describe MT-7 as completely closed yet.
+MT-7's engineering gate is checked. Do not confuse that with separate
+MT-14 live pilot and production-launch gates.
 
 ------------------------------------------------------------------------
 

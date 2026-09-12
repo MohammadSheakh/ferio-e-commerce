@@ -77,6 +77,34 @@ jobs:
           PLATFORM_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/ferio_ci_test
       - name: Migration compatibility gate
         run: pnpm check:migration-compatibility
+      - name: Tenant context boundary gate
+        run: pnpm check:tenant-context-boundaries
+      - name: Architecture boundary gate
+        run: pnpm architecture:check
+      - name: PostgreSQL connection budget gate
+        run: pnpm check:connection-budget
+      - name: Production tenant-edge policy contract
+        run: |
+          TENANT_EDGE_POLICY_ENV=production \
+          TENANCY_ENABLED=true \
+          PLATFORM_PUBLIC_DOMAIN=ferio.example \
+          CUSTOMER_WEB_TRUSTED_PROXY=false \
+          TENANT_TRUSTED_PROXY_CIDRS=127.0.0.1/32 \
+          pnpm check:tenant-edge-policy
+      - name: Production operations configuration contracts
+        run: |
+          BACKUP_POLICY_ENV=production \
+          BACKUP_PROVIDER=managed-postgresql \
+          BACKUP_PITR_ENABLED=true \
+          BACKUP_RETENTION_DAYS=30 \
+          BACKUP_RPO_MINUTES=60 \
+          BACKUP_RTO_MINUTES=240 \
+          BACKUP_LOGICAL_SCHEDULE='0 2 * * *' \
+          pnpm check:backup-policy
+          UPLOAD_SECURITY_POLICY_ENV=production \
+          MALWARE_SCANNER_URL=https://scanner.ci.invalid/scan \
+          MALWARE_SCANNER_TIMEOUT_MS=10000 \
+          pnpm check:upload-security
       - name: Strict typecheck (incl. specs)
         run: pnpm exec tsc --noEmit -p tsconfig.json
       - name: Application lint (read-only)
@@ -150,6 +178,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: OpenAPI client drift check
         run: pnpm api:check
+      - name: ESLint
+        run: pnpm lint
       - name: TypeScript check
         run: pnpm exec tsc --noEmit
       - name: Production build
@@ -177,6 +207,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: OpenAPI client drift check
         run: pnpm api:check
+      - name: ESLint
+        run: pnpm lint
       - name: TypeScript check
         run: pnpm exec tsc --noEmit
       - name: Production build
@@ -202,6 +234,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: OpenAPI client drift check
         run: pnpm api:check
+      - name: ESLint
+        run: pnpm lint
       - name: TypeScript check
         run: pnpm exec tsc --noEmit
       - name: Production build

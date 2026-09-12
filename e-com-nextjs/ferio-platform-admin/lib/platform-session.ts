@@ -33,11 +33,20 @@ export async function platformApi<T>(
   const payload = (await response.json().catch(() => ({}))) as Record<string, unknown> & {
     data?: T;
     message?: string;
+    code?: string;
+    correlationId?: string;
   };
   if (!response.ok) {
     throw Object.assign(
       new Error(payload.message || "Platform request failed."),
-      { status: response.status },
+      {
+        status: response.status,
+        code: typeof payload.code === "string" ? payload.code : undefined,
+        correlationId:
+          typeof payload.correlationId === "string"
+            ? payload.correlationId
+            : undefined,
+      },
     );
   }
   return (payload.data ?? (payload as unknown)) as T;

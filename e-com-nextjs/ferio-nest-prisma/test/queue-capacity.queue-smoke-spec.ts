@@ -23,7 +23,9 @@ const queue = new Queue<CapacityJobData>(queueName, {
   prefix: queuePrefix,
   defaultJobOptions: {
     attempts: 1,
-    removeOnComplete: true,
+    // Keep completed jobs until waitUntilFinished observes their return value.
+    // The afterAll cleanup removes the shot-specific queue data.
+    removeOnComplete: false,
     removeOnFail: false,
   },
 });
@@ -50,6 +52,8 @@ describe('BullMQ queue capacity smoke', () => {
   it('drains a bounded tenant-labelled batch at controlled concurrency', async () => {
     const jobCount = boundedEnv('QUEUE_CAPACITY_JOBS', 500, 10, 10_000);
     const concurrency = boundedEnv('QUEUE_CAPACITY_CONCURRENCY', 10, 1, 100);
+    queue.setMaxListeners(jobCount + 10);
+    queueEvents.setMaxListeners(jobCount + 10);
     const processedOrganizations: string[] = [];
     const worker = new Worker<CapacityJobData>(
       queueName,
@@ -142,7 +146,7 @@ describe('BullMQ queue capacity smoke', () => {
 
       const schedulers = await firstInstance.getJobSchedulers();
       const matching = schedulers.filter(
-        (scheduler) => scheduler.id === schedulerId,
+        (scheduler) => scheduler.key === schedulerId,
       );
       expect(matching).toHaveLength(1);
       console.log(

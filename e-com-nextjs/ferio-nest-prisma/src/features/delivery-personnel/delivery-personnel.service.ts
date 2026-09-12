@@ -72,7 +72,11 @@ export class DeliveryPersonnelService {
    * legacy fallback otherwise. Never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    return resolveTenantDatabase(this.tenantDb, this.prisma);
+    return resolveTenantDatabase(
+      this.tenantDb,
+      this.prisma,
+      'delivery-personnel-service',
+    );
   }
   /**
    * Public Self-Registration for Bangladesh Candidates
@@ -572,8 +576,7 @@ export class DeliveryPersonnelService {
   async toggleOnlineStatus(userId: string, isOnline: boolean) {
     const db = await this.db();
     const personnel = await this.resolveDeliveryPersonnel(userId);
-    // If turning online, update lastLocationAt timestamp
-    const updateData: Prisma.DeliveryPersonnelUpdateInput = {};
+    const updateData: Prisma.DeliveryPersonnelUpdateInput = { isOnline };
     if (isOnline) {
       updateData.lastLocationAt = new Date();
     }

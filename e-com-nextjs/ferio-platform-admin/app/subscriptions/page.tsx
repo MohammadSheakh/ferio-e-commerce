@@ -12,15 +12,10 @@ interface SubscriptionRow {
 }
 
 export default async function SubscriptionsPage() {
-  let rows: SubscriptionRow[] = [];
-  try {
-    const data = await platformApi<{ items: SubscriptionRow[] }>(
-      "/platform/subscriptions",
-    );
-    rows = data.items ?? [];
-  } catch {
-    /* error.tsx handles */
-  }
+  const data = await platformApi<{ items: SubscriptionRow[] }>(
+    "/platform/subscriptions",
+  );
+  const rows = data.items ?? [];
   return (
     <>
       <p className="eyebrow">SaaS Operations</p>

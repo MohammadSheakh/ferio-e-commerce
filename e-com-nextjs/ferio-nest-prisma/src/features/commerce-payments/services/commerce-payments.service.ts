@@ -51,7 +51,11 @@ export class CommercePaymentsService {
    * HMAC-verified callback token); legacy DB otherwise. Never guesses.
    */
   private async db(): Promise<PrismaClient> {
-    return resolveTenantDatabase(this.tenantDb, this.prisma);
+    return resolveTenantDatabase(
+      this.tenantDb,
+      this.prisma,
+      'commerce-payments-service',
+    );
   }
 
   async providers() {

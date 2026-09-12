@@ -333,7 +333,9 @@ The exact production mechanism depends on Ferio's final managed PostgreSQL provi
 
 And this is important:
 
-> **The current MT-12 checklist has NOT yet selected the managed PostgreSQL backup/PITR strategy.**
+> **PO-012 has selected the managed PostgreSQL backup/PITR direction, but
+> provider scheduling, PITR execution, and production recovery evidence are
+> still deployment-owned.**
 
 So PITR is the architectural target/category to understand, not a capability we should falsely claim is already operational in Ferio.
 
@@ -341,17 +343,13 @@ So PITR is the architectural target/category to understand, not a capability we 
 
 # 9. Current backup status: important reality check
 
-MT-12 is **not complete**.
-
-The current checklist says these are still open:
+MT-12 is not production-operations complete, but the current checklist marks
+the application-side backup, evidence, alert, credential-safety, and local
+restore controls complete. The remaining provider-owned work is:
 
 ```text
-[ ] Select managed PostgreSQL backup/PITR strategy
-[ ] Back up Control Plane
-[ ] Back up every tenant DB
-[ ] Track backup evidence/status centrally
-[ ] Alert on stale/failed backup
-[ ] Protect backup credentials
+[ ] Execute managed-provider scheduling/PITR in the selected deployment
+[ ] Prove production recovery and provider-side restore evidence
 ```
 
 What is already defined:
@@ -366,7 +364,9 @@ Legal or plan-specific retention extensions remain an operations-policy follow-u
 
 This distinction is critical:
 
-> Ferio has recovery objectives and some recovery tooling/design, but the production managed backup system is not yet complete.
+> Ferio has recovery objectives, application-side backup/restore tooling, and
+> local drill evidence; managed-provider scheduling/PITR and production
+> recovery proof remain open.
 
 ---
 
@@ -534,7 +534,8 @@ backup too old
 recovery protection degraded
 ```
 
-That checklist item is currently still open.
+Application-side stale/failed-backup alert emission is checked; external
+notification routing and provider-side retention remain deployment work.
 
 ---
 
@@ -561,9 +562,10 @@ placed in screenshots
 included in audit detail
 ```
 
-Ferio's backup-credential protection is still an explicit MT-12 open item.
-
-A production implementation should use proper secrets-management/provider controls.
+Application helpers already protect backup credentials through operator-
+provided environment/CLI-profile inputs, restrictive file permissions, and
+secret-free evidence. Provider secret-manager selection and rotation remain
+production deployment work.
 
 ---
 
@@ -611,10 +613,10 @@ record evidence
 
 # 17. Restore Control Plane separately
 
-The checklist still requires:
+The checklist records the local control-plane restore drill:
 
 ```text
-[ ] Restore Control Plane to isolated environment
+[x] Restore Control Plane to isolated environment
 ```
 
 Why isolated?
@@ -665,7 +667,8 @@ restore entire SaaS fleet because one tenant broke
 
 The current MT-12 gate specifically requires proof that one tenant can be restored independently from backup.
 
-That gate item is currently **not complete**.
+The application-level gate is checked by the recorded local PostgreSQL
+restore drill; managed-provider recovery evidence remains open.
 
 ---
 
@@ -809,13 +812,9 @@ inaccessible
 wrongly scoped
 ```
 
-That is why MT-12 includes:
-
-```text
-[ ] Verify object/media references
-```
-
-This is currently open.
+The current MT-12 tooling verifies tenant-prefixed media references with
+read-only provider `head-object` checks. Provider credentials and live bucket
+availability remain operator-managed.
 
 A full tenant recovery must reason about both:
 
@@ -884,15 +883,9 @@ while external provider reality says something else.
 
 Recovery may therefore require reconciliation.
 
-The current checklist explicitly has:
-
-```text
-[ ] Verify financial ledgers/reconciliation
-```
-
-still open.
-
-This is a major production requirement.
+The current checklist marks financial ledger/reconciliation verification
+complete for the local restore contract. Provider settlement verification
+remains deployment work.
 
 ---
 
@@ -963,10 +956,10 @@ Do not casually repoint traffic before verification.
 
 # 28. Restore drill
 
-The checklist still requires:
+The checklist records the completed local drill:
 
 ```text
-[ ] Perform and record restore exercise
+[x] Perform and record restore exercise
 ```
 
 A restore drill proves the process under controlled conditions.
@@ -1039,15 +1032,16 @@ financial/audit data
 media
 ```
 
-But the exact Ferio export package is still open.
+The current Ferio export package is defined and implemented as an operator
+workflow.
 
 The checklist currently says:
 
 ```text
-[ ] Define export package
-[ ] Export tenant business data
-[ ] Export audit/financial data according to policy
-[ ] Export media where required
+[x] Define export package
+[x] Export tenant business data
+[x] Export audit/financial data according to policy
+[x] Export media where required
 ```
 
 Do not invent a final export format until the project defines it.
@@ -1203,13 +1197,11 @@ READY tenant databases
 owned by ACTIVE organizations
 ```
 
-But MT-12 marks job stopping as **PARTIAL**.
-
-Why?
-
-An already queued job may still exist.
-
-The explicit queued-job revocation sweep remains pending.
+The current checklist marks the safety contract as **DONE**: new tenant
+fan-out work is restricted to READY databases owned by ACTIVE organizations,
+and targeted queued work fails closed before tenant-client acquisition when an
+organization is closed or unavailable. Redis queue deletion is intentionally
+not required for this safety contract.
 
 This distinction is subtle and important:
 
@@ -1362,10 +1354,10 @@ if only logical retirement occurred.
 
 # 42. Integration credentials on closure
 
-The checklist still says:
+The checklist records this control as complete:
 
 ```text
-[ ] Revoke integration credentials
+[x] Revoke integration credentials
 ```
 
 Why?
@@ -1606,7 +1598,9 @@ settlement/reconciliation state
 
 The exact financial invariants depend on Ferio's commerce model.
 
-The current checklist explicitly keeps financial ledger/reconciliation verification open.
+The current checklist records financial ledger/reconciliation verification as
+complete for the local restore contract; provider settlement verification
+remains deployment work.
 
 This is appropriate because financial correctness needs deliberate tests rather than generic "row count looks okay."
 
@@ -1669,7 +1663,8 @@ object exists but restored DB has no row
 
 A full recovery strategy must define how database and object-storage recovery points relate.
 
-The current Ferio checklist has not yet completed media-reference verification.
+The current Ferio checklist records media-reference verification as complete
+through the read-only tenant-media verification script.
 
 ---
 
@@ -2115,7 +2110,9 @@ only Tenant A's order 123
 
 The same database-per-tenant isolation principles from MT-7 continue here.
 
-The final export implementation is still open, so this is a testing principle rather than a claim of completed MT-12 functionality.
+The export implementation is present; this remains a testing principle for
+future export extensions rather than a claim that external side effects are
+automatically orchestrated during every closure.
 
 ---
 
@@ -2287,7 +2284,9 @@ Tenant B violates the 1-hour objective.
 
 A mature operations system should surface this before an incident.
 
-This is why centralized evidence and stale-backup alerts are important open MT-12 items.
+Centralized evidence and stale-backup alerts are implemented at the
+application boundary; external notification routing and provider-side
+retention remain deployment work.
 
 ---
 
@@ -2539,7 +2538,9 @@ The exact final MT-12 control surface remains implementation work, but the risk 
 "We have backups, so DR is done."
 ```
 
-Restore has not been proven.
+Managed-provider restore has not been proven. A local PostgreSQL restore drill
+is recorded, but it is not evidence of provider scheduling, PITR, or managed
+production recovery.
 
 ## Never restore over production first
 
@@ -2559,7 +2560,9 @@ Closure is staged.
 
 ## Never assume stopping new jobs cancels already queued jobs
 
-That MT-12 area is currently partial.
+Queued-job deletion is not required by the current safety contract: targeted
+work re-checks organization/registry readiness and fails closed before tenant
+database acquisition.
 
 ## Never claim a retired registry means physical DB deletion
 
@@ -2582,41 +2585,41 @@ Based strictly on the current Ferio checklist:
 ## Backup
 
 ```text
-OPEN     managed PostgreSQL backup/PITR strategy
+RESOLVED-DIRECTION managed PostgreSQL backup/PITR strategy
 DONE     RPO ≤ 1 hour defined
 DONE     RTO ≤ 4 hours defined
-OPEN     Control Plane backup
-OPEN     every-tenant DB backup
-OPEN     central backup evidence/status
-OPEN     stale/failed backup alerts
-OPEN     backup credential protection
+DONE     Control Plane backup (local drill)
+DONE     every-tenant DB backup tooling
+DONE     central backup evidence/status
+DONE     stale/failed backup alert emission
+DONE     backup credential protection
 DONE     initial 30-day retention defined
 ```
 
 ## Restore
 
 ```text
-OPEN     restore Control Plane in isolation
-OPEN     independently restore one tenant from backup
+DONE     restore Control Plane in isolation (local drill)
+DONE     independently restore one tenant from backup (local drill)
 DONE     restore helper refuses existing target
 DONE     restored schema/migration version verification
-OPEN     object/media verification
-OPEN     financial ledger/reconciliation verification
-OPEN     DNS/domain DR behavior documentation
-OPEN     performed + recorded restore exercise
+DONE     object/media verification tooling
+DONE     financial ledger/reconciliation verification tooling
+DONE     DNS/domain DR behavior documentation
+DONE     performed + recorded local restore exercise
 ```
 
 ## Export / closure
 
 ```text
 DONE     90-day recoverable closure policy
-OPEN     define export package
-OPEN     business-data export
-OPEN     audit/financial export
-OPEN     media export where required
+DONE     define export package
+DONE     business-data export
+DONE     audit/financial export
+DONE     media export where required
 DONE     domains safely revoked
-OPEN     integration credential revocation
-PARTIAL  scheduled-job shutdown/revocation
+DONE     integration credential revocation
+DONE     scheduled-job safety / queued-work fail-closed behavior
 DONE     DB connection retirement
 PARTIAL  archive/delete physical DB
 DONE     post-closure domain takeover prevention
@@ -2632,10 +2635,11 @@ The current MT-12 gate has two items.
 ### Still open
 
 ```text
-[ ] One tenant can be restored independently from backup.
+[ ] Managed-provider backup/PITR execution and production restore evidence.
 ```
 
-This is the major unfinished proof.
+The application-level independent tenant restore gate is checked by the
+recorded local PostgreSQL drill; provider-backed proof remains open.
 
 ### Complete
 
@@ -2706,7 +2710,9 @@ backup retention initially 30 days
 closure recovery window 90 days
 ```
 
-But the production backup provider/PITR strategy and independent tenant restore proof are still open.
+The production backup provider/PITR execution remains open; the independent
+tenant restore proof is checked for the local drill and must be repeated
+against the selected managed provider before production launch.
 
 ---
 
@@ -2878,7 +2884,9 @@ audit evidence
 
 ## 10. Open operations work
 
-Do not search the code expecting already-complete production provider backup automation if the checklist says it is still open.
+Do not confuse the application-side backup/restore helpers and local drill
+with managed-provider backup automation; provider scheduling, PITR execution,
+and production recovery evidence remain deployment-owned.
 
 That is an important engineering habit:
 
@@ -3028,7 +3036,9 @@ If you can explain all of these clearly, you understand the core of production d
 
 > **4. Closure is a staged 90-day recoverable lifecycle, not an immediate database deletion.**
 
-> **5. MT-12 is still incomplete because the production backup/PITR system and independent tenant restore proof remain open.**
+> **5. MT-12 remains open for production operations because managed backup/PITR
+> and provider-backed recovery evidence are not yet proven; the local
+> independent tenant restore drill is complete.**
 
 ---
 
@@ -3100,21 +3110,21 @@ RPO definition                       DONE
 RTO definition                       DONE
 30-day initial backup retention      DONE
 
-Managed backup/PITR strategy         OPEN
-Control Plane backups                OPEN
-All-tenant DB backups                OPEN
-Central backup evidence              OPEN
-Backup stale/failure alerts          OPEN
-Backup credential protection         OPEN
+Managed backup/PITR strategy         SELECTED / PROVIDER SETUP OPEN
+Control Plane backups                DONE (local drill)
+All-tenant DB backups                DONE (local tooling)
+Central backup evidence              DONE
+Backup stale/failure alerts          DONE (application boundary)
+Backup credential protection         DONE (application boundary)
 
 Safe new restore target              DONE
 Restored schema-version check        DONE
-Control Plane restore drill          OPEN
-Independent tenant restore           OPEN
-Media verification                   OPEN
-Financial reconciliation             OPEN
-DNS/DR documentation                 OPEN
-Recorded restore exercise            OPEN
+Control Plane restore drill          DONE (local drill)
+Independent tenant restore           DONE (local drill)
+Media verification                   DONE (local tooling)
+Financial reconciliation             DONE (local tooling)
+DNS/DR documentation                 DONE
+Recorded restore exercise            DONE (local drill)
 
 90-day closure policy                DONE
 Domain revocation                    DONE
@@ -3122,15 +3132,15 @@ DB connection retirement             DONE
 Domain takeover prevention           DONE
 Platform billing/audit preservation  DONE
 
-Export package                       OPEN
-Business-data export                 OPEN
-Audit/financial export               OPEN
-Media export                         OPEN
-Integration credential revocation    OPEN
-Scheduled-job shutdown               PARTIAL
+Export package                       DONE
+Business-data export                 DONE
+Audit/financial export               DONE
+Media export                         DONE
+Integration credential revocation    DONE
+Scheduled-job safety                 DONE
 Physical DB archive/delete           PARTIAL
 
-MT-12 independent restore gate       OPEN
+MT-12 independent restore gate       DONE (local drill; managed provider remains open)
 MT-12 documented closure gate        DONE
 ```
 

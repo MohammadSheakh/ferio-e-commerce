@@ -77,7 +77,7 @@ export class SettingsService {
 
   /** Tenant client inside resolved requests; legacy DB otherwise (MT-7). */
   private async db(): Promise<PrismaClient> {
-    return resolveTenantDatabase(this.tenantDb, this.prisma);
+    return resolveTenantDatabase(this.tenantDb, this.prisma, 'settings-service');
   }
 
   async createOrUpdateSettings(
