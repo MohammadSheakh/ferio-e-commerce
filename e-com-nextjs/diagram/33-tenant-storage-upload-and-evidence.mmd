@@ -33,6 +33,3 @@ sequenceDiagram
         API-->>Web: Safe failure state
         API->>DB: Persist sanitized failure/evidence state when required
     end
-
-    Note over Store,DB: Object key namespace includes the trusted organization identity; browser-supplied cross-tenant keys are rejected.
-    Note over Validate,Scan: File acceptance is not the same as malware-clean evidence until the scan/quarantine policy completes.
