@@ -10,13 +10,24 @@ are learning the project:
 4. `04-authentication-and-authorization.md`
 5. `05-platform-admin-and-organization-provisioning.md`
 6. `06-tenant-commerce-flow.md`
-7. `07-async-workers-payments-and-notifications.md`
+7. `07-async-workers-and-integrations.md`
 8. `08-realtime-and-operations.md`
 9. `09-module-map-and-change-guide.md`
 
 These are learning documents, not a replacement for source code, tests, ADRs,
 or the API contract. When behavior changes, update the relevant flow document
 and verify it against the implementation.
+
+For a source-oriented backend curriculum with file paths, test anchors,
+Prisma/Redis/queue boundaries, and evidence rules, read
+`study-codebase/README.md` and its chapters.
+
+For the reusable implementation patterns that appear across many backend
+features, read `pattern/README.md` after the study-codebase introduction.
+
+For the source-backed documentation audit and its bounded evidence shots, see
+`PROJECT-FLOW-AUDIT-STATUS.md` and the linked records under
+`e-com-nextjs/_doc/project-progress/`.
 
 ## The One-Sentence Model
 
@@ -61,4 +72,3 @@ The most important invariant is:
   tenant user identity and must resolve a tenant from the request host.
 - **Tenant context:** Immutable AsyncLocalStorage state containing the resolved
   organization, database registry, hostname, and subscription status.
-

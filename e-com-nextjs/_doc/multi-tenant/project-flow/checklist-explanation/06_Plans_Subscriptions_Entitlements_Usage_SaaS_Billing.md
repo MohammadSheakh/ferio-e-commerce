@@ -435,7 +435,7 @@ SUSPENDED
 Checkout denial uses:
 
 ``` text
-CHECKOUT_DISABLED_SUSPENDED
+COMMERCE_MUTATION_DISABLED_SUSPENDED
 ```
 
 This is an important architecture lesson.
@@ -1451,7 +1451,7 @@ Verify the intended capability-specific policy:
 
 ``` text
 storefront browsing → works
-checkout → CHECKOUT_DISABLED_SUSPENDED
+checkout → COMMERCE_MUTATION_DISABLED_SUSPENDED
 plan/recovery information → available to authorized owner
 ```
 

@@ -1492,9 +1492,9 @@ Conceptual example:
 |---|---|---|---|---|
 | Provisioning idempotency | PASS | automated tests | Backend | — |
 | Migration orchestration | PASS | orchestration suite | Backend | — |
-| Cross-tenant suite | OPEN | final suite pending | Security/Backend | SSR/BFF |
-| Backup/restore | OPEN | restore drill needed | Ops | provider workflow |
-| Runbooks | OPEN | incomplete | Ops | deployment specifics |
+| Cross-tenant suite | DONE | indexed two-tenant negative evidence | Security/Backend | live host/pilot evidence |
+| Backup/restore | DONE locally / OPEN provider | local restore drill | Ops | managed provider workflow |
+| Runbooks | DONE | indexed operational runbooks | Ops | provider-specific deployment details |
 
 Do not copy this table blindly as the official tracker; use the actual checklist and project evidence as source of truth.
 
@@ -1720,14 +1720,10 @@ If a mandatory gate is open, keep it open.
 Examples currently open in MT-14 include:
 
 ```text
-internal alpha execution
 pilot beta execution
 all Release 1 exit criteria
-two-org isolated production proof
-cross-tenant negative suite
-backup/restore proof
 critical/high security disposition
-operational runbooks
+managed-provider backup/restore proof
 ```
 
 A checklist is valuable only if unchecked items remain visibly unchecked.
@@ -2340,23 +2336,27 @@ Good operational documentation reduces dependence on one person's memory.
 
 # 96. Internal alpha status
 
-Every listed internal-alpha item is currently unchecked:
+The current checklist records the internal-alpha engineering scenarios as
+completed with automated, local-PostgreSQL, or service-level evidence:
 
 ```text
-OPEN provision ≥3 internal tenants
-OPEN intentionally overlapping identifiers
-OPEN full commerce flow
-OPEN wallet flow
-OPEN warranty/service/chat/pickup
-OPEN suspension/reactivation
-OPEN plan upgrade/downgrade
-OPEN provisioning retry
-OPEN migration canary/batch
-OPEN backup/restore
-OPEN support-access workflow
+DONE provision ≥3 internal tenants
+DONE intentionally overlapping identifiers
+DONE full commerce flow
+DONE wallet flow
+DONE warranty/service/chat/pickup
+DONE suspension/reactivation
+DONE plan upgrade/downgrade
+DONE provisioning retry
+DONE migration canary/batch
+DONE local backup/restore drill
+DONE support-access workflow
 ```
 
-So internal alpha has not yet been recorded as complete in the source checklist.
+This closes the engineering-controlled alpha evidence, not the real-business
+pilot. The backup/restore item is specifically a local Docker PostgreSQL
+drill; managed-provider scheduling, PITR, and production restore evidence
+remain open operational gates.
 
 ---
 
@@ -2407,13 +2407,17 @@ Still open:
 
 ```text
 OPEN every PRD Release 1 SaaS exit criterion
-OPEN ≥2 independent organizations with isolated DBs/domains
-OPEN cross-tenant negative suite
-OPEN backup and restore proof
+DONE ≥2 independent organizations with isolated DBs/domains
+DONE cross-tenant negative suite
+DONE local backup/restore drill; OPEN managed-provider proof
 OPEN critical/high security findings closed/formally accepted
-OPEN operational runbooks
+DONE operational runbooks
 ```
 
+The independent-organization, negative-suite, provisioning, migration,
+subscription, platform-billing, domain-state, infrastructure-isolation,
+support-access, no-fallback, and runbook gates have engineering evidence.
+The remaining open items still prevent a production launch.
 Therefore the correct status is:
 
 > **Ferio Release 1 is not yet production-launch complete according to the current checklist.**

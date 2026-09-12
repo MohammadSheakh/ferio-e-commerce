@@ -25,6 +25,9 @@ ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1
 COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static
 COPY --from=build /app/public ./public
+# Next.js may write incremental server-rendered cache entries at runtime.
+# Keep the container non-root while granting only the required path access.
+RUN mkdir -p /app/.next/cache && chown -R node:node /app
 
 USER node
 EXPOSE 3000

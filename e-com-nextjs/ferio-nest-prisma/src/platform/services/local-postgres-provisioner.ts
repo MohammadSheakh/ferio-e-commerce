@@ -52,6 +52,23 @@ export class LocalPostgresProvisioner extends TenantDatabaseProvisioner {
       await pool.query(
         `GRANT ALL PRIVILEGES ON DATABASE ${quotedName} TO ${quotedRole}`,
       );
+
+      // PostgreSQL 15+ may revoke CREATE on the public schema from ordinary
+      // database roles. Migrations run as the tenant role, so grant only the
+      // schema privileges required to bootstrap that tenant database.
+      const tenantUrl = new URL(url);
+      tenantUrl.pathname = `/${dbName}`;
+      const tenantPool = new Pool({
+        connectionString: tenantUrl.toString(),
+        max: 1,
+      });
+      try {
+        await tenantPool.query(
+          `GRANT USAGE, CREATE ON SCHEMA public TO ${quotedRole}`,
+        );
+      } finally {
+        await tenantPool.end().catch(() => undefined);
+      }
     } finally {
       await pool.end().catch(() => undefined);
     }

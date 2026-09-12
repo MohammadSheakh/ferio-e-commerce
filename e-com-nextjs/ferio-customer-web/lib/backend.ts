@@ -2,6 +2,12 @@ import { withCorrelationId } from "@/lib/correlation";
 import { hostForwardHeaders } from "@/lib/host-forward";
 
 function getBackendApiUrl(): string {
+  // Server components run inside the Compose network and must use the
+  // private backend service name. Browser code must continue using the public
+  // URL baked into NEXT_PUBLIC_FERIO_API_URL.
+  if (typeof window === "undefined" && process.env.FERIO_API_URL) {
+    return process.env.FERIO_API_URL;
+  }
   if (process.env.NEXT_PUBLIC_FERIO_API_URL) {
     return process.env.NEXT_PUBLIC_FERIO_API_URL;
   }

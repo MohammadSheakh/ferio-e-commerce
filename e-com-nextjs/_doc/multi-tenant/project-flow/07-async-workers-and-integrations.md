@@ -37,8 +37,10 @@ and audited.
 
 ## Payment Recovery
 
-The payment recovery queue sweeps expired prepaid attempts and processes one
-attempt at a time. The processor:
+The payment recovery queue sweeps expired prepaid attempts. Each attempt is
+claimed atomically inside a serializable tenant transaction, so duplicate or
+concurrent jobs safely become no-ops; the queue itself may process multiple
+jobs concurrently. The processor:
 
 1. receives a tenant-stamped job;
 2. resolves that organization database;
@@ -91,4 +93,3 @@ The retention queue fans out cleanup by organization. It deletes only data that
 matches the configured retention policy, uses bounded batches, records deleted
 counts, and reports deferred backlog. A retention failure for one tenant must
 not stop the sweep for other tenants.
-

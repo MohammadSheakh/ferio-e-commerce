@@ -20,13 +20,21 @@ describe('LocalPostgresProvisioner', () => {
   it('reconciles a role left by a partial run before returning its password', async () => {
     process.env.PLATFORM_DATABASE_URL =
       'postgresql://ferio:ferio@localhost:5433/ferio_platform';
-    const query = jest
+    const adminQuery = jest
       .fn<() => Promise<unknown>>()
       .mockResolvedValueOnce({})
       .mockRejectedValueOnce({ code: '42710' })
       .mockResolvedValue({});
-    const end = jest.fn<() => Promise<void>>().mockResolvedValue(undefined);
-    (Pool as unknown as jest.Mock).mockImplementation(() => ({ query, end }));
+    const tenantQuery = jest
+      .fn<() => Promise<unknown>>()
+      .mockResolvedValue({});
+    const adminEnd = jest.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    const tenantEnd = jest
+      .fn<() => Promise<void>>()
+      .mockResolvedValue(undefined);
+    (Pool as unknown as jest.Mock)
+      .mockImplementationOnce(() => ({ query: adminQuery, end: adminEnd }))
+      .mockImplementationOnce(() => ({ query: tenantQuery, end: tenantEnd }));
 
     const result = await new LocalPostgresProvisioner().createTenantDatabase({
       organizationId: 'org-12345678',
@@ -34,15 +42,19 @@ describe('LocalPostgresProvisioner', () => {
     });
 
     expect(result.username).toMatch(/^tenant_[a-f0-9]{24}$/);
-    expect(query).toHaveBeenCalledTimes(4);
-    const queryCalls = query.mock.calls as unknown as Array<[unknown]>;
+    expect(adminQuery).toHaveBeenCalledTimes(4);
+    const queryCalls = adminQuery.mock.calls as unknown as Array<[unknown]>;
     expect(queryCalls[2]?.[0]).toEqual(
       expect.stringMatching(/^ALTER ROLE "tenant_[a-f0-9]{24}" PASSWORD '/),
     );
     expect(queryCalls[3]?.[0]).toEqual(
       expect.stringContaining('GRANT ALL PRIVILEGES ON DATABASE'),
     );
-    expect(end).toHaveBeenCalledTimes(1);
+    expect(tenantQuery).toHaveBeenCalledWith(
+      expect.stringMatching(/^GRANT USAGE, CREATE ON SCHEMA public TO /),
+    );
+    expect(adminEnd).toHaveBeenCalledTimes(1);
+    expect(tenantEnd).toHaveBeenCalledTimes(1);
   });
 
   it('does not hide non-duplicate role creation errors', async () => {

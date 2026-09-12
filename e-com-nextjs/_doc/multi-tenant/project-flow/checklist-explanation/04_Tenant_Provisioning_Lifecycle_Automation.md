@@ -1156,8 +1156,9 @@ reasons to preserve data.
 
 Physical destruction remains provider/retention controlled.
 
-The export-before-closure workflow is still open/conditional in the
-supplied checklist.
+The export package and tenant business/audit/financial/media export workflows
+are implemented and checked. Automatic provider-side export orchestration
+before every closure remains an operational policy/deployment concern.
 
 ------------------------------------------------------------------------
 

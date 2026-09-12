@@ -4,6 +4,11 @@ import {
 } from '../../../tenancy/context/tenant-context';
 import { DeliveryPersonnelService } from '../delivery-personnel.service';
 
+type ToggleOnlineUpdate = {
+  where: { id: string };
+  data: { isOnline: boolean; lastLocationAt?: Date };
+};
+
 describe('DeliveryPersonnelService tenant GPS isolation', () => {
   const originalTenancy = process.env.TENANCY_ENABLED;
 
@@ -161,11 +166,12 @@ describe('DeliveryPersonnelService tenant GPS isolation', () => {
     await runWithTenantContext(context('org-a', 'tenant_a'), () =>
       service.toggleOnlineStatus('same-rider-user-id', true),
     );
-    expect(tenant.deliveryPersonnel.update).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        where: { id: 'rider-a' },
-        data: expect.objectContaining({ isOnline: true }),
-      }),
-    );
+    const updateCalls = tenant.deliveryPersonnel.update.mock.calls as unknown as Array<
+      [ToggleOnlineUpdate]
+    >;
+    const latestUpdate = updateCalls.at(-1)?.[0];
+    expect(latestUpdate?.where).toEqual({ id: 'rider-a' });
+    expect(latestUpdate?.data.isOnline).toBe(true);
+    expect(latestUpdate?.data.lastLocationAt).toBeInstanceOf(Date);
   });
 });

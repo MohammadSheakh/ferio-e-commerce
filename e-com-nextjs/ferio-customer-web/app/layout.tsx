@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { CartProvider } from "@/components/CartContext";
@@ -12,6 +13,7 @@ import { GoogleAnalytics } from "@next/third-parties/google";
 import { fallbackStoreConfig, getStoreConfig } from "@/lib/store";
 import { getCategories } from "@/lib/catalog";
 import { getTenantStatus } from "@/lib/tenancy";
+import { tenantHostFromHeaders } from "@/lib/host-forward";
 import { tenantStateForCode } from "@/components/tenant-states";
 
 const inter = Inter({
@@ -19,6 +21,11 @@ const inter = Inter({
   variable: "--font-inter",
   weight: ["400", "500", "600", "700"],
 });
+
+function tenantFetchInit(): RequestInit {
+  const host = tenantHostFromHeaders(headers());
+  return host ? { headers: { "x-forwarded-host": host } } : {};
+}
 
 export async function generateMetadata(): Promise<Metadata> {
   const tenant = await getTenantStatus();
@@ -29,7 +36,7 @@ export async function generateMetadata(): Promise<Metadata> {
       robots: { index: false, follow: false },
     };
   }
-  const store = await getStoreConfig().catch(() => fallbackStoreConfig);
+  const store = await getStoreConfig(tenantFetchInit()).catch(() => fallbackStoreConfig);
   return {
     title: `${store.storeName} — Shop Online`,
     description: `Browse current products, delivery options, and order support from ${store.storeName}.`,
@@ -56,8 +63,8 @@ export default async function RootLayout({
   }
 
   const [store, categories] = await Promise.all([
-    getStoreConfig().catch(() => fallbackStoreConfig),
-    getCategories().catch(() => []),
+    getStoreConfig(tenantFetchInit()).catch(() => fallbackStoreConfig),
+    getCategories(tenantFetchInit()).catch(() => []),
   ]);
   return (
     <html lang="en">

@@ -59,7 +59,8 @@ This step does not yet mean the tenant can serve traffic.
 5. SEED_TENANT
 6. ATTACH_OWNER_MEMBERSHIP
 7. HEALTH_CHECK
-8. ACTIVATE_ORGANIZATION
+8. SMOKE_TEST
+9. ACTIVATE_ORGANIZATION
 ```
 
 ### Step 1: Reserve subdomain
@@ -98,7 +99,13 @@ that the prerequisite is present for the provisioning evidence trail.
 The registry is marked ready only after the tenant database can be reached and
 has the expected schema state.
 
-### Step 8: Activate
+### Step 8: Smoke test
+
+`TenantSchemaBootstrapper.verifyReady()` confirms the baseline tenant tables
+and schema marker after the health check. The provisioning run records this as
+an explicit evidence step; it does not apply migrations a second time.
+
+### Step 9: Activate
 
 The organization transitions from `PROVISIONING` to `ACTIVE`. Only after this
 point can host resolution return a ready tenant database.
@@ -106,8 +113,9 @@ point can host resolution return a ready tenant database.
 ## Retry And Failure
 
 Provisioning uses an idempotency key. Repeating the same request resumes the
-existing run rather than creating a second domain/database. A failed run is
-marked `PROVISIONING_FAILED`, records the failed step, and can be resumed.
+existing run rather than creating a second domain/database. A failed
+`ProvisioningRun` is marked `FAILED`, records the failed step, and transitions
+the organization to `PROVISIONING_FAILED`; the run can then be resumed.
 
 Organization transitions are explicit:
 
@@ -143,4 +151,3 @@ Platform Admin can initiate/finalize closure, create migration runs, pause or
 resume them, and inspect provisioning/database health. These operations are
 control-plane workflows and must be audited. Tenant traffic is rejected or
 restricted according to the organization/database lifecycle state.
-

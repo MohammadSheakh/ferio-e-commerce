@@ -1888,21 +1888,22 @@ according to the tracker.
 
 Here is the most important status nuance.
 
-Most individual MT-10 implementation items are checked complete.
-
-But the supplied tracker still leaves the final MT-10 gate
-**unchecked**:
+Most individual MT-10 implementation items are checked complete, and the
+current checklist/evidence matrix also marks the two-tenant vertical gate
+checked:
 
 ``` text
-□ A business owner can receive a tenant, configure it,
+✓ A business owner can receive a tenant, configure it,
   publish products, receive an order, fulfill it,
   and see only that business's data.
 
-□ A second tenant can perform the same flow concurrently
+✓ A second tenant can perform the same flow concurrently
   with no shared state.
 ```
 
-So MT-10 is not fully closed at the release-gate level.
+This closes the engineering gate. It does not replace live pilot execution,
+registered-host/browser evidence, provider readiness, or MT-14 production
+launch approval.
 
 ------------------------------------------------------------------------
 
@@ -2280,10 +2281,9 @@ Ferio's tracker explicitly uses the bounded approach.
 > entitlement UX is a projection of fail-closed backend policy,
 > downgrade and suspension behavior preserve data without permitting
 > unauthorized mutations, and provider readiness exposes metadata rather
-> than secrets. Individual controls are largely implemented, but the
-> release gate correctly remains open until two concurrent tenants
-> complete the full owner-to-fulfillment vertical journey with no shared
-> state.
+> than secrets. The MT-10 engineering gate is checked by the two-tenant
+> vertical evidence; live pilot, provider, and MT-14 production-launch gates
+> remain separate.
 
 ------------------------------------------------------------------------
 

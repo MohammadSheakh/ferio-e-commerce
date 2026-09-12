@@ -351,3 +351,53 @@ shared customer session client for access-token refresh and tenant-host
 forwarding, while guests retain the public submission path. Runtime multipart
 content checks, booking races, moderation authorization, browser behavior, and
 cross-tenant evidence remain required.
+
+Shot 70 verified the Redis-backed refresh-token revocation path. The focused
+NestJS auth suite passed 2 suites / 9 tests, including tenant-mismatch refresh
+rejection and blacklisted-token rejection. A disposable key round trip against
+the project Redis instance on host port `6380` returned `SET=OK`, the expected
+`blacklisted` value, a 30-second TTL, successful deletion, and `PONG`. Live
+cookie rotation, provisioned two-tenant browser isolation, tunnel forwarding,
+queue/retention operations, and production Redis recovery/monitoring remain
+open. Evidence is recorded in
+`project-progress/2026-09-11-redis-session-revocation-api-integration-shot-70.md`.
+
+Shot 71 exercised the live local SSR/tenant-resolution negative path with
+`alpha-a.ferio.sheakh.qzz.io` and `alpha-b.ferio.sheakh.qzz.io`. Backend health
+returned 200, but the platform database has no `TenantDomain` rows, so both
+candidate hosts correctly returned `TENANT_RESOLUTION_FAILED`; customer SSR
+rendered the fail-closed Store unavailable page when forwarded host and HTTPS
+headers were supplied. Direct requests without forwarded protocol redirected to
+the internal container hostname, confirming that the tunnel/reverse proxy must
+preserve those headers. Positive two-tenant browser/BFF isolation, cookie
+refresh, and public wildcard DNS remain blocked on real tenant provisioning.
+Evidence is recorded in
+`project-progress/2026-09-11-live-tenant-host-forwarding-api-integration-shot-71.md`.
+
+Shot 72 ran the cross-app contract gates without changing source snapshots.
+Customer web, tenant-admin web, and platform-admin web all passed
+`pnpm api:check`, confirming their generated `lib/api-schema.ts` files match
+the active backend `openapi.json`. All three apps also passed
+`pnpm exec tsc --noEmit`. These static checks do not close runtime
+authorization, cookie, provider, queue, browser-forwarding, or positive
+cross-tenant isolation evidence. Evidence is recorded in
+`project-progress/2026-09-11-cross-app-openapi-typecheck-api-integration-shot-72.md`.
+
+Shot 73 fixed and ran the Redis/BullMQ runtime smoke gate with isolated prefix
+`ferio:test:shot73:` on project Redis port `6380`. The queue suite passed 6
+suites / 11 tests, covering payment recovery, courier webhook and polling
+retries, reconciliation retry, bounded capacity, scheduler idempotence, Redis
+pipelining, and reconnect recovery. The backend application typecheck and lint
+for all five changed smoke tests also passed. A non-failing BullMQ teardown
+listener warning remains documented; production Redis failover, queue fairness
+under real tenant load, and positive browser tenant isolation remain open.
+Evidence is recorded in
+`project-progress/2026-09-11-redis-bullmq-api-integration-shot-73.md`.
+
+Shot 74 isolated the remaining non-failing BullMQ listener warning. Queue
+capacity, payment recovery, shipping webhook, shipping polling,
+reconciliation, and Redis reconnect smoke suites each passed independently
+under `NODE_OPTIONS=--trace-warnings`; the warning appears only when all six
+suites share one Jest process. It is recorded as a test-runner listener-budget
+cleanup item, not an API or Redis failure. Evidence is recorded in
+`project-progress/2026-09-11-bullmq-listener-warning-api-integration-shot-74.md`.

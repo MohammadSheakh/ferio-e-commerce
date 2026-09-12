@@ -83,8 +83,9 @@ export function formatTaka(amountInPaisa: number): string {
   }).format(amountInPaisa / 100);
 }
 
-export function getCategories(): Promise<CatalogCategory[]> {
+export function getCategories(init?: RequestInit): Promise<CatalogCategory[]> {
   return getPublicApi<CatalogCategory[]>("/catalog/categories", {
+    ...init,
     next: { revalidate: 60 },
   });
 }

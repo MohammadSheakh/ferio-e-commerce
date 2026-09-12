@@ -1369,23 +1369,21 @@ The trusted hostname starts the routing decision.
 
 ------------------------------------------------------------------------
 
-# 53. The MT-5 Gate Has One Important Open Item
+# 53. The MT-5 Gate Has One Important Operational Boundary
 
-The supplied checklist currently shows:
+The current checklist and evidence matrix show:
 
 ``` text
-[ ] Tenant A and Tenant B render different storefronts/data/settings
+[x] Tenant A and Tenant B render different storefronts/data/settings
     on distinct hosts.
 ```
 
 while cache/CDN isolation and unknown/removed-domain safety are marked
 complete.
 
-This means the architecture/components may exist, but the specific
-end-to-end distinct-host gate still needs proof according to the
-tracker.
-
-Do not silently mark it complete.
+The engineering gate is checked using the two-tenant vertical integration
+evidence. This does not replace live registered-domain, browser, Cloudflare
+Tunnel, pilot, or production-host evidence.
 
 ------------------------------------------------------------------------
 
@@ -2428,10 +2426,10 @@ Yes according to Ferio's policy; storefront browsing remains possible
 while commerce writes such as checkout are restricted.
 
 **Q: Is MT-5 completely proven?**\
-Not yet according to the supplied tracker: the distinct-host Tenant
-A/Tenant B storefront/data/settings gate remains unchecked, wildcard DNS
-is partial operationally, and custom-domain DNS/TLS readiness
-verification remains open.
+The application-level distinct-host gate is checked. Wildcard DNS remains
+partial operationally, custom-domain DNS/TLS readiness verification remains
+open, and live registered-domain/browser/Cloudflare evidence is still a
+separate deployment gate.
 
 ------------------------------------------------------------------------
 
@@ -2570,8 +2568,11 @@ Still not fully closed:
 △ production wildcard DNS record creation
 △ automated custom-domain DNS verification
 △ custom-domain TLS readiness verification
-△ end-to-end proof that Tenant A and Tenant B render
+✓ application-level proof that Tenant A and Tenant B render
   distinct storefronts/data/settings on distinct hosts
+
+Live registered-domain/browser/Cloudflare SSR/BFF evidence remains a separate
+deployment/runtime gate.
 ```
 
 This distinction is important when evaluating whether MT-5 is actually

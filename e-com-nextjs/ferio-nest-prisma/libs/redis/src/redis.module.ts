@@ -4,6 +4,7 @@ import {
   RedisPubProvider,
   RedisSubProvider,
 } from './redis.provider';
+import { RedisClientsLifecycle } from './redis.lifecycle';
 import { RedisService } from './redis.service';
 
 /**
@@ -25,7 +26,13 @@ import { RedisService } from './redis.service';
  */
 @Global()
 @Module({
-  providers: [RedisProvider, RedisPubProvider, RedisSubProvider, RedisService],
+  providers: [
+    RedisProvider,
+    RedisPubProvider,
+    RedisSubProvider,
+    RedisClientsLifecycle,
+    RedisService,
+  ],
   exports: [RedisProvider, RedisPubProvider, RedisSubProvider, RedisService],
 })
 export class RedisModule {}

@@ -2121,25 +2121,26 @@ Teaching pseudocode:
 
 ``` ts
 @UseGuards(PlatformAuthGuard)
-@Controller("platform/organizations")
+@Controller("platform")
 export class PlatformOrganizationsController {
-  @Post(":id/suspend")
-  @RequirePlatformPermission("organization:write")
-  suspend(
+  @Patch("organizations/:id/status")
+  @PlatformPermissions("organization:write")
+  transition(
     @Param("id") id: string,
-    @Body() dto: SuspendOrganizationDto,
-    @PlatformActor() actor: PlatformActor,
+    @Body() dto: TransitionOrganizationDto,
+    @Req() request: PlatformRequest,
   ) {
-    return this.organizations.suspend({
-      organizationId: id,
+    return this.organizations.transition(id, dto.status, {
+      actorId: request.platformPrincipal?.platformUserId,
       reason: dto.reason,
-      actor,
     });
   }
 }
 ```
 
-The UI does not decide authorization.
+The UI does not decide authorization. The names above mirror the current
+backend decorator, route, request type, and organization transition service;
+the snippet remains educational pseudocode rather than a copy-paste controller.
 
 ------------------------------------------------------------------------
 

@@ -6,11 +6,11 @@
 set -e
 
 SECRETS_DIR=/app/.secrets
-# The volume may be root-owned; fall back to a writable dir if mkdir/chmod
-# fails as the non-root user.
+# Secret persistence is mandatory. Falling back to an ephemeral directory
+# would make encrypted platform credentials undecryptable after a restart.
 if ! mkdir -p "$SECRETS_DIR" 2>/dev/null || [ ! -w "$SECRETS_DIR" ]; then
-  SECRETS_DIR=/tmp/ferio-secrets
-  mkdir -p "$SECRETS_DIR"
+  echo "ERROR: persistent secret volume is unavailable or not writable: $SECRETS_DIR" >&2
+  exit 1
 fi
 
 gen_once() {

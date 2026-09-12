@@ -493,7 +493,7 @@ All surfaces live in the ferio-platform-admin console:
 - [x] Implement trialing if approved. (startTrial, default 14 days per PO-002)
 - [x] Implement active.
 - [x] Implement past-due/grace period if approved. (7-day window from latest PAST_DUE event, PO-004 — unit-tested incl. override)
-- [x] Implement suspended/restricted. (checkout denial CHECKOUT_DISABLED_SUSPENDED per PO-005; storefront stays browsable)
+- [x] Implement suspended/restricted. (commerce mutation denial `COMMERCE_MUTATION_DISABLED_SUSPENDED` per PO-005; storefront stays browsable and authentication/read operations remain available)
 - [x] Implement cancelled/non-renewing.
 - [x] Implement reactivation. (PAST_DUE/SUSPENDED/CANCELLED → ACTIVE)
 - [x] Preserve tenant data across non-destructive subscription state changes. (plan-limit lifecycle integration spec: every historical order survives an upgrade AND a downgrade byte-for-byte)
