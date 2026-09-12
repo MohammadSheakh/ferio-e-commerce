@@ -38,5 +38,5 @@ sequenceDiagram
     API-->>BFF: Transformed response
     BFF-->>Browser: Tenant-safe response
 
-    Note over Resolver,Context: Browser body, query, or cookie never selects a database.
-    Note over Manager,Tenant: Missing context fails loudly; no legacy database fallback.
+    Note over Resolver: Browser input never selects a database.
+    Note over Manager: Missing context fails loudly; no legacy fallback.
