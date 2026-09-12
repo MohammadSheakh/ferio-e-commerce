@@ -50,6 +50,3 @@ sequenceDiagram
         DB-->>Checkout: Updated order/payment status
         Checkout-->>Web: Updated order/payment status
     end
-
-    Note over Cart,DB: Cart contents are not checkout truth; mutable facts are revalidated.
-    Note over Checkout,DB: Browser retries are deduplicated by idempotency key.
