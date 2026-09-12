@@ -38,6 +38,3 @@ sequenceDiagram
     REST->>Auth: Recheck participant and sender ownership
     REST->>DB: Apply cursor/ownership-safe mutation
     REST->>Gateway: Ask gateway to emit updated tenant-scoped event
-
-    Note over DB,Queue: Notifications reference a durable message; a rolled-back message is not notified.
-    Note over Gateway,Redis: Identical conversation IDs in different tenants use different room namespaces.
