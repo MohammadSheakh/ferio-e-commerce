@@ -37,6 +37,3 @@ sequenceDiagram
     Service-->>API: Domain result or stable domain error
     API-->>BFF: Transformed response
     BFF-->>Browser: Tenant-safe response
-
-    Note over Resolver: Browser input never selects a database.
-    Note over Manager: Missing context fails loudly; no legacy fallback.
