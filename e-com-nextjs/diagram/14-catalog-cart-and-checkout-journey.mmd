@@ -12,7 +12,8 @@ sequenceDiagram
     Customer->>Web: Open tenant storefront
     Web->>Catalog: GET published catalog and product detail
     Catalog->>DB: Read published products, variants, inventory
-    DB-->>Web: Tenant-scoped catalog projection
+    DB-->>Catalog: Tenant-scoped catalog projection
+    Catalog-->>Web: Tenant-scoped catalog projection
 
     Customer->>Web: Add variant to cart
     Web->>Cart: POST cart/items with x-cart-token
@@ -24,7 +25,8 @@ sequenceDiagram
         Web->>Cart: POST cart/merge with guest token
         Cart->>DB: Merge guest items into customer cart
         Cart->>DB: Revalidate ownership and availability
-        DB-->>Web: Account cart result
+        DB-->>Cart: Account cart result
+        Cart-->>Web: Account cart result
     end
 
     Customer->>Web: Start checkout
@@ -36,7 +38,8 @@ sequenceDiagram
     alt COD
         Web->>Checkout: POST checkout/orders + idempotency key
         Checkout->>DB: Transactionally create order and reserve inventory
-        DB-->>Web: COD order reference
+        DB-->>Checkout: COD order reference
+        Checkout-->>Web: COD order reference
     else Prepaid
         Web->>Checkout: Create prepaid order/payment attempt
         Checkout->>DB: Persist order and payment attempt
@@ -44,7 +47,8 @@ sequenceDiagram
         Payment-->>Web: Redirect/session
         Payment->>Checkout: Signed callback
         Checkout->>DB: Verify and finalize payment state
-        DB-->>Web: Updated order/payment status
+        DB-->>Checkout: Updated order/payment status
+        Checkout-->>Web: Updated order/payment status
     end
 
     Note over Cart,DB: Cart contents are not checkout truth; mutable facts are revalidated.

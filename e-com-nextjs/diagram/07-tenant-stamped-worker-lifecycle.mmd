@@ -11,7 +11,7 @@ sequenceDiagram
     participant JobDB as Tenant PostgreSQL
     participant Ops as Metrics and audit
 
-    Request->>TenantDB: Persist durable event or job intent
+    Request->>TenantDB: Persist durable event or job intent in owning store
     Request->>Queue: Enqueue organizationId + entityId + idempotency key
     Queue-->>Worker: Deliver trusted job envelope
     Worker->>Worker: Validate required fields and lifecycle state
@@ -34,4 +34,4 @@ sequenceDiagram
     end
 
     Note over Queue,Context: HTTP AsyncLocalStorage is not reused; tenant context is reconstructed from trusted control-plane identity.
-    Note over Request,JobDB: A job payload never carries a database URL or browser-selected tenant identity.
+    Note over Request,JobDB: A job payload carries organization identity only; it never carries a database URL or browser-selected connection.

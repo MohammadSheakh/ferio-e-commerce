@@ -29,7 +29,7 @@ sequenceDiagram
     REST->>DB: Transactionally persist message and last-message state
     DB-->>REST: Durable message
     REST->>Queue: Enqueue participant notification after commit
-    REST->>Gateway: Emit through organization-scoped room
+    REST->>Gateway: Ask gateway to emit through organization-scoped room
     Gateway->>Redis: Fan out tenant-scoped event
     Gateway-->>Agent: New message event
     Queue-->>Agent: Notification delivery work
@@ -37,7 +37,7 @@ sequenceDiagram
     Agent->>REST: Read, update, or delete own permitted message
     REST->>Auth: Recheck participant and sender ownership
     REST->>DB: Apply cursor/ownership-safe mutation
-    REST->>Gateway: Emit updated tenant-scoped event
+    REST->>Gateway: Ask gateway to emit updated tenant-scoped event
 
     Note over DB,Queue: Notifications reference a durable message; a rolled-back message is not notified.
     Note over Gateway,Redis: Identical conversation IDs in different tenants use different room namespaces.

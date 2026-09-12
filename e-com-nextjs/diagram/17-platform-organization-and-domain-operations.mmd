@@ -15,13 +15,15 @@ sequenceDiagram
     API->>Guard: Validate platform realm and organization permission
     Guard->>Org: Load organization, domains, registry, subscription
     Org->>DB: Read control-plane metadata
-    DB-->>Web: Status and domain inventory
+    DB-->>Org: Status and domain inventory
+    Org-->>API: Status and domain inventory
+    API-->>Web: Status and domain inventory
 
     Operator->>Web: Add custom domain or reserve platform subdomain
     Web->>API: POST domain configuration
     API->>Guard: Check domain entitlement and platform permission
     Guard->>Org: Normalize and validate hostname
-    Org->>DB: Persist pending/active domain mapping
+    Org->>DB: Persist pending domain mapping
     Org->>Audit: Record domain mutation
     Org->>Cache: Invalidate affected host mapping
     API-->>Web: Verification instructions or active domain
@@ -30,7 +32,7 @@ sequenceDiagram
         Operator->>Web: Submit DNS verification token
         Web->>API: POST domain verify
         API->>Org: Confirm token and domain ownership
-        Org->>DB: Mark domain ACTIVE
+        Org->>DB: Mark domain ACTIVE after ownership proof
         Org->>Cache: Invalidate negative cache
     end
 

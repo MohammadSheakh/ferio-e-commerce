@@ -11,11 +11,14 @@ sequenceDiagram
 
     Operator->>Web: Submit platform credentials
     Web->>API: POST /platform/auth/login
+    API->>Guard: Apply login-route bypass and throttling
+    Guard-->>API: Credential exchange allowed
     API->>Auth: Validate login DTO and rate limit
     Auth->>DB: Load PlatformUser
     DB-->>Auth: User, role, permission state
     Auth->>Auth: Verify password and issue platform-realm JWT
-    Auth-->>Web: Access token and session response
+    Auth-->>API: Access token and roles
+    API-->>Web: Access token and session response
 
     Operator->>Web: Open protected platform operation
     Web->>API: GET/POST /platform/* with platform token
@@ -29,5 +32,6 @@ sequenceDiagram
         Guard-->>Web: Stable authorization error
     end
 
+    Note over Guard,Auth: Login is the only platform route that intentionally bypasses bearer-token validation.
     Note over Auth,DB: Platform auth never resolves a tenant database for ordinary platform operations.
     Note over Guard,Service: Organization IDs in platform routes are operator targets, not browser-selected tenant context.

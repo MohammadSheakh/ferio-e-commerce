@@ -26,7 +26,7 @@ sequenceDiagram
         API->>Match: Match shipment/order identity and collection evidence
         Match->>DB: Read eligible tenant collections
         DB-->>Match: Order/shipment evidence
-        Match->>DB: Transactionally post settlement result
+        Match->>DB: Transactionally post settlement result with idempotency key
         DB-->>Match: MATCHED, SHORTFALL, or exception state
         Match->>Audit: Record source, row identity, actor, and outcome
         Match-->>Web: Idempotent settlement result
@@ -36,5 +36,6 @@ sequenceDiagram
     Web->>API: Same idempotency key
     API->>DB: Return original committed result
 
+    Note over Parser,DB: Preflight validates the file; posting is the only step that mutates tenant settlement state.
     Note over Parser,DB: Operational row limits prevent oversized synchronous imports.
     Note over Match,DB: COD is marked paid only when collection and shipment evidence match.

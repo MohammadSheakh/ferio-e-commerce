@@ -9,7 +9,6 @@ sequenceDiagram
     participant Tenant as Tenant registry/DB probes
     participant Redis
     participant Queue as BullMQ queues
-    participant Provider as Payment/courier providers
     participant Backup as Backup/restore evidence
 
     Operator->>Console: Open system, database, or domain health
@@ -23,8 +22,6 @@ sequenceDiagram
         Health->>Redis: Probe connectivity and safe metrics
     and Queues
         Health->>Queue: Read waiting/active/failed counts
-    and Providers
-        Health->>Provider: Read readiness/configuration summary
     and Recovery
         Health->>Backup: Read latest backup and restore verification
     end
@@ -32,5 +29,5 @@ sequenceDiagram
     Health-->>API: Sanitized status and launch blockers
     API-->>Console: Operator-readable health response
 
-    Note over Health,Backup: Health is a signal assembled from evidence; it is not proof of capacity or production launch readiness.
+    Note over Health,Backup: This health surface reports control-plane, tenant registry, queues, and backup evidence; it does not actively probe every external provider.
     Note over API,Console: Responses exclude secrets, connection strings, provider credentials, and raw driver errors.

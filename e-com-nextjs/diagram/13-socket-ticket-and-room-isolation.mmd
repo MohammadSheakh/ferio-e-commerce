@@ -29,7 +29,9 @@ sequenceDiagram
         Gateway->>Redis: Store tenant-scoped presence and socket ownership
         Gateway-->>Client: Connected with principal metadata
         Client->>Gateway: Join conversation or task room
-        Gateway->>DB: Verify tenant membership/participant access
+        Gateway->>Ticket: Verify tenant membership/participant access
+        Ticket->>DB: Read tenant participant/conversation membership
+        Ticket-->>Gateway: Room authorization result
         Gateway->>Room: Add only authorized scoped room
     else Ticket invalid or organization missing
         Gateway-->>Client: Reject connection

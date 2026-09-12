@@ -30,7 +30,7 @@ sequenceDiagram
     alt Subscription and entitlement allow
         Gate-->>Feature: ALLOW with effective limit
         Feature->>Tenant: Apply tenant mutation or read
-        Feature->>Usage: Record usage after durable fact
+        Feature->>Usage: Record control-plane usage after durable fact
     else Missing, inactive, disabled, or over limit
         Gate-->>Feature: DENY with stable reason code
         Feature-->>API: Entitlement error
@@ -38,8 +38,8 @@ sequenceDiagram
 
     Operator->>API: Reconcile usage for organization
     API->>Usage: Compare tenant facts with recorded counters
-    Usage->>Tenant: Read bounded authoritative facts
-    Usage->>DB: Correct counter and audit reconciliation
+    Usage->>Tenant: Read bounded authoritative tenant facts
+    Usage->>DB: Correct control-plane counter and audit reconciliation
 
     Note over Feature,Gate: Frontend hiding is UX only; backend evaluation is enforcement.
-    Note over DB,Tenant: Plans/usage live in the control plane; commerce facts remain tenant-owned.
+    Note over DB,Tenant: Plans and usage counters live in the control plane; commerce facts remain tenant-owned and are only read for reconciliation.

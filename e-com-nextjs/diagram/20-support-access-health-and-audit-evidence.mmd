@@ -21,7 +21,9 @@ sequenceDiagram
     Console->>API: Present active support grant
     API->>Support: Verify scope, expiry, and revocation
     Support-->>Console: Allowed read/support context
-    Console->>DB: Read only permitted tenant data
+    Console->>API: Read tenant data using support grant
+    API->>Support: Enforce grant scope and expiry
+    Support->>DB: Read only permitted tenant data
     Console->>Audit: Record support action and correlation ID
 
     Operator->>Console: Open health dashboard

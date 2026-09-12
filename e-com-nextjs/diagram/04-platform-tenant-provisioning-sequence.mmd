@@ -18,7 +18,8 @@ sequenceDiagram
     Org->>Platform: Create PROVISIONING organization
     Org->>Platform: Create initial owner membership
     Org->>Audit: Record organization-created event
-    Platform-->>Web: Organization metadata
+    Org-->>API: Organization metadata
+    API-->>Web: Organization metadata
 
     Operator->>Web: Start provisioning with idempotency key
     Web->>API: POST /organizations/:id/provision
@@ -34,6 +35,7 @@ sequenceDiagram
         Run->>Platform: ATTACH_OWNER_MEMBERSHIP evidence
         Run->>Bootstrap: HEALTH_CHECK
         Run->>Bootstrap: SMOKE_TEST / verifyReady
+        Run->>Domain: ACTIVATE_ORGANIZATION and platform domain
         Run->>Platform: Record step outcome
     end
 

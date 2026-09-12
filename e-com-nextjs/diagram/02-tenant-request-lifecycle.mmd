@@ -14,10 +14,10 @@ sequenceDiagram
     participant Service as Feature service
 
     Browser->>BFF: Request on tenant.example
-    BFF->>API: Forward request and trusted original host
+    BFF->>API: Forward request with trusted x-forwarded-host
     API->>Middleware: Run tenant middleware
     Middleware->>Resolver: Resolve effective host
-    Resolver->>Resolver: Normalize host and validate proxy chain
+    Resolver->>Resolver: Normalize host and validate trusted proxy chain
     Resolver->>Redis: Read positive or negative host cache
 
     alt Cache miss

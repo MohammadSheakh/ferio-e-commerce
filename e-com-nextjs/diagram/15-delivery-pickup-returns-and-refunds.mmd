@@ -41,7 +41,7 @@ sequenceDiagram
     alt Refund approved
         Admin->>Refund: Create refund with idempotency key
         Refund->>DB: Persist refund intent/result state
-        Refund-->>Courier: Optional reverse logistics/RTO coordination
+        Refund-->>API: Return stable refund status
     else Return-to-origin
         Order->>DB: Persist RTO state and resolution evidence
     end

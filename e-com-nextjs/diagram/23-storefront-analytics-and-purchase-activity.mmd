@@ -25,11 +25,13 @@ sequenceDiagram
     end
 
     opt Public purchase activity
-        Browser->>Activity: Request page of recent activity
+        Browser->>Web: Request page of recent activity
+        Web->>Activity: Forward tenant-scoped activity request
         Activity->>Settings: Check activity enabled and policy
         Activity->>DB: Select delivered/completed opted-in orders
         DB-->>Activity: Masked customer/product projection
-        Activity-->>Browser: Bounded page and pagination metadata
+        Activity-->>Web: Bounded page and pagination metadata
+        Web-->>Browser: Bounded page and pagination metadata
     end
 
     Note over Analytics,DB: Identical event IDs and search terms remain isolated by tenant database.

@@ -7,6 +7,7 @@ sequenceDiagram
     participant Context as Tenant resolver/context
     participant Auth as AuthService and OTP service
     participant DB as Tenant PostgreSQL
+    participant Queue as Email/OTP queue
     participant Mail as Email or OTP provider
 
     Customer->>Web: Register or submit login on tenant host
@@ -17,7 +18,8 @@ sequenceDiagram
     alt Registration
         API->>Auth: Validate input and create tenant user
         Auth->>DB: Store user and one-time verification state
-        Auth->>Mail: Enqueue verification message
+        Auth->>Queue: Enqueue verification message
+        Queue->>Mail: Deliver verification message
         Mail-->>Customer: Verification code/link
         Customer->>Web: Submit verification code
         Web->>API: POST /auth/verify-email

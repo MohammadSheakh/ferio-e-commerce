@@ -15,7 +15,7 @@ sequenceDiagram
     API->>Guard: Validate tenant membership and reports permission
     Guard->>Report: Continue with actor permission set
     Report->>Report: Normalize UTC period and allowed filters
-    Report->>DB: Read tenant-local orders in keyset pages
+    Report->>DB: Read tenant-local orders in bounded keyset pages
     DB-->>Report: Bounded page of rows
     loop Until keyset exhausted
         Report->>DB: Read next page after last stable key
@@ -29,4 +29,4 @@ sequenceDiagram
 
     Note over Guard,Report: Frontend-hidden fields remain protected by backend projection.
     Note over Report,DB: Tenant database is resolved before any order/customer read.
-    Note over Report,CSV: Keyset pages prevent unbounded memory growth.
+    Note over Report,CSV: Keyset pages and bounded date ranges prevent unbounded memory growth.

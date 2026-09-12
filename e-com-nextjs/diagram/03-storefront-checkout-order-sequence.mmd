@@ -9,12 +9,14 @@ sequenceDiagram
     participant DB as Tenant PostgreSQL
     participant Payment as Payment gateway adapter
     participant Queue as Transactional queue
+    participant Worker as Tenant-stamped worker
     participant Courier as Courier adapter
 
     Customer->>Web: Browse published catalog
     Web->>API: Read catalog using resolved tenant host
     API->>DB: Read published products and variants
-    DB-->>Web: Catalog projection
+    DB-->>API: Catalog projection
+    API-->>Web: Catalog projection
 
     Customer->>Web: Add item and open checkout
     Web->>API: Cart token and requested item changes
@@ -44,9 +46,10 @@ sequenceDiagram
 
     API->>Queue: Record deduplicated notification/fulfillment work
     Queue-->>API: Accepted for asynchronous processing
-    Queue->>Courier: Poll or send shipment workflow
-    Courier-->>Queue: Normalized shipment event
-    Queue->>DB: Persist shipment and order history
+    Queue->>Worker: Deliver tenant-stamped job
+    Worker->>Courier: Poll or send shipment workflow
+    Courier-->>Worker: Normalized shipment event
+    Worker->>DB: Persist shipment and order history
     API-->>Web: Stable order/payment status
 
     Note over API,DB: Idempotency prevents browser retries from duplicating orders.

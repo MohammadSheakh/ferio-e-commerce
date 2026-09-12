@@ -23,8 +23,8 @@ sequenceDiagram
             Worker->>Notify: Record outcome and side effects
         end
     else Courier webhook
-        Callback->>API: Raw body + signature + tenant callback token
-        API->>API: Verify authenticity and store callback evidence
+        Callback->>API: Raw body + signature + callback tenant token
+        API->>API: Verify authenticity and resolve tenant via signed callback data
         API->>Queue: Enqueue normalized tenant job
         Queue->>Worker: Process callback
         Worker->>Provider: Normalize provider status if needed
