@@ -1,0 +1,43 @@
+%% Tenant content, settings, store locations, and staged feature flags
+flowchart TD
+    admin[Tenant admin]
+    guard[Admin role, permission, membership,\nand feature/plan gates]
+    content[Product content and review moderation]
+    settings[Commerce settings and feature flags]
+    locations[Store locations, pickup, and warehouse metadata]
+    db[(Tenant PostgreSQL)]
+    audit[Audit record]
+    cache[Invalidate tenant-scoped Redis keys]
+    public[Public-safe storefront projection]
+    consumer[Catalog, checkout, pickup, warranty,\nanalytics, and booking consumers]
+    disabled[Stable disabled/unavailable response]
+
+    admin --> guard
+    guard --> content
+    guard --> settings
+    guard --> locations
+    content --> db
+    settings --> db
+    locations --> db
+    content --> audit
+    settings --> audit
+    locations --> audit
+    settings --> cache
+    db --> public
+    public --> consumer
+    settings --> consumer
+    consumer -->|flag or policy denies| disabled
+
+    note1[Public responses expose only customer-safe settings and published content]
+    note1 -.-> public
+    note2[Successful audited mutations invalidate stale settings/cache state]
+    note2 -.-> cache
+    note3[Frontend navigation is not enforcement; consumers recheck flags server-side]
+    note3 -.-> consumer
+
+    classDef control fill:#eef6ff,stroke:#2864a8,color:#17324d;
+    classDef durable fill:#eefbf3,stroke:#218739,color:#123d20;
+    classDef fail fill:#fff0f0,stroke:#b42318,color:#5f1712;
+    class guard,settings,cache control;
+    class content,locations,db,audit,public,consumer durable;
+    class disabled fail;

@@ -1,0 +1,43 @@
+%% Transactional messaging, settlement, reconciliation, and operational alert flow
+flowchart TD
+    mutation[Order, payment, fulfillment, or settlement mutation]
+    commit{Tenant transaction committed?}
+    message[Transactional message or financial run record\nwith deduplication key]
+    queue[[BullMQ delivery or reconciliation queue]]
+    processor[Processor\nvalidate envelope and tenant state]
+    adapter[Channel/provider adapter\nemail, SMS, WhatsApp, storage, courier]
+    delivery{Delivery or comparison result}
+    retry{Retryable?\nbelow attempt limit?}
+    retryQueue[[Bounded retry with backoff]]
+    dead[Failed/dead-letter evidence\nmasked recipients and provider response]
+    status[Persist delivery status, finding,\nsettlement variance, and metrics]
+    alert[Operational alert\nacknowledgement and owner]
+    resolve[Reconciliation resolution\nwith audit trail]
+
+    mutation --> commit
+    commit -->|no| dead
+    commit -->|yes| message
+    message -->|dedupe repeated event| queue
+    queue --> processor
+    processor --> adapter
+    adapter --> delivery
+    delivery -->|success or matched| status
+    delivery -->|failure or variance| retry
+    retry -->|yes| retryQueue
+    retryQueue --> processor
+    retry -->|no| dead
+    dead --> status
+    status --> alert
+    alert --> resolve
+
+    note1[Templates are versioned, admin-only, variable-validated,\nand audited before delivery]
+    note1 -.-> message
+    note2[Large scans/imports are resumable workflows, not unbounded HTTP requests]
+    note2 -.-> processor
+
+    classDef durable fill:#eefbf3,stroke:#218739,color:#123d20;
+    classDef async fill:#f2edff,stroke:#7048a8,color:#30204d;
+    classDef fail fill:#fff0f0,stroke:#b42318,color:#5f1712;
+    class message,status,resolve durable;
+    class queue,retryQueue,processor async;
+    class dead,alert fail;

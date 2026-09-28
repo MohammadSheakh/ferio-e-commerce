@@ -1,0 +1,19 @@
+flowchart TD
+    Request[Incoming request] --> Transport{HTTPS and trusted proxy?}
+    Transport -- no --> Reject[Reject or redirect safely]
+    Transport -- yes --> Host{Host is verified and active?}
+    Host -- no --> FailClosed[Fail closed without tenant lookup]
+    Host -- yes --> Session{Session valid for tenant?}
+    Session -- no --> PublicOr401[Public route or 401]
+    Session -- yes --> Permission{Role, permission, ownership?}
+    Permission -- no --> Forbidden[403 or safe not-found]
+    Permission -- yes --> Execute[Execute tenant-scoped operation]
+    Execute --> Log[Sanitized audit and correlation metadata]
+    Log --> Response[Response with safe error shape]
+    Reject --> Log
+    FailClosed --> Log
+    PublicOr401 --> Log
+    Forbidden --> Log
+
+    Note1[Do not log tokens, secrets, raw credentials, or sensitive payloads.] -.-> Log
+    Note2[Client-selected organization or database ids are never authority.] -.-> Host

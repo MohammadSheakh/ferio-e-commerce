@@ -1,0 +1,18 @@
+flowchart LR
+    PRD[PRD requirement] --> Checklist[Release checklist item]
+    Checklist --> Flow[Project-flow explanation]
+    Flow --> API[API documentation contract]
+    API --> Source[Frontend handler and NestJS source]
+    Source --> Tests[Unit, integration, and negative tests]
+    Tests --> Runtime[Staging/runtime evidence]
+    Runtime --> Review[Release review decision]
+    Review -- gap --> Fix[Tracked fix or risk acceptance]
+    Fix --> Source
+    Review -- proven --> Complete[Evidence-backed completion]
+
+    Diagram[Mermaid diagram] -. explains boundaries, not proof .-> Flow
+    Diagram -. points readers to APIs and code .-> Source
+    Diagram -. records limits .-> Review
+
+    Note1[Do not mark an infrastructure or provider gate complete from source inspection alone.] -.-> Runtime
+    Note2[Keep unresolved evidence gaps visible in the checklist.] -.-> Review

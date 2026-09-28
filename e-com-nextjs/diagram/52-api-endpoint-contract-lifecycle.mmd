@@ -1,0 +1,25 @@
+sequenceDiagram
+    actor User as Browser user or staff
+    participant Route as Next.js route handler
+    participant Contract as DTO/schema validation
+    participant Controller as NestJS controller
+    participant Guard as Auth, tenant, permission guards
+    participant Service as Domain service
+    participant Store as Prisma tenant/platform store
+    participant Response as Response mapper
+
+    User->>Route: Send request with path, body, cookies, and host
+    Route->>Contract: Validate and normalize request shape
+    Contract-->>Route: Reject malformed input or continue
+    Route->>Controller: Forward server-owned context
+    Controller->>Guard: Authenticate and resolve scope
+    Guard-->>Controller: Trusted principal and tenant context
+    Controller->>Service: Invoke domain operation
+    Service->>Store: Read/write through scoped data access
+    Store-->>Service: Domain result or typed failure
+    Service-->>Controller: Domain result
+    Controller->>Response: Map stable API contract
+    Response-->>Route: JSON and status code
+    Route-->>User: UI data or actionable error state
+
+    Note over Route,Guard: The client may provide input, but never authority over tenant or database selection.

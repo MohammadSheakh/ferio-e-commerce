@@ -1,0 +1,22 @@
+flowchart TD
+    Start[Operator starts migration or closure] --> Auth{Platform authorization?}
+    Auth -- no --> Deny[Reject and audit]
+    Auth -- yes --> Plan[Create run or closure request]
+    Plan --> Preflight[Check status, locks, backup evidence, and dependencies]
+    Preflight --> Safe{Preflight safe?}
+    Safe -- no --> Block[Block with actionable findings]
+    Safe -- yes --> Canary[Run canary or retention phase]
+    Canary --> Review{Review result and evidence}
+    Review -- pause --> Paused[Pause run / retain tenant]
+    Review -- continue --> Batch[Process bounded batches]
+    Batch --> Verify[Verify schema/data/resource invariants]
+    Verify --> More{More batches?}
+    More -- yes --> Batch
+    More -- no --> Finalize[Finalize migration or destruction window]
+    Finalize --> Audit[Persist operator, tenant, timestamps, result]
+    Audit --> Complete[Complete and expose evidence]
+    Block --> Audit
+    Paused --> Audit
+
+    Note1[Destructive closure requires disposable-tenant testing and verified recovery evidence.] -.-> Preflight
+    Note2[No browser-selected tenant database or unbounded bulk action.] -.-> Batch

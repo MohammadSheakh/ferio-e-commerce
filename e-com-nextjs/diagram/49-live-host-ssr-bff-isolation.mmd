@@ -1,0 +1,24 @@
+sequenceDiagram
+    actor BrowserA as Browser on tenant-a host
+    actor BrowserB as Browser on tenant-b host
+    participant SSR as Next.js SSR
+    participant BFFA as Tenant A BFF request
+    participant BFFB as Tenant B BFF request
+    participant API as NestJS tenant resolver
+    participant Cache as Cache and session boundary
+
+    BrowserA->>SSR: GET tenant-a host
+    SSR->>BFFA: Internal fetch preserving tenant-a host
+    BFFA->>API: Forward trusted tenant-a request
+    API-->>BFFA: Tenant A data
+    BFFA-->>SSR: Tenant A response
+    SSR-->>BrowserA: Tenant A rendered page
+    BrowserB->>SSR: GET tenant-b host
+    SSR->>BFFB: Internal fetch preserving tenant-b host
+    BFFB->>API: Forward trusted tenant-b request
+    API-->>BFFB: Tenant B data
+    BFFB-->>SSR: Tenant B response
+    SSR-->>BrowserB: Tenant B rendered page
+    Cache->>Cache: Verify host-aware keys and cookies
+
+    Note over BrowserA,BrowserB: Evidence must show no logo, cart, order, session, or cache crossover.

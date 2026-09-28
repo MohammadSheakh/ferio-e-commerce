@@ -1,0 +1,16 @@
+flowchart TD
+    Start[Provider callback or polling result] --> Verify{Authenticity and expected provider?}
+    Verify -- no --> Reject[Reject, sanitize, and audit]
+    Verify -- yes --> Lookup[Find payment/order by provider reference]
+    Lookup --> Tenant[Tenant context from trusted internal record]
+    Tenant --> State{Valid state transition?}
+    State -- no --> Conflict[Record conflict for reconciliation]
+    State -- yes --> Tx[Commit idempotent status update]
+    Tx --> Notify[Enqueue tenant-scoped notification or fulfillment job]
+    Notify --> UI[Refresh UI through read API or realtime event]
+    Tx --> Evidence[Persist provider response and correlation metadata]
+    Conflict --> Evidence
+    Reject --> Evidence
+
+    Note1[Provider data never chooses the tenant database.] -.-> Tenant
+    Note2[External calls remain outside database transactions.] -.-> Tx

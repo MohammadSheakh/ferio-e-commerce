@@ -1,0 +1,21 @@
+sequenceDiagram
+    actor Staff as Tenant staff browser
+    participant UI as Admin dashboard page
+    participant BFF as Next.js admin route handler
+    participant API as NestJS tenant API
+    participant Auth as Session and permission guards
+    participant DB as Tenant database
+
+    Staff->>UI: Open dashboard route
+    UI->>BFF: Request dashboard data
+    BFF->>BFF: Read session and trusted tenant host
+    BFF->>API: Forward request with server-owned context
+    API->>Auth: Validate staff session, membership, permission
+    Auth-->>API: Authorized tenant principal
+    API->>DB: Query tenant-scoped dashboard aggregates
+    DB-->>API: Metrics and operational summaries
+    API-->>BFF: Sanitized response
+    BFF-->>UI: Render data or structured error state
+    UI-->>Staff: Dashboard with loading/error/empty states
+
+    Note over BFF,Auth: Browser input must not select a database or bypass authorization.

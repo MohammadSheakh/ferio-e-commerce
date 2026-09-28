@@ -1,0 +1,20 @@
+sequenceDiagram
+    participant API as NestJS request
+    participant DB as Tenant database
+    participant Outbox as Durable intent/outbox
+    participant Redis as Redis and BullMQ
+    participant Worker as Tenant-stamped worker
+    participant Audit as Job evidence
+
+    API->>DB: Commit business state and durable intent
+    DB-->>API: Transaction committed
+    API->>Redis: Enqueue bounded job envelope
+    Redis-->>API: Job id
+    Redis->>Worker: Deliver job
+    Worker->>Worker: Reconstruct trusted tenant context
+    Worker->>DB: Process idempotently
+    DB-->>Worker: Success, duplicate, or domain failure
+    Worker->>Audit: Persist attempt/result metadata
+    Worker-->>Redis: Ack or retry with backoff
+    Redis-->>Worker: Dead-letter after retry policy
+    Worker->>Audit: Record terminal failure and remediation key

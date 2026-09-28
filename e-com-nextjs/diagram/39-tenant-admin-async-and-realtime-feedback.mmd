@@ -1,0 +1,23 @@
+flowchart TD
+    Action[Staff starts an operation] --> Command[Admin BFF mutation]
+    Command --> Guard{Authorized and within tenant scope?}
+    Guard -- no --> Error[Structured error state]
+    Guard -- yes --> Persist[Persist command or durable intent]
+    Persist --> Immediate[Return accepted/success response]
+    Immediate --> UI[Dashboard updates optimistic or pending state]
+    Persist --> Queue[Queue or provider boundary]
+    Queue --> Worker[Tenant-stamped worker]
+    Worker --> Retry{Retryable failure?}
+    Retry -- yes --> Queue
+    Retry -- no --> Result[Persist terminal result and evidence]
+    Result --> Notify[Notification or socket event]
+    Notify --> Ticket[Verified socket ticket and tenant room]
+    Ticket --> UI
+    Retry -- no --> Failed[Visible failure and remediation path]
+    Failed --> UI
+    UI --> Refresh[Re-fetch authoritative state]
+    Refresh --> API[Admin read API]
+    API --> DB[(Tenant database)]
+
+    Note1[Async completion is not assumed from the initial HTTP response.] -.-> Immediate
+    Note2[Realtime delivery is tenant-scoped and must be followed by an authoritative read.] -.-> Notify

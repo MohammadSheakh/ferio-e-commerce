@@ -1,0 +1,158 @@
+%% Navigation map for the focused Ferio flow diagrams
+flowchart TB
+    start[Start here: Ferio user-flow study]
+
+    subgraph Context[Architecture context]
+        context1[01 System context and planes]
+        context2[02 Tenant request lifecycle]
+        context3[06 Domain and tenant availability]
+    end
+
+    subgraph Identity[Identity and access]
+        identity1[10 Platform admin authentication]
+        identity2[11 Customer session lifecycle]
+        identity3[12 Tenant admin authorization]
+        identity4[13 Socket ticket and room isolation]
+    end
+
+    subgraph Platform[Platform operations]
+        platform1[04 Provisioning sequence]
+        platform2[05 Organization lifecycle]
+        platform3[17 Organization and domain operations]
+        platform4[18 Subscription and entitlements]
+        platform5[19 Migration backup restore closure]
+        platform6[20 Support access health audit]
+    end
+
+    subgraph Commerce[Customer commerce]
+        commerce1[03 Checkout and order sequence]
+        commerce2[14 Catalog cart checkout]
+        commerce3[15 Delivery pickup returns refunds]
+        commerce4[16 Wallet warranty booking]
+    end
+
+    subgraph Async[Async and integrations]
+        async1[07 Tenant-stamped worker lifecycle]
+        async2[08 Payment and courier recovery]
+        async3[09 Messaging and reconciliation reliability]
+    end
+
+    subgraph Engagement[Communication and engagement]
+        engagement1[21 Chat and support conversation]
+        engagement2[22 Notifications and inbox]
+        engagement3[23 Analytics and purchase activity]
+        engagement4[24 Product requests and delivery personnel]
+    end
+
+    subgraph Evidence[Operations evidence]
+        evidence1[25 Reports and orders export]
+        evidence2[26 Courier settlement posting]
+        evidence3[27 Reconciliation remediation]
+        evidence4[28 Dependency health]
+    end
+
+    subgraph Integration[Frontend and API integration]
+        integration1[30 Customer profile and addresses]
+        integration2[31 Staff invitation and access]
+        integration3[32 Content settings locations flags]
+        integration4[33 Storage upload and evidence]
+        integration5[35 Frontend route and BFF surface]
+        integration6[36 API docs to frontend integration]
+        integration7[52 API endpoint contract lifecycle]
+    end
+
+    subgraph Admin[Admin workflow study]
+        admin1[37 Dashboard initialization]
+        admin2[38 Permissioned CRUD]
+        admin3[39 Async and realtime feedback]
+        admin4[40 Organization provisioning]
+        admin5[41 Domain activation and routing]
+        admin6[42 Subscription and entitlements]
+        admin7[43 Migration and closure safety]
+    end
+
+    subgraph Reliability[Reliability and assurance]
+        reliability1[44 Redis and BullMQ reliability]
+        reliability2[45 Provider callback recovery]
+        reliability3[46 Backup restore drill]
+        reliability4[47 Dependency health evidence]
+        reliability5[48 Cross-tenant negative test]
+        reliability6[49 Live host SSR/BFF isolation]
+        reliability7[50 Security and observability checks]
+        reliability8[51 Release acceptance gate]
+    end
+
+    subgraph Scope[Scope and study guidance]
+        scope1[34 Release 1 study path]
+        scope2[53 Project-flow to evidence]
+        scope3[54 Web/admin/backend scope boundary]
+    end
+
+    start --> Context
+    Context --> Identity
+    Identity --> Commerce
+    Context --> Platform
+    Commerce --> Async
+    Async --> Engagement
+    Async --> Evidence
+    Platform --> Evidence
+    Identity --> Integration
+    Platform --> Admin
+    Integration --> Reliability
+    Admin --> Reliability
+    Evidence --> Reliability
+    Reliability --> Scope
+
+    click context1 "01-system-context-and-planes.mmd" "Open diagram"
+    click context2 "02-tenant-request-lifecycle.mmd" "Open diagram"
+    click context3 "06-domain-and-tenant-availability-rules.mmd" "Open diagram"
+    click identity1 "10-platform-admin-authentication.mmd" "Open diagram"
+    click identity2 "11-tenant-customer-session-lifecycle.mmd" "Open diagram"
+    click identity3 "12-tenant-admin-authorization-chain.mmd" "Open diagram"
+    click identity4 "13-socket-ticket-and-room-isolation.mmd" "Open diagram"
+    click platform1 "04-platform-tenant-provisioning-sequence.mmd" "Open diagram"
+    click platform2 "05-organization-lifecycle-state-machine.mmd" "Open diagram"
+    click platform3 "17-platform-organization-and-domain-operations.mmd" "Open diagram"
+    click platform4 "18-subscription-entitlement-and-usage-evaluation.mmd" "Open diagram"
+    click platform5 "19-migration-backup-restore-and-closure.mmd" "Open diagram"
+    click platform6 "20-support-access-health-and-audit-evidence.mmd" "Open diagram"
+    click commerce1 "03-storefront-checkout-order-sequence.mmd" "Open diagram"
+    click commerce2 "14-catalog-cart-and-checkout-journey.mmd" "Open diagram"
+    click commerce3 "15-delivery-pickup-returns-and-refunds.mmd" "Open diagram"
+    click commerce4 "16-wallet-warranty-and-service-booking.mmd" "Open diagram"
+    click async1 "07-tenant-stamped-worker-lifecycle.mmd" "Open diagram"
+    click async2 "08-payment-and-courier-recovery-sequence.mmd" "Open diagram"
+    click async3 "09-messaging-and-reconciliation-reliability.mmd" "Open diagram"
+    click engagement1 "21-customer-chat-and-support-conversation.mmd" "Open diagram"
+    click engagement2 "22-customer-notification-preferences-and-inbox.mmd" "Open diagram"
+    click engagement3 "23-storefront-analytics-and-purchase-activity.mmd" "Open diagram"
+    click engagement4 "24-product-request-and-delivery-personnel.mmd" "Open diagram"
+    click evidence1 "25-reports-and-orders-export.mmd" "Open diagram"
+    click evidence2 "26-courier-settlement-import-and-posting.mmd" "Open diagram"
+    click evidence3 "27-reconciliation-findings-and-remediation.mmd" "Open diagram"
+    click evidence4 "28-database-redis-queue-and-provider-health.mmd" "Open diagram"
+    click integration1 "30-customer-profile-address-and-account-linking.mmd" "Open diagram"
+    click integration2 "31-staff-invitation-and-access-lifecycle.mmd" "Open diagram"
+    click integration3 "32-content-settings-locations-and-feature-flags.mmd" "Open diagram"
+    click integration4 "33-tenant-storage-upload-and-evidence.mmd" "Open diagram"
+    click integration5 "35-frontend-route-and-bff-surface.mmd" "Open diagram"
+    click integration6 "36-api-documentation-to-frontend-integration.mmd" "Open diagram"
+    click integration7 "52-api-endpoint-contract-lifecycle.mmd" "Open diagram"
+    click admin1 "37-tenant-admin-dashboard-initialization.mmd" "Open diagram"
+    click admin2 "38-tenant-admin-permissioned-crud.mmd" "Open diagram"
+    click admin3 "39-tenant-admin-async-and-realtime-feedback.mmd" "Open diagram"
+    click admin4 "40-platform-organization-provisioning.mmd" "Open diagram"
+    click admin5 "41-platform-domain-activation-and-routing.mmd" "Open diagram"
+    click admin6 "42-platform-subscription-entitlement-change.mmd" "Open diagram"
+    click admin7 "43-platform-migration-and-closure-safety.mmd" "Open diagram"
+    click reliability1 "44-redis-bullmq-job-reliability.mmd" "Open diagram"
+    click reliability2 "45-provider-callback-and-recovery.mmd" "Open diagram"
+    click reliability3 "46-backup-restore-evidence-drill.mmd" "Open diagram"
+    click reliability4 "47-dependency-health-and-operational-evidence.mmd" "Open diagram"
+    click reliability5 "48-cross-tenant-negative-test.mmd" "Open diagram"
+    click reliability6 "49-live-host-ssr-bff-isolation.mmd" "Open diagram"
+    click reliability7 "50-security-session-and-observability-checks.mmd" "Open diagram"
+    click reliability8 "51-release-1-acceptance-gate.mmd" "Open diagram"
+    click scope1 "34-release-1-user-journey-study-path.mmd" "Open diagram"
+    click scope2 "53-project-flow-document-to-evidence.mmd" "Open diagram"
+    click scope3 "54-web-admin-backend-scope-boundary.mmd" "Open diagram"

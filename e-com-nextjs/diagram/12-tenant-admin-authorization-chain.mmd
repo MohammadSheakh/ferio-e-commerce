@@ -1,0 +1,39 @@
+%% Tenant-admin authorization chain
+flowchart LR
+    request[Admin request on tenant host]
+    context[Trusted tenant context\norganization + database]
+    auth[AuthGuard\nwho is the principal?]
+    role[RolesGuard\nbroad role check]
+    permission[PermissionsGuard\nfine-grained action]
+    membership[TenantMembershipGuard\nactive membership in resolved org]
+    service[Application service\nownership and domain rules]
+    db[(Resolved tenant PostgreSQL)]
+    audit[Audit and metrics]
+    deny[Stable authorization or ownership error]
+
+    request --> context
+    context --> auth
+    auth -->|valid tenant principal| role
+    auth -->|invalid token| deny
+    role -->|allowed role| permission
+    role -->|wrong role| deny
+    permission -->|allowed permission| membership
+    permission -->|missing permission| deny
+    membership -->|active membership| service
+    membership -->|not a member| deny
+    service -->|ownership/state valid| db
+    service -->|invalid owner or state| deny
+    db --> audit
+    service --> audit
+
+    note1[Guards narrow access; the service repeats ownership and tenant checks]
+    note1 -.-> service
+    note2[Controller does not accept organizationId as a database selector]
+    note2 -.-> context
+
+    classDef trust fill:#eef6ff,stroke:#2864a8,color:#17324d;
+    classDef allow fill:#eefbf3,stroke:#218739,color:#123d20;
+    classDef denyStyle fill:#fff0f0,stroke:#b42318,color:#5f1712;
+    class context,auth,role,permission,membership trust;
+    class service,db,audit allow;
+    class deny denyStyle;

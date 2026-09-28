@@ -1,0 +1,24 @@
+sequenceDiagram
+    actor Operator as Platform operator
+    participant UI as Platform admin UI
+    participant BFF as Platform admin route
+    participant API as NestJS platform API
+    participant Control as Control-plane database
+    participant Provision as Provisioning workflow
+    participant TenantDB as New tenant database
+
+    Operator->>UI: Submit organization setup
+    UI->>BFF: Send validated organization request
+    BFF->>API: Authenticated platform mutation
+    API->>Control: Create organization in provisioning state
+    Control-->>API: Organization identity
+    API->>Provision: Start durable provisioning run
+    Provision->>TenantDB: Create database/schema and credentials
+    Provision->>TenantDB: Apply migrations and seed required data
+    Provision->>Control: Persist step evidence and tenant connection metadata
+    Provision-->>API: Complete or actionable failure
+    API-->>BFF: Provisioning status
+    BFF-->>UI: Render status and retry path
+    UI-->>Operator: Organization ready or blocked
+
+    Note over Provision,TenantDB: The workflow is idempotent and must not expose credentials to the browser.

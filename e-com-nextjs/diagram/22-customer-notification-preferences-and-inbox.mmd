@@ -1,0 +1,38 @@
+%% Customer notification creation, preferences, inbox, and deletion
+flowchart TD
+    event[Durable order, payment, chat, wallet,\nor fulfillment event]
+    template[Approved versioned template\nallowed variables validated]
+    dedupe{Deduplication key already exists?}
+    record[Create tenant notification record\nreceiverId + link + delivery intent]
+    preference[Load tenant/customer channel preferences]
+    dispatch[[Queue channel dispatch\nemail, push, SMS, or in-app]]
+    inbox[Customer inbox API\npage + total + unread count]
+    owner[Receiver-scoped predicate\nmark read/read-all/remove]
+    soft[Soft-delete notification\nexclude from normal list/count]
+    audit[Delivery status, metrics, and audit evidence]
+
+    event --> template
+    template --> dedupe
+    dedupe -->|yes| audit
+    dedupe -->|no| record
+    record --> preference
+    preference --> dispatch
+    dispatch --> audit
+
+    customer[Customer] --> inbox
+    inbox --> owner
+    owner -->|read| audit
+    owner -->|remove| soft
+    soft --> audit
+
+    note1[The receiver remains part of every lookup; notification ID alone is not authority]
+    note1 -.-> owner
+    note2[Repeated domain events must not spam the same recipient]
+    note2 -.-> dedupe
+
+    classDef durable fill:#eefbf3,stroke:#218739,color:#123d20;
+    classDef boundary fill:#eef6ff,stroke:#2864a8,color:#17324d;
+    classDef action fill:#fff7e6,stroke:#b7791f,color:#4a3210;
+    class event,record,audit,soft durable;
+    class template,preference,dispatch,inbox,owner boundary;
+    class dedupe action;

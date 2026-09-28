@@ -1,0 +1,49 @@
+%% Customer wallet, warranty, and service booking journeys
+flowchart TD
+    customer[Authenticated tenant customer]
+    context[Resolved tenant context and customer principal]
+    wallet[Wallet summary and top-up]
+    ledger[(Tenant wallet ledger)]
+    order[Order checkout]
+    debit[Atomic wallet debit\norder idempotency key]
+    refund[Bounded wallet refund\nnever over-credit original debit]
+    warranty[Warranty claim]
+    evidence[Evidence upload\ntenant storage namespace]
+    service[Service catalog]
+    booking[Service booking request]
+    staff[Tenant admin/service staff]
+    status[Booking or warranty status transition]
+    audit[Audit, notification, and metrics]
+
+    customer --> context
+    context --> wallet
+    wallet --> ledger
+    customer --> order
+    order --> debit
+    debit --> ledger
+    order --> refund
+    refund --> ledger
+
+    customer --> warranty
+    warranty --> evidence
+    evidence --> status
+    staff --> status
+    status --> audit
+
+    customer --> service
+    service --> booking
+    booking --> status
+
+    note1[Wallet mutations are tenant-scoped and transactional]
+    note1 -.-> ledger
+    note2[Warranty evidence and service booking require owner/policy checks]
+    note2 -.-> status
+    note3[Provider or notification work is asynchronous after durable state]
+    note3 -.-> audit
+
+    classDef tenant fill:#eef6ff,stroke:#2864a8,color:#17324d;
+    classDef financial fill:#fff7e6,stroke:#b7791f,color:#4a3210;
+    classDef support fill:#eefbf3,stroke:#218739,color:#123d20;
+    class context,customer tenant;
+    class wallet,ledger,debit,refund financial;
+    class warranty,evidence,service,booking,status,audit support;

@@ -1,0 +1,38 @@
+%% Recommended Release 1 user-flow study path
+flowchart LR
+    foundation[1. Establish trust\nHost -> tenant context -> DB]
+    identity[2. Identify actor\nPlatform, customer, admin, rider]
+    setup[3. Configure tenant\nProvision, domain, plan, settings]
+    browse[4. Browse and prepare\nCatalog -> content -> cart]
+    transact[5. Commit commerce\nCheckout -> order -> payment]
+    fulfill[6. Fulfill and support\nShipping -> pickup -> returns -> chat]
+    async[7. Process async work\nQueues -> providers -> notifications]
+    account[8. Protect customer value\nWallet -> warranty -> booking]
+    operate[9. Operate the business\nReports -> settlements -> reconciliation]
+    recover[10. Prove resilience\nHealth -> backup -> restore -> closure]
+    evidence[Release evidence\nTests, audit, staging, pilot, approval]
+
+    foundation --> identity
+    identity --> setup
+    setup --> browse
+    browse --> transact
+    transact --> fulfill
+    transact --> async
+    fulfill --> async
+    fulfill --> account
+    async --> operate
+    account --> operate
+    operate --> recover
+    recover --> evidence
+
+    note1[At every step: tenant identity is server-derived,\nnot selected by browser input]
+    note1 -.-> foundation
+    note2[At every mutation: validate, authorize, transact,\nidempotently record, audit, and expose stable errors]
+    note2 -.-> transact
+
+    classDef trust fill:#eef6ff,stroke:#2864a8,color:#17324d;
+    classDef business fill:#eefbf3,stroke:#218739,color:#123d20;
+    classDef ops fill:#fff7e6,stroke:#b7791f,color:#4a3210;
+    class foundation,identity trust;
+    class setup,browse,transact,fulfill,async,account business;
+    class operate,recover,evidence ops;

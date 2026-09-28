@@ -1,0 +1,45 @@
+%% Platform organization, domain, and lifecycle administration
+sequenceDiagram
+    autonumber
+    participant Operator as Platform admin
+    participant Web as Platform admin web
+    participant API as Platform API
+    participant Guard as Platform auth/permission guards
+    participant Org as Organization/domain service
+    participant DB as Control-plane PostgreSQL
+    participant Cache as Tenant host cache
+    participant Audit as Platform audit
+
+    Operator->>Web: Open organization console
+    Web->>API: GET /platform/organizations/:id
+    API->>Guard: Validate platform realm and organization permission
+    Guard->>Org: Load organization, domains, registry, subscription
+    Org->>DB: Read control-plane metadata
+    DB-->>Org: Status and domain inventory
+    Org-->>API: Status and domain inventory
+    API-->>Web: Status and domain inventory
+
+    Operator->>Web: Add custom domain or reserve platform subdomain
+    Web->>API: POST domain configuration
+    API->>Guard: Check domain entitlement and platform permission
+    Guard->>Org: Normalize and validate hostname
+    Org->>DB: Persist pending domain mapping
+    Org->>Audit: Record domain mutation
+    Org->>Cache: Invalidate affected host mapping
+    API-->>Web: Verification instructions or active domain
+
+    opt Custom domain verification
+        Operator->>Web: Submit DNS verification token
+        Web->>API: POST domain verify
+        API->>Org: Confirm token and domain ownership
+        Org->>DB: Mark domain ACTIVE after ownership proof
+        Org->>Cache: Invalidate negative cache
+    end
+
+    Operator->>Web: Select primary, disable domain, or change status
+    Web->>API: Protected platform mutation
+    API->>Guard: Check explicit permission
+    Guard->>Org: Apply allowed transition
+    Org->>DB: Persist transition and audit metadata
+    Org->>Cache: Invalidate host resolution entries
+    API-->>Web: Sanitized operation result

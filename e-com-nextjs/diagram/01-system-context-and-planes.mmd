@@ -1,0 +1,44 @@
+%% Ferio system context and database planes
+flowchart LR
+    customer[Customer browser]
+    tenantAdmin[Tenant admin browser]
+    platformAdmin[Platform admin browser]
+    rider[Rider or delivery app]
+
+    customerWeb[Ferio customer web\nNext.js SSR/BFF]
+    platformWeb[Ferio platform admin\nNext.js application]
+    backend[NestJS modular monolith\n/api/v1]
+    socket[Socket.IO gateway\nshort-lived ticket]
+
+    platformDb[(Control-plane PostgreSQL)]
+    tenantDb[(Tenant PostgreSQL\none database per tenant)]
+    redis[(Redis\ncache, sessions, rooms)]
+    queues[[BullMQ workers\nprovider callbacks and jobs]]
+    providers[Payment, courier, messaging\nand storage providers]
+
+    customer --> customerWeb
+    tenantAdmin --> customerWeb
+    platformAdmin --> platformWeb
+    rider --> customerWeb
+
+    customerWeb -->|tenant host forwarded by BFF| backend
+    platformWeb -->|platform routes| backend
+    customerWeb -->|ticket handshake| socket
+    tenantAdmin -->|ticket handshake| socket
+    rider -->|ticket handshake| socket
+
+    backend -->|platform auth and registry| platformDb
+    backend -->|resolved tenant context| tenantDb
+    backend --> redis
+    backend --> queues
+    queues -->|stamped tenant envelope| tenantDb
+    backend --> providers
+    socket --> redis
+    socket --> tenantDb
+
+    classDef plane fill:#eef6ff,stroke:#2864a8,color:#17324d;
+    classDef data fill:#fff7e6,stroke:#b7791f,color:#4a3210;
+    classDef async fill:#f2edff,stroke:#7048a8,color:#30204d;
+    class platformDb,tenantDb plane;
+    class redis,providers data;
+    class queues,socket async;
