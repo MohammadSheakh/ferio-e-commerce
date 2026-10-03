@@ -13,6 +13,10 @@
 
 ---
 
+## User Flow Diagram Adobe Acrobat Link
+
+https://acrobat.adobe.com/id/urn:aaid:sc:AP:261cc224-a30d-4f88-a501-a3affb035ce1 
+
 ## Executive Summary
 
 **Ferio Commerce** is a Bangladesh-first, enterprise-grade, multi-tenant Commerce Software-as-a-Service (SaaS) platform. Designed as a high-throughput, high-integrity modular monolith backend serving modern distributed client surfaces, Ferio allows independent businesses to instantly subscribe, provision isolated branded digital storefronts, and manage end-to-end commerce operations from cataloging to hyper-localized fulfillment, courier integrations, automated reconciliation, and CRM.
