@@ -8,6 +8,7 @@ html {
 
 :root,
 .theme-default {
+  --font-inter: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --color-ink: 17 17 20;
   --color-ink2: 110 110 115;
   --color-line: 232 232 234;

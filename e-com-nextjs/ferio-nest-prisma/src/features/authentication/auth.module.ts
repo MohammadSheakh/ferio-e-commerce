@@ -3,7 +3,6 @@ import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { RedisModule } from '@app/redis';
 import { PrismaModule } from '@app/database';
-import { ThrottlerModule } from '@nestjs/throttler';
 import { AuthController } from './auth/auth.controller';
 import { AuthService } from './auth/auth.service';
 import { OtpService } from './otp/otp.service';
@@ -46,14 +45,6 @@ import { EMAIL_DELIVERY_SERVICE, EmailProcessor } from '@app/queue';
     RedisModule,
     PrismaModule,
     TenancyModule,
-
-    // Rate Limiting
-    ThrottlerModule.forRoot([
-      {
-        ttl: 900000, // 15 minutes
-        limit: 5, // 5 attempts
-      },
-    ]),
   ],
   controllers: [AuthController],
   providers: [

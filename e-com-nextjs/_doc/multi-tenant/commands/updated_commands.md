@@ -31,6 +31,10 @@ Use this for demo, staging-like local testing, or when you want everything in on
 
 ```bash
 cd e-com-nextjs
+
+docker compose down --remove-orphans
+docker compose up -d --force-recreate
+
 docker compose up -d --build
 ```
 

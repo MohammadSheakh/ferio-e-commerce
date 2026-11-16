@@ -54,7 +54,8 @@ export function DomainActions({
     setWorking(action);
     setMessage("");
     try {
-      const response = await fetch(`/api/platform${path}`, {
+      const cleanPath = path.startsWith("/platform") ? path.slice(9) : path;
+      const response = await fetch(`/api/platform${cleanPath}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         ...(body ? { body: JSON.stringify(body) } : {}),

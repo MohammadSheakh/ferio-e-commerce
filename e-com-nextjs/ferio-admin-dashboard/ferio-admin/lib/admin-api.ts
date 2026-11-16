@@ -4,6 +4,17 @@ import { withCorrelationId } from "@/lib/correlation";
 import { normalizeForwardedTenantHost } from "@/lib/tenant-host";
 
 function tenantHostHeaders(): Record<string, string> {
+  try {
+    const store = cookies();
+    const slug = store.get("ferio_store_slug")?.value?.trim().toLowerCase();
+    if (slug) {
+      const domain = process.env.PLATFORM_PUBLIC_DOMAIN || "sheakh.qzz.io";
+      return { "x-forwarded-host": `${slug}.${domain}` };
+    }
+  } catch {
+    // cookies() unavailable in non-request contexts
+  }
+
   const incoming = headers();
   const host = normalizeForwardedTenantHost(
     incoming.get("x-forwarded-host") ?? incoming.get("host"),

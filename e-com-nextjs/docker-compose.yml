@@ -46,7 +46,7 @@ services:
     image: redis:7-alpine
     container_name: ferio-redis
     ports:
-      - "6379:6379"
+      - "4003:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -141,6 +141,7 @@ services:
       REDIS_PORT: "6379"
       NODE_ENV: development
       TENANCY_ENABLED: ${TENANCY_ENABLED:-false}
+      PLATFORM_PUBLIC_DOMAIN: ${PLATFORM_PUBLIC_DOMAIN:-sheakh.qzz.io}
       # Only Docker-network BFF/ingress peers may supply x-forwarded-host.
       # Production environments with a narrower subnet should override this.
       TENANT_TRUSTED_PROXY_CIDRS: ${TENANT_TRUSTED_PROXY_CIDRS:-172.16.0.0/12}
@@ -161,6 +162,8 @@ services:
       PLATFORM_INITIAL_SUPERADMIN_PASSWORD: ${PLATFORM_INITIAL_SUPERADMIN_PASSWORD:-}
       PLATFORM_INITIAL_SUPERADMIN_PASSWORD_HASH: ${PLATFORM_INITIAL_SUPERADMIN_PASSWORD_HASH:-}
       JWT_SECRET: ${JWT_ACCESS_SECRET:-}
+      CUSTOMER_WEB_URL: ${CUSTOMER_WEB_URL:-http://localhost:3000}
+      ADMIN_WEB_URL: ${ADMIN_WEB_URL:-http://localhost:3001}
       FILE_UPLOAD_STRATEGY: r2
       R2_ENDPOINT: http://minio:9000
       R2_BUCKET: ferio-media
@@ -182,30 +185,52 @@ services:
     build:
       context: ./ferio-customer-web
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_FERIO_API_URL: ${PUBLIC_FERIO_API_URL:-http://localhost:6733/api/v1}
+        NEXT_PUBLIC_SOCKET_URL: ${PUBLIC_SOCKET_URL:-http://localhost:6734}
     container_name: ferio-customer-web
+    restart: unless-stopped
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     ports:
       - "3000:3000"
     environment:
+      HOSTNAME: "0.0.0.0"
+      PORT: 3000
       NEXT_PUBLIC_FERIO_API_URL: ${PUBLIC_FERIO_API_URL:-http://localhost:6733/api/v1}
       FERIO_API_URL: http://backend:6733/api/v1
       NEXT_PUBLIC_SOCKET_URL: ${PUBLIC_SOCKET_URL:-http://localhost:6734}
+    networks:
+      default:
+        aliases:
+          - frontend
 
   # ── Admin Web ──
   admin-web:
     build:
       context: ./ferio-admin-dashboard/ferio-admin
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_FERIO_API_URL: ${PUBLIC_FERIO_API_URL:-http://localhost:6733/api/v1}
+        NEXT_PUBLIC_SOCKET_URL: ${PUBLIC_SOCKET_URL:-http://localhost:6734}
     container_name: ferio-admin-web
+    restart: unless-stopped
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     ports:
-      - "3001:3000"
+      - "3001:3001"
     environment:
+      HOSTNAME: "0.0.0.0"
+      PORT: 3001
       NEXT_PUBLIC_FERIO_API_URL: ${PUBLIC_FERIO_API_URL:-http://localhost:6733/api/v1}
       FERIO_API_URL: http://backend:6733/api/v1
       NEXT_PUBLIC_SOCKET_URL: ${PUBLIC_SOCKET_URL:-http://localhost:6734}
+    networks:
+      default:
+        aliases:
+          - dashboard
 
   # ── Platform Admin ──
   platform-admin:
@@ -213,12 +238,37 @@ services:
       context: ./ferio-platform-admin
       dockerfile: Dockerfile
     container_name: ferio-platform-admin
+    restart: unless-stopped
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     ports:
       - "3100:3000"
     environment:
+      HOSTNAME: "0.0.0.0"
       PLATFORM_API_URL: http://backend:6733/api/v1
+    networks:
+      default:
+        aliases:
+          - platform
+
+  # ── Cloudflare Tunnel ──
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: ferio-cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate --protocol http2 run --token ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    env_file:
+      - .env
+    depends_on:
+      backend:
+        condition: service_healthy
+      customer-web:
+        condition: service_started
+      admin-web:
+        condition: service_started
+      platform-admin:
+        condition: service_started
 
 volumes:
   pg_data:

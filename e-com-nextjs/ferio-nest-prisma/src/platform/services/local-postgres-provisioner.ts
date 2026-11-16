@@ -81,6 +81,36 @@ export class LocalPostgresProvisioner extends TenantDatabaseProvisioner {
       password: dbPassword,
     };
   }
+
+  async dropTenantDatabase(params: {
+    databaseName: string;
+    username?: string;
+  }): Promise<void> {
+    const url = process.env.PLATFORM_DATABASE_URL;
+    if (!url) return;
+    const adminUrl = new URL(url);
+    adminUrl.pathname = '/postgres';
+    const pool = new Pool({
+      connectionString: adminUrl.toString(),
+      max: 1,
+    });
+    try {
+      const quotedName = quoteIdentifier(params.databaseName);
+      await pool
+        .query(
+          `SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = $1 AND pid <> pg_backend_pid()`,
+          [params.databaseName],
+        )
+        .catch(() => undefined);
+      await pool.query(`DROP DATABASE IF EXISTS ${quotedName}`).catch(() => undefined);
+      if (params.username) {
+        const quotedRole = quoteIdentifier(params.username);
+        await pool.query(`DROP ROLE IF EXISTS ${quotedRole}`).catch(() => undefined);
+      }
+    } finally {
+      await pool.end().catch(() => undefined);
+    }
+  }
 }
 
 function quoteIdentifier(identifier: string): string {

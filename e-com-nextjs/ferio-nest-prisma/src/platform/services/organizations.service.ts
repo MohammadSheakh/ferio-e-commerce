@@ -1,12 +1,16 @@
 import {
   ConflictException,
+  Inject,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { OrganizationStatus } from '../generated/platform-client';
 import { PlatformPrismaService } from '../platform-prisma.service';
 import { PlatformAuditService } from './platform-audit.service';
 import { RESERVED_SUBDOMAINS } from './domains.service';
+import { invalidateDomainCache } from '../utils/domain-cache-invalidation';
+import type { TenantDatabaseProvisioner } from './tenant-database-provisioner.interface';
 
 /** Legal transitions of the organization lifecycle state machine. */
 const ALLOWED_TRANSITIONS: Record<OrganizationStatus, OrganizationStatus[]> = {
@@ -31,6 +35,9 @@ export class OrganizationsService {
   constructor(
     private readonly platform: PlatformPrismaService,
     private readonly audit: PlatformAuditService,
+    @Optional()
+    @Inject('TENANT_DB_PROVISIONER')
+    private readonly dbProvisioner?: TenantDatabaseProvisioner,
   ) {}
 
   async create(input: CreateOrganizationInput) {
@@ -190,6 +197,53 @@ export class OrganizationsService {
       }),
     ]);
     return { items, total };
+  }
+
+  async delete(organizationId: string, options: { actorId?: string } = {}) {
+    const organization = await this.platform.client.organization.findUnique({
+      where: { id: organizationId },
+      include: {
+        databases: true,
+        domains: true,
+      },
+    });
+    if (!organization) throw new NotFoundException('ORGANIZATION_NOT_FOUND');
+
+    for (const domain of organization.domains) {
+      invalidateDomainCache(domain.hostname);
+    }
+
+    for (const db of organization.databases) {
+      if (this.dbProvisioner?.dropTenantDatabase && db.databaseName) {
+        await this.dbProvisioner
+          .dropTenantDatabase({
+            databaseName: db.databaseName,
+            username: db.username,
+          })
+          .catch(() => undefined);
+      }
+      await this.platform.client.tenantDatabase.deleteMany({
+        where: { id: db.id },
+      });
+    }
+
+    await this.platform.client.organization.delete({
+      where: { id: organizationId },
+    });
+
+    await this.audit.record({
+      action: 'ORGANIZATION_DELETED',
+      entityType: 'Organization',
+      entityId: organizationId,
+      actorId: options.actorId,
+      previousValue: {
+        slug: organization.slug,
+        name: organization.name,
+        status: organization.status,
+      },
+    });
+
+    return { success: true };
   }
 
   private normalizeSlug(slug: string): string {

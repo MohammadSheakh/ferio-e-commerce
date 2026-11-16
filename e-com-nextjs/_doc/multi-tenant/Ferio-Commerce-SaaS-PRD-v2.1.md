@@ -413,6 +413,9 @@ Later additions:
 
 ### 9.2 Tenant Admin Web
 
+**Architecture & Access Model:**
+Tenant Admin Web operates as a centralized administrative portal (e.g., `admin.<platform-domain>` or `adminf.sheakh.qzz.io`), mirroring modern enterprise SaaS standards (such as Shopify `admin.shopify.com` or Stripe `dashboard.stripe.com`). Rather than requiring per-tenant two-level subdomains (`{slug}.admin.<domain>`) which break standard Cloudflare Universal SSL and demand per-tenant DNS/tunnel manipulation, the centralized portal accepts the store slug during login or store selection. The Next.js BFF binds the slug into a secure `ferio_store_slug` session cookie and forwards `x-forwarded-host: {slug}.<platform-domain>` to the NestJS backend as a trusted internal proxy (`TENANT_TRUSTED_PROXY_CIDRS`), cleanly routing all subsequent operations to that tenant's isolated database.
+
 Release 1 modules:
 
 - Login and access;
@@ -734,6 +737,7 @@ Priority definitions:
 | FR-AUTH-007 | P1 | High-risk roles should support two-factor authentication. |
 | FR-AUTH-008 | P0 | Guest customer checkout must not require account creation. |
 | FR-AUTH-009 | P1 | Customer accounts must verify control of phone or email before exposing order history. |
+| FR-AUTH-010 | P0 | Automated Tenant Owner Bootstrapping: During organization provisioning (`ATTACH_OWNER_MEMBERSHIP`), the system must automatically seed an initial active `User` record (role `admin`, verified email, active staff status, full permissions) with an initial secure bcrypt-hashed password (or configurable temporary password) into the newly provisioned tenant PostgreSQL database, enabling immediate login upon organization activation without manual DB interventions. |
 
 Initial roles:
 
@@ -2442,6 +2446,8 @@ Technical dependencies:
 - Ferio is now approved as a multi-tenant Commerce SaaS platform; the existing Ferio store becomes the reference/first tenant.
 - Each tenant begins with one warehouse by default; additional warehouses may be enabled by plan or future release.
 - Customer Web and Admin Web are separate applications.
+- Tenant Admin Web operates as a centralized portal (e.g. `admin.<platform-domain>`) using store-slug session binding (`ferio_store_slug`) and trusted BFF proxy forwarding (`x-forwarded-host`), avoiding multi-level wildcard SSL breakages (`*.admin.<domain>`) and per-tenant Cloudflare DNS/tunnel friction.
+- Automated Tenant Owner Bootstrap: Provisioning step `ATTACH_OWNER_MEMBERSHIP` automatically provisions an initial active admin `User` in the newly isolated tenant database with initial secure credentials, enabling immediate login upon activation.
 - Each subscribed business has an independent SaaS organization/workspace and tenant hostname.
 - The approved operational isolation model is database-per-tenant.
 - Ferio uses a separate control-plane database for organizations, domains, plans, subscriptions, provisioning, tenant DB registry, usage, and platform operations.

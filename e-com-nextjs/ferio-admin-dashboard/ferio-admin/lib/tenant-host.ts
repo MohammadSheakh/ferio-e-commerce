@@ -11,6 +11,16 @@ export function normalizeForwardedTenantHost(rawHost: string | null): string | n
 }
 
 export function tenantHostHeadersFromRequest(request: Request): Record<string, string> {
+  const cookieHeader = request.headers.get("cookie") ?? "";
+  const match = cookieHeader.match(/(?:^|;\s*)ferio_store_slug=([^;]+)/);
+  if (match && match[1]) {
+    const slug = decodeURIComponent(match[1]).trim().toLowerCase();
+    if (slug) {
+      const domain = process.env.PLATFORM_PUBLIC_DOMAIN || "sheakh.qzz.io";
+      return { "x-forwarded-host": `${slug}.${domain}` };
+    }
+  }
+
   const host = normalizeForwardedTenantHost(
     request.headers.get("x-forwarded-host") ?? request.headers.get("host"),
   );

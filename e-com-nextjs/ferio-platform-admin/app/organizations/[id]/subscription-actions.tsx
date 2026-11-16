@@ -33,7 +33,8 @@ export function SubscriptionActions({
     setWorking(true);
     setMessage("");
     try {
-      const response = await fetch(`/api/platform${path}`, {
+      const cleanPath = path.startsWith("/platform") ? path.slice(9) : path;
+      const response = await fetch(`/api/platform${cleanPath}`, {
         method,
         headers: body ? { "Content-Type": "application/json" } : undefined,
         ...(body ? { body: JSON.stringify(body) } : {}),

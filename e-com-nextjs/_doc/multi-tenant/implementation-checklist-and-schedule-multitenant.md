@@ -362,8 +362,8 @@ Provisioning should behave as an idempotent state machine, not a controller scri
 - [x] Apply current approved tenant migration set. (ordered artifact execution tracked in `_ferio_tenant_migrations`; idempotent re-runs proven)
 - [x] Run tenant seed.
 - [x] Seed default tenant settings. (CommerceSettings store identity + COD verification ALWAYS baseline, ON CONFLICT-safe)
-- [x] Seed default permissions/owner role. (The control-plane organization transaction creates the initial `OWNER` membership; tenant authentication remains a shared global identity with tenant membership checked by `TenantMembershipGuard`, so no duplicate tenant-local super-admin is seeded)
-- [x] Create/attach initial owner membership. (created atomically with the organization; owner-membership conflicts cannot leave an orphan organization)
+- [x] Seed default permissions/owner role. (The control-plane organization transaction creates the initial `OWNER` membership; during provisioning `ATTACH_OWNER_MEMBERSHIP`, the system automatically provisions an initial active admin `User` into the tenant database with bcrypt-hashed credentials, active staff permissions, and verified email.)
+- [x] Create/attach initial owner membership. (created atomically in the control plane with the organization; provisioning `ATTACH_OWNER_MEMBERSHIP` bridges control-plane owner identity into the tenant-plane `User` table automatically)
 - [x] Run DB health check. (read-only `SELECT 1` plus required migration-ledger and baseline-table verification before registry READY stamping)
 - [x] Run minimal tenant smoke test. (provisioning records a separate `SMOKE_TEST` step and verifies the migration ledger, `CommerceSettings`, and `CodVerificationPolicy` tables against the new database)
 - [x] Activate domain only after readiness. (`PENDING_ACTIVATION` becomes `ACTIVE` only in the final provisioning step after migrations, seed, health, and smoke test)
@@ -377,7 +377,7 @@ Provisioning should behave as an idempotent state machine, not a controller scri
 
 - [x] Refactor existing Ferio seed into tenant-safe seed logic. (`TenantSchemaBootstrapper.seedBaseline` is the provisioning seed boundary and is idempotent under PostgreSQL conflict handling)
 - [x] Remove global hard-coded Ferio business assumptions. (The organization name is the tenant seed input; the `Ferio` factory value is used only to avoid overwriting a prior migration default)
-- [x] Seed tenant owner separately from platform super-admin. (The approved shared-identity design does not create a tenant-local super-admin: organization creation atomically creates the tenant's control-plane `OWNER` membership, while Platform Admin users remain a separate realm.)
+- [x] Seed tenant owner separately from platform super-admin. (Platform Admin users remain in a separate control-plane realm; the tenant owner account is automatically provisioned into the tenant-local database with role `admin` and `staffAccessStatus=active` during `ATTACH_OWNER_MEMBERSHIP` with initial credentials.)
 - [x] Seed tenant-local settings. (`CommerceSettings` is created in the tenant database with the requested organization name)
 - [x] Seed tenant-local feature defaults. (Commerce settings defaults are stored in each tenant database; commerce-affecting options remain configuration-owned)
 - [x] Seed tenant-local notification templates. (`TenantSchemaBootstrapper.seedBaseline` inserts the approved transactional order/shipment templates idempotently while messaging remains disabled until a provider is configured.)
@@ -414,7 +414,7 @@ All surfaces live in the ferio-platform-admin console:
 
 ### MT-4 gate
 
-- [x] A new organization can be created from Platform Admin and reach a working isolated storefront/admin environment without manual SQL. (`OrganizationsService` creates the control-plane owner membership, while the resumable `ProvisioningService` reserves the domain, invokes the `TENANT_DB_PROVISIONER`, registers the database, applies canonical migrations, seeds the tenant baseline, verifies readiness, and activates the organization. The default local executor is automated; production managed-provider selection remains an infrastructure decision.)
+- [x] A new organization can be created from Platform Admin and reach a working isolated storefront/admin environment without manual SQL. (`OrganizationsService` creates the control-plane owner membership, while the resumable `ProvisioningService` reserves the domain, invokes the `TENANT_DB_PROVISIONER`, registers the database, applies canonical migrations, seeds the tenant baseline, provisions the initial owner `User` account in the tenant database with hashed credentials, verifies readiness, and activates the organization. The default local executor is automated; production managed-provider selection remains an infrastructure decision.)
 - [x] Replaying provisioning is idempotent. (active subdomain, registered tenant database, and already-active organization state are safely reused on step replay)
 - [x] Failed provisioning is diagnosable and recoverable. (Provisioning timeline, durable step/error records, idempotent replay, and the partial-failure runbook are available.)
 
@@ -868,7 +868,7 @@ Intentionally NOT swept (documented boundaries): `auth`/`two-factor`/`oauthAccou
 
 ## 13.1 Tenant owner onboarding
 
-- [x] Invitation/first-login flow.
+- [x] Invitation/first-login flow. (Centralized Tenant Admin portal at `admin.<domain>` / `adminf.sheakh.qzz.io` supports store-slug selection, binds the active store via `ferio_store_slug` session cookie, and forwards trusted `x-forwarded-host` to the NestJS backend; initial owner credentials provisioned during MT-4 allow immediate first-login without multi-level wildcard DNS manipulation)
 - [x] Organization/store setup wizard. (Tenant Admin dashboard Store Setup checklist combines validated settings, delivery-zone, payment, subscription, and domain readiness with deep links to the owning screens.)
 - [x] Store identity. (tenant-scoped via CommerceSettings and surfaced in the Store Setup checklist card)
 - [x] Logo/branding. (Tenant admins can update the tenant-local logo, address, social links, and approved theme preset through guarded CommerceSettings; the customer storefront renders the logo and public identity.)

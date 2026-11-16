@@ -23,4 +23,9 @@ export abstract class TenantDatabaseProvisioner {
   abstract createTenantDatabase(
     params: CreateTenantDatabaseParams,
   ): Promise<CreatedTenantDatabase>;
+
+  abstract dropTenantDatabase?(params: {
+    databaseName: string;
+    username?: string;
+  }): Promise<void>;
 }

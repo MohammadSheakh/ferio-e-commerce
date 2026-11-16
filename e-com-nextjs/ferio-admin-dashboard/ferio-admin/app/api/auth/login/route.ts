@@ -29,7 +29,7 @@ function extractRefreshToken(setCookie: string | null): string | null {
 }
 
 export async function POST(request: Request) {
-  let credentials: { email?: string; password?: string };
+  let credentials: { email?: string; password?: string; storeSlug?: string };
 
   try {
     credentials = await request.json();
@@ -49,13 +49,23 @@ export async function POST(request: Request) {
     );
   }
 
+  const storeSlug = credentials.storeSlug?.trim().toLowerCase();
+  const domain = process.env.PLATFORM_PUBLIC_DOMAIN || "sheakh.qzz.io";
+  const loginHeaders: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (storeSlug) {
+    loginHeaders["x-forwarded-host"] = `${storeSlug}.${domain}`;
+  }
+
   try {
     const upstream = await fetch(getBackendUrl("/auth/admin/login"), {
       method: "POST",
-      headers: forwardedHeaders(request, {
-        "Content-Type": "application/json",
+      headers: forwardedHeaders(request, loginHeaders),
+      body: JSON.stringify({
+        email: credentials.email,
+        password: credentials.password,
       }),
-      body: JSON.stringify(credentials),
       cache: "no-store",
     });
 
@@ -72,11 +82,23 @@ export async function POST(request: Request) {
       );
     }
 
+    const secure = process.env.NODE_ENV === "production";
+
     if (payload.data.requiresTwoFactor && payload.data.challengeToken) {
-      return NextResponse.json({
+      const response = NextResponse.json({
         requiresTwoFactor: true,
         challengeToken: payload.data.challengeToken,
       });
+      if (storeSlug) {
+        response.cookies.set("ferio_store_slug", storeSlug, {
+          httpOnly: false,
+          secure,
+          sameSite: "lax",
+          maxAge: 7 * 24 * 60 * 60,
+          path: "/",
+        });
+      }
+      return response;
     }
 
     const refreshToken = extractRefreshToken(upstream.headers.get("set-cookie"));
@@ -89,7 +111,16 @@ export async function POST(request: Request) {
     }
 
     const response = NextResponse.json({ user: payload.data.user });
-    const secure = process.env.NODE_ENV === "production";
+
+    if (storeSlug) {
+      response.cookies.set("ferio_store_slug", storeSlug, {
+        httpOnly: false,
+        secure,
+        sameSite: "lax",
+        maxAge: 7 * 24 * 60 * 60,
+        path: "/",
+      });
+    }
 
     response.cookies.set("ferio_admin_access", payload.data.accessToken, {
       httpOnly: true,

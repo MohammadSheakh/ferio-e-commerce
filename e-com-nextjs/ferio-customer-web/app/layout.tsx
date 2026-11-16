@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import { Inter } from "next/font/google";
 import "./globals.css";
 import { CartProvider } from "@/components/CartContext";
 import Header from "@/components/Header";
@@ -15,12 +14,6 @@ import { getCategories } from "@/lib/catalog";
 import { getTenantStatus } from "@/lib/tenancy";
 import { tenantHostFromHeaders } from "@/lib/host-forward";
 import { tenantStateForCode } from "@/components/tenant-states";
-
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-  weight: ["400", "500", "600", "700"],
-});
 
 function tenantFetchInit(): RequestInit {
   const host = tenantHostFromHeaders(headers());
@@ -55,7 +48,7 @@ export default async function RootLayout({
   if (tenant.code !== "ACTIVE" && tenant.code !== "LEGACY") {
     return (
       <html lang="en">
-        <body className={`${inter.variable} font-sans text-ink antialiased`}>
+        <body className="font-sans text-ink antialiased">
           {tenantStateForCode(tenant.code, tenant.storeName)}
         </body>
       </html>
@@ -69,7 +62,7 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${inter.variable} theme-${store.themePreset} font-sans text-ink antialiased`}
+        className={`theme-${store.themePreset} font-sans text-ink antialiased`}
       >
         <CartProvider>
           <Header

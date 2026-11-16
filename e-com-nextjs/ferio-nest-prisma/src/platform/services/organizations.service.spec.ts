@@ -180,4 +180,51 @@ describe('OrganizationsService lifecycle state machine', () => {
     ).not.toHaveBeenCalled();
     expect(audit.record).not.toHaveBeenCalled();
   });
+
+  it('deletes an organization, cleans up databases, and records audit', async () => {
+    platform.client.organization.findUnique.mockResolvedValueOnce({
+      ...org('ACTIVE'),
+      databases: [{ id: 'db-1', databaseName: 'ferio_tenant_1', username: 'role_1' }],
+      domains: [{ hostname: 'acme.ferio.local' }],
+    });
+    (platform.client as Record<string, unknown>).tenantDatabase = {
+      deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
+    };
+    (platform.client.organization as Record<string, unknown>).delete = jest
+      .fn()
+      .mockResolvedValue(org('ACTIVE'));
+
+    const mockProvisioner = {
+      createTenantDatabase: jest.fn(),
+      dropTenantDatabase: jest.fn().mockResolvedValue(undefined),
+    };
+    const serviceWithProvisioner = new OrganizationsService(
+      platform as never,
+      audit as never,
+      mockProvisioner as never,
+    );
+
+    const result = await serviceWithProvisioner.delete('org-1', {
+      actorId: 'admin-1',
+    });
+
+    expect(result).toEqual({ success: true });
+    expect(mockProvisioner.dropTenantDatabase).toHaveBeenCalledWith({
+      databaseName: 'ferio_tenant_1',
+      username: 'role_1',
+    });
+    expect(
+      (platform.client as { tenantDatabase: { deleteMany: jest.Mock } })
+        .tenantDatabase.deleteMany,
+    ).toHaveBeenCalledWith({ where: { id: 'db-1' } });
+    expect(
+      (platform.client.organization as { delete: jest.Mock }).delete,
+    ).toHaveBeenCalledWith({ where: { id: 'org-1' } });
+    expect(audit.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'ORGANIZATION_DELETED',
+        entityId: 'org-1',
+      }),
+    );
+  });
 });

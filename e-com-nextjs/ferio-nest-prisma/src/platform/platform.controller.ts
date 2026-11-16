@@ -367,6 +367,17 @@ export class PlatformAdminController {
     });
   }
 
+  @Delete('organizations/:id')
+  @PlatformPermissions('organization:write')
+  deleteOrganization(
+    @Param('id') id: string,
+    @Req() request: PlatformRequest,
+  ) {
+    return this.organizations.delete(id, {
+      actorId: request.platformPrincipal?.platformUserId,
+    });
+  }
+
   @Post('organizations/:id/provision')
   @PlatformPermissions('provisioning:run')
   provision(

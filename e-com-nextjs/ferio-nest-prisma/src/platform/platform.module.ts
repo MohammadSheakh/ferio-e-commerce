@@ -54,7 +54,8 @@ import {
       throttlers: [
         // Platform realm default: generous for operator workflows, but
         // every route is bounded. auth/login tightens itself via @Throttle.
-        { name: 'platform', limit: 300, ttl: 60_000 },
+        { name: 'default', limit: 600, ttl: 60_000 },
+        { name: 'platform', limit: 600, ttl: 60_000 },
       ],
     }),
     JwtModule.register({

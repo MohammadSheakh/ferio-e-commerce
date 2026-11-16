@@ -5,6 +5,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { randomBytes } from 'crypto';
+import * as bcrypt from 'bcrypt';
+import { Pool } from 'pg';
 import { PlatformPrismaService } from '../platform-prisma.service';
 import { PlatformAuditService } from './platform-audit.service';
 import { OrganizationsService } from './organizations.service';
@@ -294,10 +296,62 @@ export class ProvisioningService {
           break;
         }
         case 'ATTACH_OWNER_MEMBERSHIP': {
-          // Owner membership rows are created during organization creation;
-          // recorded here for evidence completeness.
+          const member = await this.platform.client.organizationMember.findFirst({
+            where: {
+              organizationId: run.organizationId,
+              role: 'OWNER',
+            },
+          });
+
+          if (member?.email) {
+            const registry =
+              await this.platform.client.tenantDatabase.findUnique({
+                where: { organizationId: run.organizationId },
+              });
+            if (!registry)
+              throw new ConflictException('TENANT_DATABASE_MISSING');
+            const connection = await this.databases.getDecryptedConnection(
+              registry.id,
+            );
+
+            const initialPassword =
+              process.env.TENANT_INITIAL_ADMIN_PASSWORD || 'Admin@123456';
+            const passwordHash = await bcrypt.hash(initialPassword, 12);
+            const pool = new Pool({
+              ...connection,
+              max: 1,
+            });
+
+            try {
+              const emailNorm = member.email.trim().toLowerCase();
+              const ownerName = `${run.organization.name} Admin`;
+              const userId = `usr_${randomBytes(12).toString('hex')}`;
+
+              await pool.query(
+                `INSERT INTO "User" (
+                  "id", "name", "email", "password", "role",
+                  "isEmailVerified", "staffAccessStatus", "staffPermissions",
+                  "createdAt", "updatedAt"
+                ) VALUES (
+                  $1, $2, $3, $4, 'admin',
+                  true, 'active', ARRAY['*']::text[],
+                  now(), now()
+                ) ON CONFLICT ("email") DO UPDATE
+                SET "password" = COALESCE("User"."password", EXCLUDED."password"),
+                    "role" = 'admin',
+                    "staffAccessStatus" = 'active',
+                    "updatedAt" = now()`,
+                [userId, ownerName, emailNorm, passwordHash],
+              );
+            } finally {
+              await pool.end().catch(() => undefined);
+            }
+          }
+
           await mark('COMPLETED', {
-            note: 'owner membership created at organization creation',
+            ownerEmail: member?.email,
+            userProvisioned: Boolean(member?.email),
+            note: 'Owner account provisioned in tenant database with initial credentials',
           });
           break;
         }

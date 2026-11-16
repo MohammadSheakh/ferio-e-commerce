@@ -10,8 +10,9 @@ type PlatformMethod = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
 
 async function handle(request: Request, method: PlatformMethod) {
   const url = new URL(request.url);
-  const path = url.pathname.replace(/^\/api\/platform/, "");
-  const backendPath = `/platform${path}`;
+  const rawPath = url.pathname.replace(/^\/api\/platform/, "");
+  const cleanPath = rawPath.replace(/^\/platform/, "");
+  const backendPath = `/platform${cleanPath}`;
   try {
     let body: string | undefined;
     if (method !== "GET") {
