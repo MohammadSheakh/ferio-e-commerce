@@ -1,5 +1,6 @@
 import {
   Body,
+  ConflictException,
   Controller,
   Delete,
   Get,
@@ -28,6 +29,7 @@ import { RetentionSweepService } from '../tenancy/services/retention-sweep.servi
 import { TenantSchemaBootstrapper } from '../tenancy/services/tenant-schema.bootstrapper';
 import { PlatformOperationsHealthService } from './services/platform-operations-health.service';
 import { SubscriptionsService } from './services/subscriptions.service';
+import { TenantDatabasesService } from './services/tenant-databases.service';
 import {
   PlatformAuthGuard,
   PLATFORM_PERMISSION,
@@ -67,6 +69,7 @@ export class PlatformAdminController {
     private readonly tenantSchemaBootstrapper: TenantSchemaBootstrapper,
     private readonly operationsHealth: PlatformOperationsHealthService,
     private readonly subscriptions: SubscriptionsService,
+    private readonly tenantDatabases?: TenantDatabasesService,
   ) {}
 
   @Post('organizations')
@@ -218,11 +221,15 @@ export class PlatformAdminController {
     });
     const databases = rows.map((row) => ({
       tenantDatabaseId: row.id,
+      organizationId: row.organizationId,
       organizationName: row.organization?.name ?? '—',
       organizationStatus: row.organization?.status ?? '—',
       dbStatus: row.status,
       schemaVersion: row.schemaVersion,
       upToDate: canonicalHead ? row.schemaVersion === canonicalHead : true,
+      diskSizeBytes:
+        row.diskSizeBytes != null ? row.diskSizeBytes.toString() : null,
+      diskSizeRecordedAt: row.diskSizeRecordedAt,
     }));
     return {
       canonicalHead,
@@ -230,6 +237,19 @@ export class PlatformAdminController {
       upToDateCount: databases.filter((db) => db.upToDate).length,
       databases,
     };
+  }
+
+  /**
+   * On-demand tenant database disk storage measurement.
+   * Explicit operator action to avoid automated continuous SSD I/O.
+   */
+  @Post('organizations/:id/database-storage/refresh')
+  @PlatformPermissions('organization:write')
+  async refreshOrganizationDatabaseStorage(@Param('id') id: string) {
+    if (!this.tenantDatabases) {
+      throw new ConflictException('TENANT_DATABASES_SERVICE_UNAVAILABLE');
+    }
+    return this.tenantDatabases.measureStorage(id);
   }
 
   /** MT-9 §12.1/§12.4 — credential-free domain routing diagnostics. */

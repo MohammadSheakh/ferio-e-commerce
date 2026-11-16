@@ -3,6 +3,7 @@ import { DomainActions } from "./domain-actions";
 import { OrgActions } from "./org-actions";
 import { SubscriptionActions } from "./subscription-actions";
 import { UsageCard, type UsageMetricRow } from "./usage-card";
+import { TenantStorageCard } from "./tenant-storage-card";
 
 // TODO(brutal-audit #8 follow-up): replace with contract-derived type once
 // this endpoint declares an @ApiOkResponse schema.
@@ -14,7 +15,15 @@ interface OrgDetail {
   slug: string;
   status: string;
   domains: Array<{ id: string; hostname: string; type: string; status: string; isPrimary: boolean }>;
-  databases: Array<{ id: string; status: string; schemaVersion?: string; databaseName: string; lastHealthy?: boolean | null }>;
+  databases: Array<{
+    id: string;
+    status: string;
+    schemaVersion?: string;
+    databaseName: string;
+    lastHealthy?: boolean | null;
+    diskSizeBytes?: string | null;
+    diskSizeRecordedAt?: string | null;
+  }>;
   subscription?: { status: string; plan: { displayName: string; key: string } } | null;
   members: Array<{ id: string; email: string; role: string; isActive: boolean }>;
 }
@@ -100,18 +109,7 @@ export default async function OrganizationDetail({ params }: { params: { id: str
 
       <DomainActions organizationId={org.id} domains={org.domains ?? []} />
 
-      <div className="card">
-        <p className="eyebrow">Tenant Database</p>
-        {db ? (
-          <p>
-            {db.databaseName} · <span className="statuspill">{db.status}</span>{" "}
-            {db.schemaVersion ? <>· schema {db.schemaVersion}</> : null}
-            {db.lastHealthy === false ? " · ⚠ last health check failed" : ""}
-          </p>
-        ) : (
-          <p className="muted">Not provisioned yet — run provisioning.</p>
-        )}
-      </div>
+      <TenantStorageCard organizationId={org.id} database={db ?? null} />
 
       <div className="card">
         <p className="eyebrow">Members (platform metadata)</p>

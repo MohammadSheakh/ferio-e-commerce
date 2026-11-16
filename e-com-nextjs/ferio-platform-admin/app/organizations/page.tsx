@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { platformApi } from "@/lib/platform-session";
 import { CreateOrganizationForm } from "./create-form";
 import { OrgRowActions } from "./org-row-actions";
@@ -55,7 +56,14 @@ export default async function OrganizationsPage() {
         <tbody>
           {rows.map((org) => (
             <tr key={org.id}>
-              <td>{org.name}</td>
+              <td>
+                <Link
+                  href={`/organizations/${org.id}`}
+                  style={{ textDecoration: "underline", textUnderlineOffset: 2 }}
+                >
+                  {org.name}
+                </Link>
+              </td>
               <td className="muted">{org.slug}</td>
               <td><span className="statuspill">{org.status}</span></td>
               <td className="muted">{new Date(org.createdAt).toISOString().slice(0, 10)}</td>

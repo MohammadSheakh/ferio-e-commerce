@@ -132,6 +132,10 @@ model TenantDatabase {
   lastHealthAt    DateTime?
   lastHealthy     Boolean?
 
+  // Physical disk storage measurement (collected strictly on-demand to protect SSD endurance).
+  diskSizeBytes      BigInt?
+  diskSizeRecordedAt DateTime?
+
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @updatedAt
 

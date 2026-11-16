@@ -172,6 +172,8 @@ export class OrganizationsService {
             port: true,
             databaseName: true,
             username: true,
+            diskSizeBytes: true,
+            diskSizeRecordedAt: true,
           },
         },
         subscription: { include: { plan: true } },
@@ -179,7 +181,14 @@ export class OrganizationsService {
       },
     });
     if (!organization) throw new NotFoundException('ORGANIZATION_NOT_FOUND');
-    return organization;
+    return {
+      ...organization,
+      databases: organization.databases.map((db) => ({
+        ...db,
+        diskSizeBytes:
+          db.diskSizeBytes != null ? db.diskSizeBytes.toString() : null,
+      })),
+    };
   }
 
   async list(

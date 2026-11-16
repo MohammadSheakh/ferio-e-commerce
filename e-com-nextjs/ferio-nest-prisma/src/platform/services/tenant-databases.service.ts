@@ -129,6 +129,64 @@ export class TenantDatabasesService {
     return record;
   }
 
+  /**
+   * On-demand physical storage measurement for a specific tenant database.
+   * Runs explicitly upon operator confirmation to prevent automated SSD/IO wear.
+   */
+  async measureStorage(organizationId: string) {
+    const record = await this.platform.client.tenantDatabase.findUnique({
+      where: { organizationId },
+    });
+    if (!record) {
+      throw new NotFoundException('TENANT_DATABASE_NOT_FOUND');
+    }
+
+    try {
+      const rows = await this.platform.client.$queryRawUnsafe<
+        Array<{ sizeBytes: string; formattedSize: string }>
+      >(
+        `SELECT pg_database_size($1)::text AS "sizeBytes", pg_size_pretty(pg_database_size($1)) AS "formattedSize"`,
+        record.databaseName,
+      );
+
+      const sizeBytes = rows[0]?.sizeBytes ?? '0';
+      const formattedSize = rows[0]?.formattedSize ?? '0 bytes';
+      const now = new Date();
+
+      await this.platform.client.tenantDatabase.update({
+        where: { id: record.id },
+        data: {
+          diskSizeBytes: BigInt(sizeBytes),
+          diskSizeRecordedAt: now,
+        },
+      });
+
+      await this.audit.record({
+        action: 'TENANT_DATABASE_STORAGE_MEASURED',
+        entityType: 'TenantDatabase',
+        entityId: record.id,
+        newValue: {
+          organizationId,
+          databaseName: record.databaseName,
+          sizeBytes,
+          formattedSize,
+        },
+      });
+
+      return {
+        tenantDatabaseId: record.id,
+        databaseName: record.databaseName,
+        sizeBytes,
+        formattedSize,
+        recordedAt: now.toISOString(),
+      };
+    } catch (error) {
+      throw new ConflictException(
+        `STORAGE_MEASUREMENT_FAILED: ${(error as Error).message}`,
+      );
+    }
+  }
+
   /** Credential-free view safe for APIs and logs. */
   async publicView(id: string) {
     const record = await this.platform.client.tenantDatabase.findUnique({
@@ -145,6 +203,9 @@ export class TenantDatabasesService {
       schemaVersion: record.schemaVersion,
       lastHealthAt: record.lastHealthAt,
       lastHealthy: record.lastHealthy,
+      diskSizeBytes:
+        record.diskSizeBytes != null ? record.diskSizeBytes.toString() : null,
+      diskSizeRecordedAt: record.diskSizeRecordedAt,
     };
   }
 }
