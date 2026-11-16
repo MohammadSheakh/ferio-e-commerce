@@ -40,6 +40,7 @@ COPY --from=build /app/dist ./dist
 # Generated platform client is prebuilt JS referenced from src/
 COPY --from=build /app/src/platform/generated ./src/platform/generated
 COPY --from=build /app/prisma ./prisma
+COPY --from=build /app/scripts ./scripts
 COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/prisma.config.ts ./prisma.config.ts
 # First-boot secret generation (persisted via the ferio_secrets volume in

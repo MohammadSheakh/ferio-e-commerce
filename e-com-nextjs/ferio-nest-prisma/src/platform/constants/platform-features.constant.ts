@@ -1,0 +1,258 @@
+export type FeatureCategory = 'CORE' | 'SELECTIVE' | 'EXPANSION';
+
+export interface PlatformFeatureDefinition {
+  key: string;
+  displayName: string;
+  category: FeatureCategory;
+  description: string;
+  defaultInStarter: boolean;
+  defaultInBusiness: boolean;
+  defaultInPro: boolean;
+  defaultInInternal: boolean;
+  supportsLimit?: boolean;
+}
+
+export const PLATFORM_FEATURES: readonly PlatformFeatureDefinition[] = [
+  // ── Core Commercial Baseline (Always On) ──
+  {
+    key: 'storefront',
+    displayName: 'Branded Storefront',
+    category: 'CORE',
+    description: 'Public storefront web and mobile shopping access.',
+    defaultInStarter: true,
+    defaultInBusiness: true,
+    defaultInPro: true,
+    defaultInInternal: true,
+  },
+  {
+    key: 'inventory',
+    displayName: 'Inventory Management',
+    category: 'CORE',
+    description: 'Stock tracking, reservations, and low-stock alerts.',
+    defaultInStarter: true,
+    defaultInBusiness: true,
+    defaultInPro: true,
+    defaultInInternal: true,
+  },
+  {
+    key: 'online_payments',
+    displayName: 'Online Payments',
+    category: 'CORE',
+    description: 'bKash, Nagad, card gateways, and digital payment reconciliation.',
+    defaultInStarter: true,
+    defaultInBusiness: true,
+    defaultInPro: true,
+    defaultInInternal: true,
+  },
+  {
+    key: 'cod',
+    displayName: 'Cash on Delivery (COD)',
+    category: 'CORE',
+    description: 'COD checkout and phone confirmation workflows.',
+    defaultInStarter: true,
+    defaultInBusiness: true,
+    defaultInPro: true,
+    defaultInInternal: true,
+  },
+  {
+    key: 'couriers_basic',
+    displayName: '3rd-Party Courier Integration',
+    category: 'CORE',
+    description: 'Automated consignment booking and tracking with Steadfast/Pathao.',
+    defaultInStarter: true,
+    defaultInBusiness: true,
+    defaultInPro: true,
+    defaultInInternal: true,
+  },
+  {
+    key: 'returns_rto',
+    displayName: 'Returns & RTO',
+    category: 'CORE',
+    description: 'Customer return requests, refund processing, and courier RTO tracking.',
+    defaultInStarter: true,
+    defaultInBusiness: true,
+    defaultInPro: true,
+    defaultInInternal: true,
+  },
+  {
+    key: 'basic_reports',
+    displayName: 'Basic Reporting',
+    category: 'CORE',
+    description: 'Daily sales, order volumes, and delivered-order reporting.',
+    defaultInStarter: true,
+    defaultInBusiness: true,
+    defaultInPro: true,
+    defaultInInternal: true,
+  },
+  {
+    key: 'ferio_subdomain',
+    displayName: 'Ferio Subdomain',
+    category: 'CORE',
+    description: 'Default *.ferio.app subdomain routing.',
+    defaultInStarter: true,
+    defaultInBusiness: true,
+    defaultInPro: true,
+    defaultInInternal: true,
+  },
+
+  // ── Selective Add-ons (Per-Merchant Toggles) ──
+  {
+    key: 'customer_wallet',
+    displayName: 'Customer Stored-Value Wallet',
+    category: 'SELECTIVE',
+    description: 'Customer account wallet balances, top-ups, and wallet-funded checkout.',
+    defaultInStarter: false,
+    defaultInBusiness: false,
+    defaultInPro: false,
+    defaultInInternal: true,
+  },
+  {
+    key: 'rider_management',
+    displayName: 'In-House Delivery Personnel',
+    category: 'SELECTIVE',
+    description: 'Fleet driver onboarding, duty rosters, and internal rider assignment.',
+    defaultInStarter: false,
+    defaultInBusiness: false,
+    defaultInPro: true,
+    defaultInInternal: true,
+  },
+  {
+    key: 'live_rider_tracking',
+    displayName: 'Live GPS Rider Map',
+    category: 'SELECTIVE',
+    description: 'Real-time WebSocket rider location broadcasting and live tracking map.',
+    defaultInStarter: false,
+    defaultInBusiness: false,
+    defaultInPro: true,
+    defaultInInternal: true,
+  },
+  {
+    key: 'warranty_management',
+    displayName: 'Warranty & Serial Tracking',
+    category: 'SELECTIVE',
+    description: 'Device serial numbers, manufacturer warranty periods, and claim evidence.',
+    defaultInStarter: false,
+    defaultInBusiness: false,
+    defaultInPro: false,
+    defaultInInternal: true,
+  },
+  {
+    key: 'service_booking',
+    displayName: 'Service & Repair Booking',
+    category: 'SELECTIVE',
+    description: 'Appointment slot scheduling, technician booking, and servicing catalog.',
+    defaultInStarter: false,
+    defaultInBusiness: false,
+    defaultInPro: false,
+    defaultInInternal: true,
+  },
+  {
+    key: 'realtime_chat',
+    displayName: 'Real-Time Customer Chat',
+    category: 'SELECTIVE',
+    description: 'Live WebSocket chat between customers and store staff agents.',
+    defaultInStarter: false,
+    defaultInBusiness: false,
+    defaultInPro: false,
+    defaultInInternal: true,
+  },
+  {
+    key: 'store_pickup',
+    displayName: 'Store Outlets & In-Store Pickup',
+    category: 'SELECTIVE',
+    description: 'Physical outlet management and store pickup with OTP handover.',
+    defaultInStarter: false,
+    defaultInBusiness: false,
+    defaultInPro: false,
+    defaultInInternal: true,
+  },
+  {
+    key: 'purchase_social_proof',
+    displayName: 'Recent Purchase Activity',
+    category: 'SELECTIVE',
+    description: 'Consented real-time recent order toasts and social proof feeds.',
+    defaultInStarter: false,
+    defaultInBusiness: false,
+    defaultInPro: false,
+    defaultInInternal: true,
+  },
+  {
+    key: 'custom_domain',
+    displayName: 'Custom Domain',
+    category: 'SELECTIVE',
+    description: 'Custom apex or CNAME domain routing with automatic SSL.',
+    defaultInStarter: false,
+    defaultInBusiness: true,
+    defaultInPro: true,
+    defaultInInternal: true,
+  },
+  {
+    key: 'advanced_reports',
+    displayName: 'Advanced Analytics & P&L',
+    category: 'SELECTIVE',
+    description: 'Delivered-order economics, contribution margins, and marketing attribution.',
+    defaultInStarter: false,
+    defaultInBusiness: true,
+    defaultInPro: true,
+    defaultInInternal: true,
+  },
+
+  // ── Expansion / Long-Term ──
+  {
+    key: 'crm',
+    displayName: 'Customer 360 CRM',
+    category: 'EXPANSION',
+    description: 'Unified profiles, cross-channel communication preferences, and segments.',
+    defaultInStarter: false,
+    defaultInBusiness: true,
+    defaultInPro: true,
+    defaultInInternal: true,
+  },
+  {
+    key: 'campaigns',
+    displayName: 'Automated Messaging Campaigns',
+    category: 'EXPANSION',
+    description: 'WhatsApp and SMS automated sequences for abandoned cart and win-backs.',
+    defaultInStarter: false,
+    defaultInBusiness: true,
+    defaultInPro: true,
+    defaultInInternal: true,
+  },
+  {
+    key: 'marketing_advanced',
+    displayName: 'Advanced Marketing & CAPI',
+    category: 'EXPANSION',
+    description: 'Meta Conversions API, catalog feeds, and audience synchronization.',
+    defaultInStarter: false,
+    defaultInBusiness: false,
+    defaultInPro: true,
+    defaultInInternal: true,
+  },
+  {
+    key: 'api_webhooks',
+    displayName: 'Developer API & Webhooks',
+    category: 'EXPANSION',
+    description: 'REST API keys and custom webhook endpoints for external systems.',
+    defaultInStarter: false,
+    defaultInBusiness: false,
+    defaultInPro: true,
+    defaultInInternal: true,
+  },
+  {
+    key: 'priority_support',
+    displayName: 'Priority Support SLA',
+    category: 'EXPANSION',
+    description: 'Dedicated account manager and accelerated support SLA.',
+    defaultInStarter: false,
+    defaultInBusiness: false,
+    defaultInPro: true,
+    defaultInInternal: true,
+  },
+] as const;
+
+export type PlatformFeatureKey = (typeof PLATFORM_FEATURES)[number]['key'];
+
+export const CANONICAL_FEATURE_KEYS = new Set<string>(
+  PLATFORM_FEATURES.map((f) => f.key),
+);
+

@@ -43,6 +43,7 @@ import { OperationsHealthModule } from './features/operations-health/operations-
 import { CustomerNotificationsModule } from './features/customer-notifications/customer-notifications.module';
 import { WalletModule } from './features/wallet/wallet.module';
 import { StorageModule } from './features/storage/storage.module';
+import { StorefrontModule } from './features/storefront/storefront.module';
 
 /**
  * Application Root Module
@@ -90,6 +91,7 @@ import { StorageModule } from './features/storage/storage.module';
     OperationsHealthModule,
     CustomerNotificationsModule,
     WalletModule,
+    StorefrontModule,
   ],
   controllers: [AppController],
   providers: [AppService],

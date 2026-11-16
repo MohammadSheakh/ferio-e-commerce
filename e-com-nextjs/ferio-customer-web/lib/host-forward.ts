@@ -53,10 +53,23 @@ export function setHostHeaderProvider(fn: HostHeaderProvider): void {
 
 /** Safe in every bundle: returns {} on the client or before registration. */
 export async function hostForwardHeaders(): Promise<Record<string, string>> {
-  if (!provider) return {};
-  try {
-    return await provider();
-  } catch {
-    return {};
+  if (provider) {
+    try {
+      return await provider();
+    } catch {
+      // ignore
+    }
   }
+  // Server fallback: dynamically read incoming headers in Server Components
+  if (typeof window === "undefined") {
+    try {
+      const { headers } = await import("next/headers");
+      const headerList = headers();
+      const host = tenantHostFromHeaders(headerList);
+      if (host) return { "x-forwarded-host": host };
+    } catch {
+      // headers() unavailable outside request context
+    }
+  }
+  return {};
 }

@@ -56,7 +56,10 @@ export class TenancyPlanController {
     const [subscription, domains, usage] = await Promise.all([
       this.platform.client.subscription.findUnique({
         where: { organizationId: ctx.organizationId },
-        include: { plan: { include: { entitlements: true } } },
+        include: {
+          plan: { include: { entitlements: true } },
+          entitlementOverrides: true,
+        },
       }),
       this.platform.client.tenantDomain.findMany({
         where: { organizationId: ctx.organizationId, status: 'ACTIVE' },
@@ -76,6 +79,19 @@ export class TenancyPlanController {
       features[entitlement.featureKey] = entitlement.enabled;
       if (entitlement.limit != null)
         limits[entitlement.featureKey] = entitlement.limit;
+    }
+
+    // Apply active per-merchant overrides (ADR-0006 / ADR-0010)
+    const now = new Date();
+    if (subscription.entitlementOverrides) {
+      for (const override of subscription.entitlementOverrides) {
+        if (override.revokedAt === null && override.expiresAt > now) {
+          features[override.featureKey] = override.enabled;
+          if (override.limit !== null && override.limit !== undefined) {
+            limits[override.featureKey] = override.limit;
+          }
+        }
+      }
     }
 
     return {

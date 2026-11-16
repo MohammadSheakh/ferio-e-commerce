@@ -21,6 +21,7 @@ import {
 } from '@app/common';
 import type { UserPayload } from '@app/common';
 import { TenantMembershipGuard } from '../../tenancy/guards/tenant-membership.guard';
+import { RequireEntitlement } from '../../tenancy/guards/tenant-entitlement.guard';
 import { ServiceBookingService } from './service-booking.service';
 import { CommerceSettingsService } from '../settings/services/commerce-settings.service';
 import {
@@ -30,6 +31,7 @@ import {
 } from './service-booking.dto';
 
 @Controller('services')
+@RequireEntitlement('service_booking')
 export class PublicServiceController {
   constructor(
     private readonly service: ServiceBookingService,
@@ -63,6 +65,7 @@ export class PublicServiceController {
 
 @Controller('admin/services')
 @UseGuards(AuthGuard, RolesGuard, PermissionsGuard, TenantMembershipGuard)
+@RequireEntitlement('service_booking')
 @Roles('admin')
 @Permissions(PERMISSIONS.SERVICES_READ)
 export class AdminServiceController {

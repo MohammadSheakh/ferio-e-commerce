@@ -203,7 +203,7 @@ export class CatalogService {
     }
   }
 
-  private serializeProduct(product: ProductRecord, publicOnly = false) {
+  public serializeProduct(product: ProductRecord, publicOnly = false) {
     const sourceVariants = publicOnly
       ? product.variants.filter((variant) => variant.isActive)
       : product.variants;

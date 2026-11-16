@@ -1,0 +1,189 @@
+// ============================================================================
+// STOREFRONT & MERCHANDISING MODULE SCHEMA
+// Location: prisma/schema/storefront.module/storefront.prisma
+// Tenant Database Scope (Per-Tenant)
+// ============================================================================
+
+enum StorefrontPageType {
+  HOME
+  COLLECTION_LANDING
+  CUSTOM_PAGE
+}
+
+enum StorefrontSectionType {
+  HERO_SHOWCASE
+  CATEGORY_GRID
+  PRODUCT_GRID
+  PRODUCT_CAROUSEL
+  PROMOTIONAL_BANNER
+  PRODUCT_REQUEST_BANNER
+  FEEDBACK_BANNER
+  BRAND_SHOWCASE
+  TEXT_WITH_IMAGE
+  FLASH_SALE
+}
+
+enum ProductSourceType {
+  MANUAL_SELECTION
+  COLLECTION
+  LATEST_PRODUCTS
+  BEST_SELLERS
+  FLASH_SALE
+  ACTIVE_DISCOUNTS
+}
+
+enum CollectionType {
+  MANUAL
+  AUTOMATIC
+}
+
+enum CollectionRuleField {
+  TITLE
+  CATEGORY_ID
+  BRAND_ID
+  PRICE
+  STOCK_QUANTITY
+  TAG
+}
+
+enum CollectionRuleOperator {
+  EQUALS
+  NOT_EQUALS
+  GREATER_THAN
+  LESS_THAN_OR_EQUAL
+  CONTAINS
+  IN_LIST
+}
+
+model StorefrontPage {
+  id                 String             @id @default(cuid())
+  type               StorefrontPageType @default(HOME)
+  slug               String             @unique @default("home")
+  title              String             @default("Home")
+  seoTitle           String?
+  seoDescription     String?
+  
+  // Active published version pointer
+  publishedVersionId String?
+  publishedVersion   StorefrontPageVersion? @relation("PublishedVersion", fields: [publishedVersionId], references: [id], onDelete: SetNull)
+  
+  versions           StorefrontPageVersion[] @relation("AllVersions")
+  
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  @@index([type, slug])
+}
+
+model StorefrontPageVersion {
+  id              String         @id @default(cuid())
+  pageId          String
+  page            StorefrontPage @relation("AllVersions", fields: [pageId], references: [id], onDelete: Cascade)
+  versionNumber   Int
+  isPublished     Boolean        @default(false)
+  publishedAt     DateTime?
+  publishedById   String?
+  changeSummary   String?
+  
+  sections        StorefrontSection[]
+  
+  activeForPages  StorefrontPage[] @relation("PublishedVersion")
+
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@unique([pageId, versionNumber])
+  @@index([pageId, isPublished])
+}
+
+model StorefrontSection {
+  id              String                @id @default(cuid())
+  versionId       String
+  version         StorefrontPageVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  
+  type            StorefrontSectionType
+  enabled         Boolean               @default(true)
+  sortOrder       Int                   @default(0)
+  
+  // Extensible section settings validated by NestJS Zod Schemas
+  // (e.g. title, subtitle, columns, productLimit, showViewAll, hideWhenEmpty)
+  settings        Json
+  
+  // Data Source Specification
+  // (e.g. { type: "COLLECTION", collectionId: "...", filters: { ... } })
+  dataSource      Json?
+
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  @@index([versionId, sortOrder])
+  @@index([versionId, enabled])
+}
+
+model ProductCollection {
+  id              String                  @id @default(cuid())
+  name            String
+  slug            String                  @unique
+  description     String?
+  bannerImageUrl  String?
+  type            CollectionType          @default(MANUAL)
+  isActive        Boolean                 @default(true)
+  seoTitle        String?
+  seoDescription  String?
+  matchMode       String                  @default("ALL") // "ALL" | "ANY"
+
+  items           ProductCollectionItem[]
+  rules           ProductCollectionRule[]
+
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  @@index([isActive, slug])
+  @@index([name])
+}
+
+model ProductCollectionItem {
+  id           String            @id @default(cuid())
+  collectionId String
+  collection   ProductCollection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  
+  productId    String
+  product      Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  sortOrder    Int               @default(0)
+
+  createdAt    DateTime          @default(now())
+
+  @@unique([collectionId, productId])
+  @@index([collectionId, sortOrder])
+  @@index([productId])
+}
+
+model ProductCollectionRule {
+  id           String                 @id @default(cuid())
+  collectionId String
+  collection   ProductCollection      @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  
+  field        CollectionRuleField
+  operator     CollectionRuleOperator
+  value        String
+
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+
+  @@index([collectionId])
+}
+
+model StorefrontPublicationAudit {
+  id             String   @id @default(cuid())
+  pageId         String
+  versionNumber  Int
+  actorId        String
+  actorEmail     String
+  action         String   // "PUBLISH" | "ROLLBACK"
+  snapshotJson   Json
+  createdAt      DateTime @default(now())
+
+  @@index([pageId, createdAt])
+}
+

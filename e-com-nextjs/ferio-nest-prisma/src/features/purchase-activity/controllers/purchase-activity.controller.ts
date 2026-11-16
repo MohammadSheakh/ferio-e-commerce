@@ -1,5 +1,6 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { TenantMembershipGuard } from '../../../tenancy/guards/tenant-membership.guard';
+import { RequireEntitlement } from '../../../tenancy/guards/tenant-entitlement.guard';
 import {
   AuthGuard,
   PERMISSIONS,
@@ -12,6 +13,7 @@ import { PurchaseActivityQueryDto } from '../purchase-activity.dto';
 import { PurchaseActivityService } from '../services/purchase-activity.service';
 
 @Controller('purchase-activity')
+@RequireEntitlement('purchase_social_proof')
 export class PurchaseActivityController {
   constructor(private readonly service: PurchaseActivityService) {}
 
@@ -23,6 +25,7 @@ export class PurchaseActivityController {
 
 @Controller('admin/purchase-activity')
 @UseGuards(AuthGuard, RolesGuard, PermissionsGuard, TenantMembershipGuard)
+@RequireEntitlement('purchase_social_proof')
 @Roles('admin')
 @Permissions(PERMISSIONS.PURCHASE_ACTIVITY_READ)
 export class AdminPurchaseActivityController {

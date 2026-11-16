@@ -2,6 +2,7 @@ import { platformApi } from "@/lib/platform-session";
 import { DomainActions } from "./domain-actions";
 import { OrgActions } from "./org-actions";
 import { SubscriptionActions } from "./subscription-actions";
+import { TenantFeatureMatrix, type FeatureItem } from "./tenant-feature-matrix";
 import { UsageCard, type UsageMetricRow } from "./usage-card";
 import { TenantStorageCard } from "./tenant-storage-card";
 
@@ -39,14 +40,22 @@ export default async function OrganizationDetail({ params }: { params: { id: str
   let org: OrgDetail;
   let runs: ProvisioningRun[];
   let usage: { organizationId: string; periodKey: string; metrics: UsageMetricRow[] };
+  let entitlements: FeatureItem[] = [];
   try {
-    [org, runs, usage] = await Promise.all([
+    const [orgData, runsData, usageData, entitlementsData] = await Promise.all([
       platformApi<OrgDetail>(`/platform/organizations/${params.id}`),
       platformApi<ProvisioningRun[]>(`/platform/organizations/${params.id}/provisioning-runs`),
       platformApi<UsageResponse>(
         `/platform/organizations/${params.id}/usage`,
       ),
+      platformApi<FeatureItem[]>(
+        `/platform/organizations/${params.id}/entitlements`,
+      ).catch(() => []),
     ]);
+    org = orgData;
+    runs = runsData;
+    usage = usageData;
+    entitlements = Array.isArray(entitlementsData) ? entitlementsData : [];
   } catch (error) {
     return (
       <>
@@ -69,6 +78,12 @@ export default async function OrganizationDetail({ params }: { params: { id: str
       <SubscriptionActions
         organizationId={org.id}
         status={org.subscription?.status ?? null}
+      />
+
+      <TenantFeatureMatrix
+        organizationId={org.id}
+        initialFeatures={entitlements}
+        subscriptionStatus={org.subscription?.status ?? null}
       />
 
       <div style={{ height: 28 }} />

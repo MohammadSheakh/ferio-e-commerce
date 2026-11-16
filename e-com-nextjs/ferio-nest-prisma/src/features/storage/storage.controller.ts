@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Inject, Post, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Inject, Post, Query, UseGuards } from '@nestjs/common';
 import { AuthGuard, PermissionsGuard, Roles, RolesGuard } from '@app/common';
 import { TenantMembershipGuard } from '../../tenancy/guards/tenant-membership.guard';
 import { assertTenantObjectKey } from '../../tenancy/utils/object-keys.util';
@@ -23,9 +23,14 @@ export class StorageController {
   ) {}
 
   @Get('presign-get')
-  async presignGet(@Body() body: { key: string }) {
-    assertTenantObjectKey(body.key);
-    return { url: await this.strategy.getSignedUrl(body.key), key: body.key };
+  async presignGet(
+    @Query('key') queryKey?: string,
+    @Body() body?: { key?: string },
+  ) {
+    const key = queryKey || body?.key;
+    if (!key) throw new BadRequestException('KEY_REQUIRED');
+    assertTenantObjectKey(key);
+    return { url: await this.strategy.getSignedUrl(key), key };
   }
 
   @Post('presign-put')

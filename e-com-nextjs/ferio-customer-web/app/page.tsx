@@ -1,14 +1,122 @@
 import Link from "next/link";
-import ProductCard from "@/components/ProductCard";
-import FlashSaleCard from "@/components/FlashSaleCard";
+import type { Metadata } from "next";
+import { getPublishedStorefrontPage } from "@/lib/storefront";
+import { sectionRegistry } from "@/components/storefront/registry";
+import { getCategories, getProducts } from "@/lib/catalog";
 import InteractiveHeroShowcaseV2 from "@/components/InteractiveHeroShowcaseV2";
+import CategoryGridSection from "@/components/storefront/CategoryGridSection";
+import ProductGridSection from "@/components/storefront/ProductGridSection";
+import FlashSaleSection from "@/components/storefront/FlashSaleSection";
 import ProductRequestBanner from "@/components/ProductRequestBanner";
 import FeedbackBanner from "@/components/FeedbackBanner";
-import { getCategories, getProducts } from "@/lib/catalog";
 
 export const dynamic = "force-dynamic";
 
-export default async function HomePage() {
+export async function generateMetadata(): Promise<Metadata> {
+  const pageData = await getPublishedStorefrontPage("home").catch(() => null);
+  const title =
+    pageData?.seoTitle ||
+    pageData?.title ||
+    "Ferio — Modern Multi-Tenant Commerce";
+  const description =
+    pageData?.seoDescription ||
+    "Curated quality products delivered nationwide Bangladesh with verified stock and genuine warranty.";
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+    },
+  };
+}
+
+interface HomePageProps {
+  searchParams?: {
+    preview?: string;
+  };
+}
+
+export default async function HomePage({ searchParams }: HomePageProps) {
+  const isPreview = searchParams?.preview === "true";
+  const pageData = await getPublishedStorefrontPage("home", isPreview).catch(() => null);
+
+  // If schema-driven storefront configuration is available, render via registry
+  if (pageData && pageData.sections && pageData.sections.length > 0) {
+    const activeSections = pageData.sections
+      .filter((section) => (isPreview ? true : section.enabled))
+      .sort((a, b) => a.sortOrder - b.sortOrder);
+
+    return (
+      <main className="min-h-screen bg-paper">
+        {/* Enterprise Live Draft Preview Bar */}
+        {isPreview && (
+          <aside
+            aria-label="Draft Preview Bar"
+            className="sticky top-0 z-50 flex flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-[#111114] px-6 py-2.5 text-white"
+          >
+            <div className="flex items-center gap-2.5 text-[12px]">
+              <span className="rounded bg-amber-400 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-black">
+                PREVIEW MODE
+              </span>
+              <span className="font-medium text-white/90">
+                Viewing Working Draft (v{pageData.versionNumber})
+              </span>
+              <span className="hidden sm:inline text-white/40">•</span>
+              <span className="hidden sm:inline text-[11px] text-white/70">
+                Changes are not visible to live customers until published.
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Link
+                href="/"
+                className="rounded-full border border-white/20 bg-white/10 px-3.5 py-1 text-[11px] font-medium text-white transition hover:bg-white/20"
+              >
+                Exit Preview
+              </Link>
+            </div>
+          </aside>
+        )}
+
+        {activeSections.map((section) => {
+          const Component = sectionRegistry[section.type];
+          if (!Component) return null;
+
+          // Production-grade empty state suppression on public storefront
+          const isCategoryGrid = section.type === "CATEGORY_GRID";
+          const hasZeroCategories =
+            isCategoryGrid && (!section.data?.categories || section.data.categories.length === 0);
+          const hasZeroProducts =
+            !isCategoryGrid && (!section.data?.items || section.data.items.length === 0);
+
+          if (
+            !isPreview &&
+            section.settings?.hideWhenEmpty &&
+            (hasZeroCategories || (section.data?.items !== undefined && hasZeroProducts))
+          ) {
+            return null;
+          }
+
+          return (
+            <Component
+              key={section.id}
+              settings={section.settings || {}}
+              data={section.data || {}}
+            />
+          );
+        })}
+      </main>
+    );
+  }
+
+  // Resilient fallback if tenant database hasn't initialized storefront tables
   const [categories, products] = await Promise.all([
     getCategories().catch(() => []),
     getProducts({ limit: 4 }).catch(() => ({
@@ -16,113 +124,39 @@ export default async function HomePage() {
       page: 1,
       limit: 4,
       total: 0,
-      totalPages: 0,
+      totalPages: 1,
     })),
   ]);
 
   return (
-    <main>
-      {/* Primary Hero Section */}
-      {/* <section className="border-b border-line">
-        <div className="mx-auto grid max-w-6xl items-center gap-14 px-6 py-20 md:grid-cols-2 md:py-28">
-          <div>
-            <p className="text-[11px] uppercase tracking-eyebrow text-ink2">New arrivals every week</p>
-            <h1 className="mt-5 text-[52px] font-semibold leading-[1.05] tracking-tight text-ink md:text-[60px]">From our shelf<br />to your doorstep.</h1>
-            <p className="mt-6 max-w-md text-[15px] leading-relaxed text-ink2">Handpicked products with clear stock and pricing — pay by cash when available, nationwide Bangladesh.</p>
-            <div className="mt-9 flex items-center gap-5">
-              <Link href="/products" className="rounded-full bg-ink px-7 py-3 text-[14px] font-medium text-white transition hover:opacity-85">Shop the collection</Link>
-              <span className="text-[13px] text-ink2">Secure checkout</span>
-            </div>
-          </div>
-          <div className="flex aspect-[4/5] items-center justify-center overflow-hidden rounded-card bg-surface px-10 text-center text-[14px] text-ink2">Published catalog products appear here automatically.</div>
-        </div>
-      </section> */}
-
-      {/* get.ru Style Hero Showcase V2 Section */}
+    <main className="min-h-screen bg-paper">
       <InteractiveHeroShowcaseV2 />
-
-      {/* Shop By Category */}
-      <section id="categories" className="mx-auto max-w-6xl px-6 py-16">
-        <div className="flex items-baseline justify-between">
-          <h2 className="text-[22px] font-semibold tracking-tight text-ink">Shop by category</h2>
-          <Link href="/products" className="text-[13px] text-ink2 hover:text-ink">View all →</Link>
-        </div>
-        <div className="mt-7 grid grid-cols-2 gap-3 md:grid-cols-5">
-          {categories.map((category) => (
-            <Link key={category.id} href={`/products?category=${category.slug}`} className="rounded-card border border-line px-4 py-7 text-center text-[13px] text-ink transition hover:border-ink/30">{category.name}</Link>
-          ))}
-          {categories.length === 0 && <p className="col-span-full text-[13px] text-ink2">Categories will appear after the catalog is published.</p>}
-        </div>
-      </section>
-
-      {/* Featured Products Section (Existing, untouched) */}
-      <section className="mx-auto max-w-6xl px-6 pb-16">
-        <div className="flex items-baseline justify-between">
-          <h2 className="text-[22px] font-semibold tracking-tight text-ink">Featured products</h2>
-          <Link href="/products" className="text-[13px] text-ink2 hover:text-ink">View all →</Link>
-        </div>
-        <div className="mt-7 grid grid-cols-2 gap-x-5 gap-y-9 md:grid-cols-4">
-          {products.items.map((product) => <ProductCard key={product.id} product={product} />)}
-        </div>
-        {products.items.length === 0 && <p className="mt-7 text-[13px] text-ink2">Products will appear after an administrator publishes them.</p>}
-      </section>
-
-      {/* Custom Product Request Banner */}
+      <CategoryGridSection
+        settings={{ title: "Shop by category", columns: 5, showViewAll: true }}
+        data={{ categories }}
+      />
+      <ProductGridSection
+        settings={{ title: "Featured products", columns: 4, showViewAll: true }}
+        data={{ items: products.items }}
+      />
       <ProductRequestBanner />
-
-      {/* User Suggestions, Feedback & Well Wishes Banner */}
       <FeedbackBanner />
-
-      {/* Exclusive Deals Section */}
-      <section className="mx-auto max-w-6xl px-6 py-12 border-t border-line">
-        <div className="flex items-baseline justify-between">
-          <h2 className="text-[22px] font-semibold tracking-tight text-ink">Exclusive deals</h2>
-          <Link href="/products?sale=true" className="text-[13px] text-ink2 hover:text-ink">View all →</Link>
-        </div>
-        <div className="mt-7 grid grid-cols-2 gap-x-5 gap-y-9 md:grid-cols-4">
-          {products.items.map((product) => <ProductCard key={`deal-${product.id}`} product={product} />)}
-        </div>
-        {products.items.length === 0 && <p className="mt-7 text-[13px] text-ink2">No product found right now.</p>}
-      </section>
-
-      {/* Latest Products Section */}
-      <section className="mx-auto max-w-6xl px-6 py-12 border-t border-line">
-        <div className="flex items-baseline justify-between">
-          <h2 className="text-[22px] font-semibold tracking-tight text-ink">Latest products</h2>
-          <Link href="/products?sort=newest" className="text-[13px] text-ink2 hover:text-ink">View all →</Link>
-        </div>
-        <p className="mt-7 text-[13px] text-ink2">No product found right now.</p>
-      </section>
-
-      {/* Best Sellers Section */}
-      <section className="mx-auto max-w-6xl px-6 py-12 border-t border-line">
-        <div className="flex items-baseline justify-between">
-          <h2 className="text-[22px] font-semibold tracking-tight text-ink">Best sellers</h2>
-          <Link href="/products" className="text-[13px] text-ink2 hover:text-ink">View all →</Link>
-        </div>
-        <p className="mt-7 text-[13px] text-ink2">No product found right now.</p>
-      </section>
-
-      {/* Flash Sale Section */}
-      <section className="mx-auto max-w-6xl px-6 py-12 pb-24 border-t border-line">
-        <div className="flex items-baseline justify-between">
-          <h2 className="text-[22px] font-semibold tracking-tight text-ink">Flash sale</h2>
-          <Link href="/products?sale=true" className="text-[13px] text-ink2 hover:text-ink">View all →</Link>
-        </div>
-        <div className="mt-7 grid grid-cols-2 gap-x-5 gap-y-9 md:grid-cols-4">
-          {products.items.map((product, idx) => (
-            <FlashSaleCard
-              key={`flash-${product.id}`}
-              product={product}
-              initialDays={12 + idx * 2}
-              initialHours={6 + idx * 3}
-              initialMinutes={15 + idx * 5}
-            />
-          ))}
-        </div>
-        {products.items.length === 0 && <p className="mt-7 text-[13px] text-ink2">No product found right now.</p>}
-      </section>
+      <ProductGridSection
+        settings={{ title: "Exclusive deals", columns: 4, showViewAll: true }}
+        data={{ items: products.items }}
+      />
+      <ProductGridSection
+        settings={{ title: "Latest products", columns: 4, showViewAll: true }}
+        data={{ items: products.items }}
+      />
+      <ProductGridSection
+        settings={{ title: "Best sellers", columns: 4, showViewAll: true }}
+        data={{ items: products.items }}
+      />
+      <FlashSaleSection
+        settings={{ title: "Flash sale", showViewAll: true }}
+        data={{ items: products.items }}
+      />
     </main>
   );
 }
-

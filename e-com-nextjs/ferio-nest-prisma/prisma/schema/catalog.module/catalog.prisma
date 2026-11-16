@@ -85,6 +85,7 @@ model Product {
   youtubeReviews ProductYoutubeReview[]
   features   ProductFeature[]
   specifications ProductSpecification[]
+  collectionItems ProductCollectionItem[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

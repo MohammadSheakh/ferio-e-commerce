@@ -15,6 +15,7 @@ import {
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { TenantMembershipGuard } from '../../tenancy/guards/tenant-membership.guard';
+import { RequireEntitlement } from '../../tenancy/guards/tenant-entitlement.guard';
 import { memoryStorage } from 'multer';
 import {
   AuthGuard,
@@ -39,6 +40,7 @@ import {
 
 @Controller('warranty')
 @UseGuards(AuthGuard)
+@RequireEntitlement('warranty_management')
 export class WarrantyController {
   constructor(
     private readonly service: WarrantyService,

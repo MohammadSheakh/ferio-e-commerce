@@ -212,4 +212,47 @@ describe('EntitlementsService evaluation matrix (ADR-0006)', () => {
       'control plane unavailable',
     );
   });
+
+  it('merges plan entitlements with active overrides in getEffectiveEntitlements', async () => {
+    const future = new Date(Date.now() + 86400000);
+    platform.client.subscription.findUnique.mockResolvedValueOnce({
+      id: 'sub-1',
+      organizationId: 'org-1',
+      status: 'ACTIVE',
+      plan: {
+        entitlements: [
+          { featureKey: 'storefront', enabled: true, limit: null },
+          { featureKey: 'warranty_management', enabled: false, limit: null },
+        ],
+      },
+      entitlementOverrides: [
+        {
+          id: 'ov-1',
+          featureKey: 'warranty_management',
+          enabled: true,
+          limit: null,
+          reason: 'Pilot merchant approval',
+          revokedAt: null,
+          expiresAt: future,
+        },
+      ],
+    });
+
+    const items = await service.getEffectiveEntitlements('org-1');
+    const warranty = items.find((i) => i.featureKey === 'warranty_management');
+    const storefront = items.find((i) => i.featureKey === 'storefront');
+
+    expect(warranty).toMatchObject({
+      featureKey: 'warranty_management',
+      enabled: true,
+      source: 'OVERRIDE',
+      overrideId: 'ov-1',
+      reason: 'Pilot merchant approval',
+    });
+    expect(storefront).toMatchObject({
+      featureKey: 'storefront',
+      enabled: true,
+      source: 'PLAN',
+    });
+  });
 });

@@ -81,6 +81,7 @@ services:
       /bin/sh -c "
       mc alias set local http://minio:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadmin} &&
       mc mb --ignore-existing local/ferio-media &&
+      mc anonymous set download local/ferio-media &&
       echo 'bucket ready: ferio-media'"
 
   # ── One-shot migrations (complete before the backend starts) ──
@@ -90,12 +91,19 @@ services:
       dockerfile: ferio-nest-prisma/Dockerfile
       target: build
     command: >
-      sh -c "node_modules/.bin/prisma migrate deploy --schema prisma/schema.prisma"
+      sh -c "node_modules/.bin/prisma migrate deploy --schema prisma/schema.prisma && node scripts/migrate-tenant-fleet.mjs"
     environment:
       DATABASE_URL: postgresql://ferio:${POSTGRES_PASSWORD:-ferio}@postgres:5432/ferio_dev
+      PLATFORM_DATABASE_URL: postgresql://ferio:${POSTGRES_PASSWORD:-ferio}@postgres:5432/ferio_platform
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ferio
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ferio}
     depends_on:
       postgres:
         condition: service_healthy
+      platform-migrate:
+        condition: service_completed_successfully
     restart: "no"
 
   platform-migrate:
@@ -198,6 +206,7 @@ services:
     environment:
       HOSTNAME: "0.0.0.0"
       PORT: 3000
+      CUSTOMER_WEB_TRUSTED_PROXY: "true"
       NEXT_PUBLIC_FERIO_API_URL: ${PUBLIC_FERIO_API_URL:-http://localhost:6733/api/v1}
       FERIO_API_URL: http://backend:6733/api/v1
       NEXT_PUBLIC_SOCKET_URL: ${PUBLIC_SOCKET_URL:-http://localhost:6734}

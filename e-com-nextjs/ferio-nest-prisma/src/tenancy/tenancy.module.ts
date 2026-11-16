@@ -27,6 +27,7 @@ import { TenancyObservabilityService } from './services/tenancy-observability.se
 import { UsageReconciliationService } from './services/usage-reconciliation.service';
 import { TenantReturnOriginService } from './services/tenant-return-origin.service';
 import { TenantSuspensionGuard } from './guards/tenant-suspension.guard';
+import { TenantEntitlementGuard } from './guards/tenant-entitlement.guard';
 
 /**
  * Tenant plane (MT-2/MT-3): trusted resolution, immutable request context,
@@ -64,9 +65,14 @@ import { TenantSuspensionGuard } from './guards/tenant-suspension.guard';
       inject: [PlatformPrismaService, RedisService],
     },
     TenantMembershipGuard,
+    TenantEntitlementGuard,
     {
       provide: APP_GUARD,
       useClass: TenantSuspensionGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: TenantEntitlementGuard,
     },
     TenantContextMiddleware,
     TenantDatabaseManager,
@@ -90,6 +96,7 @@ import { TenantSuspensionGuard } from './guards/tenant-suspension.guard';
     TenantFanoutService,
     TenantMembershipGuard,
     TenantMembershipService,
+    TenantEntitlementGuard,
     UsageReconciliationService,
     RetentionSweepService,
     TenantReturnOriginService,

@@ -76,4 +76,87 @@ describe('TenancyPlanController overdue subscription behavior', () => {
       features: { staff_seats: true, custom_domain: false },
     });
   });
+
+  it('reflects active per-merchant entitlement overrides in myPlan features and limits', async () => {
+    process.env.TENANCY_ENABLED = 'true';
+    const future = new Date(Date.now() + 86400000);
+    const controller = new TenancyPlanController(
+      { findActive: jest.fn().mockResolvedValue({ role: 'OWNER' }) } as never,
+      {
+        client: {
+          subscription: {
+            findUnique: jest.fn().mockResolvedValue({
+              status: 'ACTIVE',
+              plan: {
+                key: 'starter',
+                displayName: 'Starter',
+                entitlements: [
+                  { featureKey: 'warranty_management', enabled: false, limit: null },
+                  { featureKey: 'staff_seats', enabled: true, limit: 2 },
+                ],
+              },
+              entitlementOverrides: [
+                {
+                  featureKey: 'warranty_management',
+                  enabled: true,
+                  limit: null,
+                  revokedAt: null,
+                  expiresAt: future,
+                },
+                {
+                  featureKey: 'staff_seats',
+                  enabled: true,
+                  limit: 5,
+                  revokedAt: null,
+                  expiresAt: future,
+                },
+              ],
+            }),
+          },
+          tenantDomain: {
+            findMany: jest.fn().mockResolvedValue([]),
+          },
+        },
+      } as never,
+      {} as never,
+      {
+        snapshot: jest.fn().mockResolvedValue({}),
+      } as never,
+    );
+
+    const request = {
+      user: { email: 'owner@example.com' },
+    } as unknown as Request;
+
+    const result = await runWithTenantContext(
+      {
+        correlationId: 'corr-override',
+        organizationId: 'org-override',
+        tenantDatabaseId: 'tdb-override',
+        database: {
+          id: 'tdb-override',
+          host: 'h',
+          port: 5432,
+          databaseName: 'd',
+          username: 'u',
+          credentialCipher: 'c',
+        },
+        domainId: 'dom-override',
+        hostname: 'store.example.com',
+        subscriptionStatus: 'ACTIVE',
+      },
+      () => controller.myPlan(request),
+    );
+
+    expect(result).toMatchObject({
+      code: 'ACTIVE',
+      features: {
+        warranty_management: true, // overridden from false to true
+        staff_seats: true,
+      },
+      limits: {
+        staff_seats: 5, // overridden from 2 to 5
+      },
+    });
+  });
 });

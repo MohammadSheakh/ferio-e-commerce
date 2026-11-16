@@ -11,5 +11,9 @@ Status legend: `PROPOSED` â†’ `ACCEPTED` (owner sign-off pending where noted) â†
 | [ADR-0005](ADR-0005-tenant-migration-orchestration.md) | Tenant migration orchestration (canary/batch/fleet) | ACCEPTED |
 | [ADR-0006](ADR-0006-subscription-entitlement-enforcement.md) | Centralized subscription/entitlement enforcement | ACCEPTED (plan catalog owner-blocked) |
 | [ADR-0007](ADR-0007-tenant-closure-export-retention.md) | Tenant closure, export, and retention | PROPOSED (policy owner-blocked) |
+| [ADR-0008](ADR-0008-platform-admin-app-boundary.md) | Platform Admin as a separate application boundary | ACCEPTED |
+| [ADR-0009](ADR-0009-managed-postgresql-backup-pitr.md) | Managed PostgreSQL backup and PITR strategy | ACCEPTED |
+| [ADR-0010](ADR-0010-per-tenant-feature-flagging-and-selective-entitlements.md) | Per-tenant feature flagging and commercial scope decoupling | ACCEPTED |
+| [ADR-0011](ADR-0011-schema-driven-storefront-builder-and-collections-engine.md) | Schema-driven storefront builder and dynamic product collections engine | ACCEPTED |
 
 Each ADR records context, decision, consequences, and the negative alternatives rejected, so future contributors can challenge decisions with evidence rather than folklore.

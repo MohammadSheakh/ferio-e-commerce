@@ -34,8 +34,10 @@ import {
 } from './delivery-personnel.dto';
 import { DeliveryPersonnelService } from './delivery-personnel.service';
 import { TenantMembershipGuard } from '../../tenancy/guards/tenant-membership.guard';
+import { RequireEntitlement } from '../../tenancy/guards/tenant-entitlement.guard';
 
 @Controller('delivery-personnel')
+@RequireEntitlement('rider_management')
 export class DeliveryPersonnelController {
   constructor(private readonly service: DeliveryPersonnelService) {}
 

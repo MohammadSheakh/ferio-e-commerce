@@ -29,6 +29,7 @@ import { RetentionSweepService } from '../tenancy/services/retention-sweep.servi
 import { TenantSchemaBootstrapper } from '../tenancy/services/tenant-schema.bootstrapper';
 import { PlatformOperationsHealthService } from './services/platform-operations-health.service';
 import { SubscriptionsService } from './services/subscriptions.service';
+import { EntitlementsService } from './services/entitlements.service';
 import { TenantDatabasesService } from './services/tenant-databases.service';
 import {
   PlatformAuthGuard,
@@ -69,6 +70,7 @@ export class PlatformAdminController {
     private readonly tenantSchemaBootstrapper: TenantSchemaBootstrapper,
     private readonly operationsHealth: PlatformOperationsHealthService,
     private readonly subscriptions: SubscriptionsService,
+    private readonly entitlements: EntitlementsService,
     private readonly tenantDatabases?: TenantDatabasesService,
   ) {}
 
@@ -156,6 +158,16 @@ export class PlatformAdminController {
       featureKey,
       request.platformPrincipal?.platformUserId,
     );
+  }
+
+  /**
+   * SPEC-0001 / ADR-0010: Returns the complete effective feature entitlement
+   * catalog for an organization, merging plan defaults with active overrides.
+   */
+  @Get('organizations/:id/entitlements')
+  @PlatformPermissions('subscription:read')
+  getOrganizationEntitlements(@Param('id') id: string) {
+    return this.entitlements.getEffectiveEntitlements(id);
   }
 
   /** MT-9 §12.3 — platform invoices with payment outcome at a glance. */

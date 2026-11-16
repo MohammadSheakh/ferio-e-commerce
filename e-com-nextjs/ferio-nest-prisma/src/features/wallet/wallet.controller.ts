@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { TenantMembershipGuard } from '../../tenancy/guards/tenant-membership.guard';
+import { RequireEntitlement } from '../../tenancy/guards/tenant-entitlement.guard';
 import {
   AuthGuard,
   PERMISSIONS,
@@ -32,6 +33,7 @@ import { WalletService } from './wallet.service';
 @ApiBearerAuth()
 @Controller('account/wallet')
 @UseGuards(AuthGuard)
+@RequireEntitlement('customer_wallet')
 export class CustomerWalletController {
   constructor(private readonly wallet: WalletService) {}
 
@@ -62,6 +64,7 @@ export class CustomerWalletController {
 @ApiBearerAuth()
 @Controller('admin/wallet')
 @UseGuards(AuthGuard, RolesGuard, PermissionsGuard, TenantMembershipGuard)
+@RequireEntitlement('customer_wallet')
 @Roles('admin')
 @Permissions(PERMISSIONS.WALLETS_READ)
 export class AdminWalletController {
