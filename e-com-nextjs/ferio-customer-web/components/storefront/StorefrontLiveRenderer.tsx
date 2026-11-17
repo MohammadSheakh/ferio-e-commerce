@@ -74,6 +74,8 @@ export default function StorefrontLiveRenderer({
 }: StorefrontLiveRendererProps) {
   const [sections, setSections] = useState<StorefrontSectionData[]>(initialSections);
   const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
+  const [inIframe, setInIframe] = useState<boolean>(false);
+  const [interactionMode, setInteractionMode] = useState<"edit" | "interact">("edit");
   const isInsideIframe = useRef(false);
 
   useEffect(() => {
@@ -81,7 +83,9 @@ export default function StorefrontLiveRenderer({
   }, [initialSections]);
 
   useEffect(() => {
-    isInsideIframe.current = typeof window !== "undefined" && window !== window.parent;
+    const isFrame = typeof window !== "undefined" && window !== window.parent;
+    setInIframe(isFrame);
+    isInsideIframe.current = isFrame;
 
     const handleMessage = (event: MessageEvent) => {
       if (!event.data || typeof event.data !== "object") return;
@@ -99,13 +103,17 @@ export default function StorefrontLiveRenderer({
             el.scrollIntoView({ behavior: "smooth", block: "center" });
           }
         }
+      } else if (event.data.type === "FERIO_STUDIO_SET_INTERACTION_MODE") {
+        if (event.data.mode === "edit" || event.data.mode === "interact") {
+          setInteractionMode(event.data.mode);
+        }
       }
     };
 
     window.addEventListener("message", handleMessage);
 
     // Announce ready to parent studio
-    if (isInsideIframe.current) {
+    if (isFrame) {
       try {
         window.parent.postMessage({ type: "FERIO_STOREFRONT_READY" }, "*");
       } catch (e) {
@@ -118,8 +126,12 @@ export default function StorefrontLiveRenderer({
     };
   }, []);
 
-  const handleSectionClick = (sectionId: string) => {
+  const handleSectionClick = (e: React.MouseEvent, sectionId: string) => {
     if (!isPreview) return;
+    if (interactionMode === "edit") {
+      // In edit mode, clicking selects the section instead of following child links
+      e.stopPropagation();
+    }
     setSelectedSectionId(sectionId);
     if (isInsideIframe.current) {
       try {
@@ -141,21 +153,18 @@ export default function StorefrontLiveRenderer({
   if (activeSections.length === 0) {
     return (
       <main className="min-h-screen bg-paper flex flex-col">
-        {isPreview && (
+        {/* Only show minimal preview bar if in standalone tab, never inside Studio iframe */}
+        {isPreview && !inIframe && (
           <aside
             aria-label="Draft Preview Bar"
-            className="sticky top-0 z-50 flex flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-[#111114] px-6 py-2.5 text-white"
+            className="sticky top-0 z-50 flex items-center justify-between border-b border-line bg-paper/95 backdrop-blur px-6 py-2 text-ink shadow-2xs"
           >
-            <div className="flex items-center gap-2.5 text-[12px]">
-              <span className="rounded bg-amber-400 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-black">
-                PREVIEW MODE
+            <div className="flex items-center gap-2 text-[12px]">
+              <span className="rounded-full bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
+                Preview Mode
               </span>
-              <span className="font-medium text-white/90">
+              <span className="text-[12px] text-ink2">
                 Empty Storefront Canvas
-              </span>
-              <span className="hidden sm:inline text-white/40">•</span>
-              <span className="hidden sm:inline text-[11px] text-white/70">
-                Add sections in Storefront Studio to build your layout.
               </span>
             </div>
           </aside>
@@ -174,32 +183,30 @@ export default function StorefrontLiveRenderer({
 
   return (
     <main className="min-h-screen bg-paper">
-      {/* Enterprise Live Draft Preview Bar */}
-      {isPreview && (
+      {/* Sleek Minimal Preview Bar - ONLY rendered in standalone tabs, NEVER inside Studio iframe */}
+      {isPreview && !inIframe && (
         <aside
           aria-label="Draft Preview Bar"
-          className="sticky top-0 z-50 flex flex-wrap items-center justify-between gap-3 border-b border-white/10 bg-[#111114] px-6 py-2.5 text-white"
+          className="sticky top-0 z-50 flex items-center justify-between border-b border-line bg-paper/95 backdrop-blur px-6 py-2 text-ink shadow-2xs"
         >
-          <div className="flex items-center gap-2.5 text-[12px]">
-            <span className="rounded bg-amber-400 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-black">
-              PREVIEW MODE
+          <div className="flex items-center gap-2 text-[12px]">
+            <span className="rounded-full bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-0.5 text-[10px] font-medium text-emerald-700">
+              Live Preview
             </span>
-            <span className="font-medium text-white/90">
-              Viewing Working Draft {pageVersionNumber ? `(v${pageVersionNumber})` : ""}
+            <span className="font-medium text-ink">
+              Draft {pageVersionNumber ? `v${pageVersionNumber}` : ""}
             </span>
-            <span className="hidden sm:inline text-white/40">•</span>
-            <span className="hidden sm:inline text-[11px] text-white/70">
-              Live Real-Time Sync Active. Click any section to customize.
+            <span className="text-ink2/40">•</span>
+            <span className="text-[11px] text-ink2">
+              Changes sync real-time with Storefront Studio
             </span>
           </div>
-          <div className="flex items-center gap-2">
-            <Link
-              href="/"
-              className="rounded-full border border-white/20 bg-white/10 px-3.5 py-1 text-[11px] font-medium text-white transition hover:bg-white/20"
-            >
-              Exit Preview
-            </Link>
-          </div>
+          <Link
+            href="/"
+            className="rounded-full border border-line bg-surface px-3 py-1 text-[11px] font-medium text-ink transition hover:bg-paper"
+          >
+            Exit Preview
+          </Link>
         </aside>
       )}
 
@@ -243,7 +250,7 @@ export default function StorefrontLiveRenderer({
           <div
             key={section.id}
             id={`storefront-section-${section.id}`}
-            onClick={() => handleSectionClick(section.id)}
+            onClick={(e) => handleSectionClick(e, section.id)}
             className={`transition-all duration-200 relative ${
               isPreview ? "cursor-pointer hover:outline hover:outline-2 hover:outline-ink/20" : ""
             } ${

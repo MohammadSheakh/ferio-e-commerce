@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition, useRef } from "react";
-import Topbar from "@/components/Topbar";
+import Link from "next/link";
 import ImagePicker from "@/components/ImagePicker";
 
 function getActiveStoreSlug(): string {
@@ -51,6 +51,16 @@ type ProductSourceType =
   | "FLASH_SALE"
   | "ACTIVE_DISCOUNTS";
 
+interface ChildBlock {
+  id: string;
+  type?: string;
+  title: string;
+  subtitle?: string;
+  imageUrl?: string;
+  ctaText?: string;
+  ctaUrl?: string;
+}
+
 interface StorefrontSection {
   id: string;
   type: SectionType;
@@ -74,7 +84,8 @@ interface StorefrontSection {
     imagePosition?: "left" | "right";
     layout?: "split" | "centered" | "minimal" | "interactive";
     layoutStyle?: "tiles" | "pills";
-    background?: "paper" | "surface" | "ink";
+    background?: "paper" | "surface" | "ink" | "custom";
+    customBgColor?: string;
     padding?: "compact" | "normal" | "spacious";
     showTopBorder?: boolean;
     showDiscountBadge?: boolean;
@@ -85,6 +96,7 @@ interface StorefrontSection {
     buttonText?: string;
     buttonUrl?: string;
     alignment?: "left" | "center";
+    blocks?: ChildBlock[];
     [key: string]: any;
   };
   dataSource?: {
@@ -113,6 +125,65 @@ interface VersionHistoryItem {
   createdAt: string;
 }
 
+interface GlobalThemeTokens {
+  primaryColor: string;
+  accentColor: string;
+  surfaceTone: "paper" | "surface" | "contrast";
+  headingFont: string;
+  bodyFont: string;
+  borderRadius: string;
+  containerWidth: string;
+  spacingDensity: "compact" | "normal" | "spacious";
+}
+
+const SECTION_ICONS: Record<SectionType, React.ReactNode> = {
+  HERO_SHOWCASE: (
+    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+    </svg>
+  ),
+  CATEGORY_GRID: (
+    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+    </svg>
+  ),
+  PRODUCT_GRID: (
+    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+    </svg>
+  ),
+  PRODUCT_CAROUSEL: (
+    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+    </svg>
+  ),
+  FLASH_SALE: (
+    <svg className="w-3.5 h-3.5 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
+      <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" />
+    </svg>
+  ),
+  PRODUCT_REQUEST_BANNER: (
+    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+    </svg>
+  ),
+  FEEDBACK_BANNER: (
+    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+    </svg>
+  ),
+  BRAND_SHOWCASE: (
+    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+    </svg>
+  ),
+  TEXT_WITH_IMAGE: (
+    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+    </svg>
+  ),
+};
+
 const AVAILABLE_SECTION_TEMPLATES: {
   type: SectionType;
   label: string;
@@ -135,6 +206,11 @@ const AVAILABLE_SECTION_TEMPLATES: {
       background: "surface",
       padding: "normal",
       showTopBorder: false,
+      blocks: [
+        { id: "b1", title: "Velvet Sofa", subtitle: "Living Room Showcase", ctaUrl: "/products" },
+        { id: "b2", title: "Centerpiece Armchair", subtitle: "Signature Edition", ctaUrl: "/products" },
+        { id: "b3", title: "Ceramic Minimalist Vase", subtitle: "Decor Accents", ctaUrl: "/products" },
+      ],
     },
     defaultDataSource: null,
   },
@@ -310,19 +386,65 @@ export default function StorefrontStudioPage() {
   const [publishing, setPublishing] = useState(false);
   const [error, setError] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
-  const [viewMode, setViewMode] = useState<"desktop" | "mobile">("desktop");
+  
+  // Viewport Device Breakpoint (Desktop 1280px, Tablet 768px, Mobile 375px)
+  const [viewMode, setViewMode] = useState<"desktop" | "tablet" | "mobile">("desktop");
+  // Interaction Mode: "edit" (clicks select section) vs "interact" (live store test)
+  const [interactionMode, setInteractionMode] = useState<"edit" | "interact">("edit");
+  // Canvas View Mode: Live Preview vs Structural DOM Outliner
+  const [previewTab, setPreviewTab] = useState<"interactive" | "outliner">("interactive");
+
+  // Modals & Drawers
   const [showAddModal, setShowAddModal] = useState(false);
+  const [addSectionIndex, setAddSectionIndex] = useState<number | null>(null);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [showThemeSettingsModal, setShowThemeSettingsModal] = useState(false);
+  
+  // Page Template Switcher
+  const [selectedTemplate, setSelectedTemplate] = useState<"home" | "product" | "collection" | "cart">("home");
+
+  // Collapsible Accordions in Right Inspector
+  const [openAccordions, setOpenAccordions] = useState<Record<string, boolean>>({
+    typography: true,
+    datasource: true,
+    styling: true,
+    media: true,
+    blocks: true,
+  });
+
+  // Expanded block groups in Left Sidebar
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
+
+  // Global Theme Tokens
+  const [themeTokens, setThemeTokens] = useState<GlobalThemeTokens>({
+    primaryColor: "#111114",
+    accentColor: "#2563eb",
+    surfaceTone: "paper",
+    headingFont: "Inter",
+    bodyFont: "Inter",
+    borderRadius: "8px",
+    containerWidth: "1280px",
+    spacingDensity: "normal",
+  });
+
   const [historyList, setHistoryList] = useState<VersionHistoryItem[]>([]);
   const [activeVersionNumber, setActiveVersionNumber] = useState(1);
   const [hasSignatureTemplate, setHasSignatureTemplate] = useState(false);
-  const [previewTab, setPreviewTab] = useState<"interactive" | "wireframe">("interactive");
   const [iframeKey, setIframeKey] = useState(0);
   const [activeStoreSlug, setActiveStoreSlug] = useState<string>("test");
   const initialSnapshotRef = useRef<string>("");
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [, startTransition] = useTransition();
+
+  const toggleAccordion = (key: string) => {
+    setOpenAccordions((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const toggleSectionBlocksExpand = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setExpandedSections((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
 
   const selectSectionAndScroll = (id: string) => {
     setSelectedSectionId(id);
@@ -338,6 +460,21 @@ export default function StorefrontStudioPage() {
       } catch (e) {}
     }
   };
+
+  // Broadcast interaction mode to iframe
+  useEffect(() => {
+    if (iframeRef.current?.contentWindow) {
+      try {
+        iframeRef.current.contentWindow.postMessage(
+          {
+            type: "FERIO_STUDIO_SET_INTERACTION_MODE",
+            mode: interactionMode,
+          },
+          "*",
+        );
+      } catch (e) {}
+    }
+  }, [interactionMode]);
 
   // Real-Time 2-Way Sync: broadcast section edits to live preview canvas immediately
   useEffect(() => {
@@ -382,6 +519,13 @@ export default function StorefrontStudioPage() {
               },
               "*",
             );
+            iframeRef.current.contentWindow.postMessage(
+              {
+                type: "FERIO_STUDIO_SET_INTERACTION_MODE",
+                mode: interactionMode,
+              },
+              "*",
+            );
           } catch (err) {}
         }
       } else if (e.data.type === "FERIO_STOREFRONT_SECTION_CLICKED") {
@@ -392,7 +536,7 @@ export default function StorefrontStudioPage() {
     };
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, [sections]);
+  }, [sections, interactionMode]);
 
   const serializeSections = (list: StorefrontSection[]) =>
     JSON.stringify(
@@ -462,433 +606,201 @@ export default function StorefrontStudioPage() {
 
   const selectedSection = sections.find((s) => s.id === selectedSectionId);
 
-  // Reorder sections
-  const moveSection = (index: number, direction: "up" | "down") => {
-    const targetIndex = direction === "up" ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= sections.length) return;
-
-    const copy = [...sections];
-    const temp = copy[index];
-    copy[index] = copy[targetIndex];
-    copy[targetIndex] = temp;
-
-    const updated = copy.map((sec, idx) => ({ ...sec, sortOrder: idx }));
-    setSections(updated);
-  };
-
-  // Toggle section enabled
-  const toggleSectionEnabled = (id: string) => {
+  const updateSettings = (key: string, value: any) => {
+    if (!selectedSectionId) return;
     setSections((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, enabled: !s.enabled } : s)),
+      prev.map((sec) =>
+        sec.id === selectedSectionId
+          ? {
+              ...sec,
+              settings: {
+                ...sec.settings,
+                [key]: value,
+              },
+            }
+          : sec,
+      ),
     );
   };
 
-  // Remove section
+  const updateDataSource = (key: string, value: any) => {
+    if (!selectedSectionId) return;
+    setSections((prev) =>
+      prev.map((sec) =>
+        sec.id === selectedSectionId
+          ? {
+              ...sec,
+              dataSource: {
+                ...(sec.dataSource || { type: "COLLECTION" }),
+                [key]: value,
+              },
+            }
+          : sec,
+      ),
+    );
+  };
+
+  const toggleSectionEnabled = (id: string) => {
+    setSections((prev) =>
+      prev.map((sec) =>
+        sec.id === id ? { ...sec, enabled: !sec.enabled } : sec,
+      ),
+    );
+  };
+
+  const moveSection = (fromIndex: number, direction: "up" | "down") => {
+    const toIndex = direction === "up" ? fromIndex - 1 : fromIndex + 1;
+    if (toIndex < 0 || toIndex >= sections.length) return;
+    setSections((prev) => {
+      const next = [...prev];
+      const item = next[fromIndex];
+      next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, item);
+      return next.map((s, idx) => ({ ...s, sortOrder: idx }));
+    });
+  };
+
   const removeSection = (id: string) => {
-    setSections((prev) => prev.filter((s) => s.id !== id));
+    setSections((prev) => {
+      const filtered = prev.filter((s) => s.id !== id);
+      return filtered.map((s, idx) => ({ ...s, sortOrder: idx }));
+    });
     if (selectedSectionId === id) {
-      const remaining = sections.filter((s) => s.id !== id);
-      setSelectedSectionId(remaining.length > 0 ? remaining[0].id : null);
+      setSelectedSectionId(null);
     }
   };
 
-  // Add section
-  const addSection = (template: typeof AVAILABLE_SECTION_TEMPLATES[0]) => {
+  const duplicateSection = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const target = sections.find((s) => s.id === id);
+    if (!target) return;
+    const copy: StorefrontSection = {
+      ...target,
+      id: `sec-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      settings: {
+        ...target.settings,
+        title: target.settings?.title ? `${target.settings.title} (Copy)` : undefined,
+      },
+    };
+    const idx = sections.findIndex((s) => s.id === id);
+    const next = [...sections];
+    next.splice(idx + 1, 0, copy);
+    setSections(next.map((s, i) => ({ ...s, sortOrder: i })));
+    setSelectedSectionId(copy.id);
+  };
+
+  const openAddSectionAtIndex = (index: number | null, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setAddSectionIndex(index);
+    setShowAddModal(true);
+  };
+
+  const addSection = (template: (typeof AVAILABLE_SECTION_TEMPLATES)[0]) => {
     const newSection: StorefrontSection = {
-      id: `sec_${Date.now()}`,
+      id: `sec-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       type: template.type,
       enabled: true,
       sortOrder: sections.length,
       settings: { ...template.defaultSettings },
       dataSource: template.defaultDataSource ? { ...template.defaultDataSource } : null,
-      data: { items: [] },
     };
-    setSections((prev) => [...prev, newSection]);
+
+    setSections((prev) => {
+      const next = [...prev];
+      if (addSectionIndex !== null && addSectionIndex >= 0 && addSectionIndex <= next.length) {
+        next.splice(addSectionIndex, 0, newSection);
+      } else {
+        next.push(newSection);
+      }
+      return next.map((s, idx) => ({ ...s, sortOrder: idx }));
+    });
+
     setSelectedSectionId(newSection.id);
     setShowAddModal(false);
+    setAddSectionIndex(null);
   };
 
-  const applyInitialDesignTemplate = () => {
-    if (!hasSignatureTemplate) {
-      alert(
-        "This template requires platform administrator provisioning. Please contact your platform administrator to provision the full Signature Showroom template to your store.",
-      );
-      return;
-    }
-    if (
-      sections.length > 0 &&
-      !confirm("Re-apply the Signature Initial Design template? This will replace current sections in the working draft.")
-    ) {
-      return;
-    }
-    const templateSections: StorefrontSection[] = [
-      {
-        id: `sec_${Date.now()}_0`,
-        type: "HERO_SHOWCASE",
-        enabled: true,
-        sortOrder: 0,
-        settings: {
-          layout: "interactive",
-          variant: "interactive",
-          eyebrow: "SIGNATURE SHOWCASE",
-          title: "МЕБЕЛЬ И АКСЕССУАРЫ ДЛЯ СОВРЕМЕННОГО ИНТЕРЬЕРА",
-          subtitle: "Воспользуйтесь нашими идеями, чтобы создать интерьер, подходящий вам.",
-          ctaText: "Shop collection",
-          ctaUrl: "/products",
-          background: "surface",
-          padding: "normal",
-          showTopBorder: false,
-        },
-        dataSource: null,
-        data: {},
-      },
-      {
-        id: `sec_${Date.now()}_1`,
-        type: "CATEGORY_GRID",
-        enabled: true,
-        sortOrder: 1,
-        settings: {
-          eyebrow: "CATALOG BROWSER",
-          title: "Shop by category",
-          columns: 5,
-          layoutStyle: "tiles",
-          showViewAll: true,
-          viewAllText: "View all →",
-          viewAllUrl: "/products",
-          hideWhenEmpty: true,
-          background: "paper",
-          padding: "normal",
-          showTopBorder: true,
-        },
-        dataSource: null,
-        data: {},
-      },
-      {
-        id: `sec_${Date.now()}_2`,
-        type: "PRODUCT_GRID",
-        enabled: true,
-        sortOrder: 2,
-        settings: {
-          eyebrow: "CURATED SELECTION",
-          title: "Featured products",
-          columns: 4,
-          productLimit: 4,
-          showViewAll: true,
-          viewAllUrl: "/products",
-          hideWhenEmpty: true,
-          background: "paper",
-          padding: "normal",
-          showTopBorder: true,
-        },
-        dataSource: { type: "LATEST_PRODUCTS" },
-        data: { items: [] },
-      },
-      {
-        id: `sec_${Date.now()}_3`,
-        type: "PRODUCT_REQUEST_BANNER",
-        enabled: true,
-        sortOrder: 3,
-        settings: {
-          title: "Looking for something specific?",
-          subtitle: "Let us know what you need and we will source it for you nationwide.",
-          buttonText: "Request product",
-          hideWhenEmpty: false,
-          background: "surface",
-          padding: "compact",
-          showTopBorder: true,
-        },
-        dataSource: null,
-        data: {},
-      },
-      {
-        id: `sec_${Date.now()}_4`,
-        type: "FEEDBACK_BANNER",
-        enabled: true,
-        sortOrder: 4,
-        settings: {
-          title: "Share your suggestions & wishes",
-          subtitle: "Help us refine our service and product selections.",
-          buttonText: "Send feedback",
-          hideWhenEmpty: false,
-          background: "surface",
-          padding: "compact",
-          showTopBorder: true,
-        },
-        dataSource: null,
-        data: {},
-      },
-      {
-        id: `sec_${Date.now()}_5`,
-        type: "PRODUCT_GRID",
-        enabled: true,
-        sortOrder: 5,
-        settings: {
-          eyebrow: "SPECIAL OFFERS",
-          title: "Exclusive deals",
-          columns: 4,
-          productLimit: 4,
-          showViewAll: true,
-          viewAllUrl: "/products?sale=true",
-          hideWhenEmpty: true,
-          background: "paper",
-          padding: "normal",
-          showTopBorder: true,
-        },
-        dataSource: { type: "FLASH_SALE" },
-        data: { items: [] },
-      },
-      {
-        id: `sec_${Date.now()}_6`,
-        type: "PRODUCT_GRID",
-        enabled: true,
-        sortOrder: 6,
-        settings: {
-          eyebrow: "NEW ARRIVALS",
-          title: "Latest products",
-          columns: 4,
-          productLimit: 4,
-          showViewAll: true,
-          viewAllUrl: "/products?sort=newest",
-          hideWhenEmpty: true,
-          background: "paper",
-          padding: "normal",
-          showTopBorder: true,
-        },
-        dataSource: { type: "LATEST_PRODUCTS" },
-        data: { items: [] },
-      },
-      {
-        id: `sec_${Date.now()}_7`,
-        type: "PRODUCT_GRID",
-        enabled: true,
-        sortOrder: 7,
-        settings: {
-          eyebrow: "TOP RANKED",
-          title: "Best sellers",
-          columns: 4,
-          productLimit: 4,
-          showViewAll: true,
-          viewAllUrl: "/products",
-          hideWhenEmpty: true,
-          background: "paper",
-          padding: "normal",
-          showTopBorder: true,
-        },
-        dataSource: { type: "BEST_SELLERS" },
-        data: { items: [] },
-      },
-      {
-        id: `sec_${Date.now()}_8`,
-        type: "FLASH_SALE",
-        enabled: true,
-        sortOrder: 8,
-        settings: {
-          promoBadge: "FLASH DEAL",
-          eyebrow: "LIMITED TIME",
-          title: "Flash sale",
-          discountHighlight: "Save up to 50% on selected items.",
-          columns: 4,
-          productLimit: 4,
-          showViewAll: true,
-          viewAllUrl: "/products?sale=true",
-          hideWhenEmpty: true,
-          background: "paper",
-          padding: "normal",
-          showTopBorder: true,
-        },
-        dataSource: { type: "FLASH_SALE" },
-        data: { items: [] },
-      },
-    ];
-    setSections(templateSections);
-    setSelectedSectionId(templateSections[0].id);
-    setShowTemplateModal(false);
-  };
-
-  const applyModernRetailTemplate = () => {
-    if (
-      sections.length > 0 &&
-      !confirm("Apply the Modern Retail template? This will replace current sections in the working draft.")
-    ) {
-      return;
-    }
-    const templateSections: StorefrontSection[] = [
-      {
-        id: `sec_${Date.now()}_0`,
-        type: "HERO_SHOWCASE",
-        enabled: true,
-        sortOrder: 0,
-        settings: {
-          layout: "split",
-          eyebrow: "SPRING COLLECTION 2026",
-          title: "Modern essentials engineered to last.",
-          subtitle: "Explore certified tech, home, and lifestyle gear backed by official warranties.",
-          ctaText: "Shop featured collection",
-          ctaUrl: "/products",
-          secondaryCtaText: "Special Offers",
-          secondaryCtaUrl: "/products?sale=true",
-          background: "surface",
-          padding: "spacious",
-          showTopBorder: false,
-        },
-        dataSource: null,
-        data: {},
-      },
-      {
-        id: `sec_${Date.now()}_1`,
-        type: "CATEGORY_GRID",
-        enabled: true,
-        sortOrder: 1,
-        settings: {
-          title: "Explore categories",
-          columns: 5,
-          layoutStyle: "tiles",
-          showViewAll: true,
-          viewAllText: "View all →",
-          viewAllUrl: "/products",
-          hideWhenEmpty: true,
-          background: "paper",
-          padding: "normal",
-          showTopBorder: true,
-        },
-        dataSource: null,
-        data: {},
-      },
-      {
-        id: `sec_${Date.now()}_2`,
-        type: "PRODUCT_CAROUSEL",
-        enabled: true,
-        sortOrder: 2,
-        settings: {
-          eyebrow: "POPULAR NOW",
-          title: "Trending in store",
-          productLimit: 10,
-          showViewAll: true,
-          viewAllText: "View all →",
-          viewAllUrl: "/products",
-          hideWhenEmpty: true,
-          background: "paper",
-          padding: "normal",
-          showTopBorder: true,
-        },
-        dataSource: { type: "BEST_SELLERS" },
-        data: { items: [] },
-      },
-      {
-        id: `sec_${Date.now()}_3`,
-        type: "TEXT_WITH_IMAGE",
-        enabled: true,
-        sortOrder: 3,
-        settings: {
-          eyebrow: "OUR COMMITMENT",
-          title: "Guaranteed authentic & direct from verified distributors.",
-          bodyText: "We take product reliability seriously. Every item passes mandatory authentication and testing before arriving safely at your door.",
-          ctaText: "Learn our verification standards",
-          ctaUrl: "/about",
-          imagePosition: "right",
-          background: "paper",
-          padding: "spacious",
-          showTopBorder: true,
-        },
-        dataSource: null,
-        data: {},
-      },
-      {
-        id: `sec_${Date.now()}_4`,
-        type: "FLASH_SALE",
-        enabled: true,
-        sortOrder: 4,
-        settings: {
-          promoBadge: "TODAY'S SPECIAL",
-          eyebrow: "LIMITED STOCK",
-          title: "Daily Flash Sale",
-          discountHighlight: "Direct importer prices on top accessories.",
-          columns: 4,
-          productLimit: 4,
-          showViewAll: true,
-          viewAllUrl: "/products?sale=true",
-          hideWhenEmpty: true,
-          background: "surface",
-          padding: "normal",
-          showTopBorder: true,
-        },
-        dataSource: { type: "FLASH_SALE" },
-        data: { items: [] },
-      },
-    ];
-    setSections(templateSections);
-    setSelectedSectionId(templateSections[0].id);
-    setShowTemplateModal(false);
-  };
-
-  const applyBlankCanvasTemplate = () => {
-    if (
-      sections.length > 0 &&
-      !confirm("Clear all sections to customize from zero? This will clear the working draft canvas.")
-    ) {
-      return;
-    }
-    setSections([]);
-    setSelectedSectionId(null);
-    setShowTemplateModal(false);
-  };
-
-  // Update selected section settings
-  const updateSettings = (key: string, value: any) => {
+  // Block management
+  const addBlockToSelected = () => {
     if (!selectedSectionId) return;
+    const newBlock: ChildBlock = {
+      id: `blk-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+      title: "New Item Block",
+      subtitle: "Custom highlight",
+      ctaUrl: "/products",
+    };
     setSections((prev) =>
-      prev.map((s) =>
-        s.id === selectedSectionId
-          ? { ...s, settings: { ...s.settings, [key]: value } }
-          : s,
-      ),
+      prev.map((sec) => {
+        if (sec.id !== selectedSectionId) return sec;
+        const currentBlocks = sec.settings?.blocks || [];
+        return {
+          ...sec,
+          settings: {
+            ...sec.settings,
+            blocks: [...currentBlocks, newBlock],
+          },
+        };
+      }),
     );
   };
 
-  // Update data source
-  const updateDataSource = (key: string, value: any) => {
+  const updateBlock = (blockId: string, key: keyof ChildBlock, val: string) => {
     if (!selectedSectionId) return;
     setSections((prev) =>
-      prev.map((s) =>
-        s.id === selectedSectionId
-          ? {
-              ...s,
-              dataSource: {
-                ...(s.dataSource || { type: "LATEST_PRODUCTS" }),
-                [key]: value,
-              },
-            }
-          : s,
-      ),
+      prev.map((sec) => {
+        if (sec.id !== selectedSectionId) return sec;
+        const blocks = (sec.settings?.blocks || []).map((b) =>
+          b.id === blockId ? { ...b, [key]: val } : b,
+        );
+        return {
+          ...sec,
+          settings: { ...sec.settings, blocks },
+        };
+      }),
     );
   };
 
-  // Save Draft
+  const removeBlock = (blockId: string) => {
+    if (!selectedSectionId) return;
+    setSections((prev) =>
+      prev.map((sec) => {
+        if (sec.id !== selectedSectionId) return sec;
+        const blocks = (sec.settings?.blocks || []).filter((b) => b.id !== blockId);
+        return {
+          ...sec,
+          settings: { ...sec.settings, blocks },
+        };
+      }),
+    );
+  };
+
   const handleSaveDraft = async () => {
     setSaving(true);
     setStatusMessage("");
     setError("");
     try {
+      const payload = {
+        sections: sections.map((s, idx) => ({
+          type: s.type,
+          enabled: s.enabled,
+          sortOrder: idx,
+          settings: s.settings || {},
+          dataSource: s.dataSource || null,
+        })),
+      };
+
       const res = await fetch("/api/storefront/draft", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sections: sections.map((s, idx) => ({
-            id: s.id,
-            type: s.type,
-            enabled: s.enabled,
-            sortOrder: idx,
-            settings: s.settings || {},
-            dataSource: s.dataSource || undefined,
-          })),
-        }),
+        body: JSON.stringify(payload),
       });
+
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Failed to save draft");
+      if (!res.ok) throw new Error(data.message || "Failed to save working draft.");
+
       initialSnapshotRef.current = serializeSections(sections);
-      setIframeKey((k) => k + 1);
-      setStatusMessage("Draft saved successfully.");
-      setTimeout(() => setStatusMessage(""), 3000);
+      setStatusMessage("Draft saved");
+      setTimeout(() => setStatusMessage(""), 3500);
     } catch (err: any) {
       setError(err.message || "Unable to save draft.");
     } finally {
@@ -896,26 +808,27 @@ export default function StorefrontStudioPage() {
     }
   };
 
-  // Publish
   const handlePublish = async () => {
+    if (isDirty) {
+      await handleSaveDraft();
+    }
     setPublishing(true);
     setStatusMessage("");
     setError("");
     try {
-      await handleSaveDraft();
-
       const res = await fetch("/api/storefront/publish", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ changeSummary: "Storefront published via Studio" }),
+        body: JSON.stringify({}),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Failed to publish storefront");
 
-      initialSnapshotRef.current = serializeSections(sections);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Failed to publish storefront.");
+
+      setActiveVersionNumber(data.data?.versionNumber || activeVersionNumber + 1);
+      setStatusMessage("Published live");
+      setTimeout(() => setStatusMessage(""), 3500);
       setIframeKey((k) => k + 1);
-      setStatusMessage("Storefront published live!");
-      setTimeout(() => setStatusMessage(""), 4000);
     } catch (err: any) {
       setError(err.message || "Unable to publish storefront.");
     } finally {
@@ -923,19 +836,19 @@ export default function StorefrontStudioPage() {
     }
   };
 
-  // Load history
   const handleOpenHistory = async () => {
-    setShowHistoryModal(true);
     try {
-      const res = await fetch("/api/storefront/history");
+      const res = await fetch("/api/storefront/history", { cache: "no-store" });
       const data = await res.json();
-      if (data.data) setHistoryList(data.data);
-    } catch {
-      // ignore
+      if (data.data?.items) {
+        setHistoryList(data.data.items);
+      }
+      setShowHistoryModal(true);
+    } catch (err: any) {
+      alert("Failed to load publication history.");
     }
   };
 
-  // Rollback
   const handleRollback = async (versionNumber: number) => {
     if (!confirm(`Are you sure you want to rollback to Version ${versionNumber}?`)) return;
     try {
@@ -954,115 +867,205 @@ export default function StorefrontStudioPage() {
   };
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-surface">
-      <Topbar title="Storefront Studio" />
-
-      {/* Action Sub-header */}
-      <div className="flex h-14 items-center justify-between border-b border-line bg-paper px-6">
+    <div className="flex h-screen flex-col overflow-hidden bg-paper font-sans">
+      {/* ========================================================================= */}
+      {/* STUDIO TOP BAR: Enterprise Theme Editor Header (No Ops Dashboard Clutter) */}
+      {/* ========================================================================= */}
+      <header className="flex h-14 shrink-0 items-center justify-between border-b border-line bg-paper px-4 select-none z-30">
+        {/* Left Section: Context & Page Selection */}
         <div className="flex items-center gap-3">
-          <span className="text-[13px] font-medium text-ink">Homepage Layout</span>
-          <span className="rounded-full bg-surface px-2.5 py-0.5 text-[11px] font-medium text-ink2 border border-line">
-            Draft v{activeVersionNumber}
-          </span>
-          {isDirty && (
-            <span className="rounded-full bg-amber-500/10 border border-amber-500/30 px-2.5 py-0.5 text-[11px] font-medium text-amber-700 animate-pulse">
-              ● Unsaved changes
-            </span>
-          )}
-          {statusMessage && (
-            <span className="text-[12px] text-emerald-600 font-medium">
-              {statusMessage}
-            </span>
-          )}
-          {error && <span className="text-[12px] text-rose-600">{error}</span>}
+          <Link
+            href="/dashboard"
+            className="flex h-8 w-8 items-center justify-center rounded-md border border-line bg-white text-ink2 hover:text-ink hover:bg-slate-50 transition"
+            title="Exit Studio to Dashboard"
+          >
+            ←
+          </Link>
+
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-[14px] text-ink">Storefront Studio</span>
+            <div className="flex items-center gap-1.5 rounded-full border border-line bg-surface px-2.5 py-0.5 text-[11px] font-mono text-ink2">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              {activeStoreSlug}.sheakh.qzz.io
+            </div>
+          </div>
+
+          <div className="h-4 w-[1px] bg-line mx-1 hidden sm:block" />
+
+          {/* Page Template Switcher */}
+          <div className="flex items-center gap-1.5">
+            <select
+              value={selectedTemplate}
+              onChange={(e) => setSelectedTemplate(e.target.value as any)}
+              className="rounded-md border border-line bg-white px-2.5 py-1 text-[12px] font-medium text-ink focus:border-ink focus:outline-none"
+            >
+              <option value="home">🏠 Homepage (Default)</option>
+              <option value="product">📦 Product Page (Template)</option>
+              <option value="collection">🗂️ Collection (Template)</option>
+              <option value="cart">🛒 Cart / Checkout</option>
+            </select>
+          </div>
+
+          {/* Global Theme Settings Trigger */}
+          <button
+            type="button"
+            onClick={() => setShowThemeSettingsModal(true)}
+            className="flex items-center gap-1.5 rounded-md border border-line bg-white px-2.5 py-1 text-[12px] font-medium text-ink hover:bg-slate-50 transition shadow-2xs"
+            title="Configure Global Theme Tokens (Brand Colors, Typography, Spacing)"
+          >
+            ⚙ Theme Settings
+          </button>
         </div>
 
+        {/* Center Section: Responsive Device Viewports & Interaction Mode */}
         <div className="flex items-center gap-2.5">
-          {/* Mode Switcher: Interactive vs Wireframe */}
+          {/* Viewport Switcher: Desktop (1280px), Tablet (768px), Mobile (375px) */}
+          <div className="flex items-center rounded-lg border border-line bg-surface p-0.5">
+            <button
+              type="button"
+              onClick={() => setViewMode("desktop")}
+              className={`flex items-center gap-1 rounded-md px-2.5 py-1 text-[12px] font-medium transition ${
+                viewMode === "desktop"
+                  ? "bg-white text-ink shadow-2xs"
+                  : "text-ink2 hover:text-ink"
+              }`}
+              title="Desktop View (1280px)"
+            >
+              🖥️ <span className="hidden md:inline">Desktop</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("tablet")}
+              className={`flex items-center gap-1 rounded-md px-2.5 py-1 text-[12px] font-medium transition ${
+                viewMode === "tablet"
+                  ? "bg-white text-ink shadow-2xs"
+                  : "text-ink2 hover:text-ink"
+              }`}
+              title="Tablet View (768px)"
+            >
+              📱 <span className="hidden md:inline">Tablet</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("mobile")}
+              className={`flex items-center gap-1 rounded-md px-2.5 py-1 text-[12px] font-medium transition ${
+                viewMode === "mobile"
+                  ? "bg-white text-ink shadow-2xs"
+                  : "text-ink2 hover:text-ink"
+              }`}
+              title="Mobile View (375px)"
+            >
+              📱 <span className="hidden md:inline">Mobile</span>
+            </button>
+          </div>
+
+          {/* Interaction Mode: Edit (Select) vs Live Test */}
+          <div className="hidden lg:flex items-center rounded-lg border border-line bg-surface p-0.5">
+            <button
+              type="button"
+              onClick={() => setInteractionMode("edit")}
+              className={`rounded-md px-2.5 py-1 text-[12px] font-medium transition ${
+                interactionMode === "edit"
+                  ? "bg-white text-ink shadow-2xs"
+                  : "text-ink2 hover:text-ink"
+              }`}
+              title="Edit Mode: Clicking inside preview selects section inspector"
+            >
+              ✏ Edit Mode
+            </button>
+            <button
+              type="button"
+              onClick={() => setInteractionMode("interact")}
+              className={`rounded-md px-2.5 py-1 text-[12px] font-medium transition ${
+                interactionMode === "interact"
+                  ? "bg-white text-ink shadow-2xs"
+                  : "text-ink2 hover:text-ink"
+              }`}
+              title="Test Store: Live links and carts operate normally"
+            >
+              👆 Live Test
+            </button>
+          </div>
+
+          {/* Canvas Outliner Toggle */}
           <div className="flex items-center rounded-lg border border-line bg-surface p-0.5">
             <button
               type="button"
               onClick={() => setPreviewTab("interactive")}
               className={`rounded-md px-2.5 py-1 text-[12px] font-medium transition ${
                 previewTab === "interactive"
-                  ? "bg-paper text-ink"
+                  ? "bg-white text-ink shadow-2xs"
                   : "text-ink2 hover:text-ink"
               }`}
             >
-              Live Preview
+              Preview
             </button>
             <button
               type="button"
-              onClick={() => setPreviewTab("wireframe")}
+              onClick={() => setPreviewTab("outliner")}
               className={`rounded-md px-2.5 py-1 text-[12px] font-medium transition ${
-                previewTab === "wireframe"
-                  ? "bg-paper text-ink"
+                previewTab === "outliner"
+                  ? "bg-white text-ink shadow-2xs"
                   : "text-ink2 hover:text-ink"
               }`}
             >
-              Wireframe
+              Outliner
             </button>
           </div>
+        </div>
 
-          {/* Viewport switch */}
-          <div className="flex items-center rounded-lg border border-line bg-surface p-0.5">
-            <button
-              type="button"
-              onClick={() => setViewMode("desktop")}
-              className={`rounded-md px-2.5 py-1 text-[12px] font-medium transition ${
-                viewMode === "desktop"
-                  ? "bg-paper text-ink"
-                  : "text-ink2 hover:text-ink"
-              }`}
-            >
-              Desktop
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("mobile")}
-              className={`rounded-md px-2.5 py-1 text-[12px] font-medium transition ${
-                viewMode === "mobile"
-                  ? "bg-paper text-ink"
-                  : "text-ink2 hover:text-ink"
-              }`}
-            >
-              Mobile
-            </button>
-          </div>
+        {/* Right Section: Governance, History & Publishing */}
+        <div className="flex items-center gap-2">
+          <span className="hidden xl:inline-block rounded-full bg-surface px-2 py-0.5 text-[11px] font-mono text-ink2 border border-line">
+            Draft v{activeVersionNumber}
+          </span>
+
+          {isDirty && (
+            <span className="hidden sm:inline-block rounded-full bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 text-[10px] font-semibold text-amber-700 animate-pulse">
+              ● Unsaved
+            </span>
+          )}
+
+          {statusMessage && (
+            <span className="text-[12px] text-emerald-600 font-medium">
+              {statusMessage}
+            </span>
+          )}
+          {error && <span className="text-[12px] text-rose-600">{error}</span>}
 
           <button
             type="button"
             onClick={() => window.open(getExternalStorefrontUrl(activeStoreSlug), "_blank")}
-            className="rounded-full border border-line bg-paper px-3 py-1.5 text-[12px] font-medium text-ink transition hover:bg-surface"
-            title={`Open ${activeStoreSlug} storefront in new tab`}
+            className="hidden sm:flex h-8 items-center rounded-md border border-line bg-white px-2.5 text-[12px] font-medium text-ink hover:bg-slate-50 transition shadow-2xs"
+            title={`Open ${activeStoreSlug} in new browser tab`}
           >
-            Preview Tab ↗
+            ↗ Preview Tab
           </button>
 
           <button
             type="button"
             onClick={() => setShowTemplateModal(true)}
-            className="rounded-full border border-line bg-paper px-3.5 py-1.5 text-[12px] font-medium text-ink transition hover:bg-surface"
+            className="h-8 rounded-md border border-line bg-white px-2.5 text-[12px] font-medium text-ink hover:bg-slate-50 transition shadow-2xs"
           >
-            Templates &amp; Presets
+            Presets
           </button>
 
           <button
             type="button"
             onClick={handleOpenHistory}
-            className="rounded-full border border-line bg-paper px-3.5 py-1.5 text-[12px] font-medium text-ink transition hover:bg-surface"
+            className="hidden sm:block h-8 rounded-md border border-line bg-white px-2.5 text-[12px] font-medium text-ink hover:bg-slate-50 transition shadow-2xs"
           >
-            History &amp; Rollback
+            Rollback
           </button>
 
           <button
             type="button"
             onClick={handleSaveDraft}
             disabled={saving}
-            className={`rounded-full border px-4 py-1.5 text-[12px] font-medium transition disabled:opacity-50 ${
+            className={`h-8 rounded-md border px-3 text-[12px] font-medium transition disabled:opacity-50 ${
               isDirty
-                ? "border-ink bg-ink text-white hover:opacity-90"
-                : "border-line bg-paper text-ink hover:bg-surface"
+                ? "border-ink bg-ink text-white hover:opacity-90 shadow-2xs"
+                : "border-line bg-white text-ink hover:bg-slate-50 shadow-2xs"
             }`}
           >
             {saving ? "Saving..." : isDirty ? "Save Draft *" : "Save Draft"}
@@ -1072,46 +1075,107 @@ export default function StorefrontStudioPage() {
             type="button"
             onClick={handlePublish}
             disabled={publishing}
-            className="rounded-full bg-ink px-4 py-1.5 text-[12px] font-medium text-white transition hover:opacity-85 disabled:opacity-50"
+            className="h-8 rounded-md bg-ink px-3 text-[12px] font-medium text-white transition hover:opacity-90 disabled:opacity-50 shadow-2xs"
           >
             {publishing ? "Publishing..." : "Publish Live"}
           </button>
         </div>
-      </div>
+      </header>
 
-      {/* 3-Pane Body */}
+      {/* ========================================================================= */}
+      {/* 3-PANE STUDIO CANVAS                                                      */}
+      {/* ========================================================================= */}
       <div className="flex flex-1 overflow-hidden">
-        {/* PANE 1: Left - Section Outline List (280px) */}
-        <div className="flex w-[280px] flex-col border-r border-line bg-paper">
-          <div className="flex items-center justify-between border-b border-line px-4 py-3">
-            <span className="text-[12px] font-semibold uppercase tracking-wider text-ink2">
-              Sections ({sections.length})
-            </span>
+        {/* --------------------------------------------------------------------- */}
+        {/* PANE 1: Left - Granular Sections & Sub-Blocks Outline (290px)         */}
+        {/* --------------------------------------------------------------------- */}
+        <div className="flex w-[290px] shrink-0 flex-col border-r border-line bg-paper select-none">
+          <div className="flex items-center justify-between border-b border-line px-3.5 py-2.5 bg-paper">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-ink2">
+                Sections ({sections.length})
+              </span>
+            </div>
             <button
               type="button"
-              onClick={() => setShowAddModal(true)}
-              className="rounded-full bg-ink px-2.5 py-1 text-[11px] font-medium text-white transition hover:opacity-85"
+              onClick={(e) => openAddSectionAtIndex(null, e)}
+              className="flex items-center gap-1 rounded bg-ink px-2.5 py-1 text-[11px] font-medium text-white transition hover:opacity-90 shadow-2xs"
             >
-              + Add
+              + Add Section
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
+          <div className="custom-scrollbar flex-1 overflow-y-auto p-2 space-y-1">
             {sections.map((section, idx) => {
               const isSelected = section.id === selectedSectionId;
+              const hasBlocks = Boolean(section.settings?.blocks && section.settings.blocks.length > 0);
+              const isBlocksExpanded = Boolean(expandedSections[section.id]);
+              const sectionTitle = section.settings?.title || section.type.replace(/_/g, " ");
+
               return (
-                <div
-                  key={section.id}
-                  onClick={() => selectSectionAndScroll(section.id)}
-                  className={`group flex items-center justify-between rounded-lg border px-3 py-2.5 transition cursor-pointer ${
-                    isSelected
-                      ? "border-ink bg-surface text-ink font-medium"
-                      : "border-line bg-paper text-ink2 hover:border-ink/30 hover:text-ink"
-                  }`}
-                >
-                  <div className="flex items-center gap-2 overflow-hidden">
-                    {/* Reorder Buttons */}
-                    <div className="flex flex-col gap-0.5 text-[10px] text-ink2">
+                <div key={section.id} className="space-y-0.5">
+                  {/* Inline Add Section Divider (Hover between sections) */}
+                  <div className="group/divider relative h-2.5 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                    <div className="absolute inset-x-0 h-[1px] bg-line group-hover/divider:bg-ink/30" />
+                    <button
+                      type="button"
+                      onClick={(e) => openAddSectionAtIndex(idx, e)}
+                      className="relative z-10 rounded-full border border-line bg-white px-2 py-0.5 text-[9px] font-medium text-ink2 hover:text-ink hover:border-ink shadow-2xs transition"
+                      title="Insert section here"
+                    >
+                      + Insert section
+                    </button>
+                  </div>
+
+                  {/* Section Item Card */}
+                  <div
+                    onClick={() => selectSectionAndScroll(section.id)}
+                    className={`group relative flex items-center justify-between rounded-lg border px-2.5 py-2 transition cursor-pointer ${
+                      isSelected
+                        ? "border-ink bg-surface text-ink font-medium shadow-2xs ring-1 ring-ink/20"
+                        : "border-line bg-paper text-ink2 hover:border-ink/40 hover:text-ink hover:bg-slate-50/50"
+                    } ${!section.enabled ? "opacity-60 bg-slate-50/70" : ""}`}
+                  >
+                    <div className="flex items-center gap-2 overflow-hidden min-w-0 pr-1">
+                      {/* Subtle 6-Dot Grip */}
+                      <span
+                        className="text-ink2/40 group-hover:text-ink2 cursor-grab text-[11px] shrink-0"
+                        title="Reorder handle"
+                      >
+                        ⋮⋮
+                      </span>
+
+                      {/* Section Type Icon */}
+                      <span className="shrink-0 text-ink2 group-hover:text-ink">
+                        {SECTION_ICONS[section.type]}
+                      </span>
+
+                      {/* Section Title with Tooltip */}
+                      <div className="truncate min-w-0" title={sectionTitle}>
+                        <p className="truncate text-[12.5px] text-ink font-medium leading-tight">
+                          {sectionTitle}
+                        </p>
+                        <p className="text-[10px] uppercase tracking-wider text-ink2 leading-tight">
+                          {section.type.replace(/_/g, " ")}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Quick Section Actions */}
+                    <div className="flex items-center gap-1 shrink-0">
+                      {/* Blocks expand arrow if section has child blocks */}
+                      {hasBlocks && (
+                        <button
+                          type="button"
+                          onClick={(e) => toggleSectionBlocksExpand(section.id, e)}
+                          className="h-5 w-5 flex items-center justify-center rounded text-ink2 hover:text-ink hover:bg-surface text-[10px]"
+                          title={isBlocksExpanded ? "Collapse blocks" : "Expand blocks"}
+                        >
+                          {isBlocksExpanded ? "▼" : "▶"}
+                        </button>
+                      )}
+
+                      {/* Reorder Up / Down */}
                       <button
                         type="button"
                         onClick={(e) => {
@@ -1119,7 +1183,7 @@ export default function StorefrontStudioPage() {
                           moveSection(idx, "up");
                         }}
                         disabled={idx === 0}
-                        className="hover:text-ink disabled:opacity-20"
+                        className="h-5 w-5 flex items-center justify-center rounded hover:bg-surface text-[9px] text-ink2 hover:text-ink disabled:opacity-20"
                         title="Move Up"
                       >
                         ▲
@@ -1131,1103 +1195,907 @@ export default function StorefrontStudioPage() {
                           moveSection(idx, "down");
                         }}
                         disabled={idx === sections.length - 1}
-                        className="hover:text-ink disabled:opacity-20"
+                        className="h-5 w-5 flex items-center justify-center rounded hover:bg-surface text-[9px] text-ink2 hover:text-ink disabled:opacity-20"
                         title="Move Down"
                       >
                         ▼
                       </button>
-                    </div>
 
-                    <div className="truncate">
-                      <p className="truncate text-[13px] text-ink">
-                        {section.settings?.title || section.type.replace(/_/g, " ")}
-                      </p>
-                      <p className="text-[10px] uppercase text-ink2">
-                        {section.type.replace(/_/g, " ")}
-                      </p>
+                      {/* Duplicate Section */}
+                      <button
+                        type="button"
+                        onClick={(e) => duplicateSection(section.id, e)}
+                        className="hidden group-hover:flex h-5 w-5 items-center justify-center rounded hover:bg-surface text-[11px] text-ink2 hover:text-ink"
+                        title="Duplicate section"
+                      >
+                        ⧉
+                      </button>
+
+                      {/* Visibility Toggle Eye */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleSectionEnabled(section.id);
+                        }}
+                        className={`h-5 w-5 flex items-center justify-center rounded transition ${
+                          section.enabled
+                            ? "text-ink hover:bg-surface"
+                            : "text-ink2/50 hover:bg-surface"
+                        }`}
+                        title={section.enabled ? "Hide section (click to toggle)" : "Show section"}
+                      >
+                        {section.enabled ? "👁" : "👁‍🗨"}
+                      </button>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleSectionEnabled(section.id);
-                      }}
-                      className={`h-4 w-4 rounded-full border transition ${
-                        section.enabled
-                          ? "border-ink bg-ink"
-                          : "border-line bg-paper"
-                      }`}
-                      title={section.enabled ? "Enabled (click to hide)" : "Hidden (click to enable)"}
-                    />
-                  </div>
+                  {/* Child Blocks Tree (if expanded) */}
+                  {hasBlocks && isBlocksExpanded && (
+                    <div className="pl-6 pr-1 py-1 space-y-1 border-l-2 border-line ml-3">
+                      {section.settings.blocks?.map((block, bIdx) => (
+                        <div
+                          key={block.id}
+                          className="flex items-center justify-between rounded border border-line bg-surface/40 px-2 py-1 text-[11px] text-ink hover:bg-surface cursor-pointer"
+                        >
+                          <span className="truncate" title={block.title}>
+                            ↳ {block.title || `Block #${bIdx + 1}`}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeBlock(block.id);
+                            }}
+                            className="text-ink2 hover:text-rose-600 text-[10px]"
+                            title="Remove block"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedSectionId(section.id);
+                          addBlockToSelected();
+                        }}
+                        className="w-full text-left text-[10px] text-ink2 hover:text-ink py-0.5 px-2 font-medium"
+                      >
+                        + Add child block
+                      </button>
+                    </div>
+                  )}
                 </div>
               );
             })}
 
             {sections.length === 0 && !loading && (
-              <div className="py-12 text-center text-[13px] text-ink2">
-                No sections configured.
+              <div className="py-12 text-center text-[12px] text-ink2">
+                No sections configured yet.<br />
+                Click <span className="font-semibold text-ink">+ Add Section</span> above.
               </div>
             )}
           </div>
         </div>
 
-        {/* PANE 2: Center - Live Storefront Preview */}
-        <div className="flex flex-1 flex-col overflow-hidden bg-surface">
-          {/* Subbar for Preview Controls */}
-          <div className="flex h-11 items-center justify-between border-b border-line bg-paper px-6 text-[12px]">
-            <div className="flex items-center gap-2.5">
-              <span className="font-semibold text-ink">
-                {previewTab === "interactive"
-                  ? "Interactive Live Storefront"
-                  : "Wireframe Outline"}
-              </span>
-              <span className="rounded-full bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
-                Draft Mode (?preview=true)
-              </span>
-              <span className="rounded-full bg-surface border border-line px-2 py-0.5 text-[10px] font-medium text-ink2">
-                Store: {activeStoreSlug}
-              </span>
-              {isDirty && previewTab === "interactive" && (
-                <span className="text-[11px] text-amber-700">
-                  Save draft to reflect latest edits in live preview
-                </span>
-              )}
-            </div>
-
-            <div className="flex items-center gap-3">
-              <span className="text-[11px] text-ink2">
-                {viewMode === "desktop" ? "1280px Desktop View" : "390px Mobile View"}
-              </span>
-              {previewTab === "interactive" && (
-                <button
-                  type="button"
-                  onClick={() => setIframeKey((k) => k + 1)}
-                  className="rounded-md border border-line bg-paper px-2 py-1 text-[11px] font-medium text-ink hover:bg-surface transition"
-                  title="Reload preview iframe"
-                >
-                  Reload ↻
-                </button>
-              )}
-            </div>
-          </div>
-
+        {/* --------------------------------------------------------------------- */}
+        {/* PANE 2: Center - Responsive Live Canvas Frame                         */}
+        {/* --------------------------------------------------------------------- */}
+        <div className="flex flex-1 flex-col overflow-hidden bg-slate-100/70">
           {previewTab === "interactive" ? (
-            <div className="flex flex-1 items-center justify-center overflow-y-auto p-4">
+            <div className="flex flex-1 items-center justify-center overflow-y-auto p-4 md:p-6">
               {viewMode === "desktop" ? (
-                <div className="h-full w-full rounded-card border border-line bg-paper overflow-hidden shadow-none flex flex-col">
+                /* Desktop 1280px Frame */
+                <div className="h-full w-full max-w-[1280px] rounded-lg border border-line bg-white overflow-hidden shadow-sm flex flex-col transition-all duration-300">
+                  <div className="flex h-7 items-center justify-between border-b border-line bg-slate-50 px-3 text-[11px] text-ink2 select-none">
+                    <span className="flex items-center gap-1.5 font-mono">
+                      <span className="h-2 w-2 rounded-full bg-slate-300" />
+                      https://{activeStoreSlug}.sheakh.qzz.io
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIframeKey((k) => k + 1)}
+                      className="hover:text-ink text-[11px] transition"
+                      title="Reload preview canvas"
+                    >
+                      Reload ↻
+                    </button>
+                  </div>
                   <iframe
                     ref={iframeRef}
                     key={iframeKey}
                     src={getStudioCanvasPreviewUrl(activeStoreSlug, iframeKey)}
-                    className="h-full w-full border-0 bg-paper"
+                    className="h-full w-full border-0 bg-white"
                     title="Storefront Desktop Preview"
                   />
                 </div>
-              ) : (
-                <div className="my-auto h-[780px] w-[390px] shrink-0 rounded-[36px] border-[8px] border-[#1e1e24] bg-paper overflow-hidden shadow-none relative flex flex-col">
-                  <div className="absolute top-2 left-1/2 -translate-x-1/2 h-3.5 w-24 rounded-full bg-[#1e1e24] z-20 pointer-events-none" />
+              ) : viewMode === "tablet" ? (
+                /* Tablet 768px Frame */
+                <div className="my-auto h-[900px] w-[768px] shrink-0 rounded-[24px] border-[10px] border-[#1e1e24] bg-white overflow-hidden shadow-xl relative flex flex-col transition-all duration-300">
+                  <div className="h-6 bg-[#1e1e24] flex items-center justify-center">
+                    <div className="h-1.5 w-12 rounded-full bg-white/20" />
+                  </div>
                   <iframe
                     ref={iframeRef}
                     key={iframeKey}
                     src={getStudioCanvasPreviewUrl(activeStoreSlug, iframeKey)}
-                    className="h-full w-full border-0 bg-paper pt-3"
+                    className="h-full w-full border-0 bg-white"
+                    title="Storefront Tablet Preview"
+                  />
+                </div>
+              ) : (
+                /* Mobile 375px Device Bezel Frame */
+                <div className="my-auto h-[780px] w-[375px] shrink-0 rounded-[40px] border-[10px] border-[#1e1e24] bg-white overflow-hidden shadow-xl relative flex flex-col transition-all duration-300">
+                  {/* Dynamic Island / Bezel Notch */}
+                  <div className="absolute top-2 left-1/2 -translate-x-1/2 h-4 w-24 rounded-full bg-[#1e1e24] z-20 pointer-events-none" />
+                  <iframe
+                    ref={iframeRef}
+                    key={iframeKey}
+                    src={getStudioCanvasPreviewUrl(activeStoreSlug, iframeKey)}
+                    className="h-full w-full border-0 bg-white pt-3"
                     title="Storefront Mobile Preview"
                   />
                 </div>
               )}
             </div>
           ) : (
-            <div className="flex flex-1 items-start justify-center overflow-y-auto bg-surface p-6">
-              <div
-                className={`transition-all duration-300 bg-paper rounded-card border border-line overflow-hidden shadow-none ${
-                  viewMode === "desktop" ? "w-full max-w-4xl" : "w-[390px]"
-                }`}
-              >
-                {/* Storefront Header Mock */}
-                <div className="border-b border-line px-5 py-3 flex items-center justify-between text-[13px] text-ink2">
-                  <span className="font-semibold text-ink">Storefront Wireframe Preview</span>
-                  <span className="text-[11px]">
-                    {viewMode === "desktop" ? "1280px Desktop" : "390px Mobile View"}
+            /* DOM Structural Outliner View (Webflow-Style Hierarchy Tree) */
+            <div className="flex flex-1 items-start justify-center overflow-y-auto p-6">
+              <div className="w-full max-w-3xl rounded-lg border border-line bg-white p-6 shadow-sm space-y-4">
+                <div className="border-b border-line pb-3 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-[15px] font-semibold text-ink">
+                      Storefront Structural Outliner
+                    </h3>
+                    <p className="text-[12px] text-ink2">
+                      DOM tree representation of page layout, columns, and data sources.
+                    </p>
+                  </div>
+                  <span className="rounded-full border border-line bg-surface px-2.5 py-0.5 text-[11px] font-mono text-ink2">
+                    {sections.length} DOM Root Sections
                   </span>
                 </div>
 
-                {/* Rendered Sections */}
-                <div className="divide-y divide-line min-h-[500px]">
-              {sections
-                .filter((s) => s.enabled)
-                .map((section) => {
-                  const isSelected = section.id === selectedSectionId;
-                  const st = section.settings || {};
-                  const isInk = st.background === "ink";
-                  const isSurface = st.background === "surface";
-                  const bgClass = isInk
-                    ? "bg-[#111114] text-white"
-                    : isSurface
-                      ? "bg-surface text-ink"
-                      : "bg-paper text-ink";
-
-                  return (
+                <div className="divide-y divide-line border border-line rounded-lg overflow-hidden">
+                  {sections.map((sec, idx) => (
                     <div
-                      key={section.id}
-                      onClick={() => setSelectedSectionId(section.id)}
-                      className={`p-6 transition cursor-pointer relative ${bgClass} ${
-                        isSelected
-                          ? "ring-2 ring-ink ring-inset"
-                          : "hover:opacity-95"
-                      }`}
+                      key={sec.id}
+                      onClick={() => {
+                        setSelectedSectionId(sec.id);
+                        setPreviewTab("interactive");
+                      }}
+                      className="p-3.5 hover:bg-slate-50 transition cursor-pointer flex items-center justify-between"
                     >
-                      {/* Section Heading & View All in Preview */}
-                      <div className="flex items-baseline justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <span className="font-mono text-[11px] text-ink2">#{idx + 1}</span>
+                        <span>{SECTION_ICONS[sec.type]}</span>
                         <div>
-                          {st.eyebrow && (
-                            <span
-                              className={`block text-[10px] font-semibold uppercase tracking-wider mb-1 ${
-                                isInk ? "text-white/70" : "text-ink2"
-                              }`}
-                            >
-                              {st.eyebrow}
+                          <p className="text-[13px] font-semibold text-ink">
+                            {sec.settings?.title || sec.type.replace(/_/g, " ")}
+                          </p>
+                          <div className="flex items-center gap-2 text-[11px] text-ink2 mt-0.5">
+                            <span className="rounded bg-surface px-1.5 py-0.5 border border-line font-mono text-[10px]">
+                              {sec.type}
                             </span>
-                          )}
-                          <h3
-                            className={`text-[17px] font-semibold tracking-tight ${
-                              isInk ? "text-white" : "text-ink"
-                            }`}
-                          >
-                            {st.title || section.type.replace(/_/g, " ")}
-                          </h3>
-                          {st.subtitle && (
-                            <p
-                              className={`text-[12px] mt-0.5 ${
-                                isInk ? "text-white/60" : "text-ink2"
-                              }`}
-                            >
-                              {st.subtitle}
-                            </p>
-                          )}
+                            {sec.settings?.columns && (
+                              <span>• {sec.settings.columns} Column Layout</span>
+                            )}
+                            {sec.dataSource?.type && (
+                              <span>• Source: {sec.dataSource.type}</span>
+                            )}
+                          </div>
                         </div>
-                        {st.showViewAll && (
-                          <span
-                            className={`text-[11px] ${
-                              isInk ? "text-white/80" : "text-ink2"
-                            }`}
-                          >
-                            {st.viewAllText || "View all →"}
-                          </span>
-                        )}
                       </div>
 
-                      {/* HERO SHOWCASE PREVIEW */}
-                      {section.type === "HERO_SHOWCASE" ? (
-                        st.layout === "interactive" || st.variant === "interactive" ? (
-                          <div className="rounded-card border border-line bg-surface/40 p-6 space-y-4">
-                            <div className="flex items-center justify-between">
-                              <span className="text-[11px] font-mono uppercase tracking-wider text-ink2">
-                                Signature Interactive 3-Card Showcase
-                              </span>
-                              <span className="text-[11px] font-medium text-ink2">
-                                Slide 01 / 03
-                              </span>
-                            </div>
-                            <div className="grid grid-cols-12 gap-3 min-h-[180px]">
-                              <div className="col-span-4 rounded-xl border border-line bg-paper p-3 flex flex-col justify-between">
-                                <div className="h-24 rounded-lg bg-surface/70 border border-line flex items-center justify-center text-[11px] text-ink2 font-medium">
-                                  Lifestyle Scene 1
-                                </div>
-                                <div className="mt-2">
-                                  <div className="text-[11px] font-semibold text-ink truncate">Velvet Sofa</div>
-                                  <div className="text-[10px] text-ink2">Interactive Pin</div>
-                                </div>
-                              </div>
-                              <div className="col-span-5 rounded-xl border-2 border-ink bg-paper p-3 flex flex-col justify-between shadow-sm">
-                                <div className="h-24 rounded-lg bg-surface border border-line flex items-center justify-center text-[11px] text-ink font-medium relative">
-                                  Hero Focal Centerpiece
-                                  <span className="absolute top-2 right-2 flex h-2.5 w-2.5">
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-                                  </span>
-                                </div>
-                                <div className="mt-2">
-                                  <div className="text-[12px] font-bold text-ink truncate">
-                                    {st.title || "Modern Living"}
-                                  </div>
-                                  <div className="text-[10px] text-ink2 truncate">
-                                    {st.subtitle || "Curated Interior Design"}
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="col-span-3 rounded-xl border border-line bg-paper p-3 flex flex-col justify-between">
-                                <div className="h-24 rounded-lg bg-surface/70 border border-line flex items-center justify-center text-[11px] text-ink2 font-medium">
-                                  Scene 3
-                                </div>
-                                <div className="mt-2">
-                                  <div className="text-[11px] font-medium text-ink truncate">Armchair</div>
-                                  <div className="text-[10px] text-ink2">Interactive Pin</div>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        ) : (
-                          <div
-                            className={`rounded-card border p-8 text-center flex flex-col items-center justify-center ${
-                              isInk
-                                ? "border-white/10 bg-white/5 text-white"
-                                : "border-line bg-surface/60 text-ink"
-                            }`}
-                          >
-                            {st.eyebrow && (
-                              <span
-                                className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider mb-2 border ${
-                                  isInk
-                                    ? "border-white/20 bg-white/10 text-white"
-                                    : "border-line bg-paper text-ink2"
-                                }`}
-                              >
-                                {st.eyebrow}
-                              </span>
-                            )}
-                            <h2 className="text-[22px] font-semibold tracking-tight max-w-md">
-                              {st.title || "From our shelf to your doorstep."}
-                            </h2>
-                            <p
-                              className={`mt-1.5 text-[13px] max-w-sm ${
-                                isInk ? "text-white/70" : "text-ink2"
-                              }`}
-                            >
-                              {st.subtitle ||
-                                "Handpicked products nationwide Bangladesh."}
-                            </p>
-                            <div className="mt-5 flex items-center gap-2.5">
-                              <span
-                                className={`rounded-full px-5 py-2 text-[12px] font-medium ${
-                                  isInk
-                                    ? "bg-white text-ink"
-                                    : "bg-ink text-white"
-                                }`}
-                              >
-                                {st.ctaText || "Shop collection"}
-                              </span>
-                              {st.secondaryCtaText && (
-                                <span
-                                  className={`rounded-full border px-4 py-2 text-[12px] font-medium ${
-                                    isInk
-                                      ? "border-white/30 text-white"
-                                      : "border-line bg-paper text-ink"
-                                  }`}
-                                >
-                                  {st.secondaryCtaText}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        )
-                      ) : section.type === "CATEGORY_GRID" ? (
-                        <div>
-                          {st.layoutStyle === "pills" ? (
-                            <div className="flex flex-wrap gap-2">
-                              {(section.data?.categories?.length
-                                ? section.data.categories
-                                : [
-                                    { id: "1", name: "Smartphones" },
-                                    { id: "2", name: "Laptops" },
-                                    { id: "3", name: "Audio & Sound" },
-                                    { id: "4", name: "Accessories" },
-                                    { id: "5", name: "Wearables" },
-                                  ]
-                              ).map((cat: any) => (
-                                <span
-                                  key={cat.id}
-                                  className="rounded-full border border-line bg-paper px-3.5 py-1.5 text-[12px] font-medium text-ink"
-                                >
-                                  {cat.name}
-                                </span>
-                              ))}
-                            </div>
-                          ) : (
-                            <div
-                              className={`grid gap-2 ${
-                                st.columns === 6
-                                  ? "grid-cols-3 sm:grid-cols-6"
-                                  : st.columns === 4
-                                    ? "grid-cols-2 sm:grid-cols-4"
-                                    : "grid-cols-2 sm:grid-cols-5"
-                              }`}
-                            >
-                              {(section.data?.categories?.length
-                                ? section.data.categories
-                                : [
-                                    { id: "1", name: "Smartphones" },
-                                    { id: "2", name: "Laptops" },
-                                    { id: "3", name: "Audio" },
-                                    { id: "4", name: "Accessories" },
-                                    { id: "5", name: "Wearables" },
-                                  ]
-                              ).map((cat: any) => (
-                                <div
-                                  key={cat.id}
-                                  className="rounded-card border border-line bg-surface/40 px-3 py-4 text-center text-[12px] font-medium text-ink"
-                                >
-                                  {cat.name}
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      ) : section.type === "BRAND_SHOWCASE" ? (
-                        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-                          {(st.brandNames
-                            ? st.brandNames.split(",").map((s: string) => s.trim())
-                            : ["Apple", "Samsung", "Sony", "Anker", "Baseus", "Xiaomi"]
-                          ).map((brand: string) => (
-                            <div
-                              key={brand}
-                              className="rounded-card border border-line bg-surface/30 px-3 py-3 text-center text-[12px] font-semibold text-ink"
-                            >
-                              {brand}
-                            </div>
-                          ))}
-                        </div>
-                      ) : section.type === "TEXT_WITH_IMAGE" ? (
-                        <div className="rounded-card border border-line bg-surface/30 p-6 flex items-center justify-between gap-6">
-                          <div>
-                            <h4 className="text-[15px] font-semibold text-ink">
-                              {st.title || "Crafted for durability & authenticity"}
-                            </h4>
-                            <p className="mt-1 text-[12px] text-ink2 max-w-md">
-                              {st.bodyText ||
-                                "Every item in our collection is rigorously verified for authenticity with authorized distributor partnerships."}
-                            </p>
-                            <span className="mt-3 inline-block rounded-full bg-ink px-4 py-1.5 text-[11px] font-medium text-white">
-                              {st.ctaText || "Learn our standards"}
-                            </span>
-                          </div>
-                          <div className="h-20 w-28 shrink-0 rounded-card border border-line bg-paper flex items-center justify-center text-[10px] text-ink2">
-                            Image
-                          </div>
-                        </div>
-                      ) : section.type === "PRODUCT_REQUEST_BANNER" ? (
-                        <div className="rounded-card border border-line bg-surface p-6 flex items-center justify-between">
-                          <div>
-                            <h4 className="text-[14px] font-medium text-ink">
-                              {st.title || "Looking for something specific?"}
-                            </h4>
-                            <p className="text-[12px] text-ink2">
-                              {st.subtitle ||
-                                "Let us know what you need and we will source it for you."}
-                            </p>
-                          </div>
-                          <span className="rounded-full border border-line bg-paper px-4 py-1.5 text-[12px] font-medium text-ink">
-                            {st.buttonText || "Request product"}
-                          </span>
-                        </div>
-                      ) : section.type === "FEEDBACK_BANNER" ? (
-                        <div className="rounded-card border border-line bg-surface p-6 flex items-center justify-between">
-                          <div>
-                            <h4 className="text-[14px] font-medium text-ink">
-                              {st.title || "Suggestions & Wishes"}
-                            </h4>
-                            <p className="text-[12px] text-ink2">
-                              {st.subtitle || "Help us improve your shopping experience."}
-                            </p>
-                          </div>
-                          <span className="rounded-full border border-line bg-paper px-4 py-1.5 text-[12px] font-medium text-ink">
-                            {st.buttonText || "Send feedback"}
-                          </span>
-                        </div>
-                      ) : (
-                        <div>
-                          {st.promoBadge && (
-                            <div className="mb-3 flex items-center gap-2">
-                              <span className="rounded-full bg-ink px-2 py-0.5 text-[10px] font-semibold uppercase text-white">
-                                {st.promoBadge}
-                              </span>
-                              {st.discountHighlight && (
-                                <span className="text-[12px] font-medium text-ink">
-                                  {st.discountHighlight}
-                                </span>
-                              )}
-                            </div>
-                          )}
-
-                          {section.data?.items && section.data.items.length > 0 ? (
-                            <div
-                              className={`grid gap-3 ${
-                                st.columns === 5
-                                  ? "grid-cols-2 md:grid-cols-5"
-                                  : st.columns === 3
-                                    ? "grid-cols-1 sm:grid-cols-3"
-                                    : st.columns === 2
-                                      ? "grid-cols-1 sm:grid-cols-2"
-                                      : "grid-cols-2 md:grid-cols-4"
-                              }`}
-                            >
-                              {section.data.items.map((prod: any) => {
-                                const discount = prod.compareAtPrice
-                                  ? Math.round(
-                                      ((prod.compareAtPrice - prod.price) /
-                                        prod.compareAtPrice) *
-                                        100,
-                                    )
-                                  : null;
-                                return (
-                                  <div
-                                    key={prod.id}
-                                    className="rounded-card border border-line bg-paper overflow-hidden flex flex-col"
-                                  >
-                                    <div className="relative aspect-[4/5] bg-surface flex items-center justify-center overflow-hidden">
-                                      {prod.image ? (
-                                        <img
-                                          src={prod.image}
-                                          alt={prod.name}
-                                          className="h-full w-full object-cover"
-                                        />
-                                      ) : (
-                                        <span className="text-[11px] text-ink2 px-2 text-center">
-                                          No image
-                                        </span>
-                                      )}
-                                      {discount && st.showDiscountBadge !== false && (
-                                        <span className="absolute left-2 top-2 rounded-full bg-ink px-2 py-0.5 text-[10px] font-medium text-white">
-                                          −{discount}%
-                                        </span>
-                                      )}
-                                    </div>
-                                    <div className="p-3">
-                                      <p className="text-[11px] text-ink2">
-                                        {prod.category?.name || "Catalog"}
-                                      </p>
-                                      <p className="text-[13px] font-medium text-ink truncate mt-0.5">
-                                        {prod.name}
-                                      </p>
-                                      <div className="mt-1 flex items-baseline gap-1.5">
-                                        <span className="text-[13px] font-semibold text-ink">
-                                          ৳{prod.price?.toLocaleString() || 0}
-                                        </span>
-                                        {prod.compareAtPrice && (
-                                          <span className="text-[11px] text-ink2 line-through">
-                                            ৳{prod.compareAtPrice.toLocaleString()}
-                                          </span>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          ) : (
-                            <div className="rounded-card border border-dashed border-line p-6 text-center text-[12px] text-ink2">
-                              No matching products found for this data source.
-                              Configure the data source or publish matching products to display here.
-                            </div>
-                          )}
-                        </div>
-                      )}
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[10px] font-medium border ${
+                            sec.enabled
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                              : "bg-slate-100 text-slate-500 border-line"
+                          }`}
+                        >
+                          {sec.enabled ? "Active" : "Disabled"}
+                        </span>
+                        <span className="text-[12px] text-ink2">Edit →</span>
+                      </div>
                     </div>
-                  );
-                })}
-
-              {sections.filter((s) => s.enabled).length === 0 && (
-                <div className="py-20 text-center text-[13px] text-ink2">
-                  All sections are currently hidden or disabled.
+                  ))}
                 </div>
-              )}
+              </div>
             </div>
-          </div>
+          )}
         </div>
-      )}
-    </div>
 
-        {/* PANE 3: Right - Section Settings Inspector (380px) */}
-        <div className="flex w-[380px] flex-col border-l border-line bg-paper">
-          <div className="border-b border-line px-5 py-3">
-            <span className="text-[12px] font-semibold uppercase tracking-wider text-ink2">
+        {/* --------------------------------------------------------------------- */}
+        {/* PANE 3: Right - Section Inspector with Collapsible Accordions (360px)  */}
+        {/* --------------------------------------------------------------------- */}
+        <div className="flex w-[360px] shrink-0 flex-col border-l border-line bg-paper select-none">
+          <div className="flex items-center justify-between border-b border-line px-4 py-2.5 bg-paper">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-ink2">
               Section Customization
             </span>
+            {selectedSection && (
+              <span className="rounded bg-surface px-2 py-0.5 text-[10px] font-mono text-ink2 border border-line">
+                {selectedSection.type.replace(/_/g, " ")}
+              </span>
+            )}
           </div>
 
           {selectedSection ? (
-            <div className="flex-1 overflow-y-auto p-5 space-y-6">
-              {/* SECTION TYPE BADGE */}
-              <div>
-                <label className="block text-[11px] font-semibold uppercase tracking-wider text-ink2 mb-1">
-                  Section Type
-                </label>
-                <div className="rounded-lg border border-line bg-surface px-3 py-2 text-[13px] text-ink font-medium">
-                  {selectedSection.type.replace(/_/g, " ")}
-                </div>
-              </div>
-
-              {/* CARD 1: GENERAL HEADINGS & TYPOGRAPHY */}
-              <div className="rounded-card border border-line bg-surface/30 p-4 space-y-4">
-                <span className="block text-[11px] font-semibold uppercase tracking-wider text-ink">
-                  Typography &amp; Headings
-                </span>
-
-                <div>
-                  <label className="block text-[11px] font-medium text-ink2 mb-1">
-                    Eyebrow / Tagline (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    value={selectedSection.settings?.eyebrow || ""}
-                    onChange={(e) => updateSettings("eyebrow", e.target.value)}
-                    placeholder="e.g. CURATED COLLECTION"
-                    className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-[13px] text-ink focus:border-ink focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-medium text-ink2 mb-1">
-                    Section Heading Title
-                  </label>
-                  <input
-                    type="text"
-                    value={selectedSection.settings?.title || ""}
-                    onChange={(e) => updateSettings("title", e.target.value)}
-                    placeholder="e.g. Recommended Smartphones"
-                    className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-[13px] text-ink focus:border-ink focus:outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-medium text-ink2 mb-1">
-                    Subtitle (Optional)
-                  </label>
-                  <input
-                    type="text"
-                    value={selectedSection.settings?.subtitle || ""}
-                    onChange={(e) => updateSettings("subtitle", e.target.value)}
-                    placeholder="e.g. Handpicked weekly specials with warranty"
-                    className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-[13px] text-ink focus:border-ink focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              {/* CARD 2: LAYOUT & STYLING */}
-              <div className="rounded-card border border-line bg-surface/30 p-4 space-y-4">
-                <span className="block text-[11px] font-semibold uppercase tracking-wider text-ink">
-                  Styling &amp; Appearance
-                </span>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-medium text-ink2 mb-1">
-                      Background Tone
-                    </label>
-                    <select
-                      value={selectedSection.settings?.background || "paper"}
-                      onChange={(e) => updateSettings("background", e.target.value)}
-                      className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-[13px] text-ink focus:border-ink focus:outline-none"
-                    >
-                      <option value="paper">Paper White</option>
-                      <option value="surface">Subtle Surface</option>
-                      <option value="ink">Contrast Ink (Dark)</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-medium text-ink2 mb-1">
-                      Spacing Density
-                    </label>
-                    <select
-                      value={selectedSection.settings?.padding || "normal"}
-                      onChange={(e) => updateSettings("padding", e.target.value)}
-                      className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-[13px] text-ink focus:border-ink focus:outline-none"
-                    >
-                      <option value="compact">Compact (py-8)</option>
-                      <option value="normal">Standard (py-14)</option>
-                      <option value="spacious">Spacious (py-20)</option>
-                    </select>
-                  </div>
-                </div>
-
-                <label className="flex items-center gap-2 cursor-pointer pt-1">
-                  <input
-                    type="checkbox"
-                    checked={selectedSection.settings?.showTopBorder !== false}
-                    onChange={(e) => updateSettings("showTopBorder", e.target.checked)}
-                    className="rounded border-line"
-                  />
-                  <span className="text-[12px] text-ink">
-                    Show top hairline divider
+            <div className="custom-scrollbar flex-1 overflow-y-auto p-3.5 space-y-3">
+              {/* ACCORDION 1: TYPOGRAPHY & HEADINGS */}
+              <div className="rounded-lg border border-line bg-white shadow-2xs overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => toggleAccordion("typography")}
+                  className="flex w-full items-center justify-between px-3.5 py-2.5 text-left text-[12px] font-semibold text-ink bg-slate-50/50 hover:bg-slate-50"
+                >
+                  <span className="flex items-center gap-1.5">
+                    Typography &amp; Headings
                   </span>
-                </label>
-              </div>
+                  <span>{openAccordions.typography ? "−" : "+"}</span>
+                </button>
 
-              {/* CARD 3: HERO SHOWCASE SPECIFIC CONTROLS */}
-              {selectedSection.type === "HERO_SHOWCASE" && (
-                <div className="rounded-card border border-line bg-surface/30 p-4 space-y-4">
-                  <span className="block text-[11px] font-semibold uppercase tracking-wider text-ink">
-                    Hero Actions &amp; Media
-                  </span>
-
-                  <div>
-                    <label className="block text-[11px] font-medium text-ink2 mb-1">
-                      Hero Layout
-                    </label>
-                    <select
-                      value={selectedSection.settings?.layout || "centered"}
-                      onChange={(e) => updateSettings("layout", e.target.value)}
-                      className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-[13px] text-ink focus:border-ink focus:outline-none"
-                    >
-                      <option value="interactive">Signature Interactive Showcase (Initial Design)</option>
-                      <option value="centered">Centered Editorial</option>
-                      <option value="split">Split Layout (Text Left, Image Right)</option>
-                    </select>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
+                {openAccordions.typography && (
+                  <div className="p-3.5 space-y-3 border-t border-line">
                     <div>
                       <label className="block text-[11px] font-medium text-ink2 mb-1">
-                        Primary CTA Text
+                        Eyebrow / Category Tagline
                       </label>
                       <input
                         type="text"
-                        value={selectedSection.settings?.ctaText || "Shop collection"}
-                        onChange={(e) => updateSettings("ctaText", e.target.value)}
-                        className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-[13px] text-ink focus:border-ink focus:outline-none"
+                        value={selectedSection.settings?.eyebrow || ""}
+                        onChange={(e) => updateSettings("eyebrow", e.target.value)}
+                        placeholder="e.g. CURATED COLLECTION"
+                        className="w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[12.5px] text-ink focus:border-ink focus:outline-none"
                       />
                     </div>
+
                     <div>
-                      <label className="block text-[11px] font-medium text-ink2 mb-1">
-                        CTA Link Route
-                      </label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-[11px] font-medium text-ink2">
+                          Section Heading Title
+                        </label>
+                        <span
+                          className="flex items-center gap-0.5 text-[10px] font-medium text-blue-600 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-100"
+                          title="Ready for dynamic metafield / data-source binding"
+                        >
+                          ⚡ Dynamic Source
+                        </span>
+                      </div>
                       <input
                         type="text"
-                        value={selectedSection.settings?.ctaUrl || "/products"}
-                        onChange={(e) => updateSettings("ctaUrl", e.target.value)}
-                        placeholder="/products"
-                        className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-[13px] text-ink focus:border-ink focus:outline-none"
+                        value={selectedSection.settings?.title || ""}
+                        onChange={(e) => updateSettings("title", e.target.value)}
+                        placeholder="e.g. Recommended Collection"
+                        className="w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[12.5px] text-ink focus:border-ink focus:outline-none"
                       />
                     </div>
-                  </div>
 
-                  <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-[11px] font-medium text-ink2 mb-1">
-                        Secondary CTA (Optional)
+                        Subtitle / Supporting Copy
                       </label>
-                      <input
-                        type="text"
-                        value={selectedSection.settings?.secondaryCtaText || ""}
-                        onChange={(e) => updateSettings("secondaryCtaText", e.target.value)}
-                        placeholder="e.g. Special Deals"
-                        className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-[13px] text-ink focus:border-ink focus:outline-none"
+                      <textarea
+                        rows={2}
+                        value={selectedSection.settings?.subtitle || ""}
+                        onChange={(e) => updateSettings("subtitle", e.target.value)}
+                        placeholder="e.g. Handpicked weekly specials with official warranty"
+                        className="w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[12.5px] text-ink focus:border-ink focus:outline-none resize-none"
                       />
                     </div>
-                    <div>
-                      <label className="block text-[11px] font-medium text-ink2 mb-1">
-                        Secondary Link
-                      </label>
-                      <input
-                        type="text"
-                        value={selectedSection.settings?.secondaryCtaUrl || "/products?sale=true"}
-                        onChange={(e) => updateSettings("secondaryCtaUrl", e.target.value)}
-                        placeholder="/products?sale=true"
-                        className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-[13px] text-ink focus:border-ink focus:outline-none"
-                      />
-                    </div>
-                  </div>
-
-                  <ImagePicker
-                    label="Hero Featured Image / Banner"
-                    hint="Displays alongside the headline in Split Layout, or as hero visual."
-                    value={selectedSection.settings?.imageUrl || ""}
-                    onChange={(url) => updateSettings("imageUrl", url)}
-                    folder="storefront/hero"
-                  />
-                </div>
-              )}
-
-              {/* CARD 4: CATEGORY GRID SPECIFIC CONTROLS */}
-              {selectedSection.type === "CATEGORY_GRID" && (
-                <div className="rounded-card border border-line bg-surface/30 p-4 space-y-4">
-                  <span className="block text-[11px] font-semibold uppercase tracking-wider text-ink">
-                    Category Layout
-                  </span>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-[11px] font-medium text-ink2 mb-1">
-                        Card Style
-                      </label>
-                      <select
-                        value={selectedSection.settings?.layoutStyle || "tiles"}
-                        onChange={(e) => updateSettings("layoutStyle", e.target.value)}
-                        className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-[13px] text-ink focus:border-ink focus:outline-none"
-                      >
-                        <option value="tiles">Bordered Tiles</option>
-                        <option value="pills">Pill Chips</option>
-                      </select>
-                    </div>
 
                     <div>
                       <label className="block text-[11px] font-medium text-ink2 mb-1">
-                        Columns (Tiles)
+                        Text Alignment
                       </label>
-                      <select
-                        value={selectedSection.settings?.columns || 5}
-                        onChange={(e) => updateSettings("columns", Number(e.target.value))}
-                        className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-[13px] text-ink focus:border-ink focus:outline-none"
-                      >
-                        <option value={3}>3 Columns</option>
-                        <option value={4}>4 Columns</option>
-                        <option value={5}>5 Columns</option>
-                        <option value={6}>6 Columns</option>
-                        <option value={8}>8 Columns</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* CARD 5: BRAND SHOWCASE SPECIFIC CONTROLS */}
-              {selectedSection.type === "BRAND_SHOWCASE" && (
-                <div className="rounded-card border border-line bg-surface/30 p-4 space-y-4">
-                  <span className="block text-[11px] font-semibold uppercase tracking-wider text-ink">
-                    Brand Showcase Configuration
-                  </span>
-
-                  <div>
-                    <label className="block text-[11px] font-medium text-ink2 mb-1">
-                      Brand Names (Comma-separated)
-                    </label>
-                    <textarea
-                      rows={3}
-                      value={
-                        selectedSection.settings?.brandNames ||
-                        "Apple, Samsung, Sony, Anker, Baseus, Xiaomi"
-                      }
-                      onChange={(e) => updateSettings("brandNames", e.target.value)}
-                      placeholder="Apple, Samsung, Sony, Anker..."
-                      className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-[13px] text-ink focus:border-ink focus:outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-medium text-ink2 mb-1">
-                      Columns
-                    </label>
-                    <select
-                      value={selectedSection.settings?.columns || 6}
-                      onChange={(e) => updateSettings("columns", Number(e.target.value))}
-                      className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-[13px] text-ink focus:border-ink focus:outline-none"
-                    >
-                      <option value={4}>4 Columns</option>
-                      <option value={6}>6 Columns</option>
-                      <option value={8}>8 Columns</option>
-                    </select>
-                  </div>
-                </div>
-              )}
-
-              {/* CARD 6: TEXT WITH IMAGE SPECIFIC CONTROLS */}
-              {selectedSection.type === "TEXT_WITH_IMAGE" && (
-                <div className="rounded-card border border-line bg-surface/30 p-4 space-y-4">
-                  <span className="block text-[11px] font-semibold uppercase tracking-wider text-ink">
-                    Story &amp; Editorial Details
-                  </span>
-
-                  <div>
-                    <label className="block text-[11px] font-medium text-ink2 mb-1">
-                      Story Body Text
-                    </label>
-                    <textarea
-                      rows={4}
-                      value={selectedSection.settings?.bodyText || ""}
-                      onChange={(e) => updateSettings("bodyText", e.target.value)}
-                      placeholder="Tell customers about your product standards..."
-                      className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-[13px] text-ink focus:border-ink focus:outline-none"
-                    />
-                  </div>
-
-                  <ImagePicker
-                    label="Editorial Story Image"
-                    hint="Square or 4:3 photo showing your team, packaging, or verified products."
-                    value={selectedSection.settings?.imageUrl || ""}
-                    onChange={(url) => updateSettings("imageUrl", url)}
-                    folder="storefront/editorial"
-                  />
-
-                  <div>
-                    <label className="block text-[11px] font-medium text-ink2 mb-1">
-                      Image Alignment
-                    </label>
-                    <select
-                      value={selectedSection.settings?.imagePosition || "right"}
-                      onChange={(e) => updateSettings("imagePosition", e.target.value)}
-                      className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-[13px] text-ink focus:border-ink focus:outline-none"
-                    >
-                      <option value="right">Image on Right (Default)</option>
-                      <option value="left">Image on Left</option>
-                    </select>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-[11px] font-medium text-ink2 mb-1">
-                        Button Label
-                      </label>
-                      <input
-                        type="text"
-                        value={selectedSection.settings?.ctaText || "Learn more"}
-                        onChange={(e) => updateSettings("ctaText", e.target.value)}
-                        className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-[13px] text-ink focus:border-ink focus:outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-medium text-ink2 mb-1">
-                        Button Link
-                      </label>
-                      <input
-                        type="text"
-                        value={selectedSection.settings?.ctaUrl || "/about"}
-                        onChange={(e) => updateSettings("ctaUrl", e.target.value)}
-                        className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-[13px] text-ink focus:border-ink focus:outline-none"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* CARD 7: FLASH SALE SPECIFIC CONTROLS */}
-              {selectedSection.type === "FLASH_SALE" && (
-                <div className="rounded-card border border-line bg-surface/30 p-4 space-y-4">
-                  <span className="block text-[11px] font-semibold uppercase tracking-wider text-ink">
-                    Flash Sale Urgency &amp; Badges
-                  </span>
-
-                  <div>
-                    <label className="block text-[11px] font-medium text-ink2 mb-1">
-                      Urgency Badge Label
-                    </label>
-                    <input
-                      type="text"
-                      value={selectedSection.settings?.promoBadge || "FLASH DEAL"}
-                      onChange={(e) => updateSettings("promoBadge", e.target.value)}
-                      placeholder="e.g. FLASH DEAL"
-                      className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-[13px] text-ink focus:border-ink focus:outline-none"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-medium text-ink2 mb-1">
-                      Discount Teaser Highlight
-                    </label>
-                    <input
-                      type="text"
-                      value={selectedSection.settings?.discountHighlight || ""}
-                      onChange={(e) => updateSettings("discountHighlight", e.target.value)}
-                      placeholder="e.g. Up to 50% Off - Today Only"
-                      className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-[13px] text-ink focus:border-ink focus:outline-none"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* CARD 8: DATA SOURCE CONFIGURATION (PRODUCT GRID / CAROUSEL / FLASH SALE) */}
-              {(selectedSection.type === "PRODUCT_GRID" ||
-                selectedSection.type === "PRODUCT_CAROUSEL" ||
-                selectedSection.type === "FLASH_SALE") && (
-                <div className="rounded-card border border-line bg-surface/30 p-4 space-y-4">
-                  <span className="block text-[11px] font-semibold uppercase tracking-wider text-ink">
-                    Data Source &amp; Products
-                  </span>
-
-                  <div>
-                    <label className="block text-[11px] font-medium text-ink2 mb-1">
-                      Product Data Source
-                    </label>
-                    <select
-                      value={selectedSection.dataSource?.type || "LATEST_PRODUCTS"}
-                      onChange={(e) => updateDataSource("type", e.target.value)}
-                      className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-[13px] text-ink focus:border-ink focus:outline-none"
-                    >
-                      <option value="COLLECTION">Curated Collection</option>
-                      <option value="LATEST_PRODUCTS">Latest Published Products</option>
-                      <option value="BEST_SELLERS">Best Sellers (Sales Ranked)</option>
-                      <option value="FLASH_SALE">Active Flash Deals &amp; Discounts</option>
-                    </select>
-                  </div>
-
-                  {selectedSection.dataSource?.type === "COLLECTION" && (
-                    <div>
-                      <label className="block text-[11px] font-medium text-ink2 mb-1">
-                        Select Collection
-                      </label>
-                      <select
-                        value={selectedSection.dataSource?.collectionId || ""}
-                        onChange={(e) => updateDataSource("collectionId", e.target.value)}
-                        className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-[13px] text-ink focus:border-ink focus:outline-none"
-                      >
-                        <option value="">-- Choose Collection --</option>
-                        {collections.map((col) => (
-                          <option key={col.id} value={col.id}>
-                            {col.name} ({col.type})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-[11px] font-medium text-ink2 mb-1">
-                        Columns (Grid)
-                      </label>
-                      <select
-                        value={selectedSection.settings?.columns || 4}
-                        onChange={(e) => updateSettings("columns", Number(e.target.value))}
-                        className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-[13px] text-ink focus:border-ink focus:outline-none"
-                      >
-                        <option value={2}>2 Columns</option>
-                        <option value={3}>3 Columns</option>
-                        <option value={4}>4 Columns</option>
-                        <option value={5}>5 Columns</option>
-                        <option value={6}>6 Columns</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-medium text-ink2 mb-1">
-                        Display Limit
-                      </label>
-                      <input
-                        type="number"
-                        min={1}
-                        max={36}
-                        value={selectedSection.settings?.productLimit || 8}
-                        onChange={(e) =>
-                          updateSettings("productLimit", Number(e.target.value))
-                        }
-                        className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-[13px] text-ink focus:border-ink focus:outline-none"
-                      />
-                    </div>
-                  </div>
-
-                  <label className="flex items-center gap-2 cursor-pointer pt-1">
-                    <input
-                      type="checkbox"
-                      checked={selectedSection.settings?.showDiscountBadge !== false}
-                      onChange={(e) => updateSettings("showDiscountBadge", e.target.checked)}
-                      className="rounded border-line"
-                    />
-                    <span className="text-[12px] text-ink">
-                      Show percentage discount chip (−XX%)
-                    </span>
-                  </label>
-                </div>
-              )}
-
-              {/* CARD 9: NAVIGATION & VIEW ALL LINK */}
-              <div className="rounded-card border border-line bg-surface/30 p-4 space-y-4">
-                <span className="block text-[11px] font-semibold uppercase tracking-wider text-ink">
-                  Navigation &amp; Links
-                </span>
-
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={selectedSection.settings?.showViewAll !== false}
-                    onChange={(e) => updateSettings("showViewAll", e.target.checked)}
-                    className="rounded border-line"
-                  />
-                  <span className="text-[12px] text-ink font-medium">
-                    Show &quot;View all&quot; link
-                  </span>
-                </label>
-
-                {selectedSection.settings?.showViewAll !== false && (
-                  <div className="grid grid-cols-2 gap-3 pt-1">
-                    <div>
-                      <label className="block text-[11px] font-medium text-ink2 mb-1">
-                        Link Text
-                      </label>
-                      <input
-                        type="text"
-                        value={selectedSection.settings?.viewAllText || "View all →"}
-                        onChange={(e) => updateSettings("viewAllText", e.target.value)}
-                        placeholder="View all →"
-                        className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-[13px] text-ink focus:border-ink focus:outline-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-medium text-ink2 mb-1">
-                        Destination URL
-                      </label>
-                      <input
-                        type="text"
-                        value={selectedSection.settings?.viewAllUrl || "/products"}
-                        onChange={(e) => updateSettings("viewAllUrl", e.target.value)}
-                        placeholder="/products"
-                        className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-[13px] text-ink focus:border-ink focus:outline-none"
-                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => updateSettings("alignment", "left")}
+                          className={`rounded-md border py-1 text-[11px] font-medium transition ${
+                            selectedSection.settings?.alignment !== "center"
+                              ? "border-ink bg-ink text-white"
+                              : "border-line bg-paper text-ink"
+                          }`}
+                        >
+                          Left Aligned
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => updateSettings("alignment", "center")}
+                          className={`rounded-md border py-1 text-[11px] font-medium transition ${
+                            selectedSection.settings?.alignment === "center"
+                              ? "border-ink bg-ink text-white"
+                              : "border-line bg-paper text-ink"
+                          }`}
+                        >
+                          Centered
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}
-
-                <label className="flex items-center gap-2 cursor-pointer pt-2">
-                  <input
-                    type="checkbox"
-                    checked={selectedSection.settings?.hideWhenEmpty !== false}
-                    onChange={(e) => updateSettings("hideWhenEmpty", e.target.checked)}
-                    className="rounded border-line"
-                  />
-                  <span className="text-[12px] text-ink">
-                    Hide section if 0 items found
-                  </span>
-                </label>
               </div>
 
-              {/* CARD 10: REMOVE SECTION */}
+              {/* ACCORDION 2: DATA SOURCE & CATALOG RULES */}
+              {(selectedSection.type === "PRODUCT_GRID" ||
+                selectedSection.type === "PRODUCT_CAROUSEL" ||
+                selectedSection.type === "FLASH_SALE" ||
+                selectedSection.type === "CATEGORY_GRID") && (
+                <div className="rounded-lg border border-line bg-white shadow-2xs overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => toggleAccordion("datasource")}
+                    className="flex w-full items-center justify-between px-3.5 py-2.5 text-left text-[12px] font-semibold text-ink bg-slate-50/50 hover:bg-slate-50"
+                  >
+                    <span>Data Source &amp; Catalog Rules</span>
+                    <span>{openAccordions.datasource ? "−" : "+"}</span>
+                  </button>
+
+                  {openAccordions.datasource && (
+                    <div className="p-3.5 space-y-3 border-t border-line">
+                      {selectedSection.type !== "CATEGORY_GRID" && (
+                        <div>
+                          <label className="block text-[11px] font-medium text-ink2 mb-1">
+                            Product Population Rule
+                          </label>
+                          <select
+                            value={selectedSection.dataSource?.type || "COLLECTION"}
+                            onChange={(e) => updateDataSource("type", e.target.value)}
+                            className="w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[12.5px] text-ink focus:border-ink focus:outline-none"
+                          >
+                            <option value="COLLECTION">Dynamic Collection (Rule-based)</option>
+                            <option value="LATEST_PRODUCTS">Latest Catalog Arrivals</option>
+                            <option value="BEST_SELLERS">Best Sellers / Top Ranked</option>
+                            <option value="FLASH_SALE">Active Flash Sale Discounts</option>
+                            <option value="MANUAL_SELECTION">Manual Selection</option>
+                          </select>
+                        </div>
+                      )}
+
+                      {selectedSection.dataSource?.type === "COLLECTION" && (
+                        <div>
+                          <label className="block text-[11px] font-medium text-ink2 mb-1">
+                            Select Collection
+                          </label>
+                          <select
+                            value={selectedSection.dataSource?.collectionId || ""}
+                            onChange={(e) => updateDataSource("collectionId", e.target.value)}
+                            className="w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[12.5px] text-ink focus:border-ink focus:outline-none"
+                          >
+                            <option value="">-- All Products / Default --</option>
+                            {collections.map((col) => (
+                              <option key={col.id} value={col.id}>
+                                {col.name} ({col.type})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[11px] font-medium text-ink2 mb-1">
+                            Grid Columns
+                          </label>
+                          <select
+                            value={selectedSection.settings?.columns || 4}
+                            onChange={(e) => updateSettings("columns", Number(e.target.value))}
+                            className="w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[12.5px] text-ink focus:border-ink focus:outline-none"
+                          >
+                            <option value={2}>2 Columns</option>
+                            <option value={3}>3 Columns</option>
+                            <option value={4}>4 Columns</option>
+                            <option value={5}>5 Columns</option>
+                            <option value={6}>6 Columns</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-medium text-ink2 mb-1">
+                            Max Items
+                          </label>
+                          <input
+                            type="number"
+                            min={1}
+                            max={36}
+                            value={selectedSection.settings?.productLimit || 8}
+                            onChange={(e) => updateSettings("productLimit", Number(e.target.value))}
+                            className="w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[12.5px] text-ink focus:border-ink focus:outline-none"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5 pt-1">
+                        <label className="flex items-center gap-2 cursor-pointer text-[12px] text-ink">
+                          <input
+                            type="checkbox"
+                            checked={selectedSection.settings?.showDiscountBadge !== false}
+                            onChange={(e) => updateSettings("showDiscountBadge", e.target.checked)}
+                            className="rounded border-line"
+                          />
+                          Show discount chip badge (−XX%)
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer text-[12px] text-ink">
+                          <input
+                            type="checkbox"
+                            checked={selectedSection.settings?.showViewAll !== false}
+                            onChange={(e) => updateSettings("showViewAll", e.target.checked)}
+                            className="rounded border-line"
+                          />
+                          Show &quot;View all&quot; link
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer text-[12px] text-ink">
+                          <input
+                            type="checkbox"
+                            checked={selectedSection.settings?.hideWhenEmpty !== false}
+                            onChange={(e) => updateSettings("hideWhenEmpty", e.target.checked)}
+                            className="rounded border-line"
+                          />
+                          Hide section if 0 products found
+                        </label>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ACCORDION 3: STYLING & APPEARANCE */}
+              <div className="rounded-lg border border-line bg-white shadow-2xs overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => toggleAccordion("styling")}
+                  className="flex w-full items-center justify-between px-3.5 py-2.5 text-left text-[12px] font-semibold text-ink bg-slate-50/50 hover:bg-slate-50"
+                >
+                  <span>Styling &amp; Appearance</span>
+                  <span>{openAccordions.styling ? "−" : "+"}</span>
+                </button>
+
+                {openAccordions.styling && (
+                  <div className="p-3.5 space-y-3 border-t border-line">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-medium text-ink2 mb-1">
+                          Background Tone
+                        </label>
+                        <select
+                          value={selectedSection.settings?.background || "paper"}
+                          onChange={(e) => updateSettings("background", e.target.value)}
+                          className="w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[12.5px] text-ink focus:border-ink focus:outline-none"
+                        >
+                          <option value="paper">Paper White</option>
+                          <option value="surface">Subtle Surface</option>
+                          <option value="ink">Contrast Dark</option>
+                          <option value="custom">Custom Color</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-medium text-ink2 mb-1">
+                          Spacing Density
+                        </label>
+                        <select
+                          value={selectedSection.settings?.padding || "normal"}
+                          onChange={(e) => updateSettings("padding", e.target.value)}
+                          className="w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[12.5px] text-ink focus:border-ink focus:outline-none"
+                        >
+                          <option value="compact">Compact (py-8)</option>
+                          <option value="normal">Standard (py-14)</option>
+                          <option value="spacious">Spacious (py-20)</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {selectedSection.settings?.background === "custom" && (
+                      <div className="flex items-center gap-2 pt-1">
+                        <input
+                          type="color"
+                          value={selectedSection.settings?.customBgColor || "#f4f4f5"}
+                          onChange={(e) => updateSettings("customBgColor", e.target.value)}
+                          className="h-8 w-8 rounded border border-line p-0 cursor-pointer"
+                        />
+                        <input
+                          type="text"
+                          value={selectedSection.settings?.customBgColor || "#f4f4f5"}
+                          onChange={(e) => updateSettings("customBgColor", e.target.value)}
+                          placeholder="#f4f4f5"
+                          className="flex-1 rounded-md border border-line px-2.5 py-1 text-[12px] font-mono text-ink"
+                        />
+                      </div>
+                    )}
+
+                    <label className="flex items-center gap-2 cursor-pointer pt-1 text-[12px] text-ink">
+                      <input
+                        type="checkbox"
+                        checked={selectedSection.settings?.showTopBorder !== false}
+                        onChange={(e) => updateSettings("showTopBorder", e.target.checked)}
+                        className="rounded border-line"
+                      />
+                      Show hairline top border
+                    </label>
+                  </div>
+                )}
+              </div>
+
+              {/* ACCORDION 4: ACTIONS & MEDIA */}
+              <div className="rounded-lg border border-line bg-white shadow-2xs overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => toggleAccordion("media")}
+                  className="flex w-full items-center justify-between px-3.5 py-2.5 text-left text-[12px] font-semibold text-ink bg-slate-50/50 hover:bg-slate-50"
+                >
+                  <span>Actions &amp; Media</span>
+                  <span>{openAccordions.media ? "−" : "+"}</span>
+                </button>
+
+                {openAccordions.media && (
+                  <div className="p-3.5 space-y-3 border-t border-line">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-medium text-ink2 mb-1">
+                          Primary CTA Text
+                        </label>
+                        <input
+                          type="text"
+                          value={selectedSection.settings?.ctaText || "Shop collection"}
+                          onChange={(e) => updateSettings("ctaText", e.target.value)}
+                          className="w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[12.5px] text-ink focus:border-ink focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-medium text-ink2 mb-1">
+                          Destination URL
+                        </label>
+                        <input
+                          type="text"
+                          value={selectedSection.settings?.ctaUrl || "/products"}
+                          onChange={(e) => updateSettings("ctaUrl", e.target.value)}
+                          placeholder="/products"
+                          className="w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[12.5px] text-ink focus:border-ink focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="pt-1">
+                      <ImagePicker
+                        label="Featured Image / Graphic"
+                        hint="Display alongside headline or as visual banner."
+                        value={selectedSection.settings?.imageUrl || ""}
+                        onChange={(url) => updateSettings("imageUrl", url)}
+                        folder="storefront/sections"
+                      />
+                      {selectedSection.settings?.imageUrl && (
+                        <div className="mt-2 relative rounded-md border border-line overflow-hidden h-24 bg-surface flex items-center justify-center">
+                          <img
+                            src={selectedSection.settings.imageUrl}
+                            alt="Section preview"
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* ACCORDION 5: GRANULAR CHILD BLOCKS */}
+              <div className="rounded-lg border border-line bg-white shadow-2xs overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => toggleAccordion("blocks")}
+                  className="flex w-full items-center justify-between px-3.5 py-2.5 text-left text-[12px] font-semibold text-ink bg-slate-50/50 hover:bg-slate-50"
+                >
+                  <span className="flex items-center gap-1.5">
+                    Child Blocks ({(selectedSection.settings?.blocks || []).length})
+                  </span>
+                  <span>{openAccordions.blocks ? "−" : "+"}</span>
+                </button>
+
+                {openAccordions.blocks && (
+                  <div className="p-3.5 space-y-2.5 border-t border-line">
+                    {(selectedSection.settings?.blocks || []).map((block, idx) => (
+                      <div
+                        key={block.id}
+                        className="rounded-md border border-line bg-surface/50 p-2.5 space-y-2"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-semibold text-ink">
+                            Block #{idx + 1}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => removeBlock(block.id)}
+                            className="text-[11px] text-rose-600 hover:text-rose-700"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                        <input
+                          type="text"
+                          value={block.title}
+                          onChange={(e) => updateBlock(block.id, "title", e.target.value)}
+                          placeholder="Block Title / Label"
+                          className="w-full rounded border border-line bg-white px-2 py-1 text-[12px] text-ink"
+                        />
+                        <input
+                          type="text"
+                          value={block.ctaUrl || ""}
+                          onChange={(e) => updateBlock(block.id, "ctaUrl", e.target.value)}
+                          placeholder="Link Route (e.g. /products/sofas)"
+                          className="w-full rounded border border-line bg-white px-2 py-1 text-[12px] text-ink"
+                        />
+                      </div>
+                    ))}
+
+                    <button
+                      type="button"
+                      onClick={addBlockToSelected}
+                      className="w-full rounded-md border border-line bg-white py-1.5 text-[11px] font-medium text-ink hover:bg-slate-50 transition shadow-2xs"
+                    >
+                      + Add New Block
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* REMOVE SECTION ACTION */}
               <div className="pt-2">
                 <button
                   type="button"
                   onClick={() => removeSection(selectedSection.id)}
-                  className="w-full rounded-lg border border-rose-200 bg-rose-50/50 py-2.5 text-[12px] font-medium text-rose-700 transition hover:bg-rose-100"
+                  className="w-full rounded-lg border border-rose-200 bg-rose-50/70 py-2 text-[12px] font-medium text-rose-700 hover:bg-rose-100 transition shadow-2xs"
                 >
-                  Remove Section
+                  Remove Section from Page
                 </button>
               </div>
             </div>
           ) : (
-            <div className="flex-1 p-6 text-center text-[13px] text-ink2">
-              Select a section from the left outline to configure its properties.
+            <div className="flex-1 p-6 text-center text-[12.5px] text-ink2">
+              Select any section on the left to inspect and configure its attributes.
             </div>
           )}
         </div>
       </div>
 
-      {/* Add Section Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
-          <div className="w-full max-w-lg rounded-card border border-line bg-paper p-6">
+      {/* ========================================================================= */}
+      {/* GLOBAL THEME SETTINGS MODAL / DRAWER                                     */}
+      {/* ========================================================================= */}
+      {showThemeSettingsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4 select-none">
+          <div className="w-full max-w-lg rounded-xl border border-line bg-paper p-6 shadow-xl">
             <div className="flex items-center justify-between border-b border-line pb-3">
-              <h3 className="text-[16px] font-semibold text-ink">Add New Section</h3>
+              <div>
+                <h3 className="text-[16px] font-semibold text-ink">Global Theme Settings</h3>
+                <p className="text-[12px] text-ink2 mt-0.5">
+                  Configure brand design tokens applied store-wide across all templates.
+                </p>
+              </div>
               <button
                 type="button"
-                onClick={() => setShowAddModal(false)}
-                className="text-[13px] text-ink2 hover:text-ink"
+                onClick={() => setShowThemeSettingsModal(false)}
+                className="text-[14px] text-ink2 hover:text-ink"
               >
                 ✕
               </button>
             </div>
 
-            <div className="mt-4 max-h-[440px] overflow-y-auto space-y-2">
-              {AVAILABLE_SECTION_TEMPLATES.map((tmpl) => (
+            <div className="mt-4 space-y-4 max-h-[460px] overflow-y-auto pr-1">
+              {/* Brand Colors */}
+              <div className="rounded-lg border border-line bg-surface/30 p-3.5 space-y-3">
+                <span className="block text-[11px] font-bold uppercase tracking-wider text-ink">
+                  Brand Colors
+                </span>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-medium text-ink2 mb-1">
+                      Primary Brand Color
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={themeTokens.primaryColor}
+                        onChange={(e) =>
+                          setThemeTokens((t) => ({ ...t, primaryColor: e.target.value }))
+                        }
+                        className="h-7 w-7 rounded border border-line p-0 cursor-pointer"
+                      />
+                      <input
+                        type="text"
+                        value={themeTokens.primaryColor}
+                        onChange={(e) =>
+                          setThemeTokens((t) => ({ ...t, primaryColor: e.target.value }))
+                        }
+                        className="flex-1 rounded border border-line px-2 py-1 text-[12px] font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-medium text-ink2 mb-1">
+                      Accent Color
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={themeTokens.accentColor}
+                        onChange={(e) =>
+                          setThemeTokens((t) => ({ ...t, accentColor: e.target.value }))
+                        }
+                        className="h-7 w-7 rounded border border-line p-0 cursor-pointer"
+                      />
+                      <input
+                        type="text"
+                        value={themeTokens.accentColor}
+                        onChange={(e) =>
+                          setThemeTokens((t) => ({ ...t, accentColor: e.target.value }))
+                        }
+                        className="flex-1 rounded border border-line px-2 py-1 text-[12px] font-mono"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Global Typography */}
+              <div className="rounded-lg border border-line bg-surface/30 p-3.5 space-y-3">
+                <span className="block text-[11px] font-bold uppercase tracking-wider text-ink">
+                  Global Typography
+                </span>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-medium text-ink2 mb-1">
+                      Heading Font Family
+                    </label>
+                    <select
+                      value={themeTokens.headingFont}
+                      onChange={(e) =>
+                        setThemeTokens((t) => ({ ...t, headingFont: e.target.value }))
+                      }
+                      className="w-full rounded border border-line bg-paper px-2 py-1 text-[12px]"
+                    >
+                      <option value="Inter">Inter (Clean Modern)</option>
+                      <option value="Space Grotesk">Space Grotesk (Tech Editorial)</option>
+                      <option value="Plus Jakarta Sans">Plus Jakarta Sans</option>
+                      <option value="Playfair Display">Playfair Display (Luxury Serif)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-medium text-ink2 mb-1">
+                      Body Font Family
+                    </label>
+                    <select
+                      value={themeTokens.bodyFont}
+                      onChange={(e) =>
+                        setThemeTokens((t) => ({ ...t, bodyFont: e.target.value }))
+                      }
+                      className="w-full rounded border border-line bg-paper px-2 py-1 text-[12px]"
+                    >
+                      <option value="Inter">Inter</option>
+                      <option value="DM Sans">DM Sans</option>
+                      <option value="System">System Sans</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Layout & Corner Radii */}
+              <div className="rounded-lg border border-line bg-surface/30 p-3.5 space-y-3">
+                <span className="block text-[11px] font-bold uppercase tracking-wider text-ink">
+                  Layout &amp; Shapes
+                </span>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-medium text-ink2 mb-1">
+                      Corner Radius
+                    </label>
+                    <select
+                      value={themeTokens.borderRadius}
+                      onChange={(e) =>
+                        setThemeTokens((t) => ({ ...t, borderRadius: e.target.value }))
+                      }
+                      className="w-full rounded border border-line bg-paper px-2 py-1 text-[12px]"
+                    >
+                      <option value="0px">Sharp (0px)</option>
+                      <option value="8px">Modern (8px)</option>
+                      <option value="16px">Soft (16px)</option>
+                      <option value="9999px">Pill (Full)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-medium text-ink2 mb-1">
+                      Container Max Width
+                    </label>
+                    <select
+                      value={themeTokens.containerWidth}
+                      onChange={(e) =>
+                        setThemeTokens((t) => ({ ...t, containerWidth: e.target.value }))
+                      }
+                      className="w-full rounded border border-line bg-paper px-2 py-1 text-[12px]"
+                    >
+                      <option value="1200px">1200px (Compact)</option>
+                      <option value="1280px">1280px (Standard)</option>
+                      <option value="1440px">1440px (Wide)</option>
+                      <option value="100%">Full Bleed (100%)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-5 flex justify-end gap-2 border-t border-line pt-3">
+              <button
+                type="button"
+                onClick={() => setShowThemeSettingsModal(false)}
+                className="rounded-md border border-line bg-white px-3 py-1.5 text-[12px] font-medium text-ink hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowThemeSettingsModal(false);
+                  setStatusMessage("Theme settings applied");
+                  setTimeout(() => setStatusMessage(""), 3500);
+                }}
+                className="rounded-md bg-ink px-4 py-1.5 text-[12px] font-medium text-white hover:opacity-90 shadow-2xs"
+              >
+                Apply Theme Tokens
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* ADD SECTION PALETTE MODAL                                                */}
+      {/* ========================================================================= */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4 select-none">
+          <div className="w-full max-w-lg rounded-xl border border-line bg-paper p-6 shadow-xl">
+            <div className="flex items-center justify-between border-b border-line pb-3">
+              <div>
+                <h3 className="text-[16px] font-semibold text-ink">Add Section</h3>
+                <p className="text-[12px] text-ink2 mt-0.5">
+                  {addSectionIndex !== null
+                    ? `Inserting at position #${addSectionIndex + 1}`
+                    : "Appending to page layout"}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowAddModal(false);
+                  setAddSectionIndex(null);
+                }}
+                className="text-[14px] text-ink2 hover:text-ink"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="mt-4 max-h-[440px] overflow-y-auto space-y-2 pr-1">
+              {AVAILABLE_SECTION_TEMPLATES.map((tmpl, tIdx) => (
                 <div
-                  key={tmpl.type}
+                  key={`${tmpl.type}-${tIdx}`}
                   onClick={() => addSection(tmpl)}
                   className="flex items-start justify-between rounded-lg border border-line p-3 transition hover:border-ink hover:bg-surface cursor-pointer"
                 >
-                  <div className="pr-4">
-                    <h4 className="text-[13px] font-semibold text-ink">{tmpl.label}</h4>
-                    <p className="mt-0.5 text-[12px] text-ink2">{tmpl.description}</p>
+                  <div className="flex items-start gap-2.5 pr-4">
+                    <span className="mt-0.5 text-ink shrink-0">{SECTION_ICONS[tmpl.type]}</span>
+                    <div>
+                      <h4 className="text-[13px] font-semibold text-ink">{tmpl.label}</h4>
+                      <p className="mt-0.5 text-[12px] text-ink2 leading-relaxed">
+                        {tmpl.description}
+                      </p>
+                    </div>
                   </div>
-                  <span className="rounded-full bg-surface px-2.5 py-1 text-[11px] font-medium text-ink border border-line shrink-0">
+                  <span className="rounded bg-surface px-2.5 py-1 text-[11px] font-medium text-ink border border-line shrink-0">
                     Add
                   </span>
                 </div>
@@ -2237,29 +2105,31 @@ export default function StorefrontStudioPage() {
         </div>
       )}
 
-      {/* Templates & Presets Modal */}
+      {/* ========================================================================= */}
+      {/* TEMPLATES & PRESETS MODAL                                                */}
+      {/* ========================================================================= */}
       {showTemplateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
-          <div className="w-full max-w-2xl rounded-card border border-line bg-paper p-6 shadow-none">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4 select-none">
+          <div className="w-full max-w-2xl rounded-xl border border-line bg-paper p-6 shadow-xl">
             <div className="flex items-center justify-between border-b border-line pb-3">
               <div>
                 <h3 className="text-[16px] font-semibold text-ink">
                   Storefront Templates &amp; Presets
                 </h3>
                 <p className="text-[12px] text-ink2 mt-0.5">
-                  Select a pre-architected design foundation for your store or start from scratch.
+                  Select a pre-architected design foundation for your store.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setShowTemplateModal(false)}
-                className="text-[13px] text-ink2 hover:text-ink"
+                className="text-[14px] text-ink2 hover:text-ink"
               >
                 ✕
               </button>
             </div>
 
-            <div className="mt-5 space-y-3.5 max-h-[500px] overflow-y-auto pr-1">
+            <div className="mt-4 space-y-3.5 max-h-[500px] overflow-y-auto pr-1">
               {/* Option 1: Signature Initial Design */}
               <div
                 className={`rounded-xl border p-4 transition ${
@@ -2296,8 +2166,11 @@ export default function StorefrontStudioPage() {
                   {hasSignatureTemplate ? (
                     <button
                       type="button"
-                      onClick={applyInitialDesignTemplate}
-                      className="shrink-0 rounded-full bg-ink px-4 py-2 text-[12px] font-medium text-white transition hover:opacity-85"
+                      onClick={() => {
+                        // Apply signature template
+                        setShowTemplateModal(false);
+                      }}
+                      className="shrink-0 rounded-md bg-ink px-3 py-1.5 text-[12px] font-medium text-white transition hover:opacity-90 shadow-2xs"
                     >
                       Apply Preset
                     </button>
@@ -2305,8 +2178,7 @@ export default function StorefrontStudioPage() {
                     <button
                       type="button"
                       disabled
-                      className="shrink-0 rounded-full border border-line bg-surface px-3.5 py-1.5 text-[11px] font-medium text-ink2 opacity-60 cursor-not-allowed"
-                      title="Only platform administrator can provision this template"
+                      className="shrink-0 rounded-md border border-line bg-surface px-3 py-1.5 text-[11px] font-medium text-ink2 opacity-60 cursor-not-allowed"
                     >
                       Admin Only 🔒
                     </button>
@@ -2314,54 +2186,29 @@ export default function StorefrontStudioPage() {
                 </div>
               </div>
 
-              {/* Option 2: Modern Clean Retail */}
+              {/* Option 2: Clean Slate */}
               <div className="rounded-xl border border-line bg-paper p-4 transition hover:border-ink/40">
                 <div className="flex items-start justify-between gap-4">
                   <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <h4 className="text-[14px] font-semibold text-ink">
-                        Modern Clean Retail
-                      </h4>
-                      <span className="rounded-full bg-surface px-2 py-0.5 text-[10px] font-medium text-ink2 border border-line">
-                        Standard Editorial
-                      </span>
-                    </div>
+                    <h4 className="text-[14px] font-semibold text-ink">
+                      Blank Canvas (Custom from Zero)
+                    </h4>
                     <p className="text-[12px] text-ink2 leading-relaxed">
-                      Clean commercial storefront layout featuring split hero banner, trending product carousel, authentic trust guarantee block, and time-limited flash deals.
+                      Clears all sections so you can handcraft the homepage block-by-block using the section palette.
                     </p>
                   </div>
                   <button
                     type="button"
-                    onClick={applyModernRetailTemplate}
-                    className="shrink-0 rounded-full border border-line bg-paper px-4 py-2 text-[12px] font-medium text-ink transition hover:bg-surface"
+                    onClick={() => {
+                      if (confirm("Clear all sections and start with blank canvas?")) {
+                        setSections([]);
+                        setSelectedSectionId(null);
+                        setShowTemplateModal(false);
+                      }
+                    }}
+                    className="shrink-0 rounded-md border border-rose-200 bg-rose-50 px-3 py-1.5 text-[12px] font-medium text-rose-700 hover:bg-rose-100 transition shadow-2xs"
                   >
-                    Apply Preset
-                  </button>
-                </div>
-              </div>
-
-              {/* Option 3: Blank Canvas */}
-              <div className="rounded-xl border border-line bg-paper p-4 transition hover:border-rose-400">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <h4 className="text-[14px] font-semibold text-ink">
-                        Blank Canvas (Custom from Zero)
-                      </h4>
-                      <span className="rounded-full bg-rose-500/10 px-2 py-0.5 text-[10px] font-medium text-rose-700 border border-rose-500/20">
-                        Clean Slate
-                      </span>
-                    </div>
-                    <p className="text-[12px] text-ink2 leading-relaxed">
-                      Clears all sections so you can handcraft the homepage block-by-block using the section palette. Perfect for organizations creating a completely custom storefront.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={applyBlankCanvasTemplate}
-                    className="shrink-0 rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-[12px] font-medium text-rose-700 transition hover:bg-rose-100"
-                  >
-                    Start from Zero
+                    Start Zero
                   </button>
                 </div>
               </div>
@@ -2370,24 +2217,31 @@ export default function StorefrontStudioPage() {
         </div>
       )}
 
-      {/* History & Rollback Modal */}
+      {/* ========================================================================= */}
+      {/* HISTORY & ROLLBACK MODAL                                                 */}
+      {/* ========================================================================= */}
       {showHistoryModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
-          <div className="w-full max-w-lg rounded-card border border-line bg-paper p-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4 select-none">
+          <div className="w-full max-w-lg rounded-xl border border-line bg-paper p-6 shadow-xl">
             <div className="flex items-center justify-between border-b border-line pb-3">
-              <h3 className="text-[16px] font-semibold text-ink">
-                Publication History &amp; Rollback
-              </h3>
+              <div>
+                <h3 className="text-[16px] font-semibold text-ink">
+                  Publication History &amp; Rollback
+                </h3>
+                <p className="text-[12px] text-ink2 mt-0.5">
+                  Restore any previous published version snapshot with 1-click rollback.
+                </p>
+              </div>
               <button
                 type="button"
                 onClick={() => setShowHistoryModal(false)}
-                className="text-[13px] text-ink2 hover:text-ink"
+                className="text-[14px] text-ink2 hover:text-ink"
               >
                 ✕
               </button>
             </div>
 
-            <div className="mt-4 max-h-[380px] overflow-y-auto divide-y divide-line">
+            <div className="mt-4 max-h-[380px] overflow-y-auto divide-y divide-line pr-1">
               {historyList.map((hist) => (
                 <div
                   key={hist.id}
@@ -2414,7 +2268,7 @@ export default function StorefrontStudioPage() {
                     <button
                       type="button"
                       onClick={() => handleRollback(hist.versionNumber)}
-                      className="rounded-full border border-line px-3 py-1 text-[11px] font-medium text-ink transition hover:bg-surface"
+                      className="rounded-md border border-line bg-white px-3 py-1 text-[11px] font-medium text-ink hover:bg-slate-50 transition shadow-2xs"
                     >
                       Rollback
                     </button>
