@@ -4,7 +4,10 @@ import React, { useEffect, useRef, useState, useMemo } from "react";
 import { StorefrontSectionData } from "@/lib/storefront";
 
 interface CustomCodeSectionProps {
-  section: StorefrontSectionData;
+  settings?: Record<string, unknown>;
+  data?: unknown;
+  section?: StorefrontSectionData;
+  [key: string]: unknown;
 }
 
 /**
@@ -124,8 +127,10 @@ class SectionErrorBoundary extends React.Component<
   }
 }
 
-export default function CustomCodeSection({ section }: CustomCodeSectionProps) {
-  const { settings } = section;
+export default function CustomCodeSection(props: CustomCodeSectionProps) {
+  const section = props.section;
+  const settings = (props.settings || section?.settings || {}) as Record<string, unknown>;
+  const sectionId = section?.id || (settings.id as string) || "custom-code";
   const containerRef = useRef<HTMLDivElement>(null);
   const [scriptError, setScriptError] = useState<string | null>(null);
 
@@ -149,7 +154,7 @@ export default function CustomCodeSection({ section }: CustomCodeSectionProps) {
   }, [rawCode, settings.customCss, settings.customJs]);
 
   const containerMaxWidth = (settings.containerMaxWidth as string) || "contained";
-  const scopeSelector = `[data-section-id="${section.id}"]`;
+  const scopeSelector = `[data-section-id="${sectionId}"]`;
 
   // Memoize safely scoped CSS to prevent style leakage
   const scopedCss = useMemo(() => {
@@ -234,7 +239,7 @@ export default function CustomCodeSection({ section }: CustomCodeSectionProps) {
         React.useEffect,
         React.useRef,
         React.useMemo,
-        section
+        section || { id: sectionId, settings }
       );
 
       if (typeof result === "function") {
@@ -253,13 +258,13 @@ export default function CustomCodeSection({ section }: CustomCodeSectionProps) {
         }
       }
     };
-  }, [parsedJs, section]);
+  }, [parsedJs, section, sectionId, settings]);
 
   // If completely empty in initial state
   if (!rawCode && !parsedHtml && !parsedCss && !parsedJs) {
     return (
       <section
-        data-section-id={section.id}
+        data-section-id={sectionId}
         className={`${bgClass} ${padClass} ${
           settings.showTopBorder ? "border-t border-line" : ""
         }`}
@@ -282,9 +287,10 @@ export default function CustomCodeSection({ section }: CustomCodeSectionProps) {
   }
 
   return (
-    <SectionErrorBoundary sectionId={section.id}>
+    <SectionErrorBoundary sectionId={sectionId}>
       <section
-        data-section-id={section.id}
+        data-section-id={sectionId}
+        id={`custom-section-${sectionId}`}
         className={`${bgClass} ${padClass} ${
           settings.showTopBorder ? "border-t border-line" : ""
         }`}

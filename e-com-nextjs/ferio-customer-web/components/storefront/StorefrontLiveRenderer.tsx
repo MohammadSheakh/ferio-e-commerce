@@ -1,10 +1,51 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, Component as ReactComponent, ErrorInfo, ReactNode } from "react";
 import Link from "next/link";
 import { sectionRegistry } from "./registry";
 import { StorefrontSectionData, StorefrontSectionType } from "@/lib/storefront";
 import { CatalogCategory, CatalogProduct } from "@/lib/catalog";
+
+class SectionErrorBoundary extends ReactComponent<
+  { children: ReactNode; sectionTitle: string; isPreview: boolean },
+  { hasError: boolean; error?: Error }
+> {
+  constructor(props: { children: ReactNode; sectionTitle: string; isPreview: boolean }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error(`[StorefrontSection: ${this.props.sectionTitle}] Render error:`, error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      if (!this.props.isPreview) {
+        // In live production, gracefully do not crash the rest of the store
+        return null;
+      }
+      return (
+        <div className="mx-auto max-w-4xl p-6 my-4 rounded-xl border border-rose-300 bg-rose-50 text-rose-900 text-xs font-mono">
+          <div className="flex items-center gap-2 font-bold text-rose-800 mb-1">
+            <svg className="w-4 h-4 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            Section Render Fault: {this.props.sectionTitle}
+          </div>
+          <p className="text-rose-700 leading-relaxed">
+            {this.state.error?.message || "An unexpected error occurred rendering this section."}
+          </p>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const MOCK_CATEGORIES: CatalogCategory[] = [
   { id: "mock-cat-1", name: "Living Room", slug: "living-room", description: "Modern seating and tables", _count: { products: 14 } },
@@ -267,10 +308,16 @@ export default function StorefrontLiveRenderer({
                 Sample Catalog Items (Empty Storefront)
               </div>
             )}
-            <Component
-              settings={section.settings || {}}
-              data={enrichedData}
-            />
+            <SectionErrorBoundary
+              sectionTitle={section.type.replace(/_/g, " ")}
+              isPreview={isPreview}
+            >
+              <Component
+                settings={section.settings || {}}
+                data={enrichedData}
+                section={section}
+              />
+            </SectionErrorBoundary>
           </div>
         );
       })}
