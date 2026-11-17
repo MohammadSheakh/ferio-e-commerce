@@ -83,6 +83,7 @@ interface StorefrontSection {
     imageUrl?: string;
     imagePosition?: "left" | "right";
     layout?: "split" | "centered" | "minimal" | "interactive";
+    variant?: "interactive" | "standard";
     layoutStyle?: "tiles" | "pills";
     background?: "paper" | "surface" | "ink" | "custom";
     customBgColor?: string;
@@ -394,6 +395,10 @@ export default function StorefrontStudioPage() {
   // Canvas View Mode: Live Preview vs Structural DOM Outliner
   const [previewTab, setPreviewTab] = useState<"interactive" | "outliner">("interactive");
 
+  // Drag and drop state
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
   // Modals & Drawers
   const [showAddModal, setShowAddModal] = useState(false);
   const [addSectionIndex, setAddSectionIndex] = useState<number | null>(null);
@@ -407,7 +412,9 @@ export default function StorefrontStudioPage() {
   // Collapsible Accordions in Right Inspector
   const [openAccordions, setOpenAccordions] = useState<Record<string, boolean>>({
     typography: true,
+    layout: true,
     datasource: true,
+    specialty: true,
     styling: true,
     media: true,
     blocks: true,
@@ -660,6 +667,36 @@ export default function StorefrontStudioPage() {
     });
   };
 
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedIndex(index);
+    e.dataTransfer.setData("text/plain", index.toString());
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dragOverIndex !== index) {
+      setDragOverIndex(index);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent, targetIndex: number) => {
+    e.preventDefault();
+    setDragOverIndex(null);
+    if (draggedIndex === null || draggedIndex === targetIndex) {
+      setDraggedIndex(null);
+      return;
+    }
+    setSections((prev) => {
+      const next = [...prev];
+      const [item] = next.splice(draggedIndex, 1);
+      next.splice(targetIndex, 0, item);
+      return next.map((s, idx) => ({ ...s, sortOrder: idx }));
+    });
+    setDraggedIndex(null);
+  };
+
   const removeSection = (id: string) => {
     setSections((prev) => {
       const filtered = prev.filter((s) => s.id !== id);
@@ -772,6 +809,298 @@ export default function StorefrontStudioPage() {
         };
       }),
     );
+  };
+
+  // Preset Handlers
+  const applyInitialDesignTemplate = () => {
+    if (!hasSignatureTemplate) {
+      alert("This template requires platform administrator provisioning for this specific tenant.");
+      return;
+    }
+    if (sections.length > 0 && !confirm("Re-apply the Signature Initial Design template? This will replace current sections in working draft.")) {
+      return;
+    }
+    const templateSections: StorefrontSection[] = [
+      {
+        id: `sec_${Date.now()}_0`,
+        type: "HERO_SHOWCASE",
+        enabled: true,
+        sortOrder: 0,
+        settings: {
+          layout: "interactive",
+          variant: "interactive",
+          eyebrow: "SIGNATURE SHOWCASE",
+          title: "МЕБЕЛЬ И АКСЕССУАРЫ ДЛЯ СОВРЕМЕННОГО ИНТЕРЬЕРА",
+          subtitle: "Воспользуйтесь нашими идеями, чтобы создать интерьер, подходящий вам.",
+          ctaText: "Shop collection",
+          ctaUrl: "/products",
+          background: "surface",
+          padding: "normal",
+          showTopBorder: false,
+        },
+        dataSource: null,
+      },
+      {
+        id: `sec_${Date.now()}_1`,
+        type: "CATEGORY_GRID",
+        enabled: true,
+        sortOrder: 1,
+        settings: {
+          eyebrow: "CATALOG BROWSER",
+          title: "Shop by category",
+          columns: 5,
+          layoutStyle: "tiles",
+          showViewAll: true,
+          viewAllText: "View all →",
+          viewAllUrl: "/products",
+          hideWhenEmpty: true,
+          background: "paper",
+          padding: "normal",
+          showTopBorder: true,
+        },
+        dataSource: null,
+      },
+      {
+        id: `sec_${Date.now()}_2`,
+        type: "PRODUCT_GRID",
+        enabled: true,
+        sortOrder: 2,
+        settings: {
+          eyebrow: "CURATED SELECTION",
+          title: "Featured products",
+          columns: 4,
+          productLimit: 4,
+          showViewAll: true,
+          viewAllUrl: "/products",
+          hideWhenEmpty: true,
+          background: "paper",
+          padding: "normal",
+          showTopBorder: true,
+        },
+        dataSource: { type: "LATEST_PRODUCTS" },
+      },
+      {
+        id: `sec_${Date.now()}_3`,
+        type: "PRODUCT_REQUEST_BANNER",
+        enabled: true,
+        sortOrder: 3,
+        settings: {
+          title: "Looking for something specific?",
+          subtitle: "Let us know what you need and we will source it for you nationwide.",
+          buttonText: "Request product",
+          hideWhenEmpty: false,
+          background: "surface",
+          padding: "compact",
+          showTopBorder: true,
+        },
+        dataSource: null,
+      },
+      {
+        id: `sec_${Date.now()}_4`,
+        type: "FEEDBACK_BANNER",
+        enabled: true,
+        sortOrder: 4,
+        settings: {
+          title: "Share your suggestions & wishes",
+          subtitle: "Help us refine our service and product selections.",
+          buttonText: "Send feedback",
+          hideWhenEmpty: false,
+          background: "surface",
+          padding: "compact",
+          showTopBorder: true,
+        },
+        dataSource: null,
+      },
+      {
+        id: `sec_${Date.now()}_5`,
+        type: "PRODUCT_GRID",
+        enabled: true,
+        sortOrder: 5,
+        settings: {
+          eyebrow: "SPECIAL OFFERS",
+          title: "Exclusive deals",
+          columns: 4,
+          productLimit: 4,
+          showViewAll: true,
+          viewAllUrl: "/products?sale=true",
+          hideWhenEmpty: true,
+          background: "paper",
+          padding: "normal",
+          showTopBorder: true,
+        },
+        dataSource: { type: "FLASH_SALE" },
+      },
+      {
+        id: `sec_${Date.now()}_6`,
+        type: "PRODUCT_GRID",
+        enabled: true,
+        sortOrder: 6,
+        settings: {
+          eyebrow: "NEW ARRIVALS",
+          title: "Latest products",
+          columns: 4,
+          productLimit: 4,
+          showViewAll: true,
+          viewAllUrl: "/products?sort=newest",
+          hideWhenEmpty: true,
+          background: "paper",
+          padding: "normal",
+          showTopBorder: true,
+        },
+        dataSource: { type: "LATEST_PRODUCTS" },
+      },
+      {
+        id: `sec_${Date.now()}_7`,
+        type: "PRODUCT_GRID",
+        enabled: true,
+        sortOrder: 7,
+        settings: {
+          eyebrow: "TOP RANKED",
+          title: "Best sellers",
+          columns: 4,
+          productLimit: 4,
+          showViewAll: true,
+          viewAllUrl: "/products",
+          hideWhenEmpty: true,
+          background: "paper",
+          padding: "normal",
+          showTopBorder: true,
+        },
+        dataSource: { type: "BEST_SELLERS" },
+      },
+      {
+        id: `sec_${Date.now()}_8`,
+        type: "FLASH_SALE",
+        enabled: true,
+        sortOrder: 8,
+        settings: {
+          promoBadge: "FLASH DEAL",
+          eyebrow: "LIMITED TIME",
+          title: "Flash sale",
+          discountHighlight: "Save up to 50% on selected items.",
+          columns: 4,
+          productLimit: 4,
+          showViewAll: true,
+          viewAllUrl: "/products?sale=true",
+          hideWhenEmpty: true,
+          background: "paper",
+          padding: "normal",
+          showTopBorder: true,
+        },
+        dataSource: { type: "FLASH_SALE" },
+      },
+    ];
+    setSections(templateSections);
+    setSelectedSectionId(templateSections[0].id);
+    setShowTemplateModal(false);
+  };
+
+  const applyModernRetailTemplate = () => {
+    if (sections.length > 0 && !confirm("Apply the Modern Retail template? This will replace current sections in working draft.")) {
+      return;
+    }
+    const templateSections: StorefrontSection[] = [
+      {
+        id: `sec_${Date.now()}_0`,
+        type: "HERO_SHOWCASE",
+        enabled: true,
+        sortOrder: 0,
+        settings: {
+          layout: "split",
+          eyebrow: "SPRING COLLECTION 2026",
+          title: "Modern essentials engineered to last.",
+          subtitle: "Explore certified tech, home, and lifestyle gear backed by official warranties.",
+          ctaText: "Shop featured collection",
+          ctaUrl: "/products",
+          secondaryCtaText: "Special Offers",
+          secondaryCtaUrl: "/products?sale=true",
+          background: "surface",
+          padding: "spacious",
+          showTopBorder: false,
+        },
+        dataSource: null,
+      },
+      {
+        id: `sec_${Date.now()}_1`,
+        type: "CATEGORY_GRID",
+        enabled: true,
+        sortOrder: 1,
+        settings: {
+          title: "Explore categories",
+          columns: 5,
+          layoutStyle: "tiles",
+          showViewAll: true,
+          viewAllText: "View all →",
+          viewAllUrl: "/products",
+          hideWhenEmpty: true,
+          background: "paper",
+          padding: "normal",
+          showTopBorder: true,
+        },
+        dataSource: null,
+      },
+      {
+        id: `sec_${Date.now()}_2`,
+        type: "PRODUCT_CAROUSEL",
+        enabled: true,
+        sortOrder: 2,
+        settings: {
+          eyebrow: "POPULAR NOW",
+          title: "Trending in store",
+          productLimit: 10,
+          showViewAll: true,
+          viewAllText: "View all →",
+          viewAllUrl: "/products",
+          hideWhenEmpty: true,
+          background: "paper",
+          padding: "normal",
+          showTopBorder: true,
+        },
+        dataSource: { type: "BEST_SELLERS" },
+      },
+      {
+        id: `sec_${Date.now()}_3`,
+        type: "TEXT_WITH_IMAGE",
+        enabled: true,
+        sortOrder: 3,
+        settings: {
+          eyebrow: "OUR COMMITMENT",
+          title: "Guaranteed authentic & direct from verified distributors.",
+          bodyText: "We take product reliability seriously. Every item passes mandatory authentication and testing before arriving safely at your door.",
+          ctaText: "Learn our verification standards",
+          ctaUrl: "/about",
+          imagePosition: "right",
+          background: "paper",
+          padding: "spacious",
+          showTopBorder: true,
+        },
+        dataSource: null,
+      },
+      {
+        id: `sec_${Date.now()}_4`,
+        type: "FLASH_SALE",
+        enabled: true,
+        sortOrder: 4,
+        settings: {
+          promoBadge: "TODAY'S SPECIAL",
+          eyebrow: "LIMITED STOCK",
+          title: "Daily Flash Sale",
+          discountHighlight: "Direct importer prices on top accessories.",
+          columns: 4,
+          productLimit: 4,
+          showViewAll: true,
+          viewAllUrl: "/products?sale=true",
+          hideWhenEmpty: true,
+          background: "surface",
+          padding: "normal",
+          showTopBorder: true,
+        },
+        dataSource: { type: "FLASH_SALE" },
+      },
+    ];
+    setSections(templateSections);
+    setSelectedSectionId(templateSections[0].id);
+    setShowTemplateModal(false);
   };
 
   const handleSaveDraft = async () => {
@@ -1111,6 +1440,8 @@ export default function StorefrontStudioPage() {
               const hasBlocks = Boolean(section.settings?.blocks && section.settings.blocks.length > 0);
               const isBlocksExpanded = Boolean(expandedSections[section.id]);
               const sectionTitle = section.settings?.title || section.type.replace(/_/g, " ");
+              const isDragged = draggedIndex === idx;
+              const isDragOver = dragOverIndex === idx;
 
               return (
                 <div key={section.id} className="space-y-0.5">
@@ -1127,20 +1458,26 @@ export default function StorefrontStudioPage() {
                     </button>
                   </div>
 
-                  {/* Section Item Card */}
+                  {/* Section Item Card with HTML5 Drag & Drop */}
                   <div
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, idx)}
+                    onDragOver={(e) => handleDragOver(e, idx)}
+                    onDrop={(e) => handleDrop(e, idx)}
                     onClick={() => selectSectionAndScroll(section.id)}
                     className={`group relative flex items-center justify-between rounded-lg border px-2.5 py-2 transition cursor-pointer ${
                       isSelected
                         ? "border-ink bg-surface text-ink font-medium shadow-2xs ring-1 ring-ink/20"
                         : "border-line bg-paper text-ink2 hover:border-ink/40 hover:text-ink hover:bg-slate-50/50"
-                    } ${!section.enabled ? "opacity-60 bg-slate-50/70" : ""}`}
+                    } ${!section.enabled ? "opacity-60 bg-slate-50/70" : ""} ${
+                      isDragged ? "opacity-40 border-dashed border-ink" : ""
+                    } ${isDragOver ? "ring-2 ring-blue-500 bg-blue-50/20" : ""}`}
                   >
                     <div className="flex items-center gap-2 overflow-hidden min-w-0 pr-1">
-                      {/* Subtle 6-Dot Grip */}
+                      {/* Subtle 6-Dot Grip (Drag & Drop) */}
                       <span
-                        className="text-ink2/40 group-hover:text-ink2 cursor-grab text-[11px] shrink-0"
-                        title="Reorder handle"
+                        className="text-ink2/40 group-hover:text-ink2 cursor-grab active:cursor-grabbing text-[11px] shrink-0"
+                        title="Drag to reorder"
                       >
                         ⋮⋮
                       </span>
@@ -1150,7 +1487,7 @@ export default function StorefrontStudioPage() {
                         {SECTION_ICONS[section.type]}
                       </span>
 
-                      {/* Section Title with Tooltip */}
+                      {/* Section Title with Tooltip for Cyrillic / long text */}
                       <div className="truncate min-w-0" title={sectionTitle}>
                         <p className="truncate text-[12.5px] text-ink font-medium leading-tight">
                           {sectionTitle}
@@ -1433,9 +1770,7 @@ export default function StorefrontStudioPage() {
                   onClick={() => toggleAccordion("typography")}
                   className="flex w-full items-center justify-between px-3.5 py-2.5 text-left text-[12px] font-semibold text-ink bg-slate-50/50 hover:bg-slate-50"
                 >
-                  <span className="flex items-center gap-1.5">
-                    Typography &amp; Headings
-                  </span>
+                  <span>Typography &amp; Headings</span>
                   <span>{openAccordions.typography ? "−" : "+"}</span>
                 </button>
 
@@ -1521,7 +1856,67 @@ export default function StorefrontStudioPage() {
                 )}
               </div>
 
-              {/* ACCORDION 2: DATA SOURCE & CATALOG RULES */}
+              {/* ACCORDION 2: HERO SPECIFIC LAYOUT CONTROLS */}
+              {selectedSection.type === "HERO_SHOWCASE" && (
+                <div className="rounded-lg border border-line bg-white shadow-2xs overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => toggleAccordion("layout")}
+                    className="flex w-full items-center justify-between px-3.5 py-2.5 text-left text-[12px] font-semibold text-ink bg-slate-50/50 hover:bg-slate-50"
+                  >
+                    <span>Hero Layout Model</span>
+                    <span>{openAccordions.layout ? "−" : "+"}</span>
+                  </button>
+
+                  {openAccordions.layout && (
+                    <div className="p-3.5 space-y-3 border-t border-line">
+                      <div>
+                        <label className="block text-[11px] font-medium text-ink2 mb-1">
+                          Hero Architecture
+                        </label>
+                        <select
+                          value={selectedSection.settings?.layout || "centered"}
+                          onChange={(e) => updateSettings("layout", e.target.value)}
+                          className="w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[12.5px] text-ink focus:border-ink focus:outline-none"
+                        >
+                          <option value="interactive">Signature Interactive Showcase (3-Card Multi-Pin)</option>
+                          <option value="centered">Centered Editorial Headline</option>
+                          <option value="split">Split Layout (Text Left, Image Right)</option>
+                        </select>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[11px] font-medium text-ink2 mb-1">
+                            Secondary CTA Text
+                          </label>
+                          <input
+                            type="text"
+                            value={selectedSection.settings?.secondaryCtaText || ""}
+                            onChange={(e) => updateSettings("secondaryCtaText", e.target.value)}
+                            placeholder="e.g. Special Deals"
+                            className="w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[12.5px] text-ink focus:border-ink focus:outline-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-medium text-ink2 mb-1">
+                            Secondary CTA Link
+                          </label>
+                          <input
+                            type="text"
+                            value={selectedSection.settings?.secondaryCtaUrl || "/products?sale=true"}
+                            onChange={(e) => updateSettings("secondaryCtaUrl", e.target.value)}
+                            placeholder="/products?sale=true"
+                            className="w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[12.5px] text-ink focus:border-ink focus:outline-none"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ACCORDION 3: DATA SOURCE & CATALOG RULES */}
               {(selectedSection.type === "PRODUCT_GRID" ||
                 selectedSection.type === "PRODUCT_CAROUSEL" ||
                 selectedSection.type === "FLASH_SALE" ||
@@ -1577,6 +1972,22 @@ export default function StorefrontStudioPage() {
                         </div>
                       )}
 
+                      {selectedSection.type === "CATEGORY_GRID" && (
+                        <div>
+                          <label className="block text-[11px] font-medium text-ink2 mb-1">
+                            Category Display Style
+                          </label>
+                          <select
+                            value={selectedSection.settings?.layoutStyle || "tiles"}
+                            onChange={(e) => updateSettings("layoutStyle", e.target.value)}
+                            className="w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[12.5px] text-ink focus:border-ink focus:outline-none"
+                          >
+                            <option value="tiles">Bordered Image Tiles</option>
+                            <option value="pills">Pill Filter Chips</option>
+                          </select>
+                        </div>
+                      )}
+
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="block text-[11px] font-medium text-ink2 mb-1">
@@ -1592,6 +2003,7 @@ export default function StorefrontStudioPage() {
                             <option value={4}>4 Columns</option>
                             <option value={5}>5 Columns</option>
                             <option value={6}>6 Columns</option>
+                            <option value={8}>8 Columns</option>
                           </select>
                         </div>
 
@@ -1644,7 +2056,129 @@ export default function StorefrontStudioPage() {
                 </div>
               )}
 
-              {/* ACCORDION 3: STYLING & APPEARANCE */}
+              {/* ACCORDION 4: SPECIALTY SECTION FIELDS */}
+              {(selectedSection.type === "BRAND_SHOWCASE" ||
+                selectedSection.type === "FLASH_SALE" ||
+                selectedSection.type === "TEXT_WITH_IMAGE" ||
+                selectedSection.type === "PRODUCT_REQUEST_BANNER" ||
+                selectedSection.type === "FEEDBACK_BANNER") && (
+                <div className="rounded-lg border border-line bg-white shadow-2xs overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => toggleAccordion("specialty")}
+                    className="flex w-full items-center justify-between px-3.5 py-2.5 text-left text-[12px] font-semibold text-ink bg-slate-50/50 hover:bg-slate-50"
+                  >
+                    <span>Specialty Section Controls</span>
+                    <span>{openAccordions.specialty ? "−" : "+"}</span>
+                  </button>
+
+                  {openAccordions.specialty && (
+                    <div className="p-3.5 space-y-3 border-t border-line">
+                      {selectedSection.type === "BRAND_SHOWCASE" && (
+                        <div>
+                          <label className="block text-[11px] font-medium text-ink2 mb-1">
+                            Brand Names (Comma-separated)
+                          </label>
+                          <textarea
+                            rows={3}
+                            value={selectedSection.settings?.brandNames || "Apple, Samsung, Sony, Anker, Baseus, Xiaomi"}
+                            onChange={(e) => updateSettings("brandNames", e.target.value)}
+                            placeholder="Apple, Samsung, Sony, Baseus"
+                            className="w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[12.5px] text-ink focus:border-ink focus:outline-none"
+                          />
+                        </div>
+                      )}
+
+                      {selectedSection.type === "FLASH_SALE" && (
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-[11px] font-medium text-ink2 mb-1">
+                              Urgency Promo Badge
+                            </label>
+                            <input
+                              type="text"
+                              value={selectedSection.settings?.promoBadge || "FLASH DEAL"}
+                              onChange={(e) => updateSettings("promoBadge", e.target.value)}
+                              className="w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[12.5px] text-ink focus:border-ink focus:outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-medium text-ink2 mb-1">
+                              Discount Highlight Callout
+                            </label>
+                            <input
+                              type="text"
+                              value={selectedSection.settings?.discountHighlight || "Save up to 50% on selected items."}
+                              onChange={(e) => updateSettings("discountHighlight", e.target.value)}
+                              className="w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[12.5px] text-ink focus:border-ink focus:outline-none"
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {selectedSection.type === "TEXT_WITH_IMAGE" && (
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-[11px] font-medium text-ink2 mb-1">
+                              Editorial Story Body
+                            </label>
+                            <textarea
+                              rows={4}
+                              value={selectedSection.settings?.bodyText || ""}
+                              onChange={(e) => updateSettings("bodyText", e.target.value)}
+                              placeholder="Write your brand assurance story..."
+                              className="w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[12.5px] text-ink focus:border-ink focus:outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-medium text-ink2 mb-1">
+                              Image Position
+                            </label>
+                            <select
+                              value={selectedSection.settings?.imagePosition || "right"}
+                              onChange={(e) => updateSettings("imagePosition", e.target.value)}
+                              className="w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[12.5px] text-ink focus:border-ink focus:outline-none"
+                            >
+                              <option value="right">Image on Right, Text on Left</option>
+                              <option value="left">Image on Left, Text on Right</option>
+                            </select>
+                          </div>
+                        </div>
+                      )}
+
+                      {(selectedSection.type === "PRODUCT_REQUEST_BANNER" ||
+                        selectedSection.type === "FEEDBACK_BANNER") && (
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[11px] font-medium text-ink2 mb-1">
+                              Button Label
+                            </label>
+                            <input
+                              type="text"
+                              value={selectedSection.settings?.buttonText || "Submit"}
+                              onChange={(e) => updateSettings("buttonText", e.target.value)}
+                              className="w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[12.5px] text-ink focus:border-ink focus:outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-medium text-ink2 mb-1">
+                              Action Route
+                            </label>
+                            <input
+                              type="text"
+                              value={selectedSection.settings?.buttonUrl || "/feedback"}
+                              onChange={(e) => updateSettings("buttonUrl", e.target.value)}
+                              className="w-full rounded-md border border-line bg-paper px-2.5 py-1.5 text-[12.5px] text-ink focus:border-ink focus:outline-none"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ACCORDION 5: STYLING & APPEARANCE */}
               <div className="rounded-lg border border-line bg-white shadow-2xs overflow-hidden">
                 <button
                   type="button"
@@ -1721,7 +2255,7 @@ export default function StorefrontStudioPage() {
                 )}
               </div>
 
-              {/* ACCORDION 4: ACTIONS & MEDIA */}
+              {/* ACCORDION 6: ACTIONS & MEDIA */}
               <div className="rounded-lg border border-line bg-white shadow-2xs overflow-hidden">
                 <button
                   type="button"
@@ -1782,7 +2316,7 @@ export default function StorefrontStudioPage() {
                 )}
               </div>
 
-              {/* ACCORDION 5: GRANULAR CHILD BLOCKS */}
+              {/* ACCORDION 7: GRANULAR CHILD BLOCKS */}
               <div className="rounded-lg border border-line bg-white shadow-2xs overflow-hidden">
                 <button
                   type="button"
@@ -2166,10 +2700,7 @@ export default function StorefrontStudioPage() {
                   {hasSignatureTemplate ? (
                     <button
                       type="button"
-                      onClick={() => {
-                        // Apply signature template
-                        setShowTemplateModal(false);
-                      }}
+                      onClick={applyInitialDesignTemplate}
                       className="shrink-0 rounded-md bg-ink px-3 py-1.5 text-[12px] font-medium text-white transition hover:opacity-90 shadow-2xs"
                     >
                       Apply Preset
@@ -2186,8 +2717,29 @@ export default function StorefrontStudioPage() {
                 </div>
               </div>
 
-              {/* Option 2: Clean Slate */}
+              {/* Option 2: Modern Clean Retail */}
               <div className="rounded-xl border border-line bg-paper p-4 transition hover:border-ink/40">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-1">
+                    <h4 className="text-[14px] font-semibold text-ink">
+                      Modern Clean Retail
+                    </h4>
+                    <p className="text-[12px] text-ink2 leading-relaxed">
+                      Clean commercial storefront layout featuring split hero banner, trending product carousel, authentic trust guarantee block, and time-limited flash deals.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={applyModernRetailTemplate}
+                    className="shrink-0 rounded-md border border-line bg-paper px-3 py-1.5 text-[12px] font-medium text-ink hover:bg-slate-50 transition shadow-2xs"
+                  >
+                    Apply Preset
+                  </button>
+                </div>
+              </div>
+
+              {/* Option 3: Clean Slate */}
+              <div className="rounded-xl border border-line bg-paper p-4 transition hover:border-rose-400">
                 <div className="flex items-start justify-between gap-4">
                   <div className="space-y-1">
                     <h4 className="text-[14px] font-semibold text-ink">
