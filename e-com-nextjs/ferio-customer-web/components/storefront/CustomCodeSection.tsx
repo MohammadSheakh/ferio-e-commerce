@@ -1,17 +1,61 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useMemo } from "react";
 import { StorefrontSectionData } from "@/lib/storefront";
 
 interface CustomCodeSectionProps {
   section: StorefrontSectionData;
 }
 
+/**
+ * Enterprise CSS Scope Isolation
+ * Automatically scopes raw CSS rules to the section's unique ID container,
+ * preventing accidental style bleeding into global navigation, checkout, or cart.
+ */
+function scopeCssRules(rawCss: string, scopeSelector: string): string {
+  if (!rawCss || typeof rawCss !== "string") return "";
+
+  try {
+    return rawCss.replace(
+      /([^\r\n,{}]+)(,(?=[^}]*{)|\s*{)/g,
+      (match, selector, suffix) => {
+        const trimmed = selector.trim();
+        // Ignore @-rules, keyframe steps (from, to, 50%)
+        if (
+          !trimmed ||
+          trimmed.startsWith("@") ||
+          trimmed.startsWith("from") ||
+          trimmed.startsWith("to") ||
+          /^\d+%$/.test(trimmed)
+        ) {
+          return match;
+        }
+
+        const scoped = trimmed
+          .split(",")
+          .map((part: string) => {
+            const p = part.trim();
+            if (!p) return p;
+            if (p === ":root" || p === "html" || p === "body") {
+              return scopeSelector;
+            }
+            return `${scopeSelector} ${p}`;
+          })
+          .join(", ");
+
+        return `${scoped}${suffix}`;
+      }
+    );
+  } catch {
+    return rawCss;
+  }
+}
+
 class SectionErrorBoundary extends React.Component<
-  { children: React.ReactNode; fallback?: React.ReactNode },
+  { children: React.ReactNode; sectionId: string },
   { hasError: boolean; error?: Error }
 > {
-  constructor(props: { children: React.ReactNode; fallback?: React.ReactNode }) {
+  constructor(props: { children: React.ReactNode; sectionId: string }) {
     super(props);
     this.state = { hasError: false };
   }
@@ -21,17 +65,23 @@ class SectionErrorBoundary extends React.Component<
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error("[CustomCodeSection] Component error:", error, errorInfo);
+    console.error(`[CustomCodeSection #${this.props.sectionId}] Runtime error:`, error, errorInfo);
   }
 
   render() {
     if (this.state.hasError) {
       return (
-        this.props.fallback || (
-          <div className="p-4 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs font-mono">
-            <strong>Custom Section Error:</strong> {this.state.error?.message || "Failed to render custom component"}
+        <div className="mx-auto max-w-4xl p-6 my-4 rounded-xl border border-rose-200 bg-rose-50/70 text-rose-900 text-xs font-mono">
+          <div className="flex items-center gap-2 font-bold text-rose-800 mb-1">
+            <svg className="w-4 h-4 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            Custom Section Execution Fault
           </div>
-        )
+          <p className="text-rose-700 leading-relaxed">
+            {this.state.error?.message || "An unexpected error occurred executing custom markup."}
+          </p>
+        </div>
       );
     }
     return this.props.children;
@@ -46,8 +96,31 @@ export default function CustomCodeSection({ section }: CustomCodeSectionProps) {
   const customHtml = (settings.customHtml as string) || (settings.bodyText as string) || "";
   const customCss = (settings.customCss as string) || "";
   const customJs = (settings.customJs as string) || "";
-  const codeType = (settings.codeType as string) || "html_tailwind";
   const containerMaxWidth = (settings.containerMaxWidth as string) || "contained";
+
+  const scopeSelector = `[data-section-id="${section.id}"]`;
+
+  // Memoize safely scoped CSS
+  const scopedCss = useMemo(() => {
+    return scopeCssRules(customCss, scopeSelector);
+  }, [customCss, scopeSelector]);
+
+  // Ensure runtime Tailwind JIT engine is present so arbitrary user classes compile live
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    // Check if Tailwind browser runtime is loaded
+    if (!(window as any).tailwind) {
+      const scriptId = "ferio-tailwind-cdn-runtime";
+      if (!document.getElementById(scriptId)) {
+        const script = document.createElement("script");
+        script.id = scriptId;
+        script.src = "https://cdn.tailwindcss.com";
+        script.async = true;
+        document.head.appendChild(script);
+      }
+    }
+  }, []);
 
   // Background Tone
   const bgClass =
@@ -73,7 +146,7 @@ export default function CustomCodeSection({ section }: CustomCodeSectionProps) {
       ? "max-w-4xl mx-auto px-4 sm:px-6"
       : "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8";
 
-  // Execute client-side JS / React widget safely if provided
+  // Execute client-side JS / React Component safely
   useEffect(() => {
     if (!customJs || !containerRef.current) return;
     setScriptError(null);
@@ -82,22 +155,35 @@ export default function CustomCodeSection({ section }: CustomCodeSectionProps) {
     let cleanupFn: (() => void) | void;
 
     try {
-      // Create a scoped runner with access to container, React, and environment
+      // Scoped execution with React standard hooks and container context
       const runner = new Function(
         "container",
         "React",
+        "useState",
+        "useEffect",
+        "useRef",
+        "useMemo",
         "section",
         `
         try {
           ${customJs}
         } catch (err) {
-          console.error("[CustomCodeSection] Script execution error:", err);
+          console.error("[CustomCodeSection] Script error:", err);
           throw err;
         }
       `
       );
 
-      const result = runner(container, React, section);
+      const result = runner(
+        container,
+        React,
+        React.useState,
+        React.useEffect,
+        React.useRef,
+        React.useMemo,
+        section
+      );
+
       if (typeof result === "function") {
         cleanupFn = result;
       }
@@ -110,16 +196,17 @@ export default function CustomCodeSection({ section }: CustomCodeSectionProps) {
         try {
           cleanupFn();
         } catch {
-          // ignore cleanup errors
+          // ignore
         }
       }
     };
   }, [customJs, section]);
 
-  // If completely empty in edit mode or initial state
+  // If completely empty in initial state
   if (!customHtml && !customJs && !customCss && !settings.title) {
     return (
       <section
+        data-section-id={section.id}
         className={`${bgClass} ${padClass} ${
           settings.showTopBorder ? "border-t border-line" : ""
         }`}
@@ -131,7 +218,7 @@ export default function CustomCodeSection({ section }: CustomCodeSectionProps) {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
               </svg>
             </div>
-            <h4 className="text-sm font-semibold text-ink">Custom HTML & Tailwind Section</h4>
+            <h4 className="text-sm font-semibold text-ink">Custom HTML &amp; Tailwind Section</h4>
             <p className="text-xs text-ink2 mt-1 max-w-md mx-auto">
               Add your custom HTML, Tailwind CSS classes, or client-side React component in the Storefront Studio inspector.
             </p>
@@ -142,7 +229,7 @@ export default function CustomCodeSection({ section }: CustomCodeSectionProps) {
   }
 
   return (
-    <SectionErrorBoundary>
+    <SectionErrorBoundary sectionId={section.id}>
       <section
         data-section-id={section.id}
         className={`${bgClass} ${padClass} ${
@@ -154,9 +241,9 @@ export default function CustomCodeSection({ section }: CustomCodeSectionProps) {
             : undefined
         }
       >
-        {/* Scoped Custom CSS if provided */}
-        {customCss ? (
-          <style dangerouslySetInnerHTML={{ __html: customCss }} />
+        {/* Scoped Custom CSS Isolated Strictly to This Section */}
+        {scopedCss ? (
+          <style dangerouslySetInnerHTML={{ __html: scopedCss }} />
         ) : null}
 
         <div className={containerWidthClass}>
@@ -177,9 +264,9 @@ export default function CustomCodeSection({ section }: CustomCodeSectionProps) {
             </div>
           ) : null}
 
-          {/* Script Execution Error Banner */}
+          {/* Script Execution Notice if runtime script throws */}
           {scriptError ? (
-            <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs font-mono">
+            <div className="mb-4 p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs font-mono">
               <strong>Custom Code Execution Notice:</strong> {scriptError}
             </div>
           ) : null}
@@ -195,4 +282,3 @@ export default function CustomCodeSection({ section }: CustomCodeSectionProps) {
     </SectionErrorBoundary>
   );
 }
-

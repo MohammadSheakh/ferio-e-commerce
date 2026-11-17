@@ -606,6 +606,26 @@ export default function StorefrontStudioPage() {
 
   // Active code editor tab (HTML & Tailwind vs Scoped CSS vs Client JS)
   const [activeCodeTab, setActiveCodeTab] = useState<"html" | "css" | "js">("html");
+  const [showFullscreenCodeEditor, setShowFullscreenCodeEditor] = useState<boolean>(false);
+
+  // Tab key indentation handler for professional code editing experience
+  const handleCodeKeyDown = (
+    e: React.KeyboardEvent<HTMLTextAreaElement>,
+    key: "customHtml" | "customCss" | "customJs"
+  ) => {
+    if (e.key === "Tab") {
+      e.preventDefault();
+      const target = e.currentTarget;
+      const start = target.selectionStart;
+      const end = target.selectionEnd;
+      const val = target.value;
+      const newVal = val.substring(0, start) + "  " + val.substring(end);
+      updateSettings(key, newVal);
+      setTimeout(() => {
+        target.selectionStart = target.selectionEnd = start + 2;
+      }, 0);
+    }
+  };
 
   // Expanded block groups in Left Sidebar
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
@@ -2043,23 +2063,37 @@ export default function StorefrontStudioPage() {
                             <span className="text-[11px] font-medium text-ink2">
                               HTML Markup with Tailwind CSS Classes
                             </span>
-                            <span className="text-[10px] text-indigo-600 font-mono">
-                              Tailwind Active
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setShowFullscreenCodeEditor(true)}
+                                className="text-[10px] text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1"
+                                title="Expand fullscreen"
+                              >
+                                <span>⛶ Fullscreen</span>
+                              </button>
+                              <span className="text-[10px] text-indigo-600 font-mono">
+                                Tailwind JIT
+                              </span>
+                            </div>
                           </div>
                           <div className="rounded-lg border border-slate-700 bg-slate-900 p-2 shadow-inner">
                             <textarea
                               rows={14}
                               value={selectedSection.settings?.customHtml || ""}
                               onChange={(e) => updateSettings("customHtml", e.target.value)}
+                              onKeyDown={(e) => handleCodeKeyDown(e, "customHtml")}
                               placeholder={`<div class="p-8 bg-indigo-600 text-white rounded-2xl shadow-xl">\n  <h2 class="text-3xl font-bold">Your Title</h2>\n  <p class="mt-2 text-indigo-100">Styled directly with Tailwind classes.</p>\n</div>`}
                               spellCheck={false}
                               className="w-full bg-transparent font-mono text-[12px] leading-relaxed text-slate-100 placeholder-slate-500 outline-none resize-y"
                             />
                           </div>
-                          <p className="text-[11px] text-ink2 leading-relaxed">
-                            💡 Use standard Tailwind classes (<code className="text-indigo-600 bg-indigo-50 px-1 py-0.2 rounded font-mono">grid grid-cols-3</code>, <code className="text-indigo-600 bg-indigo-50 px-1 py-0.2 rounded font-mono">bg-slate-900</code>, <code className="text-indigo-600 bg-indigo-50 px-1 py-0.2 rounded font-mono">hover:scale-105</code>, <code className="text-indigo-600 bg-indigo-50 px-1 py-0.2 rounded font-mono">md:flex</code>). They compile live in the storefront.
-                          </p>
+                          <div className="flex items-center justify-between text-[11px] text-ink2">
+                            <span>💡 Press <code className="text-indigo-600 bg-indigo-50 px-1 rounded font-mono">Tab</code> to indent (2 spaces).</span>
+                            <span className="font-mono text-[10px]">
+                              {(selectedSection.settings?.customHtml || "").length} chars
+                            </span>
+                          </div>
                         </div>
                       )}
 
@@ -2070,20 +2104,34 @@ export default function StorefrontStudioPage() {
                             <span className="text-[11px] font-medium text-ink2">
                               Scoped CSS / Keyframe Animations
                             </span>
-                            <span className="text-[10px] text-emerald-600 font-mono">
-                              &lt;style&gt; Inject
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setShowFullscreenCodeEditor(true)}
+                                className="text-[10px] text-emerald-600 hover:text-emerald-800 font-medium flex items-center gap-1"
+                                title="Expand fullscreen"
+                              >
+                                <span>⛶ Fullscreen</span>
+                              </button>
+                              <span className="text-[10px] text-emerald-600 font-mono">
+                                Auto-Scoped
+                              </span>
+                            </div>
                           </div>
                           <div className="rounded-lg border border-slate-700 bg-slate-900 p-2 shadow-inner">
                             <textarea
                               rows={12}
                               value={selectedSection.settings?.customCss || ""}
                               onChange={(e) => updateSettings("customCss", e.target.value)}
+                              onKeyDown={(e) => handleCodeKeyDown(e, "customCss")}
                               placeholder={`/* Scoped styles applied to this section */\n.custom-section-content {\n  animation: fadeIn 0.4s ease-in-out;\n}`}
                               spellCheck={false}
                               className="w-full bg-transparent font-mono text-[12px] leading-relaxed text-slate-100 placeholder-slate-500 outline-none resize-y"
                             />
                           </div>
+                          <p className="text-[11px] text-ink2 leading-relaxed">
+                            🛡️ Rules are automatically scoped to this section to prevent style bleeding into global navigation or cart.
+                          </p>
                         </div>
                       )}
 
@@ -2094,22 +2142,33 @@ export default function StorefrontStudioPage() {
                             <span className="text-[11px] font-medium text-ink2">
                               Interactive Client-side JavaScript / Micro-App
                             </span>
-                            <span className="text-[10px] text-amber-600 font-mono">
-                              Scoped Runner
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setShowFullscreenCodeEditor(true)}
+                                className="text-[10px] text-amber-600 hover:text-amber-800 font-medium flex items-center gap-1"
+                                title="Expand fullscreen"
+                              >
+                                <span>⛶ Fullscreen</span>
+                              </button>
+                              <span className="text-[10px] text-amber-600 font-mono">
+                                Scoped Runner
+                              </span>
+                            </div>
                           </div>
                           <div className="rounded-lg border border-slate-700 bg-slate-900 p-2 shadow-inner">
                             <textarea
                               rows={12}
                               value={selectedSection.settings?.customJs || ""}
                               onChange={(e) => updateSettings("customJs", e.target.value)}
+                              onKeyDown={(e) => handleCodeKeyDown(e, "customJs")}
                               placeholder={`// container: HTMLElement, React: React, section: StorefrontSectionData\nconst btn = container.querySelector('button');\nif (btn) {\n  btn.onclick = () => alert('Clicked!');\n}`}
                               spellCheck={false}
                               className="w-full bg-transparent font-mono text-[12px] leading-relaxed text-slate-100 placeholder-slate-500 outline-none resize-y"
                             />
                           </div>
                           <p className="text-[11px] text-ink2 leading-relaxed">
-                            ⚡ Scripts receive <code className="text-amber-700 bg-amber-50 px-1 rounded font-mono">container</code>, <code className="text-amber-700 bg-amber-50 px-1 rounded font-mono">React</code>, and <code className="text-amber-700 bg-amber-50 px-1 rounded font-mono">section</code> params and run inside an error boundary that protects the storefront.
+                            ⚡ Scripts receive <code className="text-amber-700 bg-amber-50 px-1 rounded font-mono">container</code>, <code className="text-amber-700 bg-amber-50 px-1 rounded font-mono">React</code>, and React standard hooks and run in an error boundary.
                           </p>
                         </div>
                       )}
@@ -3230,6 +3289,151 @@ export default function StorefrontStudioPage() {
                   No published versions recorded yet.
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* FULLSCREEN ENTERPRISE CODE EDITOR MODAL                                  */}
+      {/* ========================================================================= */}
+      {showFullscreenCodeEditor && selectedSection && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 sm:p-6 select-none backdrop-blur-xs">
+          <div className="flex h-full w-full max-w-6xl flex-col rounded-2xl border border-slate-800 bg-slate-950 shadow-2xl overflow-hidden text-slate-100">
+            {/* Modal Top Bar */}
+            <div className="flex items-center justify-between border-b border-slate-800 px-6 py-3.5 bg-slate-900/80">
+              <div className="flex items-center gap-3">
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-600 text-[12px] font-mono text-white font-bold">
+                  &lt;/&gt;
+                </span>
+                <div>
+                  <h3 className="text-[14px] font-semibold text-white">
+                    {selectedSection.settings?.title || "Custom Section"} • Code Inspector
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Live changes synchronize directly to the Storefront Canvas.
+                  </p>
+                </div>
+              </div>
+
+              {/* Sub-tabs */}
+              <div className="flex items-center gap-1 rounded-lg border border-slate-700 bg-slate-800 p-1 text-[12px] font-medium">
+                <button
+                  type="button"
+                  onClick={() => setActiveCodeTab("html")}
+                  className={`px-3 py-1 rounded transition ${
+                    activeCodeTab === "html"
+                      ? "bg-indigo-600 text-white font-semibold shadow-xs"
+                      : "text-slate-300 hover:text-white"
+                  }`}
+                >
+                  HTML &amp; Tailwind
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveCodeTab("css")}
+                  className={`px-3 py-1 rounded transition ${
+                    activeCodeTab === "css"
+                      ? "bg-indigo-600 text-white font-semibold shadow-xs"
+                      : "text-slate-300 hover:text-white"
+                  }`}
+                >
+                  Scoped CSS
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveCodeTab("js")}
+                  className={`px-3 py-1 rounded transition ${
+                    activeCodeTab === "js"
+                      ? "bg-indigo-600 text-white font-semibold shadow-xs"
+                      : "text-slate-300 hover:text-white"
+                  }`}
+                >
+                  Client JS / React
+                </button>
+              </div>
+
+              {/* Presets and Close */}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowFullscreenCodeEditor(false)}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white transition"
+                  title="Close Fullscreen Editor"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Starters Row */}
+            <div className="flex items-center gap-2 border-b border-slate-800/80 bg-slate-900/40 px-6 py-2 overflow-x-auto text-[11px]">
+              <span className="text-slate-400 font-semibold shrink-0">Insert Starter:</span>
+              {Object.entries(SNIPPET_PRESETS).map(([key, item]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => {
+                    updateSettings("customHtml", item.html);
+                    if (item.css) updateSettings("customCss", item.css);
+                    if (item.js) updateSettings("customJs", item.js);
+                  }}
+                  className="rounded border border-slate-700 bg-slate-800/80 px-2.5 py-1 text-slate-200 hover:border-indigo-400 hover:text-white transition shrink-0"
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Editor Canvas */}
+            <div className="flex-1 p-6 flex flex-col min-h-0 bg-slate-950">
+              {activeCodeTab === "html" && (
+                <textarea
+                  value={selectedSection.settings?.customHtml || ""}
+                  onChange={(e) => updateSettings("customHtml", e.target.value)}
+                  onKeyDown={(e) => handleCodeKeyDown(e, "customHtml")}
+                  spellCheck={false}
+                  placeholder="<!-- Write custom HTML with full Tailwind CSS classes -->"
+                  className="flex-1 w-full rounded-xl border border-slate-800 bg-slate-900/90 p-4 font-mono text-[13px] leading-relaxed text-slate-100 placeholder-slate-600 outline-none resize-none focus:border-indigo-500 shadow-inner"
+                />
+              )}
+
+              {activeCodeTab === "css" && (
+                <textarea
+                  value={selectedSection.settings?.customCss || ""}
+                  onChange={(e) => updateSettings("customCss", e.target.value)}
+                  onKeyDown={(e) => handleCodeKeyDown(e, "customCss")}
+                  spellCheck={false}
+                  placeholder="/* Scoped CSS - automatically isolated to this section */"
+                  className="flex-1 w-full rounded-xl border border-slate-800 bg-slate-900/90 p-4 font-mono text-[13px] leading-relaxed text-slate-100 placeholder-slate-600 outline-none resize-none focus:border-indigo-500 shadow-inner"
+                />
+              )}
+
+              {activeCodeTab === "js" && (
+                <textarea
+                  value={selectedSection.settings?.customJs || ""}
+                  onChange={(e) => updateSettings("customJs", e.target.value)}
+                  onKeyDown={(e) => handleCodeKeyDown(e, "customJs")}
+                  spellCheck={false}
+                  placeholder="// Client-side JavaScript / React logic (receives container, React, and hooks)"
+                  className="flex-1 w-full rounded-xl border border-slate-800 bg-slate-900/90 p-4 font-mono text-[13px] leading-relaxed text-slate-100 placeholder-slate-600 outline-none resize-none focus:border-indigo-500 shadow-inner"
+                />
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-between border-t border-slate-800 px-6 py-3 bg-slate-900/60 text-[11px] text-slate-400">
+              <div className="flex items-center gap-4">
+                <span>Tab inserts 2 spaces.</span>
+                <span className="text-emerald-400">● Live preview synchronized</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowFullscreenCodeEditor(false)}
+                className="rounded-lg bg-indigo-600 px-4 py-1.5 font-semibold text-white hover:bg-indigo-500 transition shadow-xs"
+              >
+                Done Editing
+              </button>
             </div>
           </div>
         </div>
