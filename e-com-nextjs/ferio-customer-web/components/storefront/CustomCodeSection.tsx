@@ -97,6 +97,7 @@ function scopeCssRules(rawCss: string, scopeSelector: string): string {
 function parseUnifiedCode(rawCode: string) {
   let css = "";
   let js = "";
+  const externalScripts: string[] = [];
 
   // Extract <style> contents
   const styleRegex = /<style(?:\s+[^>]*)?>([\s\S]*?)<\/style>/gi;
@@ -107,8 +108,17 @@ function parseUnifiedCode(rawCode: string) {
     }
   }
 
-  // Extract <script> contents
-  const scriptRegex = /<script(?:\s+[^>]*)?>([\s\S]*?)<\/script>/gi;
+  // Extract <script src="..."> external scripts
+  const scriptSrcRegex = /<script(?:\s+[^>]*?)src=["']([^"']+)["'][^>]*>\s*<\/script>/gi;
+  let scriptSrcMatch: RegExpExecArray | null;
+  while ((scriptSrcMatch = scriptSrcRegex.exec(rawCode)) !== null) {
+    if (scriptSrcMatch[1]) {
+      externalScripts.push(scriptSrcMatch[1]);
+    }
+  }
+
+  // Extract inline <script> contents (without src)
+  const scriptRegex = /<script(?![^>]*src=)(?:\s+[^>]*)?>([\s\S]*?)<\/script>/gi;
   let scriptMatch: RegExpExecArray | null;
   while ((scriptMatch = scriptRegex.exec(rawCode)) !== null) {
     if (scriptMatch[1]) {
@@ -116,13 +126,20 @@ function parseUnifiedCode(rawCode: string) {
     }
   }
 
-  // Strip <style> and <script> tags from the HTML markup
-  const html = rawCode
+  // Strip <style>, <script>, and full-document wrapper tags (<!DOCTYPE>, <html>, <head>, <body>)
+  // so that pasting complete HTML pages gracefully isolates the actual inner section content
+  let html = rawCode
     .replace(/<style(?:\s+[^>]*)?>[\s\S]*?<\/style>/gi, "")
     .replace(/<script(?:\s+[^>]*)?>[\s\S]*?<\/script>/gi, "")
+    .replace(/<!DOCTYPE(?:\s+[^>]*)?>/gi, "")
+    .replace(/<html(?:\s+[^>]*)?>/gi, "")
+    .replace(/<\/html>/gi, "")
+    .replace(/<head(?:\s+[^>]*)?>[\s\S]*?<\/head>/gi, "")
+    .replace(/<body(?:\s+[^>]*)?>/gi, "")
+    .replace(/<\/body>/gi, "")
     .trim();
 
-  return { html, css, js };
+  return { html, css, js, externalScripts };
 }
 
 class SectionErrorBoundary extends React.Component<
@@ -176,8 +193,8 @@ export default function CustomCodeSection(props: CustomCodeSectionProps) {
     (settings.bodyText as string) ||
     "";
 
-  // Parse unified code into HTML, scoped CSS, and JS
-  const { parsedHtml, parsedCss, parsedJs } = useMemo(() => {
+  // Parse unified code into HTML, scoped CSS, JS, and external script dependencies
+  const { parsedHtml, parsedCss, parsedJs, parsedExternalScripts } = useMemo(() => {
     const parsed = parseUnifiedCode(rawCode);
     const combinedCss = [parsed.css, (settings.customCss as string) || ""].filter(Boolean).join("\n");
     const combinedJs = [parsed.js, (settings.customJs as string) || ""].filter(Boolean).join("\n");
@@ -185,6 +202,7 @@ export default function CustomCodeSection(props: CustomCodeSectionProps) {
       parsedHtml: parsed.html || rawCode,
       parsedCss: combinedCss,
       parsedJs: combinedJs,
+      parsedExternalScripts: parsed.externalScripts || [],
     };
   }, [rawCode, settings.customCss, settings.customJs]);
 
@@ -253,6 +271,23 @@ export default function CustomCodeSection(props: CustomCodeSectionProps) {
       ? "max-w-4xl mx-auto px-4 sm:px-6"
       : "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8";
 
+  // Dynamically load any requested external library scripts (e.g. Lucide, Lottie)
+  useEffect(() => {
+    if (typeof window === "undefined" || !parsedExternalScripts.length) return;
+    parsedExternalScripts.forEach((src) => {
+      // Avoid loading Tailwind Play CDN in production (already handled separately in preview)
+      if (src.includes("cdn.tailwindcss.com")) return;
+      const scriptId = `ext-script-${src.replace(/[^a-zA-Z0-9]/g, "_")}`;
+      if (!document.getElementById(scriptId)) {
+        const script = document.createElement("script");
+        script.id = scriptId;
+        script.src = src;
+        script.async = true;
+        document.head.appendChild(script);
+      }
+    });
+  }, [parsedExternalScripts]);
+
   // Execute client-side JS / Interactive Widgets safely with credential isolation
   useEffect(() => {
     if (!parsedJs || !containerRef.current) return;
@@ -277,10 +312,23 @@ export default function CustomCodeSection(props: CustomCodeSectionProps) {
         const safeDocument = {
           querySelector: function(s) { return container.querySelector(s); },
           querySelectorAll: function(s) { return container.querySelectorAll(s); },
-          getElementById: function(id) { return container.querySelector("#" + id); },
+          getElementById: function(id) {
+            return container.querySelector("#" + id) || container.querySelector("[id='" + id + "']");
+          },
           getElementsByClassName: function(c) { return container.getElementsByClassName(c); },
-          addEventListener: function(type, listener, options) { return container.addEventListener(type, listener, options); },
-          removeEventListener: function(type, listener, options) { return container.removeEventListener(type, listener, options); },
+          createElement: function(tag) { return document.createElement(tag); },
+          createTextNode: function(text) { return document.createTextNode(text); },
+          addEventListener: function(type, listener, options) {
+            if (type === "DOMContentLoaded" || type === "load") {
+              // In React/Next.js SPA, DOMContentLoaded has already completed. Execute immediately!
+              setTimeout(listener, 20);
+              return;
+            }
+            return container.addEventListener(type, listener, options);
+          },
+          removeEventListener: function(type, listener, options) {
+            return container.removeEventListener(type, listener, options);
+          },
         };
 
         try {
