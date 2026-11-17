@@ -390,78 +390,11 @@ const AVAILABLE_SECTION_TEMPLATES: {
   },
   {
     type: "CUSTOM_HTML",
-    label: "Custom HTML & Tailwind CSS",
-    description: "Write custom HTML styled directly with full Tailwind CSS classes, responsive breakpoints, inline styles, and SVG graphics.",
+    label: "Custom Code (HTML, Tailwind & JS)",
+    description: "Write or paste custom HTML, Tailwind CSS classes, inline <style>, and interactive <script> in a single unified editor.",
     defaultSettings: {
-      title: "Custom HTML & Tailwind Section",
-      codeType: "html_tailwind",
-      containerMaxWidth: "contained",
-      customHtml: `<div class="rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-8 sm:p-12 text-white shadow-xl relative overflow-hidden">
-  <div class="max-w-xl relative z-10">
-    <span class="inline-block px-3 py-1 bg-white/10 text-white rounded-full text-xs font-semibold uppercase tracking-wider mb-3">Tailwind CSS Section</span>
-    <h3 class="text-3xl font-extrabold tracking-tight sm:text-4xl">Build Anything You Imagine</h3>
-    <p class="mt-3 text-slate-300 text-sm sm:text-base leading-relaxed">Full access to Tailwind utility classes, custom markup, SVG icons, and responsive layouts. Design custom promo cards, trust bars, or feature banners.</p>
-    <div class="mt-6 flex flex-wrap gap-4">
-      <a href="/products" class="inline-flex items-center justify-center px-6 py-3 bg-white text-slate-900 font-semibold rounded-lg shadow hover:bg-slate-100 transition-colors">Shop Now</a>
-      <a href="/services" class="inline-flex items-center justify-center px-6 py-3 bg-white/10 text-white font-medium rounded-lg border border-white/20 hover:bg-white/20 transition-colors">Our Services</a>
-    </div>
-  </div>
-</div>`,
-      customCss: `/* Scoped custom CSS for this section */
-.custom-section-content a {
-  text-decoration: none;
-}`,
-      background: "paper",
-      padding: "normal",
-      showTopBorder: false,
-    },
-    defaultDataSource: null,
-  },
-  {
-    type: "CUSTOM_CODE",
-    label: "Custom React / Client Component",
-    description: "Interactive client-side React / JavaScript component with dynamic click handlers, state, counters, or third-party embeds.",
-    defaultSettings: {
-      title: "Interactive Client Widget",
-      codeType: "react_component",
-      containerMaxWidth: "contained",
-      customHtml: `<div class="border border-line rounded-xl p-6 sm:p-8 bg-surface">
-  <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
-    <div>
-      <h4 class="font-bold text-ink text-lg sm:text-xl">Live Interactive Experience</h4>
-      <p class="text-xs sm:text-sm text-ink2 mt-1">Execute client-side component code and micro-interactions directly inside the storefront.</p>
-    </div>
-    <span id="interactive-counter-badge" class="px-3 py-1 bg-indigo-50 text-indigo-700 text-xs font-semibold rounded-full border border-indigo-100">0 Clicks</span>
-  </div>
-  <div class="pt-2 flex items-center gap-3">
-    <button id="interactive-action-btn" class="px-5 py-2.5 bg-ink text-white rounded-lg text-sm font-semibold hover:bg-slate-800 active:scale-95 transition-all shadow-sm">
-      ⚡ Test Interaction
-    </button>
-  </div>
-</div>`,
-      customJs: `// Custom Client-side React/JS Widget Logic
-const btn = container.querySelector('#interactive-action-btn');
-const badge = container.querySelector('#interactive-counter-badge');
-let count = 0;
-if (btn && badge) {
-  btn.onclick = () => {
-    count++;
-    badge.textContent = count + (count === 1 ? ' Click' : ' Clicks');
-    badge.className = 'px-3 py-1 bg-emerald-50 text-emerald-700 text-xs font-semibold rounded-full border border-emerald-100 animate-pulse';
-  };
-}`,
-      background: "paper",
-      padding: "normal",
-      showTopBorder: false,
-    },
-    defaultDataSource: null,
-  },
-];
-
-const SNIPPET_PRESETS: Record<string, { label: string; html: string; css?: string; js?: string }> = {
-  tailwind_card: {
-    label: "Tailwind Promo Card",
-    html: `<div class="rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-8 sm:p-12 text-white shadow-xl relative overflow-hidden">
+      title: "Custom Code Section",
+      customCode: `<div class="rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-8 sm:p-12 text-white shadow-xl relative overflow-hidden">
   <div class="max-w-xl relative z-10">
     <span class="inline-block px-3 py-1 bg-white/10 text-white rounded-full text-xs font-semibold uppercase tracking-wider mb-3">Tailwind CSS</span>
     <h3 class="text-3xl font-extrabold tracking-tight sm:text-4xl">Elevate Your Lifestyle</h3>
@@ -472,14 +405,33 @@ const SNIPPET_PRESETS: Record<string, { label: string; html: string; css?: strin
     </div>
   </div>
 </div>`,
-    css: `/* Scoped custom styling */
-.custom-section-content a {
-  text-decoration: none;
-}`,
+      containerMaxWidth: "contained",
+      background: "paper",
+      padding: "normal",
+      showTopBorder: false,
+    },
+    defaultDataSource: null,
+  },
+];
+
+const SNIPPET_PRESETS: Record<string, { label: string; code: string }> = {
+  tailwind_card: {
+    label: "Tailwind Promo Card",
+    code: `<div class="rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-8 sm:p-12 text-white shadow-xl relative overflow-hidden">
+  <div class="max-w-xl relative z-10">
+    <span class="inline-block px-3 py-1 bg-white/10 text-white rounded-full text-xs font-semibold uppercase tracking-wider mb-3">Tailwind CSS</span>
+    <h3 class="text-3xl font-extrabold tracking-tight sm:text-4xl">Elevate Your Lifestyle</h3>
+    <p class="mt-3 text-slate-300 text-sm sm:text-base leading-relaxed">Handcrafted minimalist essentials tailored for contemporary living. Engineered for comfort and longevity.</p>
+    <div class="mt-6 flex flex-wrap gap-4">
+      <a href="/products" class="inline-flex items-center justify-center px-6 py-3 bg-white text-slate-900 font-semibold rounded-lg shadow hover:bg-slate-100 transition-colors">Shop Now</a>
+      <a href="/services" class="inline-flex items-center justify-center px-6 py-3 bg-white/10 text-white font-medium rounded-lg border border-white/20 hover:bg-white/20 transition-colors">Our Services</a>
+    </div>
+  </div>
+</div>`,
   },
   feature_grid: {
     label: "3-Column Feature Grid",
-    html: `<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    code: `<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
   <div class="p-6 rounded-xl border border-line bg-surface hover:shadow-md transition-all">
     <div class="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center mb-4 font-bold text-lg">🚚</div>
     <h4 class="font-bold text-ink text-base">Express Delivery</h4>
@@ -497,37 +449,39 @@ const SNIPPET_PRESETS: Record<string, { label: string; html: string; css?: strin
   </div>
 </div>`,
   },
-  interactive_counter: {
-    label: "Interactive Client Widget",
-    html: `<div class="border border-line rounded-xl p-6 sm:p-8 bg-surface">
+  interactive_widget: {
+    label: "Interactive Widget (JS)",
+    code: `<div class="border border-line rounded-xl p-6 sm:p-8 bg-surface">
   <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
     <div>
       <h4 class="font-bold text-ink text-lg sm:text-xl">Interactive Experience</h4>
       <p class="text-xs sm:text-sm text-ink2 mt-1">Execute client-side component code and micro-interactions directly inside the storefront.</p>
     </div>
-    <span id="interactive-counter-badge" class="px-3 py-1 bg-indigo-50 text-indigo-700 text-xs font-semibold rounded-full border border-indigo-100 font-mono">0 Clicks</span>
+    <span id="click-counter-badge" class="px-3 py-1 bg-indigo-50 text-indigo-700 text-xs font-semibold rounded-full border border-indigo-100 font-mono">0 Clicks</span>
   </div>
   <div class="pt-2 flex items-center gap-3">
-    <button id="interactive-action-btn" class="px-5 py-2.5 bg-ink text-white rounded-lg text-sm font-semibold hover:bg-slate-800 active:scale-95 transition-all shadow-sm">
-      ⚡ Click to Test
+    <button id="click-action-btn" class="px-5 py-2.5 bg-ink text-white rounded-lg text-sm font-semibold hover:bg-slate-800 active:scale-95 transition-all shadow-sm">
+      ⚡ Test Interaction
     </button>
   </div>
-</div>`,
-    js: `// Client-side JavaScript / React Logic
-const btn = container.querySelector('#interactive-action-btn');
-const badge = container.querySelector('#interactive-counter-badge');
-let count = 0;
-if (btn && badge) {
-  btn.onclick = () => {
-    count++;
-    badge.textContent = count + (count === 1 ? ' Click' : ' Clicks');
-    badge.className = 'px-3 py-1 bg-emerald-50 text-emerald-700 text-xs font-semibold rounded-full border border-emerald-100 font-mono animate-pulse';
-  };
-}`,
+</div>
+
+<script>
+  const btn = container.querySelector('#click-action-btn');
+  const badge = container.querySelector('#click-counter-badge');
+  let count = 0;
+  if (btn && badge) {
+    btn.onclick = () => {
+      count++;
+      badge.textContent = count + (count === 1 ? ' Click' : ' Clicks');
+      badge.className = 'px-3 py-1 bg-emerald-50 text-emerald-700 text-xs font-semibold rounded-full border border-emerald-100 font-mono animate-pulse';
+    };
+  }
+</script>`,
   },
   trust_bar: {
     label: "Trust Badges & Social Proof",
-    html: `<div class="flex flex-wrap items-center justify-around gap-6 py-4 px-6 rounded-xl bg-slate-50 border border-line">
+    code: `<div class="flex flex-wrap items-center justify-around gap-6 py-4 px-6 rounded-xl bg-slate-50 border border-line">
   <div class="flex items-center gap-2">
     <span class="text-emerald-500 font-bold text-lg">✓</span>
     <span class="text-xs font-medium text-ink">100% Authentic Products</span>
@@ -548,7 +502,7 @@ if (btn && badge) {
   },
   video_embed: {
     label: "Responsive Video Embed",
-    html: `<div class="relative w-full rounded-2xl overflow-hidden shadow-lg border border-line bg-black" style="padding-top: 56.25%;">
+    code: `<div class="relative w-full rounded-2xl overflow-hidden shadow-lg border border-line bg-black" style="padding-top: 56.25%;">
   <iframe
     class="absolute top-0 left-0 w-full h-full"
     src="https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ"
@@ -1969,256 +1923,214 @@ export default function StorefrontStudioPage() {
           </div>
 
           {selectedSection ? (
-            <div className="custom-scrollbar flex-1 overflow-y-auto p-3.5 space-y-3">
-              {/* ACCORDION 0: CUSTOM CODE & TAILWIND CSS */}
-              {(selectedSection.type === "CUSTOM_HTML" ||
-                selectedSection.type === "CUSTOM_CODE" ||
-                selectedSection.settings?.customHtml !== undefined) && (
+            selectedSection.type === "CUSTOM_HTML" || selectedSection.type === "CUSTOM_CODE" ? (
+              /* DEDICATED STREAMLINED CUSTOM CODE INSPECTOR */
+              <div className="custom-scrollbar flex-1 overflow-y-auto p-3.5 space-y-3.5">
+                {/* 1. Section Label (for sidebar list identification) */}
+                <div className="rounded-lg border border-line bg-white p-3 shadow-2xs space-y-1.5">
+                  <label className="block text-[11px] font-semibold text-ink">
+                    Section Name / Label
+                  </label>
+                  <input
+                    type="text"
+                    value={selectedSection.settings?.title || ""}
+                    onChange={(e) => updateSettings("title", e.target.value)}
+                    placeholder="e.g. Summer Promo Banner, Trustpilot Reviews"
+                    className="w-full rounded border border-line bg-white px-2.5 py-1.5 text-[12px] text-ink focus:border-indigo-500 outline-none"
+                  />
+                  <p className="text-[10px] text-ink2">Renames this section in the left layout outline.</p>
+                </div>
+
+                {/* 2. Unified Code Editor (One single field for HTML + Tailwind + CSS + JS) */}
                 <div className="rounded-lg border-2 border-indigo-200 bg-white shadow-2xs overflow-hidden">
-                  <button
-                    type="button"
-                    onClick={() => toggleAccordion("customCode")}
-                    className="flex w-full items-center justify-between px-3.5 py-2.5 text-left text-[12px] font-semibold text-indigo-950 bg-indigo-50/70 hover:bg-indigo-50 transition-colors"
-                  >
-                    <span className="flex items-center gap-2">
+                  <div className="flex items-center justify-between px-3.5 py-2.5 bg-indigo-50/70 border-b border-indigo-100">
+                    <span className="flex items-center gap-1.5 text-[12px] font-semibold text-indigo-950">
                       <span className="flex h-5 w-5 items-center justify-center rounded bg-indigo-600 text-white text-[11px] font-mono">
                         &lt;/&gt;
                       </span>
-                      <span>Custom HTML, Tailwind &amp; React Component</span>
+                      <span>Custom Code Editor</span>
                     </span>
-                    <span>{openAccordions.customCode ? "−" : "+"}</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowFullscreenCodeEditor(true)}
+                      className="rounded bg-indigo-600 hover:bg-indigo-700 text-white px-2 py-0.5 text-[10.5px] font-medium flex items-center gap-1 shadow-2xs transition"
+                    >
+                      <span>⛶ Fullscreen</span>
+                    </button>
+                  </div>
+
+                  <div className="p-3.5 space-y-3 bg-white">
+                    {/* Starters Row */}
+                    <div>
+                      <span className="block text-[10.5px] font-semibold text-ink mb-1.5">
+                        Quick Starter Templates:
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {Object.entries(SNIPPET_PRESETS).map(([key, item]) => (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => {
+                              updateSettings("customCode", item.code);
+                              updateSettings("customHtml", item.code);
+                            }}
+                            className="rounded border border-line bg-surface px-2 py-1 text-[11px] font-medium text-ink hover:border-indigo-500 hover:text-indigo-600 transition shadow-2xs"
+                          >
+                            {item.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Single Unified Monospace Code Editor */}
+                    <div className="rounded-lg border border-slate-700 bg-slate-900 p-2.5 shadow-inner">
+                      <textarea
+                        rows={16}
+                        value={
+                          selectedSection.settings?.customCode !== undefined
+                            ? selectedSection.settings.customCode
+                            : (selectedSection.settings?.customHtml || "")
+                        }
+                        onChange={(e) => {
+                          updateSettings("customCode", e.target.value);
+                          updateSettings("customHtml", e.target.value);
+                        }}
+                        onKeyDown={(e) => handleCodeKeyDown(e, "customHtml")}
+                        placeholder={`<!-- Write HTML with Tailwind CSS, <style>, or <script> -->\n<div class="rounded-2xl bg-indigo-600 p-8 text-white text-center">\n  <h3 class="text-2xl font-bold">Your Custom Banner</h3>\n  <p class="mt-2 text-indigo-100">Full Tailwind CSS classes compile live.</p>\n</div>`}
+                        spellCheck={false}
+                        className="w-full bg-transparent font-mono text-[12px] leading-relaxed text-slate-100 placeholder-slate-500 outline-none resize-y"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between text-[11px] text-ink2">
+                      <span>💡 Supports Tailwind, &lt;style&gt;, and &lt;script&gt;. Press <code className="text-indigo-600 bg-indigo-50 px-1 rounded font-mono">Tab</code> to indent.</span>
+                      <span className="font-mono text-[10px] text-indigo-600">
+                        Tailwind JIT
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Container & Appearance */}
+                <div className="rounded-lg border border-line bg-white shadow-2xs overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => toggleAccordion("styling")}
+                    className="flex w-full items-center justify-between px-3.5 py-2.5 text-left text-[12px] font-semibold text-ink bg-slate-50/50 hover:bg-slate-50"
+                  >
+                    <span>Container &amp; Spacing</span>
+                    <span>{openAccordions.styling ? "−" : "+"}</span>
                   </button>
 
-                  {openAccordions.customCode && (
-                    <div className="p-3.5 space-y-3.5 border-t border-indigo-100 bg-white">
-                      {/* Starter Presets Bar */}
+                  {openAccordions.styling && (
+                    <div className="p-3.5 space-y-3 border-t border-line">
+                      {/* Container Width */}
                       <div>
-                        <div className="flex items-center justify-between mb-1.5">
-                          <label className="block text-[11px] font-semibold text-ink">
-                            Quick Starter Templates
-                          </label>
-                          <span className="text-[10px] text-ink2">Click to load preset</span>
-                        </div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {Object.entries(SNIPPET_PRESETS).map(([key, item]) => (
+                        <label className="block text-[11px] font-medium text-ink2 mb-1.5">
+                          Container Constraint
+                        </label>
+                        <div className="grid grid-cols-3 gap-1.5">
+                          {[
+                            { id: "contained", label: "Contained (1280px)" },
+                            { id: "narrow", label: "Narrow (896px)" },
+                            { id: "full_bleed", label: "Full Bleed (100%)" },
+                          ].map((c) => (
                             <button
-                              key={key}
+                              key={c.id}
                               type="button"
-                              onClick={() => {
-                                updateSettings("customHtml", item.html);
-                                if (item.css) updateSettings("customCss", item.css);
-                                if (item.js) updateSettings("customJs", item.js);
-                              }}
-                              className="rounded border border-line bg-surface px-2 py-1 text-[11px] font-medium text-ink hover:border-indigo-500 hover:text-indigo-600 transition shadow-2xs"
+                              onClick={() => updateSettings("containerMaxWidth", c.id)}
+                              className={`py-1.5 text-center rounded border text-[11px] font-medium transition ${
+                                (selectedSection.settings?.containerMaxWidth || "contained") === c.id
+                                  ? "border-indigo-600 bg-indigo-50/50 text-indigo-700"
+                                  : "border-line bg-white text-ink hover:bg-slate-50"
+                              }`}
                             >
-                              {item.label}
+                              {c.label}
                             </button>
                           ))}
                         </div>
                       </div>
 
-                      {/* Code Mode Tabs: HTML + Tailwind vs Scoped CSS vs Client JS */}
+                      {/* Padding Density */}
                       <div>
-                        <div className="flex rounded-md border border-line bg-slate-100 p-0.5 text-[11px] font-medium">
-                          <button
-                            type="button"
-                            onClick={() => setActiveCodeTab("html")}
-                            className={`flex-1 py-1 text-center rounded transition ${
-                              activeCodeTab === "html"
-                                ? "bg-white text-ink font-semibold shadow-2xs"
-                                : "text-ink2 hover:text-ink"
-                            }`}
-                          >
-                            HTML &amp; Tailwind
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setActiveCodeTab("css")}
-                            className={`flex-1 py-1 text-center rounded transition ${
-                              activeCodeTab === "css"
-                                ? "bg-white text-ink font-semibold shadow-2xs"
-                                : "text-ink2 hover:text-ink"
-                            }`}
-                          >
-                            Custom CSS
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setActiveCodeTab("js")}
-                            className={`flex-1 py-1 text-center rounded transition ${
-                              activeCodeTab === "js"
-                                ? "bg-white text-ink font-semibold shadow-2xs"
-                                : "text-ink2 hover:text-ink"
-                            }`}
-                          >
-                            Client JS / React
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Editor Sub-view 1: HTML & Tailwind CSS */}
-                      {activeCodeTab === "html" && (
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[11px] font-medium text-ink2">
-                              HTML Markup with Tailwind CSS Classes
-                            </span>
-                            <div className="flex items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() => setShowFullscreenCodeEditor(true)}
-                                className="text-[10px] text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1"
-                                title="Expand fullscreen"
-                              >
-                                <span>⛶ Fullscreen</span>
-                              </button>
-                              <span className="text-[10px] text-indigo-600 font-mono">
-                                Tailwind JIT
-                              </span>
-                            </div>
-                          </div>
-                          <div className="rounded-lg border border-slate-700 bg-slate-900 p-2 shadow-inner">
-                            <textarea
-                              rows={14}
-                              value={selectedSection.settings?.customHtml || ""}
-                              onChange={(e) => updateSettings("customHtml", e.target.value)}
-                              onKeyDown={(e) => handleCodeKeyDown(e, "customHtml")}
-                              placeholder={`<div class="p-8 bg-indigo-600 text-white rounded-2xl shadow-xl">\n  <h2 class="text-3xl font-bold">Your Title</h2>\n  <p class="mt-2 text-indigo-100">Styled directly with Tailwind classes.</p>\n</div>`}
-                              spellCheck={false}
-                              className="w-full bg-transparent font-mono text-[12px] leading-relaxed text-slate-100 placeholder-slate-500 outline-none resize-y"
-                            />
-                          </div>
-                          <div className="flex items-center justify-between text-[11px] text-ink2">
-                            <span>💡 Press <code className="text-indigo-600 bg-indigo-50 px-1 rounded font-mono">Tab</code> to indent (2 spaces).</span>
-                            <span className="font-mono text-[10px]">
-                              {(selectedSection.settings?.customHtml || "").length} chars
-                            </span>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Editor Sub-view 2: Scoped Custom CSS */}
-                      {activeCodeTab === "css" && (
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[11px] font-medium text-ink2">
-                              Scoped CSS / Keyframe Animations
-                            </span>
-                            <div className="flex items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() => setShowFullscreenCodeEditor(true)}
-                                className="text-[10px] text-emerald-600 hover:text-emerald-800 font-medium flex items-center gap-1"
-                                title="Expand fullscreen"
-                              >
-                                <span>⛶ Fullscreen</span>
-                              </button>
-                              <span className="text-[10px] text-emerald-600 font-mono">
-                                Auto-Scoped
-                              </span>
-                            </div>
-                          </div>
-                          <div className="rounded-lg border border-slate-700 bg-slate-900 p-2 shadow-inner">
-                            <textarea
-                              rows={12}
-                              value={selectedSection.settings?.customCss || ""}
-                              onChange={(e) => updateSettings("customCss", e.target.value)}
-                              onKeyDown={(e) => handleCodeKeyDown(e, "customCss")}
-                              placeholder={`/* Scoped styles applied to this section */\n.custom-section-content {\n  animation: fadeIn 0.4s ease-in-out;\n}`}
-                              spellCheck={false}
-                              className="w-full bg-transparent font-mono text-[12px] leading-relaxed text-slate-100 placeholder-slate-500 outline-none resize-y"
-                            />
-                          </div>
-                          <p className="text-[11px] text-ink2 leading-relaxed">
-                            🛡️ Rules are automatically scoped to this section to prevent style bleeding into global navigation or cart.
-                          </p>
-                        </div>
-                      )}
-
-                      {/* Editor Sub-view 3: Client Script / React Logic */}
-                      {activeCodeTab === "js" && (
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[11px] font-medium text-ink2">
-                              Interactive Client-side JavaScript / Micro-App
-                            </span>
-                            <div className="flex items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() => setShowFullscreenCodeEditor(true)}
-                                className="text-[10px] text-amber-600 hover:text-amber-800 font-medium flex items-center gap-1"
-                                title="Expand fullscreen"
-                              >
-                                <span>⛶ Fullscreen</span>
-                              </button>
-                              <span className="text-[10px] text-amber-600 font-mono">
-                                Scoped Runner
-                              </span>
-                            </div>
-                          </div>
-                          <div className="rounded-lg border border-slate-700 bg-slate-900 p-2 shadow-inner">
-                            <textarea
-                              rows={12}
-                              value={selectedSection.settings?.customJs || ""}
-                              onChange={(e) => updateSettings("customJs", e.target.value)}
-                              onKeyDown={(e) => handleCodeKeyDown(e, "customJs")}
-                              placeholder={`// container: HTMLElement, React: React, section: StorefrontSectionData\nconst btn = container.querySelector('button');\nif (btn) {\n  btn.onclick = () => alert('Clicked!');\n}`}
-                              spellCheck={false}
-                              className="w-full bg-transparent font-mono text-[12px] leading-relaxed text-slate-100 placeholder-slate-500 outline-none resize-y"
-                            />
-                          </div>
-                          <p className="text-[11px] text-ink2 leading-relaxed">
-                            ⚡ Scripts receive <code className="text-amber-700 bg-amber-50 px-1 rounded font-mono">container</code>, <code className="text-amber-700 bg-amber-50 px-1 rounded font-mono">React</code>, and React standard hooks and run in an error boundary.
-                          </p>
-                        </div>
-                      )}
-
-                      {/* Container Max Width */}
-                      <div className="border-t border-line pt-3 space-y-2">
-                        <label className="block text-[11px] font-medium text-ink2">
-                          Container Constraint &amp; Alignment
+                        <label className="block text-[11px] font-medium text-ink2 mb-1">
+                          Vertical Spacing
                         </label>
-                        <div className="grid grid-cols-3 gap-2">
-                          <button
-                            type="button"
-                            onClick={() => updateSettings("containerMaxWidth", "contained")}
-                            className={`py-1.5 text-center rounded border text-[11px] font-medium transition ${
-                              (selectedSection.settings?.containerMaxWidth || "contained") === "contained"
-                                ? "border-indigo-600 bg-indigo-50/50 text-indigo-700"
-                                : "border-line bg-white text-ink hover:bg-slate-50"
-                            }`}
-                          >
-                            Contained (1280px)
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => updateSettings("containerMaxWidth", "narrow")}
-                            className={`py-1.5 text-center rounded border text-[11px] font-medium transition ${
-                              selectedSection.settings?.containerMaxWidth === "narrow"
-                                ? "border-indigo-600 bg-indigo-50/50 text-indigo-700"
-                                : "border-line bg-white text-ink hover:bg-slate-50"
-                            }`}
-                          >
-                            Narrow (896px)
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => updateSettings("containerMaxWidth", "full_bleed")}
-                            className={`py-1.5 text-center rounded border text-[11px] font-medium transition ${
-                              selectedSection.settings?.containerMaxWidth === "full_bleed"
-                                ? "border-indigo-600 bg-indigo-50/50 text-indigo-700"
-                                : "border-line bg-white text-ink hover:bg-slate-50"
-                            }`}
-                          >
-                            Full Bleed (100%)
-                          </button>
-                        </div>
+                        <select
+                          value={selectedSection.settings?.padding || "normal"}
+                          onChange={(e) => updateSettings("padding", e.target.value)}
+                          className="w-full rounded border border-line bg-white px-2.5 py-1.5 text-[12px] text-ink"
+                        >
+                          <option value="none">None (py-0)</option>
+                          <option value="compact">Compact (py-6)</option>
+                          <option value="normal">Standard (py-12)</option>
+                          <option value="spacious">Spacious (py-20)</option>
+                        </select>
                       </div>
+
+                      {/* Background Tone */}
+                      <div>
+                        <label className="block text-[11px] font-medium text-ink2 mb-1">
+                          Background Tone
+                        </label>
+                        <select
+                          value={selectedSection.settings?.background || "paper"}
+                          onChange={(e) => updateSettings("background", e.target.value)}
+                          className="w-full rounded border border-line bg-white px-2.5 py-1.5 text-[12px] text-ink"
+                        >
+                          <option value="paper">Paper White</option>
+                          <option value="surface">Subtle Surface</option>
+                          <option value="ink">Dark Ink</option>
+                          <option value="transparent">Transparent</option>
+                          <option value="custom">Custom Hex Color</option>
+                        </select>
+                      </div>
+
+                      {selectedSection.settings?.background === "custom" && (
+                        <div className="flex items-center gap-2 pt-1">
+                          <input
+                            type="color"
+                            value={selectedSection.settings?.customBgColor || "#ffffff"}
+                            onChange={(e) => updateSettings("customBgColor", e.target.value)}
+                            className="h-8 w-8 rounded border border-line p-0 cursor-pointer"
+                          />
+                          <input
+                            type="text"
+                            value={selectedSection.settings?.customBgColor || "#ffffff"}
+                            onChange={(e) => updateSettings("customBgColor", e.target.value)}
+                            placeholder="#ffffff"
+                            className="flex-1 rounded-md border border-line px-2.5 py-1 text-[12px] font-mono text-ink"
+                          />
+                        </div>
+                      )}
+
+                      <label className="flex items-center gap-2 cursor-pointer pt-1 text-[12px] text-ink">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(selectedSection.settings?.showTopBorder)}
+                          onChange={(e) => updateSettings("showTopBorder", e.target.checked)}
+                          className="rounded border-line"
+                        />
+                        Show hairline top border
+                      </label>
                     </div>
                   )}
                 </div>
-              )}
 
+                {/* 4. Remove Section */}
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => removeSection(selectedSection.id)}
+                    className="w-full rounded-lg border border-rose-200 bg-rose-50/70 py-2 text-[12px] font-medium text-rose-700 hover:bg-rose-100 transition shadow-2xs"
+                  >
+                    Remove Custom Section
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* STANDARD 7 ACCORDIONS (for standard sections: HERO, PRODUCT GRID, etc.) */
+              <div className="custom-scrollbar flex-1 overflow-y-auto p-3.5 space-y-3">
               {/* ACCORDION 1: TYPOGRAPHY & HEADINGS */}
               <div className="rounded-lg border border-line bg-white shadow-2xs overflow-hidden">
                 <button
@@ -2843,6 +2755,7 @@ export default function StorefrontStudioPage() {
                 </button>
               </div>
             </div>
+            )
           ) : (
             <div className="flex-1 p-6 text-center text-[12.5px] text-ink2">
               Select any section on the left to inspect and configure its attributes.
@@ -3308,52 +3221,15 @@ export default function StorefrontStudioPage() {
                 </span>
                 <div>
                   <h3 className="text-[14px] font-semibold text-white">
-                    {selectedSection.settings?.title || "Custom Section"} • Code Inspector
+                    {selectedSection.settings?.title || "Custom Section"} • Fullscreen Code Studio
                   </h3>
                   <p className="text-[11px] text-slate-400">
-                    Live changes synchronize directly to the Storefront Canvas.
+                    Write HTML with Tailwind CSS, &lt;style&gt;, and &lt;script&gt;. Live preview compiles in real time.
                   </p>
                 </div>
               </div>
 
-              {/* Sub-tabs */}
-              <div className="flex items-center gap-1 rounded-lg border border-slate-700 bg-slate-800 p-1 text-[12px] font-medium">
-                <button
-                  type="button"
-                  onClick={() => setActiveCodeTab("html")}
-                  className={`px-3 py-1 rounded transition ${
-                    activeCodeTab === "html"
-                      ? "bg-indigo-600 text-white font-semibold shadow-xs"
-                      : "text-slate-300 hover:text-white"
-                  }`}
-                >
-                  HTML &amp; Tailwind
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveCodeTab("css")}
-                  className={`px-3 py-1 rounded transition ${
-                    activeCodeTab === "css"
-                      ? "bg-indigo-600 text-white font-semibold shadow-xs"
-                      : "text-slate-300 hover:text-white"
-                  }`}
-                >
-                  Scoped CSS
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveCodeTab("js")}
-                  className={`px-3 py-1 rounded transition ${
-                    activeCodeTab === "js"
-                      ? "bg-indigo-600 text-white font-semibold shadow-xs"
-                      : "text-slate-300 hover:text-white"
-                  }`}
-                >
-                  Client JS / React
-                </button>
-              </div>
-
-              {/* Presets and Close */}
+              {/* Close */}
               <div className="flex items-center gap-2">
                 <button
                   type="button"
@@ -3374,9 +3250,8 @@ export default function StorefrontStudioPage() {
                   key={key}
                   type="button"
                   onClick={() => {
-                    updateSettings("customHtml", item.html);
-                    if (item.css) updateSettings("customCss", item.css);
-                    if (item.js) updateSettings("customJs", item.js);
+                    updateSettings("customCode", item.code);
+                    updateSettings("customHtml", item.code);
                   }}
                   className="rounded border border-slate-700 bg-slate-800/80 px-2.5 py-1 text-slate-200 hover:border-indigo-400 hover:text-white transition shrink-0"
                 >
@@ -3387,44 +3262,28 @@ export default function StorefrontStudioPage() {
 
             {/* Editor Canvas */}
             <div className="flex-1 p-6 flex flex-col min-h-0 bg-slate-950">
-              {activeCodeTab === "html" && (
-                <textarea
-                  value={selectedSection.settings?.customHtml || ""}
-                  onChange={(e) => updateSettings("customHtml", e.target.value)}
-                  onKeyDown={(e) => handleCodeKeyDown(e, "customHtml")}
-                  spellCheck={false}
-                  placeholder="<!-- Write custom HTML with full Tailwind CSS classes -->"
-                  className="flex-1 w-full rounded-xl border border-slate-800 bg-slate-900/90 p-4 font-mono text-[13px] leading-relaxed text-slate-100 placeholder-slate-600 outline-none resize-none focus:border-indigo-500 shadow-inner"
-                />
-              )}
-
-              {activeCodeTab === "css" && (
-                <textarea
-                  value={selectedSection.settings?.customCss || ""}
-                  onChange={(e) => updateSettings("customCss", e.target.value)}
-                  onKeyDown={(e) => handleCodeKeyDown(e, "customCss")}
-                  spellCheck={false}
-                  placeholder="/* Scoped CSS - automatically isolated to this section */"
-                  className="flex-1 w-full rounded-xl border border-slate-800 bg-slate-900/90 p-4 font-mono text-[13px] leading-relaxed text-slate-100 placeholder-slate-600 outline-none resize-none focus:border-indigo-500 shadow-inner"
-                />
-              )}
-
-              {activeCodeTab === "js" && (
-                <textarea
-                  value={selectedSection.settings?.customJs || ""}
-                  onChange={(e) => updateSettings("customJs", e.target.value)}
-                  onKeyDown={(e) => handleCodeKeyDown(e, "customJs")}
-                  spellCheck={false}
-                  placeholder="// Client-side JavaScript / React logic (receives container, React, and hooks)"
-                  className="flex-1 w-full rounded-xl border border-slate-800 bg-slate-900/90 p-4 font-mono text-[13px] leading-relaxed text-slate-100 placeholder-slate-600 outline-none resize-none focus:border-indigo-500 shadow-inner"
-                />
-              )}
+              <textarea
+                value={
+                  selectedSection.settings?.customCode !== undefined
+                    ? selectedSection.settings.customCode
+                    : (selectedSection.settings?.customHtml || "")
+                }
+                onChange={(e) => {
+                  updateSettings("customCode", e.target.value);
+                  updateSettings("customHtml", e.target.value);
+                }}
+                onKeyDown={(e) => handleCodeKeyDown(e, "customHtml")}
+                spellCheck={false}
+                placeholder="<!-- Write HTML with Tailwind CSS classes, <style>, and <script> -->"
+                className="flex-1 w-full rounded-xl border border-slate-800 bg-slate-900/90 p-5 font-mono text-[13px] leading-relaxed text-slate-100 placeholder-slate-600 outline-none resize-none focus:border-indigo-500 shadow-inner"
+              />
             </div>
 
             {/* Modal Footer */}
             <div className="flex items-center justify-between border-t border-slate-800 px-6 py-3 bg-slate-900/60 text-[11px] text-slate-400">
               <div className="flex items-center gap-4">
                 <span>Tab inserts 2 spaces.</span>
+                <span className="text-indigo-400 font-mono">Tailwind JIT Runtime Active</span>
                 <span className="text-emerald-400">● Live preview synchronized</span>
               </div>
               <button

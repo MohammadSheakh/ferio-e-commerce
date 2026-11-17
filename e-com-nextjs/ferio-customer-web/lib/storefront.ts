@@ -33,8 +33,8 @@ export type SectionSettings = {
   imagePosition?: "left" | "right";
   layout?: "split" | "centered" | "minimal" | "interactive";
   layoutStyle?: "tiles" | "pills" | "circles";
-  background?: "paper" | "surface" | "ink";
-  padding?: "compact" | "normal" | "spacious";
+  background?: "paper" | "surface" | "ink" | "transparent" | "custom";
+  padding?: "none" | "compact" | "normal" | "spacious";
   showTopBorder?: boolean;
   showDiscountBadge?: boolean;
   showStockBadge?: boolean;

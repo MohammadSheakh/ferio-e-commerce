@@ -51,6 +51,42 @@ function scopeCssRules(rawCss: string, scopeSelector: string): string {
   }
 }
 
+/**
+ * Parses unified code into HTML, extracted <style>, and extracted <script>.
+ * Allows store admins to write or paste standard HTML/Tailwind with embedded
+ * <style> and <script> tags into a single unified input box.
+ */
+function parseUnifiedCode(rawCode: string) {
+  let css = "";
+  let js = "";
+
+  // Extract <style> contents
+  const styleRegex = /<style(?:\s+[^>]*)?>([\s\S]*?)<\/style>/gi;
+  let styleMatch: RegExpExecArray | null;
+  while ((styleMatch = styleRegex.exec(rawCode)) !== null) {
+    if (styleMatch[1]) {
+      css += styleMatch[1] + "\n";
+    }
+  }
+
+  // Extract <script> contents
+  const scriptRegex = /<script(?:\s+[^>]*)?>([\s\S]*?)<\/script>/gi;
+  let scriptMatch: RegExpExecArray | null;
+  while ((scriptMatch = scriptRegex.exec(rawCode)) !== null) {
+    if (scriptMatch[1]) {
+      js += scriptMatch[1] + "\n";
+    }
+  }
+
+  // Strip <style> and <script> tags from the HTML markup
+  const html = rawCode
+    .replace(/<style(?:\s+[^>]*)?>[\s\S]*?<\/style>/gi, "")
+    .replace(/<script(?:\s+[^>]*)?>[\s\S]*?<\/script>/gi, "")
+    .trim();
+
+  return { html, css, js };
+}
+
 class SectionErrorBoundary extends React.Component<
   { children: React.ReactNode; sectionId: string },
   { hasError: boolean; error?: Error }
@@ -93,23 +129,37 @@ export default function CustomCodeSection({ section }: CustomCodeSectionProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [scriptError, setScriptError] = useState<string | null>(null);
 
-  const customHtml = (settings.customHtml as string) || (settings.bodyText as string) || "";
-  const customCss = (settings.customCss as string) || "";
-  const customJs = (settings.customJs as string) || "";
-  const containerMaxWidth = (settings.containerMaxWidth as string) || "contained";
+  // Read code from single unified field (with backwards compatibility for split fields)
+  const rawCode =
+    (settings.customCode as string) ||
+    (settings.customHtml as string) ||
+    (settings.bodyText as string) ||
+    "";
 
+  // Parse unified code into HTML, scoped CSS, and JS
+  const { parsedHtml, parsedCss, parsedJs } = useMemo(() => {
+    const parsed = parseUnifiedCode(rawCode);
+    const combinedCss = [parsed.css, (settings.customCss as string) || ""].filter(Boolean).join("\n");
+    const combinedJs = [parsed.js, (settings.customJs as string) || ""].filter(Boolean).join("\n");
+    return {
+      parsedHtml: parsed.html || rawCode,
+      parsedCss: combinedCss,
+      parsedJs: combinedJs,
+    };
+  }, [rawCode, settings.customCss, settings.customJs]);
+
+  const containerMaxWidth = (settings.containerMaxWidth as string) || "contained";
   const scopeSelector = `[data-section-id="${section.id}"]`;
 
-  // Memoize safely scoped CSS
+  // Memoize safely scoped CSS to prevent style leakage
   const scopedCss = useMemo(() => {
-    return scopeCssRules(customCss, scopeSelector);
-  }, [customCss, scopeSelector]);
+    return scopeCssRules(parsedCss, scopeSelector);
+  }, [parsedCss, scopeSelector]);
 
   // Ensure runtime Tailwind JIT engine is present so arbitrary user classes compile live
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    // Check if Tailwind browser runtime is loaded
     if (!(window as any).tailwind) {
       const scriptId = "ferio-tailwind-cdn-runtime";
       if (!document.getElementById(scriptId)) {
@@ -128,11 +178,15 @@ export default function CustomCodeSection({ section }: CustomCodeSectionProps) {
       ? "bg-surface"
       : settings.background === "ink"
       ? "bg-ink text-white"
+      : (settings.background as string) === "transparent"
+      ? "bg-transparent"
       : "bg-paper";
 
   // Spacing Density
   const padClass =
-    settings.padding === "compact"
+    settings.padding === "none"
+      ? "py-0"
+      : settings.padding === "compact"
       ? "py-6 sm:py-8"
       : settings.padding === "spacious"
       ? "py-16 sm:py-24"
@@ -148,14 +202,13 @@ export default function CustomCodeSection({ section }: CustomCodeSectionProps) {
 
   // Execute client-side JS / React Component safely
   useEffect(() => {
-    if (!customJs || !containerRef.current) return;
+    if (!parsedJs || !containerRef.current) return;
     setScriptError(null);
 
     const container = containerRef.current;
     let cleanupFn: (() => void) | void;
 
     try {
-      // Scoped execution with React standard hooks and container context
       const runner = new Function(
         "container",
         "React",
@@ -166,7 +219,7 @@ export default function CustomCodeSection({ section }: CustomCodeSectionProps) {
         "section",
         `
         try {
-          ${customJs}
+          ${parsedJs}
         } catch (err) {
           console.error("[CustomCodeSection] Script error:", err);
           throw err;
@@ -200,10 +253,10 @@ export default function CustomCodeSection({ section }: CustomCodeSectionProps) {
         }
       }
     };
-  }, [customJs, section]);
+  }, [parsedJs, section]);
 
   // If completely empty in initial state
-  if (!customHtml && !customJs && !customCss && !settings.title) {
+  if (!rawCode && !parsedHtml && !parsedCss && !parsedJs) {
     return (
       <section
         data-section-id={section.id}
@@ -218,9 +271,9 @@ export default function CustomCodeSection({ section }: CustomCodeSectionProps) {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
               </svg>
             </div>
-            <h4 className="text-sm font-semibold text-ink">Custom HTML &amp; Tailwind Section</h4>
+            <h4 className="text-sm font-semibold text-ink">Custom Code Section</h4>
             <p className="text-xs text-ink2 mt-1 max-w-md mx-auto">
-              Add your custom HTML, Tailwind CSS classes, or client-side React component in the Storefront Studio inspector.
+              Write HTML with Tailwind CSS, &lt;style&gt;, or &lt;script&gt; in the Studio code editor.
             </p>
           </div>
         </div>
@@ -247,23 +300,6 @@ export default function CustomCodeSection({ section }: CustomCodeSectionProps) {
         ) : null}
 
         <div className={containerWidthClass}>
-          {/* Optional Section Heading if merchant specified title */}
-          {settings.title ? (
-            <div className={`mb-6 ${settings.alignment === "center" ? "text-center" : "text-left"}`}>
-              {settings.eyebrow ? (
-                <p className="text-xs font-semibold uppercase tracking-wider text-ink2 mb-1">
-                  {settings.eyebrow}
-                </p>
-              ) : null}
-              <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-ink font-heading">
-                {settings.title}
-              </h2>
-              {settings.subtitle ? (
-                <p className="text-sm text-ink2 mt-1.5 max-w-2xl">{settings.subtitle}</p>
-              ) : null}
-            </div>
-          ) : null}
-
           {/* Script Execution Notice if runtime script throws */}
           {scriptError ? (
             <div className="mb-4 p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs font-mono">
@@ -275,7 +311,7 @@ export default function CustomCodeSection({ section }: CustomCodeSectionProps) {
           <div
             ref={containerRef}
             className="custom-section-content"
-            dangerouslySetInnerHTML={customHtml ? { __html: customHtml } : undefined}
+            dangerouslySetInnerHTML={parsedHtml ? { __html: parsedHtml } : undefined}
           />
         </div>
       </section>
