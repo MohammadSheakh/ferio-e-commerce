@@ -30,9 +30,14 @@ export async function GET(request: NextRequest) {
 
     // Base tag so all relative CSS, JS chunks, and images load correctly from the tenant domain
     const baseTag = `<base href="https://${tenantHost}/" />`;
-    // Click interceptor to open external links in a new window rather than breaking the iframe studio
-    const linkInterceptor = `
+    // Router sync script to align client-side router with SSR route and avoid hydration crash
+    const routerSync = `
 <script>
+  try {
+    if (window.location.pathname.indexOf('/api/storefront/preview-render') !== -1) {
+      window.history.replaceState(null, '', '/?preview=true');
+    }
+  } catch (e) {}
   document.addEventListener('click', function(e) {
     var a = e.target.closest('a');
     if (a && a.href && !a.href.startsWith('javascript:')) {
@@ -41,7 +46,7 @@ export async function GET(request: NextRequest) {
   }, true);
 </script>`;
 
-    const injection = `${baseTag}${linkInterceptor}`;
+    const injection = `${baseTag}${routerSync}`;
 
     if (html.includes("<head>")) {
       html = html.replace("<head>", `<head>${injection}`);
@@ -70,3 +75,4 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
