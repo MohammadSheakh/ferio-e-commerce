@@ -305,7 +305,11 @@ const links: SidebarLink[] = [
   },
 ];
 
-export default function Sidebar() {
+export interface SidebarProps {
+  isCollapsed?: boolean;
+}
+
+export default function Sidebar({ isCollapsed = false }: SidebarProps) {
   const pathname = usePathname();
   const [session, setSession] = useState<AdminSession | null>();
   const [features, setFeatures] = useState<Record<string, boolean> | null>(null);
@@ -350,18 +354,13 @@ export default function Sidebar() {
   });
 
   return (
-    <aside className="sticky top-0 z-30 flex h-screen w-56 shrink-0 select-none flex-col border-r border-line bg-paper">
-      <div className="border-b border-line px-5 py-4">
-        <div className="flex items-center gap-2.5">
-          <span className="flex h-7 w-7 items-center justify-center rounded-md bg-ink text-[14px] font-bold text-white shadow-sm">
-            F
-          </span>
-          <span className="text-[15px] font-semibold tracking-tight text-ink">
-            Ferio Admin
-          </span>
-        </div>
-      </div>
-
+    <aside
+      className={`sticky top-[52px] z-30 flex h-[calc(100vh-52px)] select-none flex-col border-r border-line bg-paper transition-all duration-200 ease-in-out overflow-hidden ${
+        isCollapsed
+          ? "w-0 border-r-0 opacity-0 pointer-events-none"
+          : "w-56 shrink-0 opacity-100"
+      }`}
+    >
       <nav
         aria-label="Admin navigation"
         className="custom-scrollbar flex-1 overflow-y-auto space-y-0 py-1"
