@@ -1,0 +1,4 @@
+-- AlterEnum
+ALTER TYPE "StorefrontSectionType" ADD VALUE IF NOT EXISTS 'CUSTOM_HTML';
+ALTER TYPE "StorefrontSectionType" ADD VALUE IF NOT EXISTS 'CUSTOM_CODE';
+

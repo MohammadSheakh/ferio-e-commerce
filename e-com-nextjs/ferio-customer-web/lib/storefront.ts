@@ -11,7 +11,9 @@ export type StorefrontSectionType =
   | "FEEDBACK_BANNER"
   | "BRAND_SHOWCASE"
   | "TEXT_WITH_IMAGE"
-  | "FLASH_SALE";
+  | "FLASH_SALE"
+  | "CUSTOM_HTML"
+  | "CUSTOM_CODE";
 
 export type SectionSettings = {
   title?: string;
@@ -45,6 +47,13 @@ export type SectionSettings = {
   buttonText?: string;
   buttonUrl?: string;
   alignment?: "left" | "center";
+  // Custom code & HTML section settings
+  customHtml?: string;
+  customCss?: string;
+  customJs?: string;
+  codeType?: "html_tailwind" | "react_component" | "raw_embed";
+  containerMaxWidth?: "contained" | "full_bleed" | "narrow";
+  isClientSideOnly?: boolean;
   [key: string]: unknown;
 };
 

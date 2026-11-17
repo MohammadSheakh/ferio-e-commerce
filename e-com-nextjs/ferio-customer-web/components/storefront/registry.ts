@@ -8,6 +8,7 @@ import BrandShowcaseSection from "./BrandShowcaseSection";
 import TextWithImageSection from "./TextWithImageSection";
 import ProductRequestBanner from "@/components/ProductRequestBanner";
 import FeedbackBanner from "@/components/FeedbackBanner";
+import CustomCodeSection from "./CustomCodeSection";
 import { StorefrontSectionType } from "@/lib/storefront";
 
 export const sectionRegistry: Record<StorefrontSectionType, ComponentType<any>> = {
@@ -21,4 +22,6 @@ export const sectionRegistry: Record<StorefrontSectionType, ComponentType<any>> 
   PROMOTIONAL_BANNER: ProductGridSection,
   BRAND_SHOWCASE: BrandShowcaseSection,
   TEXT_WITH_IMAGE: TextWithImageSection,
+  CUSTOM_HTML: CustomCodeSection,
+  CUSTOM_CODE: CustomCodeSection,
 };

@@ -41,7 +41,9 @@ type SectionType =
   | "PRODUCT_REQUEST_BANNER"
   | "FEEDBACK_BANNER"
   | "BRAND_SHOWCASE"
-  | "TEXT_WITH_IMAGE";
+  | "TEXT_WITH_IMAGE"
+  | "CUSTOM_HTML"
+  | "CUSTOM_CODE";
 
 type ProductSourceType =
   | "MANUAL_SELECTION"
@@ -181,6 +183,16 @@ const SECTION_ICONS: Record<SectionType, React.ReactNode> = {
   TEXT_WITH_IMAGE: (
     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" />
+    </svg>
+  ),
+  CUSTOM_HTML: (
+    <svg className="w-3.5 h-3.5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+    </svg>
+  ),
+  CUSTOM_CODE: (
+    <svg className="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M14 10l-2 1m0 0l-2-1m2 1v2.5M20 7l-2 1m2-1l-2-1m2 1v2.5M14 4l-2-1-2 1M4 7l2-1M4 7l2 1M4 7v2.5M12 21l-2-1m2 1l2-1m-2 1v-2.5M6 18l-2-1v-2.5M18 18l2-1v-2.5" />
     </svg>
   ),
 };
@@ -376,7 +388,178 @@ const AVAILABLE_SECTION_TEMPLATES: {
     },
     defaultDataSource: null,
   },
+  {
+    type: "CUSTOM_HTML",
+    label: "Custom HTML & Tailwind CSS",
+    description: "Write custom HTML styled directly with full Tailwind CSS classes, responsive breakpoints, inline styles, and SVG graphics.",
+    defaultSettings: {
+      title: "Custom HTML & Tailwind Section",
+      codeType: "html_tailwind",
+      containerMaxWidth: "contained",
+      customHtml: `<div class="rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-8 sm:p-12 text-white shadow-xl relative overflow-hidden">
+  <div class="max-w-xl relative z-10">
+    <span class="inline-block px-3 py-1 bg-white/10 text-white rounded-full text-xs font-semibold uppercase tracking-wider mb-3">Tailwind CSS Section</span>
+    <h3 class="text-3xl font-extrabold tracking-tight sm:text-4xl">Build Anything You Imagine</h3>
+    <p class="mt-3 text-slate-300 text-sm sm:text-base leading-relaxed">Full access to Tailwind utility classes, custom markup, SVG icons, and responsive layouts. Design custom promo cards, trust bars, or feature banners.</p>
+    <div class="mt-6 flex flex-wrap gap-4">
+      <a href="/products" class="inline-flex items-center justify-center px-6 py-3 bg-white text-slate-900 font-semibold rounded-lg shadow hover:bg-slate-100 transition-colors">Shop Now</a>
+      <a href="/services" class="inline-flex items-center justify-center px-6 py-3 bg-white/10 text-white font-medium rounded-lg border border-white/20 hover:bg-white/20 transition-colors">Our Services</a>
+    </div>
+  </div>
+</div>`,
+      customCss: `/* Scoped custom CSS for this section */
+.custom-section-content a {
+  text-decoration: none;
+}`,
+      background: "paper",
+      padding: "normal",
+      showTopBorder: false,
+    },
+    defaultDataSource: null,
+  },
+  {
+    type: "CUSTOM_CODE",
+    label: "Custom React / Client Component",
+    description: "Interactive client-side React / JavaScript component with dynamic click handlers, state, counters, or third-party embeds.",
+    defaultSettings: {
+      title: "Interactive Client Widget",
+      codeType: "react_component",
+      containerMaxWidth: "contained",
+      customHtml: `<div class="border border-line rounded-xl p-6 sm:p-8 bg-surface">
+  <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+    <div>
+      <h4 class="font-bold text-ink text-lg sm:text-xl">Live Interactive Experience</h4>
+      <p class="text-xs sm:text-sm text-ink2 mt-1">Execute client-side component code and micro-interactions directly inside the storefront.</p>
+    </div>
+    <span id="interactive-counter-badge" class="px-3 py-1 bg-indigo-50 text-indigo-700 text-xs font-semibold rounded-full border border-indigo-100">0 Clicks</span>
+  </div>
+  <div class="pt-2 flex items-center gap-3">
+    <button id="interactive-action-btn" class="px-5 py-2.5 bg-ink text-white rounded-lg text-sm font-semibold hover:bg-slate-800 active:scale-95 transition-all shadow-sm">
+      ⚡ Test Interaction
+    </button>
+  </div>
+</div>`,
+      customJs: `// Custom Client-side React/JS Widget Logic
+const btn = container.querySelector('#interactive-action-btn');
+const badge = container.querySelector('#interactive-counter-badge');
+let count = 0;
+if (btn && badge) {
+  btn.onclick = () => {
+    count++;
+    badge.textContent = count + (count === 1 ? ' Click' : ' Clicks');
+    badge.className = 'px-3 py-1 bg-emerald-50 text-emerald-700 text-xs font-semibold rounded-full border border-emerald-100 animate-pulse';
+  };
+}`,
+      background: "paper",
+      padding: "normal",
+      showTopBorder: false,
+    },
+    defaultDataSource: null,
+  },
 ];
+
+const SNIPPET_PRESETS: Record<string, { label: string; html: string; css?: string; js?: string }> = {
+  tailwind_card: {
+    label: "Tailwind Promo Card",
+    html: `<div class="rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-8 sm:p-12 text-white shadow-xl relative overflow-hidden">
+  <div class="max-w-xl relative z-10">
+    <span class="inline-block px-3 py-1 bg-white/10 text-white rounded-full text-xs font-semibold uppercase tracking-wider mb-3">Tailwind CSS</span>
+    <h3 class="text-3xl font-extrabold tracking-tight sm:text-4xl">Elevate Your Lifestyle</h3>
+    <p class="mt-3 text-slate-300 text-sm sm:text-base leading-relaxed">Handcrafted minimalist essentials tailored for contemporary living. Engineered for comfort and longevity.</p>
+    <div class="mt-6 flex flex-wrap gap-4">
+      <a href="/products" class="inline-flex items-center justify-center px-6 py-3 bg-white text-slate-900 font-semibold rounded-lg shadow hover:bg-slate-100 transition-colors">Shop Now</a>
+      <a href="/services" class="inline-flex items-center justify-center px-6 py-3 bg-white/10 text-white font-medium rounded-lg border border-white/20 hover:bg-white/20 transition-colors">Our Services</a>
+    </div>
+  </div>
+</div>`,
+    css: `/* Scoped custom styling */
+.custom-section-content a {
+  text-decoration: none;
+}`,
+  },
+  feature_grid: {
+    label: "3-Column Feature Grid",
+    html: `<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+  <div class="p-6 rounded-xl border border-line bg-surface hover:shadow-md transition-all">
+    <div class="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center mb-4 font-bold text-lg">🚚</div>
+    <h4 class="font-bold text-ink text-base">Express Delivery</h4>
+    <p class="text-xs text-ink2 mt-2 leading-relaxed">Next-day courier dispatch across all major metropolitan delivery zones nationwide.</p>
+  </div>
+  <div class="p-6 rounded-xl border border-line bg-surface hover:shadow-md transition-all">
+    <div class="w-10 h-10 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center mb-4 font-bold text-lg">🛡️</div>
+    <h4 class="font-bold text-ink text-base">Genuine Warranty</h4>
+    <p class="text-xs text-ink2 mt-2 leading-relaxed">Every item verified authentic with official manufacturer warranty coverage.</p>
+  </div>
+  <div class="p-6 rounded-xl border border-line bg-surface hover:shadow-md transition-all">
+    <div class="w-10 h-10 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center mb-4 font-bold text-lg">💳</div>
+    <h4 class="font-bold text-ink text-base">Flexible Payments</h4>
+    <p class="text-xs text-ink2 mt-2 leading-relaxed">Cash on Delivery, mobile banking (bKash/Nagad), and multi-currency card checkout.</p>
+  </div>
+</div>`,
+  },
+  interactive_counter: {
+    label: "Interactive Client Widget",
+    html: `<div class="border border-line rounded-xl p-6 sm:p-8 bg-surface">
+  <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+    <div>
+      <h4 class="font-bold text-ink text-lg sm:text-xl">Interactive Experience</h4>
+      <p class="text-xs sm:text-sm text-ink2 mt-1">Execute client-side component code and micro-interactions directly inside the storefront.</p>
+    </div>
+    <span id="interactive-counter-badge" class="px-3 py-1 bg-indigo-50 text-indigo-700 text-xs font-semibold rounded-full border border-indigo-100 font-mono">0 Clicks</span>
+  </div>
+  <div class="pt-2 flex items-center gap-3">
+    <button id="interactive-action-btn" class="px-5 py-2.5 bg-ink text-white rounded-lg text-sm font-semibold hover:bg-slate-800 active:scale-95 transition-all shadow-sm">
+      ⚡ Click to Test
+    </button>
+  </div>
+</div>`,
+    js: `// Client-side JavaScript / React Logic
+const btn = container.querySelector('#interactive-action-btn');
+const badge = container.querySelector('#interactive-counter-badge');
+let count = 0;
+if (btn && badge) {
+  btn.onclick = () => {
+    count++;
+    badge.textContent = count + (count === 1 ? ' Click' : ' Clicks');
+    badge.className = 'px-3 py-1 bg-emerald-50 text-emerald-700 text-xs font-semibold rounded-full border border-emerald-100 font-mono animate-pulse';
+  };
+}`,
+  },
+  trust_bar: {
+    label: "Trust Badges & Social Proof",
+    html: `<div class="flex flex-wrap items-center justify-around gap-6 py-4 px-6 rounded-xl bg-slate-50 border border-line">
+  <div class="flex items-center gap-2">
+    <span class="text-emerald-500 font-bold text-lg">✓</span>
+    <span class="text-xs font-medium text-ink">100% Authentic Products</span>
+  </div>
+  <div class="flex items-center gap-2">
+    <span class="text-blue-500 font-bold text-lg">★</span>
+    <span class="text-xs font-medium text-ink">4.9 / 5.0 Merchant Rating</span>
+  </div>
+  <div class="flex items-center gap-2">
+    <span class="text-amber-500 font-bold text-lg">↺</span>
+    <span class="text-xs font-medium text-ink">7-Day Easy Returns</span>
+  </div>
+  <div class="flex items-center gap-2">
+    <span class="text-purple-500 font-bold text-lg">🔒</span>
+    <span class="text-xs font-medium text-ink">SSL Encrypted Checkout</span>
+  </div>
+</div>`,
+  },
+  video_embed: {
+    label: "Responsive Video Embed",
+    html: `<div class="relative w-full rounded-2xl overflow-hidden shadow-lg border border-line bg-black" style="padding-top: 56.25%;">
+  <iframe
+    class="absolute top-0 left-0 w-full h-full"
+    src="https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ"
+    title="Featured Video"
+    frameborder="0"
+    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+    allowfullscreen
+  ></iframe>
+</div>`,
+  },
+};
 
 export default function StorefrontStudioPage() {
   const [sections, setSections] = useState<StorefrontSection[]>([]);
@@ -411,6 +594,7 @@ export default function StorefrontStudioPage() {
 
   // Collapsible Accordions in Right Inspector
   const [openAccordions, setOpenAccordions] = useState<Record<string, boolean>>({
+    customCode: true,
     typography: true,
     layout: true,
     datasource: true,
@@ -419,6 +603,9 @@ export default function StorefrontStudioPage() {
     media: true,
     blocks: true,
   });
+
+  // Active code editor tab (HTML & Tailwind vs Scoped CSS vs Client JS)
+  const [activeCodeTab, setActiveCodeTab] = useState<"html" | "css" | "js">("html");
 
   // Expanded block groups in Left Sidebar
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
@@ -1763,6 +1950,216 @@ export default function StorefrontStudioPage() {
 
           {selectedSection ? (
             <div className="custom-scrollbar flex-1 overflow-y-auto p-3.5 space-y-3">
+              {/* ACCORDION 0: CUSTOM CODE & TAILWIND CSS */}
+              {(selectedSection.type === "CUSTOM_HTML" ||
+                selectedSection.type === "CUSTOM_CODE" ||
+                selectedSection.settings?.customHtml !== undefined) && (
+                <div className="rounded-lg border-2 border-indigo-200 bg-white shadow-2xs overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => toggleAccordion("customCode")}
+                    className="flex w-full items-center justify-between px-3.5 py-2.5 text-left text-[12px] font-semibold text-indigo-950 bg-indigo-50/70 hover:bg-indigo-50 transition-colors"
+                  >
+                    <span className="flex items-center gap-2">
+                      <span className="flex h-5 w-5 items-center justify-center rounded bg-indigo-600 text-white text-[11px] font-mono">
+                        &lt;/&gt;
+                      </span>
+                      <span>Custom HTML, Tailwind &amp; React Component</span>
+                    </span>
+                    <span>{openAccordions.customCode ? "−" : "+"}</span>
+                  </button>
+
+                  {openAccordions.customCode && (
+                    <div className="p-3.5 space-y-3.5 border-t border-indigo-100 bg-white">
+                      {/* Starter Presets Bar */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="block text-[11px] font-semibold text-ink">
+                            Quick Starter Templates
+                          </label>
+                          <span className="text-[10px] text-ink2">Click to load preset</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {Object.entries(SNIPPET_PRESETS).map(([key, item]) => (
+                            <button
+                              key={key}
+                              type="button"
+                              onClick={() => {
+                                updateSettings("customHtml", item.html);
+                                if (item.css) updateSettings("customCss", item.css);
+                                if (item.js) updateSettings("customJs", item.js);
+                              }}
+                              className="rounded border border-line bg-surface px-2 py-1 text-[11px] font-medium text-ink hover:border-indigo-500 hover:text-indigo-600 transition shadow-2xs"
+                            >
+                              {item.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Code Mode Tabs: HTML + Tailwind vs Scoped CSS vs Client JS */}
+                      <div>
+                        <div className="flex rounded-md border border-line bg-slate-100 p-0.5 text-[11px] font-medium">
+                          <button
+                            type="button"
+                            onClick={() => setActiveCodeTab("html")}
+                            className={`flex-1 py-1 text-center rounded transition ${
+                              activeCodeTab === "html"
+                                ? "bg-white text-ink font-semibold shadow-2xs"
+                                : "text-ink2 hover:text-ink"
+                            }`}
+                          >
+                            HTML &amp; Tailwind
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setActiveCodeTab("css")}
+                            className={`flex-1 py-1 text-center rounded transition ${
+                              activeCodeTab === "css"
+                                ? "bg-white text-ink font-semibold shadow-2xs"
+                                : "text-ink2 hover:text-ink"
+                            }`}
+                          >
+                            Custom CSS
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setActiveCodeTab("js")}
+                            className={`flex-1 py-1 text-center rounded transition ${
+                              activeCodeTab === "js"
+                                ? "bg-white text-ink font-semibold shadow-2xs"
+                                : "text-ink2 hover:text-ink"
+                            }`}
+                          >
+                            Client JS / React
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Editor Sub-view 1: HTML & Tailwind CSS */}
+                      {activeCodeTab === "html" && (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-medium text-ink2">
+                              HTML Markup with Tailwind CSS Classes
+                            </span>
+                            <span className="text-[10px] text-indigo-600 font-mono">
+                              Tailwind Active
+                            </span>
+                          </div>
+                          <div className="rounded-lg border border-slate-700 bg-slate-900 p-2 shadow-inner">
+                            <textarea
+                              rows={14}
+                              value={selectedSection.settings?.customHtml || ""}
+                              onChange={(e) => updateSettings("customHtml", e.target.value)}
+                              placeholder={`<div class="p-8 bg-indigo-600 text-white rounded-2xl shadow-xl">\n  <h2 class="text-3xl font-bold">Your Title</h2>\n  <p class="mt-2 text-indigo-100">Styled directly with Tailwind classes.</p>\n</div>`}
+                              spellCheck={false}
+                              className="w-full bg-transparent font-mono text-[12px] leading-relaxed text-slate-100 placeholder-slate-500 outline-none resize-y"
+                            />
+                          </div>
+                          <p className="text-[11px] text-ink2 leading-relaxed">
+                            💡 Use standard Tailwind classes (<code className="text-indigo-600 bg-indigo-50 px-1 py-0.2 rounded font-mono">grid grid-cols-3</code>, <code className="text-indigo-600 bg-indigo-50 px-1 py-0.2 rounded font-mono">bg-slate-900</code>, <code className="text-indigo-600 bg-indigo-50 px-1 py-0.2 rounded font-mono">hover:scale-105</code>, <code className="text-indigo-600 bg-indigo-50 px-1 py-0.2 rounded font-mono">md:flex</code>). They compile live in the storefront.
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Editor Sub-view 2: Scoped Custom CSS */}
+                      {activeCodeTab === "css" && (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-medium text-ink2">
+                              Scoped CSS / Keyframe Animations
+                            </span>
+                            <span className="text-[10px] text-emerald-600 font-mono">
+                              &lt;style&gt; Inject
+                            </span>
+                          </div>
+                          <div className="rounded-lg border border-slate-700 bg-slate-900 p-2 shadow-inner">
+                            <textarea
+                              rows={12}
+                              value={selectedSection.settings?.customCss || ""}
+                              onChange={(e) => updateSettings("customCss", e.target.value)}
+                              placeholder={`/* Scoped styles applied to this section */\n.custom-section-content {\n  animation: fadeIn 0.4s ease-in-out;\n}`}
+                              spellCheck={false}
+                              className="w-full bg-transparent font-mono text-[12px] leading-relaxed text-slate-100 placeholder-slate-500 outline-none resize-y"
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Editor Sub-view 3: Client Script / React Logic */}
+                      {activeCodeTab === "js" && (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-medium text-ink2">
+                              Interactive Client-side JavaScript / Micro-App
+                            </span>
+                            <span className="text-[10px] text-amber-600 font-mono">
+                              Scoped Runner
+                            </span>
+                          </div>
+                          <div className="rounded-lg border border-slate-700 bg-slate-900 p-2 shadow-inner">
+                            <textarea
+                              rows={12}
+                              value={selectedSection.settings?.customJs || ""}
+                              onChange={(e) => updateSettings("customJs", e.target.value)}
+                              placeholder={`// container: HTMLElement, React: React, section: StorefrontSectionData\nconst btn = container.querySelector('button');\nif (btn) {\n  btn.onclick = () => alert('Clicked!');\n}`}
+                              spellCheck={false}
+                              className="w-full bg-transparent font-mono text-[12px] leading-relaxed text-slate-100 placeholder-slate-500 outline-none resize-y"
+                            />
+                          </div>
+                          <p className="text-[11px] text-ink2 leading-relaxed">
+                            ⚡ Scripts receive <code className="text-amber-700 bg-amber-50 px-1 rounded font-mono">container</code>, <code className="text-amber-700 bg-amber-50 px-1 rounded font-mono">React</code>, and <code className="text-amber-700 bg-amber-50 px-1 rounded font-mono">section</code> params and run inside an error boundary that protects the storefront.
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Container Max Width */}
+                      <div className="border-t border-line pt-3 space-y-2">
+                        <label className="block text-[11px] font-medium text-ink2">
+                          Container Constraint &amp; Alignment
+                        </label>
+                        <div className="grid grid-cols-3 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => updateSettings("containerMaxWidth", "contained")}
+                            className={`py-1.5 text-center rounded border text-[11px] font-medium transition ${
+                              (selectedSection.settings?.containerMaxWidth || "contained") === "contained"
+                                ? "border-indigo-600 bg-indigo-50/50 text-indigo-700"
+                                : "border-line bg-white text-ink hover:bg-slate-50"
+                            }`}
+                          >
+                            Contained (1280px)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => updateSettings("containerMaxWidth", "narrow")}
+                            className={`py-1.5 text-center rounded border text-[11px] font-medium transition ${
+                              selectedSection.settings?.containerMaxWidth === "narrow"
+                                ? "border-indigo-600 bg-indigo-50/50 text-indigo-700"
+                                : "border-line bg-white text-ink hover:bg-slate-50"
+                            }`}
+                          >
+                            Narrow (896px)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => updateSettings("containerMaxWidth", "full_bleed")}
+                            className={`py-1.5 text-center rounded border text-[11px] font-medium transition ${
+                              selectedSection.settings?.containerMaxWidth === "full_bleed"
+                                ? "border-indigo-600 bg-indigo-50/50 text-indigo-700"
+                                : "border-line bg-white text-ink hover:bg-slate-50"
+                            }`}
+                          >
+                            Full Bleed (100%)
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* ACCORDION 1: TYPOGRAPHY & HEADINGS */}
               <div className="rounded-lg border border-line bg-white shadow-2xs overflow-hidden">
                 <button

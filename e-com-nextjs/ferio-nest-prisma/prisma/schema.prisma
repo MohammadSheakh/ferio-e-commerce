@@ -2934,6 +2934,8 @@ enum StorefrontSectionType {
   BRAND_SHOWCASE
   TEXT_WITH_IMAGE
   FLASH_SALE
+  CUSTOM_HTML
+  CUSTOM_CODE
 }
 
 enum ProductSourceType {
