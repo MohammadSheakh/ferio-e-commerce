@@ -27,7 +27,9 @@ function getExternalStorefrontUrl(storeSlug: string): string {
 }
 
 function getStudioCanvasPreviewUrl(storeSlug: string, versionKey: number): string {
-  return `/api/storefront/preview-render?preview=true&slug=${encodeURIComponent(storeSlug)}&v=${versionKey}`;
+  const base = getExternalStorefrontUrl(storeSlug);
+  const sep = base.includes("?") ? "&" : "?";
+  return `${base}${sep}v=${versionKey}`;
 }
 
 type SectionType =

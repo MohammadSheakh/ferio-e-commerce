@@ -10,9 +10,7 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
-    if (process.env.NODE_ENV === "development") {
-      console.error(error);
-    }
+    console.error("[FERIO_GLOBAL_ERROR]", error);
   }, [error]);
 
   return (
