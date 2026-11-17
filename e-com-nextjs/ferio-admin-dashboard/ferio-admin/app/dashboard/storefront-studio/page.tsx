@@ -321,7 +321,78 @@ export default function StorefrontStudioPage() {
   const [iframeKey, setIframeKey] = useState(0);
   const [activeStoreSlug, setActiveStoreSlug] = useState<string>("test");
   const initialSnapshotRef = useRef<string>("");
+  const iframeRef = useRef<HTMLIFrameElement>(null);
   const [, startTransition] = useTransition();
+
+  const selectSectionAndScroll = (id: string) => {
+    setSelectedSectionId(id);
+    if (iframeRef.current?.contentWindow) {
+      try {
+        iframeRef.current.contentWindow.postMessage(
+          {
+            type: "FERIO_STUDIO_SCROLL_SECTION",
+            sectionId: id,
+          },
+          "*",
+        );
+      } catch (e) {}
+    }
+  };
+
+  // Real-Time 2-Way Sync: broadcast section edits to live preview canvas immediately
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!iframe || !iframe.contentWindow) return;
+    try {
+      iframe.contentWindow.postMessage(
+        {
+          type: "FERIO_STUDIO_SYNC_SECTIONS",
+          sections: sections.map((s, idx) => ({
+            id: s.id,
+            type: s.type,
+            enabled: s.enabled,
+            sortOrder: idx,
+            settings: s.settings || {},
+            dataSource: s.dataSource || null,
+          })),
+        },
+        "*",
+      );
+    } catch (e) {}
+  }, [sections]);
+
+  // Two-way interactive link: iframe tells studio when ready or when a section is clicked
+  useEffect(() => {
+    const handleMessage = (e: MessageEvent) => {
+      if (!e.data || typeof e.data !== "object") return;
+      if (e.data.type === "FERIO_STOREFRONT_READY") {
+        if (iframeRef.current?.contentWindow) {
+          try {
+            iframeRef.current.contentWindow.postMessage(
+              {
+                type: "FERIO_STUDIO_SYNC_SECTIONS",
+                sections: sections.map((s, idx) => ({
+                  id: s.id,
+                  type: s.type,
+                  enabled: s.enabled,
+                  sortOrder: idx,
+                  settings: s.settings || {},
+                  dataSource: s.dataSource || null,
+                })),
+              },
+              "*",
+            );
+          } catch (err) {}
+        }
+      } else if (e.data.type === "FERIO_STOREFRONT_SECTION_CLICKED") {
+        if (e.data.sectionId) {
+          setSelectedSectionId(e.data.sectionId);
+        }
+      }
+    };
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, [sections]);
 
   const serializeSections = (list: StorefrontSection[]) =>
     JSON.stringify(
@@ -1031,7 +1102,7 @@ export default function StorefrontStudioPage() {
               return (
                 <div
                   key={section.id}
-                  onClick={() => setSelectedSectionId(section.id)}
+                  onClick={() => selectSectionAndScroll(section.id)}
                   className={`group flex items-center justify-between rounded-lg border px-3 py-2.5 transition cursor-pointer ${
                     isSelected
                       ? "border-ink bg-surface text-ink font-medium"
@@ -1149,6 +1220,7 @@ export default function StorefrontStudioPage() {
               {viewMode === "desktop" ? (
                 <div className="h-full w-full rounded-card border border-line bg-paper overflow-hidden shadow-none flex flex-col">
                   <iframe
+                    ref={iframeRef}
                     key={iframeKey}
                     src={getStudioCanvasPreviewUrl(activeStoreSlug, iframeKey)}
                     className="h-full w-full border-0 bg-paper"
@@ -1159,6 +1231,7 @@ export default function StorefrontStudioPage() {
                 <div className="my-auto h-[780px] w-[390px] shrink-0 rounded-[36px] border-[8px] border-[#1e1e24] bg-paper overflow-hidden shadow-none relative flex flex-col">
                   <div className="absolute top-2 left-1/2 -translate-x-1/2 h-3.5 w-24 rounded-full bg-[#1e1e24] z-20 pointer-events-none" />
                   <iframe
+                    ref={iframeRef}
                     key={iframeKey}
                     src={getStudioCanvasPreviewUrl(activeStoreSlug, iframeKey)}
                     className="h-full w-full border-0 bg-paper pt-3"
