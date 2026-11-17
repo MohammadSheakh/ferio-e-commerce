@@ -187,6 +187,16 @@ export const PLATFORM_FEATURES: readonly PlatformFeatureDefinition[] = [
     defaultInInternal: true,
   },
   {
+    key: 'signature_storefront_template',
+    displayName: 'Signature Storefront Showroom Template',
+    category: 'SELECTIVE',
+    description: 'Access to the full 3-card interactive lifestyle hero showcase with hotspots and signature showroom template.',
+    defaultInStarter: false,
+    defaultInBusiness: false,
+    defaultInPro: false,
+    defaultInInternal: false,
+  },
+  {
     key: 'advanced_reports',
     displayName: 'Advanced Analytics & P&L',
     category: 'SELECTIVE',

@@ -3,6 +3,7 @@ import { DomainActions } from "./domain-actions";
 import { OrgActions } from "./org-actions";
 import { SubscriptionActions } from "./subscription-actions";
 import { TenantFeatureMatrix, type FeatureItem } from "./tenant-feature-matrix";
+import { StorefrontProvisionCard } from "./storefront-provision-card";
 import { UsageCard, type UsageMetricRow } from "./usage-card";
 import { TenantStorageCard } from "./tenant-storage-card";
 
@@ -85,6 +86,9 @@ export default async function OrganizationDetail({ params }: { params: { id: str
         initialFeatures={entitlements}
         subscriptionStatus={org.subscription?.status ?? null}
       />
+
+      <div style={{ height: 28 }} />
+      <StorefrontProvisionCard organizationId={org.id} />
 
       <div style={{ height: 28 }} />
       <UsageCard

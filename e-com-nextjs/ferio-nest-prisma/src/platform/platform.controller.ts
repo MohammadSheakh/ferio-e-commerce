@@ -264,6 +264,31 @@ export class PlatformAdminController {
     return this.tenantDatabases.measureStorage(id);
   }
 
+  /**
+   * Diagnostic check of tenant storefront template and section state.
+   */
+  @Get('organizations/:id/storefront/status')
+  @PlatformPermissions('organization:read')
+  async getOrganizationStorefrontStatus(@Param('id') id: string) {
+    if (!this.tenantDatabases) {
+      throw new ConflictException('TENANT_DATABASES_SERVICE_UNAVAILABLE');
+    }
+    return this.tenantDatabases.getStorefrontStatus(id);
+  }
+
+  /**
+   * Platform Admin Action: Selectively provisions the full Signature Initial Showroom
+   * template to a specific organization's tenant database.
+   */
+  @Post('organizations/:id/storefront/provision-signature-template')
+  @PlatformPermissions('organization:write')
+  async provisionSignatureStorefrontTemplate(@Param('id') id: string) {
+    if (!this.tenantDatabases) {
+      throw new ConflictException('TENANT_DATABASES_SERVICE_UNAVAILABLE');
+    }
+    return this.tenantDatabases.provisionSignatureStorefront(id);
+  }
+
   /** MT-9 §12.1/§12.4 — credential-free domain routing diagnostics. */
   @Get('domain-health')
   @PlatformPermissions(PLATFORM_PERMISSION.PLATFORM_HEALTH_READ)

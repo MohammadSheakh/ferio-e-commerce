@@ -2,10 +2,13 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { PlatformAuditService } from './platform-audit.service';
 import { decryptSecret, encryptSecret } from '../utils/secret-box';
 import { PlatformPrismaService } from '../platform-prisma.service';
+import { TenantDatabaseManager } from '../../tenancy/services/tenant-database.manager';
+import { SIGNATURE_INITIAL_SECTIONS } from '../../features/storefront/services/storefront.service';
 
 export interface RegisterTenantDatabaseInput {
   organizationId: string;
@@ -27,6 +30,8 @@ export class TenantDatabasesService {
   constructor(
     private readonly platform: PlatformPrismaService,
     private readonly audit: PlatformAuditService,
+    @Optional()
+    private readonly manager?: TenantDatabaseManager,
   ) {}
 
   async register(input: RegisterTenantDatabaseInput) {
@@ -207,5 +212,178 @@ export class TenantDatabasesService {
         record.diskSizeBytes != null ? record.diskSizeBytes.toString() : null,
       diskSizeRecordedAt: record.diskSizeRecordedAt,
     };
+  }
+
+  /**
+   * Provision the Signature Initial Storefront Template (interactive showcase,
+   * category grid, product collections, and banners) into a specific tenant database.
+   */
+  async provisionSignatureStorefront(organizationId: string) {
+    const record = await this.platform.client.tenantDatabase.findUnique({
+      where: { organizationId },
+      include: { organization: true },
+    });
+    if (!record) {
+      throw new NotFoundException('TENANT_DATABASE_NOT_FOUND');
+    }
+    if (record.status !== 'READY') {
+      throw new ConflictException('TENANT_DATABASE_NOT_READY');
+    }
+    if (!this.manager) {
+      throw new ConflictException('TENANT_DATABASE_MANAGER_UNAVAILABLE');
+    }
+
+    const result = await this.manager.runTransient(record, async () => {
+      const db = await this.manager!.getClient(record);
+      return db.$transaction(async (tx: any) => {
+        let page = await tx.storefrontPage.findUnique({
+          where: { slug: 'home' },
+        });
+        if (!page) {
+          page = await tx.storefrontPage.create({
+            data: {
+              type: 'HOME',
+              slug: 'home',
+              title: 'Storefront Homepage',
+            },
+          });
+        }
+
+        const latestVersion = await tx.storefrontPageVersion.findFirst({
+          where: { pageId: page.id },
+          orderBy: { versionNumber: 'desc' },
+        });
+        const nextVersionNumber = (latestVersion?.versionNumber ?? 0) + 1;
+
+        const newVersion = await tx.storefrontPageVersion.create({
+          data: {
+            pageId: page.id,
+            versionNumber: nextVersionNumber,
+            isPublished: true,
+            publishedAt: new Date(),
+            changeSummary: 'Provisioned Signature Initial Showroom Template by Platform Admin',
+            sections: {
+              create: SIGNATURE_INITIAL_SECTIONS.map((s) => ({
+                type: s.type,
+                sortOrder: s.sortOrder,
+                enabled: s.enabled,
+                settings: s.settings,
+                dataSource: s.dataSource || undefined,
+              })),
+            },
+          },
+          include: {
+            sections: {
+              orderBy: { sortOrder: 'asc' },
+            },
+          },
+        });
+
+        await tx.storefrontPage.update({
+          where: { id: page.id },
+          data: {
+            publishedVersionId: newVersion.id,
+          },
+        });
+
+        return {
+          versionNumber: newVersion.versionNumber,
+          sectionsCount: newVersion.sections.length,
+        };
+      });
+    });
+
+    // Grant or enable entitlement override for signature_storefront_template
+    const subscription = await this.platform.client.subscription.findUnique({
+      where: { organizationId },
+    });
+    if (subscription) {
+      const expiryDate = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
+      await this.platform.client.subscriptionEntitlementOverride.upsert({
+        where: {
+          subscriptionId_featureKey: {
+            subscriptionId: subscription.id,
+            featureKey: 'signature_storefront_template',
+          },
+        },
+        update: {
+          enabled: true,
+          reason: 'Platform Admin Template Provisioning',
+          expiresAt: expiryDate,
+          revokedAt: null,
+        },
+        create: {
+          subscriptionId: subscription.id,
+          featureKey: 'signature_storefront_template',
+          enabled: true,
+          reason: 'Platform Admin Template Provisioning',
+          expiresAt: expiryDate,
+        },
+      });
+    }
+
+    await this.audit.record({
+      action: 'SIGNATURE_STOREFRONT_TEMPLATE_PROVISIONED',
+      entityType: 'Organization',
+      entityId: organizationId,
+      newValue: {
+        organizationId,
+        databaseName: record.databaseName,
+        sectionsCount: result.sectionsCount,
+        versionNumber: result.versionNumber,
+      },
+    });
+
+    return {
+      organizationId,
+      status: 'PROVISIONED',
+      sectionsCount: result.sectionsCount,
+      versionNumber: result.versionNumber,
+      message: 'Signature initial storefront template provisioned successfully.',
+    };
+  }
+
+  /**
+   * Diagnostic inspection of tenant storefront status for Platform Admin UI.
+   */
+  async getStorefrontStatus(organizationId: string) {
+    const record = await this.platform.client.tenantDatabase.findUnique({
+      where: { organizationId },
+    });
+    if (!record || record.status !== 'READY' || !this.manager) {
+      return { status: 'UNAVAILABLE', hasSignatureTemplate: false, sectionsCount: 0, versionNumber: 0 };
+    }
+
+    try {
+      return await this.manager.runTransient(record, async () => {
+        const db = await this.manager!.getClient(record);
+        const page = await db.storefrontPage.findUnique({
+          where: { slug: 'home' },
+          include: {
+            publishedVersion: {
+              include: {
+                sections: true,
+              },
+            },
+          },
+        });
+
+        const sections = page?.publishedVersion?.sections ?? [];
+        const hasInteractiveHero = sections.some(
+          (s: any) =>
+            s.type === 'HERO_SHOWCASE' &&
+            (s.settings?.layout === 'interactive' || s.settings?.variant === 'interactive'),
+        );
+
+        return {
+          status: 'READY',
+          sectionsCount: sections.length,
+          hasSignatureTemplate: hasInteractiveHero,
+          versionNumber: page?.publishedVersion?.versionNumber ?? 0,
+        };
+      });
+    } catch {
+      return { status: 'ERROR', hasSignatureTemplate: false, sectionsCount: 0, versionNumber: 0 };
+    }
   }
 }

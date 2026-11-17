@@ -93,5 +93,62 @@ describe('TenantDatabasesService storage measurement', () => {
       ConflictException,
     );
   });
+
+  it('provisions signature storefront template for a specific organization', async () => {
+    const mockTx = {
+      storefrontPage: {
+        findUnique: jest.fn().mockResolvedValue({ id: 'page-1', slug: 'home' }),
+        update: jest.fn().mockResolvedValue({}),
+      },
+      storefrontPageVersion: {
+        findFirst: jest.fn().mockResolvedValue({ versionNumber: 1 }),
+        create: jest.fn().mockResolvedValue({
+          id: 'ver-2',
+          versionNumber: 2,
+          sections: new Array(9).fill({ id: 'sec-1' }),
+        }),
+      },
+    };
+
+    const mockDb = {
+      $transaction: jest.fn().mockImplementation((cb) => cb(mockTx)),
+    };
+
+    const mockManager = {
+      runTransient: jest.fn().mockImplementation((_mat, cb) => cb()),
+      getClient: jest.fn().mockResolvedValue(mockDb),
+    };
+
+    const serviceWithManager = new TenantDatabasesService(
+      mockPlatform as never,
+      mockAudit as never,
+      mockManager as never,
+    );
+
+    mockPlatform.client.tenantDatabase.findUnique.mockResolvedValue({
+      id: 'tdb-1',
+      organizationId: 'org-1',
+      status: 'READY',
+      databaseName: 'ferio_tenant_demo_1234',
+    });
+    mockPlatform.client.subscription = {
+      findUnique: jest.fn().mockResolvedValue({ id: 'sub-1' }),
+    } as never;
+    mockPlatform.client.subscriptionEntitlementOverride = {
+      upsert: jest.fn().mockResolvedValue({}),
+    } as never;
+
+    const result = await serviceWithManager.provisionSignatureStorefront('org-1');
+
+    expect(result.status).toBe('PROVISIONED');
+    expect(result.sectionsCount).toBe(9);
+    expect(result.versionNumber).toBe(2);
+    expect(mockAudit.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'SIGNATURE_STOREFRONT_TEMPLATE_PROVISIONED',
+        entityId: 'org-1',
+      }),
+    );
+  });
 });
 

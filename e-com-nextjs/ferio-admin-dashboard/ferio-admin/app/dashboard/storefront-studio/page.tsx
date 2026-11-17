@@ -301,6 +301,7 @@ export default function StorefrontStudioPage() {
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [historyList, setHistoryList] = useState<VersionHistoryItem[]>([]);
   const [activeVersionNumber, setActiveVersionNumber] = useState(1);
+  const [hasSignatureTemplate, setHasSignatureTemplate] = useState(false);
   const [previewTab, setPreviewTab] = useState<"interactive" | "wireframe">("interactive");
   const [iframeKey, setIframeKey] = useState(0);
   const initialSnapshotRef = useRef<string>("");
@@ -352,6 +353,7 @@ export default function StorefrontStudioPage() {
             setSelectedSectionId(draftPayload.data.sections[0].id);
           }
           setActiveVersionNumber(draftPayload.data.draftVersionNumber || 1);
+          setHasSignatureTemplate(Boolean(draftPayload.data.hasSignatureTemplate));
           initialSnapshotRef.current = serializeSections(draftPayload.data.sections);
         }
 
@@ -416,9 +418,15 @@ export default function StorefrontStudioPage() {
   };
 
   const applyInitialDesignTemplate = () => {
+    if (!hasSignatureTemplate) {
+      alert(
+        "This template requires platform administrator provisioning. Please contact your platform administrator to provision the full Signature Showroom template to your store.",
+      );
+      return;
+    }
     if (
       sections.length > 0 &&
-      !confirm("Apply the Signature Initial Design template? This will replace current sections in the working draft.")
+      !confirm("Re-apply the Signature Initial Design template? This will replace current sections in the working draft.")
     ) {
       return;
     }
@@ -2157,28 +2165,56 @@ export default function StorefrontStudioPage() {
 
             <div className="mt-5 space-y-3.5 max-h-[500px] overflow-y-auto pr-1">
               {/* Option 1: Signature Initial Design */}
-              <div className="rounded-xl border border-ink/40 bg-surface/40 p-4 transition hover:border-ink">
+              <div
+                className={`rounded-xl border p-4 transition ${
+                  hasSignatureTemplate
+                    ? "border-ink/40 bg-surface/40 hover:border-ink"
+                    : "border-line bg-paper opacity-85"
+                }`}
+              >
                 <div className="flex items-start justify-between gap-4">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <h4 className="text-[14px] font-semibold text-ink">
                         Signature Interactive Showcase (Initial Design)
                       </h4>
-                      <span className="rounded-full bg-ink px-2 py-0.5 text-[10px] font-medium text-white">
-                        Initial Full Template
-                      </span>
+                      {hasSignatureTemplate ? (
+                        <span className="rounded-full bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
+                          Provisioned by Platform Admin
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-surface px-2 py-0.5 text-[10px] font-medium text-ink2 border border-line">
+                          Platform Admin Managed
+                        </span>
+                      )}
                     </div>
                     <p className="text-[12px] text-ink2 leading-relaxed">
                       Matches the original lifestyle showroom design: 3-card layout (velvet sofa, centerpiece armchair with interactive product hotspots, slide navigation 01-03, and watermark typography), followed by Category Grid, Featured Products, Product Request, and Flash Sales.
                     </p>
+                    {!hasSignatureTemplate && (
+                      <p className="text-[11px] text-amber-700 font-medium pt-1">
+                        🔒 Not provisioned for this store. Only stores selected by platform administrator receive this initial template.
+                      </p>
+                    )}
                   </div>
-                  <button
-                    type="button"
-                    onClick={applyInitialDesignTemplate}
-                    className="shrink-0 rounded-full bg-ink px-4 py-2 text-[12px] font-medium text-white transition hover:opacity-85"
-                  >
-                    Apply Preset
-                  </button>
+                  {hasSignatureTemplate ? (
+                    <button
+                      type="button"
+                      onClick={applyInitialDesignTemplate}
+                      className="shrink-0 rounded-full bg-ink px-4 py-2 text-[12px] font-medium text-white transition hover:opacity-85"
+                    >
+                      Apply Preset
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled
+                      className="shrink-0 rounded-full border border-line bg-surface px-3.5 py-1.5 text-[11px] font-medium text-ink2 opacity-60 cursor-not-allowed"
+                      title="Only platform administrator can provision this template"
+                    >
+                      Admin Only 🔒
+                    </button>
+                  )}
                 </div>
               </div>
 

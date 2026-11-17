@@ -26,7 +26,11 @@ import { sanitizeSectionSettings } from '../utils/url-sanitizer.util';
 import { StorefrontCacheInvalidationService } from './storefront-cache-invalidation.service';
 import type { UserPayload } from '@app/common';
 
-const DEFAULT_HOME_SECTIONS = [
+// Normal stores initialize with an empty design canvas (0 sections).
+// The full signature showroom template is provisioned selectively by Platform Admin.
+const DEFAULT_HOME_SECTIONS: any[] = [];
+
+export const SIGNATURE_INITIAL_SECTIONS = [
   {
     type: StorefrontSectionType.HERO_SHOWCASE,
     sortOrder: 0,
@@ -321,6 +325,12 @@ export class StorefrontService {
     // Hydrate preview data for studio preview
     const hydratedSections = await this.hydration.hydrateSections(db, sections, false);
 
+    const hasSignatureTemplate = sections.some(
+      (s: any) =>
+        s.type === StorefrontSectionType.HERO_SHOWCASE &&
+        (s.settings?.layout === 'interactive' || s.settings?.variant === 'interactive'),
+    );
+
     return {
       id: page.id,
       slug: page.slug,
@@ -328,6 +338,7 @@ export class StorefrontService {
       publishedVersionId: page.publishedVersionId,
       draftVersionNumber: latestVersion?.versionNumber ?? 1,
       sections: hydratedSections,
+      hasSignatureTemplate,
     };
   }
 
