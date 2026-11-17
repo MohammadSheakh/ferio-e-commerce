@@ -34,8 +34,21 @@ function redirectToHttps(request: NextRequest): NextResponse | null {
   );
   if (forwardedProtocol !== "http") return null;
 
+  const host = tenantHostFromHeaders(request.headers) || request.headers.get("host");
+  if (
+    !host ||
+    host.startsWith("0.0.0.0") ||
+    host.startsWith("localhost") ||
+    host.startsWith("127.0.0.1") ||
+    host.includes("customer-web") ||
+    host.includes("frontend")
+  ) {
+    return null;
+  }
+
   const url = request.nextUrl.clone();
   url.protocol = "https:";
+  url.host = host;
   return NextResponse.redirect(url, 308);
 }
 
@@ -45,6 +58,7 @@ function buildCspHeader(request: NextRequest): string {
     "https://*.sheakh.qzz.io",
     "https://*.qzz.io",
     "https://adminf.sheakh.qzz.io",
+    "https://sheakh.qzz.io",
     "http://localhost:*",
     "http://127.0.0.1:*",
   ]);

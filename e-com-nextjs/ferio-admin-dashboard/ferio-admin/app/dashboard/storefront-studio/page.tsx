@@ -4,17 +4,30 @@ import { useEffect, useState, useTransition, useRef } from "react";
 import Topbar from "@/components/Topbar";
 import ImagePicker from "@/components/ImagePicker";
 
-function getStorefrontPreviewUrl(): string {
+function getActiveStoreSlug(): string {
+  if (typeof window === "undefined") return "test";
+  const cookieMatch = document.cookie.match(/(?:^|;\s*)ferio_store_slug=([^;]+)/);
+  if (cookieMatch && cookieMatch[1]) {
+    return decodeURIComponent(cookieMatch[1]).trim().toLowerCase();
+  }
+  return localStorage.getItem("ferio_store_slug") || "test";
+}
+
+function getExternalStorefrontUrl(storeSlug: string): string {
   if (typeof window === "undefined") return "/?preview=true";
   const { protocol, hostname } = window.location;
   if (hostname.startsWith("adminf.")) {
-    const storefrontHost = hostname.replace("adminf.", "");
-    return `${protocol}//${storefrontHost}/?preview=true`;
+    const rootDomain = hostname.replace("adminf.", "");
+    return `${protocol}//${storeSlug}.${rootDomain}/?preview=true`;
   }
   if (hostname === "localhost" || hostname === "127.0.0.1") {
-    return `${protocol}//${hostname}:3000/?preview=true`;
+    return `${protocol}//localhost:3000/?preview=true`;
   }
-  return `/?preview=true`;
+  return `${protocol}//${storeSlug}.${hostname}/?preview=true`;
+}
+
+function getStudioCanvasPreviewUrl(storeSlug: string, versionKey: number): string {
+  return `/api/storefront/preview-render?preview=true&slug=${encodeURIComponent(storeSlug)}&v=${versionKey}`;
 }
 
 type SectionType =
@@ -304,6 +317,7 @@ export default function StorefrontStudioPage() {
   const [hasSignatureTemplate, setHasSignatureTemplate] = useState(false);
   const [previewTab, setPreviewTab] = useState<"interactive" | "wireframe">("interactive");
   const [iframeKey, setIframeKey] = useState(0);
+  const [activeStoreSlug, setActiveStoreSlug] = useState<string>("test");
   const initialSnapshotRef = useRef<string>("");
   const [, startTransition] = useTransition();
 
@@ -322,6 +336,10 @@ export default function StorefrontStudioPage() {
   const isDirty =
     initialSnapshotRef.current !== "" &&
     initialSnapshotRef.current !== serializeSections(sections);
+
+  useEffect(() => {
+    setActiveStoreSlug(getActiveStoreSlug());
+  }, []);
 
   useEffect(() => {
     const onBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -941,9 +959,9 @@ export default function StorefrontStudioPage() {
 
           <button
             type="button"
-            onClick={() => window.open(getStorefrontPreviewUrl(), "_blank")}
+            onClick={() => window.open(getExternalStorefrontUrl(activeStoreSlug), "_blank")}
             className="rounded-full border border-line bg-paper px-3 py-1.5 text-[12px] font-medium text-ink transition hover:bg-surface"
-            title="Open storefront preview in new tab"
+            title={`Open ${activeStoreSlug} storefront in new tab`}
           >
             Preview Tab ↗
           </button>
@@ -1097,6 +1115,9 @@ export default function StorefrontStudioPage() {
               <span className="rounded-full bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
                 Draft Mode (?preview=true)
               </span>
+              <span className="rounded-full bg-surface border border-line px-2 py-0.5 text-[10px] font-medium text-ink2">
+                Store: {activeStoreSlug}
+              </span>
               {isDirty && previewTab === "interactive" && (
                 <span className="text-[11px] text-amber-700">
                   Save draft to reflect latest edits in live preview
@@ -1127,7 +1148,7 @@ export default function StorefrontStudioPage() {
                 <div className="h-full w-full rounded-card border border-line bg-paper overflow-hidden shadow-none flex flex-col">
                   <iframe
                     key={iframeKey}
-                    src={getStorefrontPreviewUrl()}
+                    src={getStudioCanvasPreviewUrl(activeStoreSlug, iframeKey)}
                     className="h-full w-full border-0 bg-paper"
                     title="Storefront Desktop Preview"
                   />
@@ -1137,7 +1158,7 @@ export default function StorefrontStudioPage() {
                   <div className="absolute top-2 left-1/2 -translate-x-1/2 h-3.5 w-24 rounded-full bg-[#1e1e24] z-20 pointer-events-none" />
                   <iframe
                     key={iframeKey}
-                    src={getStorefrontPreviewUrl()}
+                    src={getStudioCanvasPreviewUrl(activeStoreSlug, iframeKey)}
                     className="h-full w-full border-0 bg-paper pt-3"
                     title="Storefront Mobile Preview"
                   />
