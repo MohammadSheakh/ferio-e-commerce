@@ -39,15 +39,48 @@ function redirectToHttps(request: NextRequest): NextResponse | null {
   return NextResponse.redirect(url, 308);
 }
 
+function buildCspHeader(request: NextRequest): string {
+  const origins = new Set<string>([
+    "'self'",
+    "https://*.sheakh.qzz.io",
+    "https://*.qzz.io",
+    "https://adminf.sheakh.qzz.io",
+    "http://localhost:*",
+    "http://127.0.0.1:*",
+  ]);
+
+  const referer = request.headers.get("referer");
+  if (referer) {
+    try {
+      const parsed = new URL(referer);
+      origins.add(parsed.origin);
+    } catch {
+      // ignore invalid referer
+    }
+  }
+
+  return `frame-ancestors ${Array.from(origins).join(" ")};`;
+}
+
+function applySecurityHeaders(request: NextRequest, response: NextResponse): NextResponse {
+  response.headers.set("Content-Security-Policy", buildCspHeader(request));
+  response.headers.delete("X-Frame-Options");
+  return response;
+}
+
 export function middleware(request: NextRequest) {
   const httpsRedirect = redirectToHttps(request);
   if (httpsRedirect) return httpsRedirect;
 
   if (!request.nextUrl.pathname.startsWith("/api/")) {
-    return NextResponse.next();
+    const response = NextResponse.next();
+    return applySecurityHeaders(request, response);
   }
 
-  if (safeMethods.has(request.method)) return NextResponse.next();
+  if (safeMethods.has(request.method)) {
+    const response = NextResponse.next();
+    return applySecurityHeaders(request, response);
+  }
 
   const origin = request.headers.get("origin");
   const fetchSite = request.headers.get("sec-fetch-site");
@@ -55,7 +88,10 @@ export function middleware(request: NextRequest) {
     ? origin === requestOrigin(request)
     : fetchSite === "same-origin";
 
-  if (allowed) return NextResponse.next();
+  if (allowed) {
+    const response = NextResponse.next();
+    return applySecurityHeaders(request, response);
+  }
 
   return NextResponse.json(
     { message: "Cross-site request blocked." },
