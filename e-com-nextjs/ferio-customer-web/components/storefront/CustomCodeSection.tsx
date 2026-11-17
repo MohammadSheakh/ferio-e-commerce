@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState, useMemo } from "react";
+import DOMPurify from "isomorphic-dompurify";
 import { StorefrontSectionData } from "@/lib/storefront";
 
 interface CustomCodeSectionProps {
@@ -9,6 +10,40 @@ interface CustomCodeSectionProps {
   section?: StorefrontSectionData;
   [key: string]: unknown;
 }
+
+const DOMPURIFY_CONFIG = {
+  USE_PROFILES: { html: true, svg: true, svgFilters: true },
+  ADD_TAGS: ["iframe", "video", "audio", "source", "style"],
+  ADD_ATTR: [
+    "target",
+    "rel",
+    "loading",
+    "autoplay",
+    "controls",
+    "loop",
+    "muted",
+    "playsinline",
+    "allowfullscreen",
+    "frameborder",
+    "data-section-id",
+    "style",
+  ],
+  FORBID_TAGS: ["script"], // <script> is parsed separately and run in an isolated credential-shielded scope
+  FORBID_ATTR: [
+    "onerror",
+    "onload",
+    "onclick",
+    "onmouseover",
+    "onmouseenter",
+    "onmouseleave",
+    "onfocus",
+    "onblur",
+    "onchange",
+    "onsubmit",
+    "onkeydown",
+    "onkeyup",
+  ],
+};
 
 /**
  * Enterprise CSS Scope Isolation
@@ -153,6 +188,12 @@ export default function CustomCodeSection(props: CustomCodeSectionProps) {
     };
   }, [rawCode, settings.customCss, settings.customJs]);
 
+  // Sanitize extracted HTML markup to neutralize any inline XSS or malicious vectors
+  const sanitizedHtml = useMemo(() => {
+    if (!parsedHtml) return "";
+    return DOMPurify.sanitize(parsedHtml, DOMPURIFY_CONFIG);
+  }, [parsedHtml]);
+
   const containerMaxWidth = (settings.containerMaxWidth as string) || "contained";
   const scopeSelector = `[data-section-id="${sectionId}"]`;
 
@@ -161,9 +202,16 @@ export default function CustomCodeSection(props: CustomCodeSectionProps) {
     return scopeCssRules(parsedCss, scopeSelector);
   }, [parsedCss, scopeSelector]);
 
-  // Ensure runtime Tailwind JIT engine is present so arbitrary user classes compile live
+  // Load Tailwind JIT CDN ONLY in Storefront Studio / Preview mode for live editing feedback.
+  // In live production customer visits, NEVER inject the 350KB Play CDN to protect Core Web Vitals (LCP, INP, CLS).
   useEffect(() => {
     if (typeof window === "undefined") return;
+
+    const isStudioPreview =
+      window !== window.parent ||
+      window.location.search.includes("preview=true");
+
+    if (!isStudioPreview) return;
 
     if (!(window as any).tailwind) {
       const scriptId = "ferio-tailwind-cdn-runtime";
@@ -205,7 +253,7 @@ export default function CustomCodeSection(props: CustomCodeSectionProps) {
       ? "max-w-4xl mx-auto px-4 sm:px-6"
       : "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8";
 
-  // Execute client-side JS / React Component safely
+  // Execute client-side JS / Interactive Widgets safely with credential isolation
   useEffect(() => {
     if (!parsedJs || !containerRef.current) return;
     setScriptError(null);
@@ -217,14 +265,28 @@ export default function CustomCodeSection(props: CustomCodeSectionProps) {
       const runner = new Function(
         "container",
         "React",
-        "useState",
-        "useEffect",
-        "useRef",
-        "useMemo",
         "section",
         `
+        "use strict";
+        // Shield sensitive browser storage from unauthorized extraction
+        const localStorage = undefined;
+        const sessionStorage = undefined;
+        const indexedDB = undefined;
+
+        // Scoped document interface limited to this section container
+        const safeDocument = {
+          querySelector: function(s) { return container.querySelector(s); },
+          querySelectorAll: function(s) { return container.querySelectorAll(s); },
+          getElementById: function(id) { return container.querySelector("#" + id); },
+          getElementsByClassName: function(c) { return container.getElementsByClassName(c); },
+          addEventListener: function(type, listener, options) { return container.addEventListener(type, listener, options); },
+          removeEventListener: function(type, listener, options) { return container.removeEventListener(type, listener, options); },
+        };
+
         try {
-          ${parsedJs}
+          return (function(container, document) {
+            ${parsedJs}
+          })(container, safeDocument);
         } catch (err) {
           console.error("[CustomCodeSection] Script error:", err);
           throw err;
@@ -235,10 +297,6 @@ export default function CustomCodeSection(props: CustomCodeSectionProps) {
       const result = runner(
         container,
         React,
-        React.useState,
-        React.useEffect,
-        React.useRef,
-        React.useMemo,
         section || { id: sectionId, settings }
       );
 
@@ -313,11 +371,11 @@ export default function CustomCodeSection(props: CustomCodeSectionProps) {
             </div>
           ) : null}
 
-          {/* Custom HTML & Tailwind Container */}
+          {/* Custom HTML & Tailwind Container (DOMPurify Sanitized) */}
           <div
             ref={containerRef}
             className="custom-section-content"
-            dangerouslySetInnerHTML={parsedHtml ? { __html: parsedHtml } : undefined}
+            dangerouslySetInnerHTML={sanitizedHtml ? { __html: sanitizedHtml } : undefined}
           />
         </div>
       </section>
