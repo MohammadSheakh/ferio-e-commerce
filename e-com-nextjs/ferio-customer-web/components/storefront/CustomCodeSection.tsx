@@ -310,6 +310,12 @@ export default function CustomCodeSection(props: CustomCodeSectionProps) {
 
         // Scoped document interface limited to this section container
         const safeDocument = {
+          currentScript: {
+            closest: function(sel) {
+              return container.closest(sel) || container.querySelector(sel) || container;
+            },
+            parentElement: container,
+          },
           querySelector: function(s) { return container.querySelector(s); },
           querySelectorAll: function(s) { return container.querySelectorAll(s); },
           getElementById: function(id) {
