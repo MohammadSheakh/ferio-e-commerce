@@ -18,12 +18,12 @@ export const GLOBAL_RATE_LIMITS = {
   },
   auth: {
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 10, // 10 attempts per 15 minutes
+    max: 30, // 30 attempts per 15 minutes
     keyPrefix: 'auth_attempt',
   },
   strict: {
     windowMs: 60 * 60 * 1000, // 1 hour
-    max: 5,
+    max: 10,
     keyPrefix: 'strict_op',
   },
 } as const;

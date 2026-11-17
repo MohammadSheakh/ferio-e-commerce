@@ -46,6 +46,9 @@ async function bootstrap() {
     rawBody: true,
   });
 
+  // Enable trust proxy for upstream ingress (Cloudflare, Docker networks, reverse proxies)
+  app.getHttpAdapter().getInstance().set('trust proxy', true);
+
   const configService = app.get(ConfigService);
   const port = configService.get<number>('PORT', 6733);
   const apiPrefix = configService.get<string>('API_PREFIX', 'api/v1');

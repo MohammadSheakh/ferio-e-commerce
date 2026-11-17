@@ -8,9 +8,22 @@ export function forwardedHeaders(
   request: Request,
   headers?: HeadersInit,
 ): Headers {
+  const clientIp =
+    request.headers.get("cf-connecting-ip") ??
+    request.headers.get("x-real-ip") ??
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+
+  const ipHeaders: Record<string, string> = {};
+  if (clientIp) {
+    ipHeaders["x-forwarded-for"] = request.headers.get("x-forwarded-for") || clientIp;
+    ipHeaders["x-real-ip"] = clientIp;
+    ipHeaders["cf-connecting-ip"] = clientIp;
+  }
+
   return withCorrelationId(
     {
       ...tenantHostHeadersFromRequest(request),
+      ...ipHeaders,
       ...Object.fromEntries(new Headers(headers).entries()),
     },
     request.headers.get("x-correlation-id") ??

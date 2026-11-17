@@ -61,10 +61,33 @@ export class SlidingWindowRateLimitGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const response = context.switchToHttp().getResponse<Response>();
 
+    // Extract client IP, respecting proxy headers (Cloudflare, reverse proxies, BFF)
+    const rawIp =
+      (request.headers?.['cf-connecting-ip'] as string) ||
+      (request.headers?.['x-real-ip'] as string) ||
+      (typeof request.headers?.['x-forwarded-for'] === 'string'
+        ? request.headers['x-forwarded-for'].split(',')[0].trim()
+        : null) ||
+      request.ip ||
+      request.connection?.remoteAddress ||
+      'unknown';
+
     // Generate unique identifier
     const userId = request.user?.userId;
-    const ip = request.ip || request.connection.remoteAddress || 'unknown';
-    const identifier = userId ? `user:${userId}` : `ip:${ip}`;
+    let identifier = userId ? `user:${userId}` : `ip:${rawIp}`;
+
+    // For authentication endpoints, isolate attempts by target account and client IP
+    // Prevents multi-session or multi-user lockouts behind shared proxies/NATs
+    if (
+      !userId &&
+      request.body &&
+      typeof request.body === 'object' &&
+      'email' in request.body &&
+      typeof request.body.email === 'string'
+    ) {
+      const email = request.body.email.trim().toLowerCase();
+      identifier = `ip:${rawIp}:email:${email}`;
+    }
 
     const keyPrefix = options.keyPrefix || 'default';
     const key = `ratelimit:${keyPrefix}:${identifier}`;
