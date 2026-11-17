@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition, useRef } from "react";
 import Link from "next/link";
 import ImagePicker from "@/components/ImagePicker";
+import Editor from "@monaco-editor/react";
 
 function getActiveStoreSlug(): string {
   if (typeof window === "undefined") return "test";
@@ -515,6 +516,41 @@ const SNIPPET_PRESETS: Record<string, { label: string; code: string }> = {
   },
 };
 
+const FERIO_CHATGPT_MASTER_PROMPT = `You are an expert Senior Frontend Web Designer and Component Architect.
+Your task is to generate a self-contained, enterprise-grade e-commerce UI component section for the Ferio Custom Code Engine.
+
+### 🎯 DESIGN BRIEF & GOAL:
+[Paste your design requirement or attach a screenshot here, e.g. "Create a dark modern FAQ accordion with purple radial glow, card gaps, and smooth arrow rotation on expand"]
+
+### 🛠️ MANDATORY ARCHITECTURAL RULES FOR FERIO ENGINE:
+1. SCOPED & ISOLATED STYLING:
+   - Scope all styles to a unique wrapper attribute or ID (e.g., [data-ferio-custom] or #ferio-custom-section).
+   - Use CSS custom properties (variables) for theme colors, borders, and spacing at the root of the section.
+   - Do NOT affect any external elements outside this section container.
+
+2. FLUID ANIMATIONS & INTERACTIVE STATES:
+   - Use pure CSS transitions for hover states, card lifts, border glows, and colors (transition: all 0.25s ease).
+   - For collapsible/accordion/drawer items:
+     - Support both CLICK/TAP and HOVER interaction smoothly.
+     - Ensure only one item expands at a time while others collapse smoothly (or accordion behavior).
+     - Arrow or chevron indicators MUST rotate smoothly (e.g., transform: rotate(180deg)).
+     - Provide visible spacing/gap between cards (e.g., gap: 16px or margin-bottom: 16px).
+
+3. INLINE ASSETS & ICONS:
+   - Use clean, optimized inline <svg> elements with currentColor and viewBox="0 0 24 24".
+   - Do NOT load external icon fonts or scripts that could fail to render.
+   - Use high-quality Unsplash image URLs or placeholder SVGs for media.
+
+4. SAFE, DEFENSIVE JAVASCRIPT:
+   - Wrap any JavaScript inside <script> in an IIFE: (function() { ... })();.
+   - Use relative/scoped DOM queries: const container = document.currentScript ? document.currentScript.closest('[data-ferio-custom]') : document; or const container = document.querySelector('[data-ferio-custom]');.
+   - Never use document.write or pollute global window variables.
+
+5. OUTPUT FORMAT:
+   - Return ONLY the executable component code inside a single \`\`\`html code block.
+   - Do NOT include <!DOCTYPE html>, <html>, <head>, or <body> wrappers.
+   - Combine HTML, <style>, and <script> in one clean, self-contained snippet ready to paste.`;
+
 export default function StorefrontStudioPage() {
   const [sections, setSections] = useState<StorefrontSection[]>([]);
   const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
@@ -561,6 +597,39 @@ export default function StorefrontStudioPage() {
   // Active code editor tab (HTML & Tailwind vs Scoped CSS vs Client JS)
   const [activeCodeTab, setActiveCodeTab] = useState<"html" | "css" | "js">("html");
   const [showFullscreenCodeEditor, setShowFullscreenCodeEditor] = useState<boolean>(false);
+  const [copiedPrompt, setCopiedPrompt] = useState<boolean>(false);
+  const [showPromptModal, setShowPromptModal] = useState<boolean>(false);
+  const monacoEditorRef = useRef<any>(null);
+
+  const handleCopyMasterPrompt = async () => {
+    try {
+      if (typeof navigator !== "undefined" && navigator.clipboard) {
+        await navigator.clipboard.writeText(FERIO_CHATGPT_MASTER_PROMPT);
+      }
+      setCopiedPrompt(true);
+      setTimeout(() => setCopiedPrompt(false), 2500);
+    } catch (err) {
+      console.error("Failed to copy master prompt:", err);
+    }
+  };
+
+  const handleFoldAll = () => {
+    if (monacoEditorRef.current) {
+      monacoEditorRef.current.trigger("fold", "editor.foldAll", null);
+    }
+  };
+
+  const handleUnfoldAll = () => {
+    if (monacoEditorRef.current) {
+      monacoEditorRef.current.trigger("unfold", "editor.unfoldAll", null);
+    }
+  };
+
+  const handleFormatCode = () => {
+    if (monacoEditorRef.current) {
+      monacoEditorRef.current.getAction("editor.action.formatDocument")?.run();
+    }
+  };
 
   // Tab key indentation handler for professional code editing experience
   const handleCodeKeyDown = (
@@ -1950,13 +2019,23 @@ export default function StorefrontStudioPage() {
                       </span>
                       <span>Custom Code Editor</span>
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => setShowFullscreenCodeEditor(true)}
-                      className="rounded bg-indigo-600 hover:bg-indigo-700 text-white px-2 py-0.5 text-[10.5px] font-medium flex items-center gap-1 shadow-2xs transition"
-                    >
-                      <span>⛶ Fullscreen</span>
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={handleCopyMasterPrompt}
+                        className="rounded border border-indigo-300 bg-white hover:bg-indigo-50 text-indigo-700 px-2 py-0.5 text-[10.5px] font-semibold flex items-center gap-1 transition shadow-2xs"
+                        title="Copy ChatGPT Master Prompt for Ferio"
+                      >
+                        <span>{copiedPrompt ? "✓ Copied" : "📋 Copy Prompt"}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowFullscreenCodeEditor(true)}
+                        className="rounded bg-indigo-600 hover:bg-indigo-700 text-white px-2 py-0.5 text-[10.5px] font-medium flex items-center gap-1 shadow-2xs transition"
+                      >
+                        <span>⛶ Code Studio</span>
+                      </button>
+                    </div>
                   </div>
 
                   <div className="p-3.5 space-y-3 bg-white">
@@ -3242,48 +3321,146 @@ export default function StorefrontStudioPage() {
               </div>
             </div>
 
-            {/* Quick Starters Row */}
-            <div className="flex items-center gap-2 border-b border-slate-800/80 bg-slate-900/40 px-6 py-2 overflow-x-auto text-[11px]">
-              <span className="text-slate-400 font-semibold shrink-0">Insert Starter:</span>
-              {Object.entries(SNIPPET_PRESETS).map(([key, item]) => (
+            {/* Master Prompt & Code Studio Toolbar */}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 bg-slate-900/90 px-6 py-2.5 text-[12px]">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5 rounded-md bg-indigo-950/80 border border-indigo-700/60 px-2.5 py-1 text-indigo-300 text-[11px] font-medium">
+                  <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>ChatGPT Prompt Ready</span>
+                </div>
                 <button
-                  key={key}
                   type="button"
-                  onClick={() => {
-                    updateSettings("customCode", item.code);
-                    updateSettings("customHtml", item.code);
-                  }}
-                  className="rounded border border-slate-700 bg-slate-800/80 px-2.5 py-1 text-slate-200 hover:border-indigo-400 hover:text-white transition shrink-0"
+                  onClick={handleCopyMasterPrompt}
+                  className={`inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-[11.5px] font-semibold transition shadow-sm ${
+                    copiedPrompt
+                      ? "bg-emerald-600 text-white shadow-emerald-900/40"
+                      : "bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-950/50"
+                  }`}
+                  title="Copy the master prompt optimized for ChatGPT to generate pixel-perfect Ferio custom sections"
                 >
-                  {item.label}
+                  {copiedPrompt ? (
+                    <>
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                      </svg>
+                      ✓ Master Prompt Copied!
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                      </svg>
+                      Copy Master Prompt
+                    </>
+                  )}
                 </button>
-              ))}
+
+                <button
+                  type="button"
+                  onClick={() => setShowPromptModal(true)}
+                  className="inline-flex items-center gap-1 rounded-lg border border-slate-700 bg-slate-800/80 px-2.5 py-1.5 text-[11.5px] font-medium text-slate-300 hover:border-slate-500 hover:text-white transition"
+                  title="View and inspect the ChatGPT Master Prompt instructions"
+                >
+                  <svg className="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                  View Instructions
+                </button>
+              </div>
+
+              {/* Code Folding Controls & Formatting Tools */}
+              <div className="flex items-center gap-2">
+                <span className="text-slate-500 text-[11px] font-mono hidden md:inline">Folding:</span>
+                <button
+                  type="button"
+                  onClick={handleFoldAll}
+                  className="rounded border border-slate-800 bg-slate-900/90 px-2 py-1 text-[11px] text-slate-300 hover:border-slate-600 hover:text-white transition"
+                  title="Fold all code blocks (HTML tags, CSS, JS)"
+                >
+                  ▸ Fold All
+                </button>
+                <button
+                  type="button"
+                  onClick={handleUnfoldAll}
+                  className="rounded border border-slate-800 bg-slate-900/90 px-2 py-1 text-[11px] text-slate-300 hover:border-slate-600 hover:text-white transition"
+                  title="Unfold all code blocks"
+                >
+                  ▾ Unfold All
+                </button>
+                <div className="h-4 w-px bg-slate-800 hidden sm:block" />
+                <button
+                  type="button"
+                  onClick={handleFormatCode}
+                  className="rounded border border-slate-800 bg-slate-900/90 px-2.5 py-1 text-[11px] text-slate-300 hover:border-slate-600 hover:text-white transition"
+                  title="Format document (Auto indent & prettify)"
+                >
+                  Format Code
+                </button>
+              </div>
             </div>
 
-            {/* Editor Canvas */}
-            <div className="flex-1 p-6 flex flex-col min-h-0 bg-slate-950">
-              <textarea
+            {/* Editor Canvas with Monaco Code Folding Gutter */}
+            <div className="flex-1 min-h-0 w-full bg-[#1e1e1e] relative">
+              <Editor
+                height="100%"
+                width="100%"
+                language="html"
+                theme="vs-dark"
                 value={
                   selectedSection.settings?.customCode !== undefined
                     ? selectedSection.settings.customCode
                     : (selectedSection.settings?.customHtml || "")
                 }
-                onChange={(e) => {
-                  updateSettings("customCode", e.target.value);
-                  updateSettings("customHtml", e.target.value);
+                onMount={(editor) => {
+                  monacoEditorRef.current = editor;
                 }}
-                onKeyDown={(e) => handleCodeKeyDown(e, "customHtml")}
-                spellCheck={false}
-                placeholder="<!-- Write HTML with Tailwind CSS classes, <style>, and <script> -->"
-                className="flex-1 w-full rounded-xl border border-slate-800 bg-slate-900/90 p-5 font-mono text-[13px] leading-relaxed text-slate-100 placeholder-slate-600 outline-none resize-none focus:border-indigo-500 shadow-inner"
+                onChange={(value) => {
+                  const code = value ?? "";
+                  updateSettings("customCode", code);
+                  updateSettings("customHtml", code);
+                }}
+                loading={
+                  <div className="flex h-full w-full items-center justify-center text-slate-400 text-xs font-mono">
+                    Loading Monaco Code Studio...
+                  </div>
+                }
+                options={{
+                  fontSize: 13,
+                  lineNumbers: "on",
+                  folding: true,
+                  foldingStrategy: "auto",
+                  showFoldingControls: "always",
+                  foldingHighlight: true,
+                  foldingImportsByDefault: false,
+                  unfoldOnClickAfterEndOfLine: true,
+                  tabSize: 2,
+                  wordWrap: "on",
+                  minimap: { enabled: true, side: "right" },
+                  scrollBeyondLastLine: false,
+                  formatOnPaste: true,
+                  formatOnType: true,
+                  automaticLayout: true,
+                  renderLineHighlight: "all",
+                  overviewRulerBorder: false,
+                  cursorBlinking: "smooth",
+                  scrollbar: {
+                    vertical: "visible",
+                    horizontal: "visible",
+                    verticalScrollbarSize: 10,
+                    horizontalScrollbarSize: 10,
+                  },
+                }}
               />
             </div>
 
             {/* Modal Footer */}
             <div className="flex items-center justify-between border-t border-slate-800 px-6 py-3 bg-slate-900/60 text-[11px] text-slate-400">
               <div className="flex items-center gap-4">
-                <span>Tab inserts 2 spaces.</span>
-                <span className="text-indigo-400 font-mono">Tailwind JIT Runtime Active</span>
+                <span className="flex items-center gap-1.5 text-slate-300">
+                  <span className="font-mono text-indigo-400">▾</span> Code folding active (click +/- or triangles in gutter)
+                </span>
+                <span className="text-indigo-400 font-mono">Monaco HTML • Tailwind CSS JIT</span>
                 <span className="text-emerald-400">● Live preview synchronized</span>
               </div>
               <button
@@ -3293,6 +3470,66 @@ export default function StorefrontStudioPage() {
               >
                 Done Editing
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ChatGPT Master Prompt Preview Modal */}
+      {showPromptModal && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/85 p-4 sm:p-6 backdrop-blur-xs select-none">
+          <div className="flex h-full max-h-[85vh] w-full max-w-3xl flex-col rounded-2xl border border-slate-700 bg-slate-950 shadow-2xl text-slate-100 overflow-hidden">
+            <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4 bg-slate-900/80">
+              <div className="flex items-center gap-2.5">
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-600 text-white font-bold text-xs">
+                  AI
+                </span>
+                <div>
+                  <h3 className="text-[14px] font-semibold text-white">
+                    ChatGPT / Claude Master Prompt for Ferio
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    Engineered to generate zero-leak, responsive, animated sections compatible with Ferio Custom Code Engine.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPromptModal(false)}
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-700 bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white transition"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="flex-1 p-6 overflow-y-auto font-mono text-[12px] leading-relaxed bg-slate-900/50 text-slate-200 whitespace-pre-wrap select-text border-b border-slate-800">
+              {FERIO_CHATGPT_MASTER_PROMPT}
+            </div>
+
+            <div className="flex items-center justify-between px-6 py-3.5 bg-slate-900/70">
+              <span className="text-[11px] text-slate-400">
+                Tip: Attach your design image or wireframe alongside this prompt in ChatGPT.
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleCopyMasterPrompt}
+                  className={`rounded-lg px-4 py-2 text-xs font-semibold transition ${
+                    copiedPrompt
+                      ? "bg-emerald-600 text-white"
+                      : "bg-indigo-600 hover:bg-indigo-500 text-white"
+                  }`}
+                >
+                  {copiedPrompt ? "✓ Copied to Clipboard!" : "Copy Full Prompt"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowPromptModal(false)}
+                  className="rounded-lg border border-slate-700 bg-slate-800 px-4 py-2 text-xs font-medium text-slate-300 hover:bg-slate-700"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>
