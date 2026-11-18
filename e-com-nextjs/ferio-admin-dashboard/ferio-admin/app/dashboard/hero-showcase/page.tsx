@@ -155,6 +155,7 @@ export default function AdminHeroShowcasePage() {
   const [activeSlideIdx, setActiveSlideIdx] = useState<number>(0);
   const [activeHotspotIdx, setActiveHotspotIdx] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [entitled, setEntitled] = useState<boolean | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -164,14 +165,31 @@ export default function AdminHeroShowcasePage() {
   useEffect(() => {
     async function load() {
       try {
-        const response = await fetch("/api/hero-showcase", {
-          cache: "no-store",
-        });
-        const payload = (await response.json()) as {
+        const [planRes, showRes] = await Promise.all([
+          fetch("/api/admin/plan-status", { cache: "no-store" }),
+          fetch("/api/hero-showcase", { cache: "no-store" }),
+        ]);
+
+        const planPayload = (await planRes.json()) as {
+          data?: { code?: string; features?: Record<string, boolean> };
+        };
+        if (planRes.ok && planPayload.data?.code === "ACTIVE") {
+          const hasSignature =
+            planPayload.data.features?.signature_storefront_template === true;
+          setEntitled(hasSignature);
+          if (!hasSignature) {
+            setLoading(false);
+            return;
+          }
+        } else {
+          setEntitled(true);
+        }
+
+        const payload = (await showRes.json()) as {
           data?: SlideData[];
           message?: string;
         };
-        if (!response.ok) {
+        if (!showRes.ok) {
           throw new Error(payload.message || "Unable to load hero showcase settings.");
         }
         if (payload.data && Array.isArray(payload.data) && payload.data.length > 0) {
@@ -346,6 +364,23 @@ export default function AdminHeroShowcasePage() {
         
         {loading ? (
           <p className="py-12 text-center text-sm text-ink2">Loading showcase settings...</p>
+        ) : entitled === false ? (
+          <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-8 text-center max-w-xl mx-auto space-y-4 my-12 shadow-sm">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <h3 className="text-base font-bold text-amber-900">
+              Signature Storefront Template Not Active
+            </h3>
+            <p className="text-xs leading-relaxed text-amber-800">
+              The 3-card interactive Hero Showcase carousel is exclusively available with the <strong>Signature Storefront Showroom Template</strong>. Your organization currently does not have this feature provisioned.
+            </p>
+            <p className="text-xs text-amber-700">
+              Please contact your Platform Administrator to provision the Signature Initial Template or enable the showroom feature in your plan overrides.
+            </p>
+          </div>
         ) : (
           <form onSubmit={handleSave} className="space-y-8">
             

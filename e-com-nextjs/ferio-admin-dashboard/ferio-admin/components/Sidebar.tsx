@@ -170,6 +170,7 @@ const links: SidebarLink[] = [
     href: "/dashboard/messages",
     label: "Messages",
     permission: "messaging.read",
+    entitlement: "campaigns",
     borderClass: "border-l-purple-500 border-r-purple-500",
     hoverClass: "hover:bg-purple-50 text-purple-950",
     activeClass: "bg-purple-600 text-white font-semibold border-l-purple-700 border-r-purple-700",
@@ -178,6 +179,7 @@ const links: SidebarLink[] = [
     href: "/dashboard/abandoned-carts",
     label: "Abandoned Carts",
     permission: "messaging.read",
+    entitlement: "campaigns",
     borderClass: "border-l-purple-500 border-r-purple-500",
     hoverClass: "hover:bg-purple-50 text-purple-950",
     activeClass: "bg-purple-600 text-white font-semibold border-l-purple-700 border-r-purple-700",
@@ -275,6 +277,7 @@ const links: SidebarLink[] = [
     href: "/dashboard/storefront-studio",
     label: "Storefront Studio",
     permission: "settings.read",
+    entitlement: "storefront",
     borderClass: "border-l-cyan-500 border-r-cyan-500",
     hoverClass: "hover:bg-cyan-50 text-cyan-950",
     activeClass: "bg-cyan-600 text-white font-semibold border-l-cyan-700 border-r-cyan-700",
@@ -291,6 +294,7 @@ const links: SidebarLink[] = [
     href: "/dashboard/hero-showcase",
     label: "Hero Showcase",
     permission: "product-content.read",
+    entitlement: "signature_storefront_template",
     borderClass: "border-l-cyan-500 border-r-cyan-500",
     hoverClass: "hover:bg-cyan-50 text-cyan-950",
     activeClass: "bg-cyan-600 text-white font-semibold border-l-cyan-700 border-r-cyan-700",
@@ -312,7 +316,15 @@ export interface SidebarProps {
 export default function Sidebar({ isCollapsed = false }: SidebarProps) {
   const pathname = usePathname();
   const [session, setSession] = useState<AdminSession | null>();
-  const [features, setFeatures] = useState<Record<string, boolean> | null>(null);
+  const [planState, setPlanState] = useState<{
+    loaded: boolean;
+    isLegacy: boolean;
+    features: Record<string, boolean>;
+  }>({
+    loaded: false,
+    isLegacy: false,
+    features: {},
+  });
 
   useEffect(() => {
     void Promise.all([
@@ -325,32 +337,61 @@ export default function Sidebar({ isCollapsed = false }: SidebarProps) {
           data?: { code?: string; features?: Record<string, boolean> };
         };
         setSession(sessionResponse.ok && sessionPayload.data ? sessionPayload.data : null);
-        setFeatures(
-          planResponse.ok && planPayload.data?.code === "ACTIVE"
-            ? planPayload.data.features ?? {}
-            : null,
-        );
+        if (planResponse.ok && planPayload.data) {
+          if (planPayload.data.code === "ACTIVE") {
+            setPlanState({
+              loaded: true,
+              isLegacy: false,
+              features: planPayload.data.features ?? {},
+            });
+          } else if (planPayload.data.code === "LEGACY") {
+            setPlanState({
+              loaded: true,
+              isLegacy: true,
+              features: {},
+            });
+          } else {
+            setPlanState({
+              loaded: true,
+              isLegacy: false,
+              features: {},
+            });
+          }
+        } else {
+          setPlanState({
+            loaded: true,
+            isLegacy: false,
+            features: {},
+          });
+        }
       })
       .catch(() => {
         setSession(null);
-        setFeatures(null);
+        setPlanState({
+          loaded: true,
+          isLegacy: false,
+          features: {},
+        });
       });
   }, []);
 
   const visibleLinks = links.filter((link) => {
-    if (session === undefined) return false;
-    if (!session) return false;
-    if (link.ownerOnly) return false;
-    if (link.staffVisible) return true;
+    if (session === undefined || !session) return false;
+    if (link.ownerOnly && session.role !== "admin") return false;
     const permissionAllowed = Boolean(
-      session.role === "admin" ||
-        (link.permission && session.permissions.includes(link.permission)),
+      link.staffVisible ||
+        session.role === "admin" ||
+        (link.permission && session.permissions?.includes(link.permission)),
     );
-    const entitlementAllowed =
-      features === null ||
-      !link.entitlement ||
-      features[link.entitlement] !== false;
-    return permissionAllowed && entitlementAllowed;
+    if (!permissionAllowed) return false;
+
+    // In standalone non-tenanted legacy deployments, show without SaaS entitlement restriction
+    if (planState.loaded && planState.isLegacy) return true;
+
+    // Fail-closed security for multi-tenant SaaS:
+    // If a link requires a platform entitlement, the plan MUST be loaded AND that feature MUST be enabled (true)
+    if (!link.entitlement) return true;
+    return Boolean(planState.loaded && planState.features[link.entitlement] === true);
   });
 
   return (

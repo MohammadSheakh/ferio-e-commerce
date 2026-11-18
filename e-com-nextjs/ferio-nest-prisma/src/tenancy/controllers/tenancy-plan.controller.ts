@@ -44,28 +44,40 @@ export class TenancyPlanController {
       return { code: 'LEGACY' };
     }
     const ctx = this.context();
-    if (!ctx) return { code: 'LEGACY' };
-
+    let organizationId = ctx?.organizationId ?? request.user?.organizationId;
     const email = String(request.user?.email ?? '').toLowerCase();
+
+    if (!organizationId && email) {
+      const member = await this.platform.client.organizationMember.findFirst({
+        where: { email, isActive: true },
+        select: { organizationId: true },
+      });
+      if (member) {
+        organizationId = member.organizationId;
+      }
+    }
+
+    if (!organizationId) return { code: 'LEGACY' };
+
     const membership = await this.memberships.findActive(
-      ctx.organizationId,
+      organizationId,
       email,
     );
     if (!membership) return { code: 'TENANT_MEMBERSHIP_REQUIRED' };
 
     const [subscription, domains, usage] = await Promise.all([
       this.platform.client.subscription.findUnique({
-        where: { organizationId: ctx.organizationId },
+        where: { organizationId },
         include: {
           plan: { include: { entitlements: true } },
           entitlementOverrides: true,
         },
       }),
       this.platform.client.tenantDomain.findMany({
-        where: { organizationId: ctx.organizationId, status: 'ACTIVE' },
+        where: { organizationId, status: 'ACTIVE' },
         select: { hostname: true, status: true, isPrimary: true },
       }),
-      this.usage.snapshot(ctx.organizationId, [
+      this.usage.snapshot(organizationId, [
         'orders_per_month',
         'products_max',
       ]),
