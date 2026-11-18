@@ -277,7 +277,6 @@ const links: SidebarLink[] = [
     href: "/dashboard/storefront-studio",
     label: "Storefront Studio",
     permission: "settings.read",
-    entitlement: "storefront",
     borderClass: "border-l-cyan-500 border-r-cyan-500",
     hoverClass: "hover:bg-cyan-50 text-cyan-950",
     activeClass: "bg-cyan-600 text-white font-semibold border-l-cyan-700 border-r-cyan-700",
@@ -330,19 +329,36 @@ export default function Sidebar({ isCollapsed = false }: SidebarProps) {
     void Promise.all([
       fetch("/api/auth/session", { cache: "no-store" }),
       fetch("/api/admin/plan-status", { cache: "no-store" }),
+      fetch("/api/hero-showcase", { cache: "no-store" }),
     ])
-      .then(async ([sessionResponse, planResponse]) => {
+      .then(async ([sessionResponse, planResponse, showcaseResponse]) => {
         const sessionPayload = (await sessionResponse.json()) as { data?: AdminSession };
         const planPayload = (await planResponse.json()) as {
           data?: { code?: string; features?: Record<string, boolean> };
         };
+        const showcasePayload = (await showcaseResponse.json().catch(() => null)) as {
+          data?: unknown[];
+        } | null;
+
+        const hasShowcaseTemplate = Boolean(
+          showcaseResponse.ok &&
+            showcasePayload?.data &&
+            Array.isArray(showcasePayload.data) &&
+            showcasePayload.data.length > 0,
+        );
+
         setSession(sessionResponse.ok && sessionPayload.data ? sessionPayload.data : null);
+
         if (planResponse.ok && planPayload.data) {
           if (planPayload.data.code === "ACTIVE") {
+            const features = { ...(planPayload.data.features ?? {}) };
+            if (hasShowcaseTemplate) {
+              features.signature_storefront_template = true;
+            }
             setPlanState({
               loaded: true,
               isLegacy: false,
-              features: planPayload.data.features ?? {},
+              features,
             });
           } else if (planPayload.data.code === "LEGACY") {
             setPlanState({
@@ -354,14 +370,14 @@ export default function Sidebar({ isCollapsed = false }: SidebarProps) {
             setPlanState({
               loaded: true,
               isLegacy: false,
-              features: {},
+              features: hasShowcaseTemplate ? { signature_storefront_template: true } : {},
             });
           }
         } else {
           setPlanState({
             loaded: true,
             isLegacy: false,
-            features: {},
+            features: hasShowcaseTemplate ? { signature_storefront_template: true } : {},
           });
         }
       })

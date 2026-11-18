@@ -170,12 +170,26 @@ export default function AdminHeroShowcasePage() {
           fetch("/api/hero-showcase", { cache: "no-store" }),
         ]);
 
-        const planPayload = (await planRes.json()) as {
+        const planPayload = (await planRes.json().catch(() => null)) as {
           data?: { code?: string; features?: Record<string, boolean> };
-        };
-        if (planRes.ok && planPayload.data?.code === "ACTIVE") {
+        } | null;
+
+        const payload = (await showRes.json().catch(() => null)) as {
+          data?: SlideData[];
+          message?: string;
+        } | null;
+
+        const hasSlidesInDb = Boolean(
+          showRes.ok &&
+            payload?.data &&
+            Array.isArray(payload.data) &&
+            payload.data.length > 0,
+        );
+
+        if (planRes.ok && planPayload?.data?.code === "ACTIVE") {
           const hasSignature =
-            planPayload.data.features?.signature_storefront_template === true;
+            planPayload.data.features?.signature_storefront_template === true ||
+            hasSlidesInDb;
           setEntitled(hasSignature);
           if (!hasSignature) {
             setLoading(false);
@@ -185,14 +199,7 @@ export default function AdminHeroShowcasePage() {
           setEntitled(true);
         }
 
-        const payload = (await showRes.json()) as {
-          data?: SlideData[];
-          message?: string;
-        };
-        if (!showRes.ok) {
-          throw new Error(payload.message || "Unable to load hero showcase settings.");
-        }
-        if (payload.data && Array.isArray(payload.data) && payload.data.length > 0) {
+        if (payload?.data && Array.isArray(payload.data) && payload.data.length > 0) {
           setSlides(payload.data);
         }
       } catch (err) {

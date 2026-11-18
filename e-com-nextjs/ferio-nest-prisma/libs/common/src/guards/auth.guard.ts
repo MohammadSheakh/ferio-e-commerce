@@ -76,6 +76,9 @@ export class AuthGuard implements CanActivate {
       if (error instanceof Error && error.name === 'TokenExpiredError') {
         throw new UnauthorizedException('Token has expired');
       }
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
       throw new UnauthorizedException('Invalid token');
     }
 
@@ -93,8 +96,8 @@ export class AuthGuard implements CanActivate {
   ): boolean {
     if ((process.env.TENANCY_ENABLED || 'false') !== 'true') return true;
     const resolvedOrganizationId = request.tenantOrganizationId;
+    if (!resolvedOrganizationId) return true;
     return Boolean(
-      resolvedOrganizationId &&
       payload.organizationId &&
       payload.organizationId === resolvedOrganizationId,
     );

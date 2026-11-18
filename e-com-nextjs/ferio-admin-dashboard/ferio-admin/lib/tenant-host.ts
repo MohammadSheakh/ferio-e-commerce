@@ -5,6 +5,20 @@ export function normalizeForwardedTenantHost(rawHost: string | null): string | n
   const host = rawHost.split(",", 1)[0].trim().toLowerCase();
   if (!host || host.length > 259 || !VALID_HOST.test(host)) return null;
 
+  // Never treat control plane or admin portal hostnames as tenant storefronts
+  const hostWithoutPort = host.split(":")[0];
+  if (
+    hostWithoutPort === "adminf.sheakh.qzz.io" ||
+    hostWithoutPort === "platform.sheakh.qzz.io" ||
+    hostWithoutPort.startsWith("admin.") ||
+    hostWithoutPort.startsWith("adminf.") ||
+    hostWithoutPort.startsWith("platform.") ||
+    hostWithoutPort === "localhost" ||
+    hostWithoutPort === "127.0.0.1"
+  ) {
+    return null;
+  }
+
   const port = host.match(/:(\d+)$/)?.[1];
   if (port && Number(port) > 65535) return null;
   return host;
